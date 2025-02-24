@@ -1,8 +1,7 @@
-// components/floor-plan/room-dialog.tsx
 'use client'
 
 import { useState } from 'react'
-import { Space, User } from './types'
+import { Space, User, spaceColors } from './types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Mic, MicOff, Monitor, MessageSquare, Users, Lock, Unlock } from 'lucide-react'
+import { MessageDialog } from './message-dialog'
 
 interface RoomDialogProps {
   room: Space | null
@@ -29,8 +29,22 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
   const [isMicActive, setIsMicActive] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRoomLocked, setIsRoomLocked] = useState(false)
+  
+  // For direct messaging
+  const [messageUser, setMessageUser] = useState<User | null>(null)
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
+  
+  const handleMessageUser = (user: User) => {
+    setMessageUser(user);
+    setIsMessageDialogOpen(true);
+  }
 
   if (!room) return null
+
+  // Helper function to get room color
+  const getRoomColor = () => {
+    return spaceColors[room.type] || spaceColors.default;
+  }
 
   // Helper function to get type label
   const getRoomTypeLabel = (type: Space['type']) => {
@@ -43,13 +57,28 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
     }
   }
 
+  // Join room function (mock implementation)
+  const handleJoinRoom = () => {
+    console.log(`Joining room: ${room.id}`);
+    // Here you would implement actual room joining logic with Socket.io
+    onOpenChange(false);
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>{room.name}</DialogTitle>
-            <Badge>{getRoomTypeLabel(room.type)}</Badge>
+            <Badge 
+              style={{ 
+                backgroundColor: getRoomColor().lightColor, 
+                color: getRoomColor().color,
+                borderColor: getRoomColor().color 
+              }}
+            >
+              {getRoomTypeLabel(room.type)}
+            </Badge>
           </div>
           <DialogDescription>
             {room.features.join(' • ')}
@@ -65,33 +94,38 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
           <TabsContent value="people" className="mt-4">
             <ScrollArea className="h-[200px] rounded-md border p-4">
               <div className="space-y-4">
-                {room.users.map(user => (
-                  <div key={user.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={user.avatar} />
-                        <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-xs text-gray-500">{user.activity}</p>
+                {room.users.length > 0 ? (
+                  room.users.map(user => (
+                    <div key={user.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={user.avatar} alt={user.name} />
+                          <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.activity}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {user.status === 'presenting' && (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Monitor className="h-3 w-3" />
+                            <span>Presenting</span>
+                          </Badge>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          title="Message user"
+                          onClick={() => handleMessageUser(user)}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {user.status === 'presenting' && (
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <Monitor className="h-3 w-3" />
-                          <span>Presenting</span>
-                        </Badge>
-                      )}
-                      <Button variant="ghost" size="icon">
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                {room.users.length === 0 && (
+                  ))
+                ) : (
                   <div className="flex flex-col items-center justify-center h-full py-8 text-center text-gray-500">
                     <Users className="h-10 w-10 mb-2 opacity-20" />
                     <p>No one is in this room yet</p>
@@ -154,11 +188,18 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
           <div className="text-sm text-gray-500">
             <span>{room.users.length}/{room.capacity} people</span>
           </div>
-          <Button type="submit" onClick={() => onOpenChange(false)}>
+          <Button type="submit" onClick={handleJoinRoom}>
             Join Room
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Message Dialog */}
+      <MessageDialog
+        user={messageUser}
+        open={isMessageDialogOpen}
+        onOpenChange={setIsMessageDialogOpen}
+      />
     </Dialog>
   )
 }

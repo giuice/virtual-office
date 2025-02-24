@@ -1,4 +1,5 @@
-// components/floor-plan/room-tooltip.tsx
+'use client'
+
 import { Space } from './types'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -8,7 +9,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from '@/components/ui/tooltip'
-import { Users } from 'lucide-react'
+import { Users, Lock } from 'lucide-react'
 
 interface RoomTooltipProps {
   room: Space
@@ -22,7 +23,8 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
       case 'active': return 'default';
       case 'available': return 'outline';
       case 'maintenance': return 'destructive';
-      default: return 'secondary';
+      case 'locked': return 'secondary';
+      default: return 'outline';
     }
   }
 
@@ -37,6 +39,7 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
             <div className="flex items-center justify-between">
               <h4 className="font-medium text-base">{room.name}</h4>
               <Badge variant={getBadgeVariant(room.status)}>
+                {room.status === 'locked' && <Lock className="h-3 w-3 mr-1" />}
                 {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
               </Badge>
             </div>
@@ -63,7 +66,7 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
                   {room.users.map(user => (
                     <div key={user.id} className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar} />
+                        <AvatarImage src={user.avatar} alt={user.name} />
                         <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
                       </Avatar>
                       <div>
