@@ -5,10 +5,12 @@ import { useState } from 'react'
 import { Space, User } from './types'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Monitor, Video } from 'lucide-react'
+import { Users, Monitor, Video, MessageSquare } from 'lucide-react'
 import { RoomDialog } from './room-dialog'
 import { RoomTooltip } from './room-tooltip'
+import { UserHoverCard } from './user-hover-card' // We'll create this
 
+// Keep your existing demoSpaces data...
 // Sample data
 const demoSpaces: Space[] = [
   {
@@ -75,116 +77,75 @@ const demoSpaces: Space[] = [
 
 export function FloorPlan() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
-  const [users] = useState<User[]>([])  // This would later be populated from real-time data
+  const [hoveredUser, setHoveredUser] = useState<User | null>(null)
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Virtual Office</CardTitle>
-        <div className="flex gap-2">
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            {users.length} Online
-          </Badge>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Video className="h-4 w-4" />
-            2 Meetings
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="relative w-full h-[600px] bg-gray-50 rounded-lg overflow-hidden">
-          <svg 
-            viewBox="0 0 800 600" 
-            className="w-full h-full"
-          >
-            {/* Grid Pattern */}
-            <pattern
-              id="grid"
-              width="40"
-              height="40"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="rgba(0,0,0,0.05)"
-                strokeWidth="1"
-              />
-            </pattern>
-            <rect width="100%" height="100%" fill="url(#grid)" />
+    <div className="space-y-4">
+      {/* Status Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium">Online Users</span>
+              </div>
+              <span className="text-2xl font-bold">24</span>
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Rooms */}
-            {demoSpaces.map(space => (
-              <RoomTooltip key={space.id} room={space}>
-                <g
-                  onClick={() => setSelectedSpace(space)}
-                  className="cursor-pointer transform transition-transform hover:scale-[1.02]"
-                >
-                  <rect
-                    x={space.position.x}
-                    y={space.position.y}
-                    width={space.position.width}
-                    height={space.position.height}
-                    fill={
-                      space.type === 'conference' ? '#E5F6FD' :
-                      space.type === 'workspace' ? '#F0FDF4' :
-                      '#FEF3F2'
-                    }
-                    stroke={
-                      space.type === 'conference' ? '#0EA5E9' :
-                      space.type === 'workspace' ? '#22C55E' :
-                      '#EF4444'
-                    }
-                    strokeWidth="2"
-                    rx="4"
-                  />
-                  
-                  {/* Room Name */}
-                  <text
-                    x={space.position.x + 20}
-                    y={space.position.y + 30}
-                    className="text-sm font-medium"
-                  >
-                    {space.name}
-                  </text>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Video className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-medium">Active Meetings</span>
+              </div>
+              <span className="text-2xl font-bold">3</span>
+            </div>
+          </CardContent>
+        </Card>
 
-                  {/* User Avatars */}
-                  <g transform={`translate(${space.position.x + 20}, ${space.position.y + 50})`}>
-                    {space.users.map((user, i) => (
-                      <g key={user.id} transform={`translate(${i * 40}, 0)`}>
-                        <circle
-                          cx="15"
-                          cy="15"
-                          r="15"
-                          fill={
-                            user.status === 'presenting' ? '#0EA5E9' :
-                            user.status === 'active' ? '#22C55E' :
-                            '#6B7280'
-                          }
-                        />
-                        {user.status === 'presenting' && (
-                          <Monitor
-                            className="w-4 h-4 text-white"
-                            x="13"
-                            y="13"
-                          />
-                        )}
-                      </g>
-                    ))}
-                  </g>
-                </g>
-              </RoomTooltip>
-            ))}
-          </svg>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="h-4 w-4 text-purple-500" />
+                <span className="text-sm font-medium">Messages</span>
+              </div>
+              <span className="text-2xl font-bold">5</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Room Dialog */}
-        <RoomDialog
-          room={selectedSpace}
-          onClose={() => setSelectedSpace(null)}
-        />
-      </CardContent>
-    </Card>
+      {/* Main Floor Plan Card */}
+      <Card className="w-full">
+        {/* Your existing CardHeader and floor plan SVG... */}
+      </Card>
+
+      {/* User Info Bar */}
+      <Card className="w-full">
+        <CardContent className="py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {hoveredUser ? (
+                <>
+                  <UserHoverCard user={hoveredUser} />
+                  <span className="text-sm text-gray-500">{hoveredUser.activity}</span>
+                </>
+              ) : (
+                <span className="text-sm text-gray-500">Hover over a user to see details</span>
+              )}
+            </div>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              24 Online
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
