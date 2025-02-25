@@ -2,6 +2,7 @@
 'use client';
 
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
+import { SearchProvider } from '@/contexts/SearchContext';
 
 export default function DashboardLayout({
   children,
@@ -11,7 +12,14 @@ export default function DashboardLayout({
   const { isAuthenticated, loading } = useProtectedRoute();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse text-center">
+          <div className="h-8 w-32 bg-gray-200 rounded mb-4 mx-auto"></div>
+          <div className="h-4 w-48 bg-gray-200 rounded mx-auto"></div>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -19,9 +27,10 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* We'll add the navigation bar here later */}
-      <main className="p-4">{children}</main>
-    </div>
+    <SearchProvider>
+      <div className="min-h-screen bg-gray-50">
+        {children}
+      </div>
+    </SearchProvider>
   );
 }

@@ -1,13 +1,21 @@
+// src/app/(dashboard)/floor-plan/page.tsx
 'use client'
 
-import { DashboardShell } from '@/components/shell'
+import { useState } from 'react'
+import { DashboardShell } from '@/components/shell/dashboard-shell'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { FloorPlan } from '@/components/floor-plan'
+import { Minimap } from '@/components/floor-plan/minimap'
 import { Space, Announcement } from '@/components/floor-plan/types'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function FloorPlanPage() {
+  // State for selected room
+  const [selectedRoom, setSelectedRoom] = useState<Space | null>(null);
+  const [isRoomDialogOpen, setIsRoomDialogOpen] = useState(false);
+
   // Demo company data
   const companyName = "TechCorp"
   const onlineUsers = 24
@@ -98,49 +106,105 @@ export default function FloorPlanPage() {
     }
   ]
 
+  // Handle room selection from minimap
+  const handleRoomSelect = (room: Space) => {
+    setSelectedRoom(room);
+    setIsRoomDialogOpen(true);
+  };
+
   return (
     <DashboardShell>
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-4">
-        <div className="space-y-4">
-          <h1 className="text-2xl font-bold tracking-tight">{companyName} Virtual Office</h1>
-          
-          {/* Use our improved FloorPlan component */}
-          <FloorPlan 
-            spaces={spaces}
-            companyName={companyName}
-            onlineUsers={onlineUsers}
-            activeMeetings={activeMeetings}
-            pendingMessages={pendingMessages}
-          />
-        </div>
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">{companyName} Virtual Office</h1>
         
-        {/* Sidebar - Announcements */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Company Updates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {announcements.map(announcement => (
-                  <div key={announcement.id} className="flex items-start space-x-3">
-                    <Avatar>
-                      <AvatarImage src={announcement.avatar} alt={announcement.author} />
-                      <AvatarFallback>{announcement.author.slice(0, 2)}</AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">{announcement.author}</span>
-                        <Badge variant="outline" className="text-xs">{announcement.role}</Badge>
-                      </div>
-                      <p className="text-sm">{announcement.message}</p>
-                      <p className="text-xs text-gray-500">{announcement.time}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+          <div className="space-y-4">
+            {/* Main Floor Plan */}
+            <FloorPlan 
+              spaces={spaces}
+              companyName={companyName}
+              onlineUsers={onlineUsers}
+              activeMeetings={activeMeetings}
+              pendingMessages={pendingMessages}
+            />
+          </div>
+          
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Minimap */}
+            <Minimap 
+              spaces={spaces} 
+              onRoomSelect={handleRoomSelect} 
+            />
+            
+            {/* Tabs for Announcements and Online Users */}
+            <Card>
+              <Tabs defaultValue="announcements">
+                <CardHeader className="pb-0">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="announcements" className="flex-1">Announcements</TabsTrigger>
+                    <TabsTrigger value="online" className="flex-1">Online Users</TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+                
+                <CardContent className="pt-4">
+                  <TabsContent value="announcements">
+                    <div className="space-y-4">
+                      {announcements.map(announcement => (
+                        <div key={announcement.id} className="flex items-start space-x-3">
+                          <Avatar>
+                            <AvatarImage src={announcement.avatar} alt={announcement.author} />
+                            <AvatarFallback>{announcement.author.slice(0, 2)}</AvatarFallback>
+                          </Avatar>
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{announcement.author}</span>
+                              <Badge variant="outline" className="text-xs">{announcement.role}</Badge>
+                            </div>
+                            <p className="text-sm">{announcement.message}</p>
+                            <p className="text-xs text-gray-500">{announcement.time}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="online">
+                    <div className="space-y-2">
+                      {spaces.flatMap(space => space.users).map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={user.avatar} alt={user.name} />
+                                <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                              </Avatar>
+                              <span 
+                                className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white"
+                                style={{ 
+                                  backgroundColor: user.status === 'active' 
+                                    ? '#22C55E' 
+                                    : user.status === 'away' 
+                                      ? '#F59E0B' 
+                                      : user.status === 'presenting' 
+                                        ? '#0EA5E9' 
+                                        : '#6B7280'
+                                }}
+                              ></span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{user.name}</p>
+                              <p className="text-xs text-gray-500">{user.activity}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+          </div>
         </div>
       </div>
     </DashboardShell>
