@@ -10,6 +10,7 @@ import { FloorPlan } from '@/components/floor-plan'
 import { Minimap } from '@/components/floor-plan/minimap'
 import { Space, Announcement } from '@/components/floor-plan/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
 
 export default function FloorPlanPage() {
   // State for selected room
@@ -22,7 +23,7 @@ export default function FloorPlanPage() {
   const activeMeetings = 3
   const pendingMessages = 5
 
-  // Demo spaces data with proper typing
+  // Demo spaces data with proper typing - no more API placeholders
   const spaces: Space[] = [
     {
       id: 'dev-team',
@@ -33,9 +34,9 @@ export default function FloorPlanPage() {
       features: ['Whiteboards', 'Multiple monitors'],
       position: { x: 100, y: 100, width: 300, height: 180 },
       users: [
-        { id: 1, name: 'John Developer', avatar: '/api/placeholder/32/32', status: 'active', activity: 'Coding' },
-        { id: 2, name: 'Sarah Coder', avatar: '/api/placeholder/32/32', status: 'active', activity: 'Code review' },
-        { id: 3, name: 'Mike Engineer', avatar: '/api/placeholder/32/32', status: 'away', activity: 'In meeting' }
+        { id: 1, name: 'John Developer', avatar: '', status: 'active', activity: 'Coding' },
+        { id: 2, name: 'Sarah Coder', avatar: '', status: 'active', activity: 'Code review' },
+        { id: 3, name: 'Mike Engineer', avatar: '', status: 'away', activity: 'In meeting' }
       ]
     },
     {
@@ -47,8 +48,8 @@ export default function FloorPlanPage() {
       features: ['Video conferencing', 'Presentation screen'],
       position: { x: 450, y: 100, width: 250, height: 150 },
       users: [
-        { id: 4, name: 'Alice Manager', avatar: '/api/placeholder/32/32', status: 'presenting', activity: 'Sprint review' },
-        { id: 5, name: 'Bob Analyst', avatar: '/api/placeholder/32/32', status: 'viewing', activity: 'Taking notes' }
+        { id: 4, name: 'Alice Manager', avatar: '', status: 'presenting', activity: 'Sprint review' },
+        { id: 5, name: 'Bob Analyst', avatar: '', status: 'viewing', activity: 'Taking notes' }
       ]
     },
     {
@@ -60,7 +61,7 @@ export default function FloorPlanPage() {
       features: ['Coffee machine', 'Snacks', 'Games'],
       position: { x: 100, y: 320, width: 200, height: 150 },
       users: [
-        { id: 6, name: 'Carol Designer', avatar: '/api/placeholder/32/32', status: 'away', activity: 'Coffee break' }
+        { id: 6, name: 'Carol Designer', avatar: '', status: 'away', activity: 'Coffee break' }
       ]
     },
     {
@@ -72,8 +73,8 @@ export default function FloorPlanPage() {
       features: ['Collaboration boards', 'Creative space'],
       position: { x: 450, y: 320, width: 250, height: 150 },
       users: [
-        { id: 7, name: 'Dave Marketing', avatar: '/api/placeholder/32/32', status: 'active', activity: 'Campaign planning' },
-        { id: 8, name: 'Ellen Content', avatar: '/api/placeholder/32/32', status: 'away', activity: 'Meeting with client' }
+        { id: 7, name: 'Dave Marketing', avatar: '', status: 'active', activity: 'Campaign planning' },
+        { id: 8, name: 'Ellen Content', avatar: '', status: 'away', activity: 'Meeting with client' }
       ]
     }
   ]
@@ -84,7 +85,7 @@ export default function FloorPlanPage() {
       id: 1,
       author: 'Jennifer Smith',
       role: 'CEO',
-      avatar: '/api/placeholder/32/32',
+      avatar: '',
       message: 'All-hands meeting tomorrow at 10 AM in the Main Conference Room',
       time: '2 hours ago'
     },
@@ -92,7 +93,7 @@ export default function FloorPlanPage() {
       id: 2,
       author: 'HR Team',
       role: 'Human Resources',
-      avatar: '/api/placeholder/32/32',
+      avatar: '',
       message: 'Remember to complete your quarterly reviews by end of week',
       time: '4 hours ago'
     },
@@ -100,7 +101,7 @@ export default function FloorPlanPage() {
       id: 3,
       author: 'IT Department',
       role: 'Support',
-      avatar: '/api/placeholder/32/32',
+      avatar: '',
       message: 'System maintenance scheduled for Saturday 10 PM - 2 AM',
       time: 'Yesterday'
     }
@@ -153,13 +154,27 @@ export default function FloorPlanPage() {
                       {announcements.map(announcement => (
                         <div key={announcement.id} className="flex items-start space-x-3">
                           <Avatar>
-                            <AvatarImage src={announcement.avatar} alt={announcement.author} />
-                            <AvatarFallback>{announcement.author.slice(0, 2)}</AvatarFallback>
+                            {/* Fixed - Use the announcement author name directly without requiring 
+                                a full User object structure */}
+                            <AvatarImage 
+                              src={getAvatarUrl({ 
+                                name: announcement.author || '',
+                                avatar: announcement.avatar || ''
+                              })} 
+                              alt={announcement.author || 'Announcement'} 
+                            />
+                            <AvatarFallback>
+                              {getUserInitials(announcement.author || '')}
+                            </AvatarFallback>
                           </Avatar>
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2">
-                              <span className="font-medium">{announcement.author}</span>
-                              <Badge variant="outline" className="text-xs">{announcement.role}</Badge>
+                              <span className="font-medium">
+                                {announcement.author || 'Anonymous'}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {announcement.role || 'Staff'}
+                              </Badge>
                             </div>
                             <p className="text-sm">{announcement.message}</p>
                             <p className="text-xs text-gray-500">{announcement.time}</p>
@@ -176,8 +191,8 @@ export default function FloorPlanPage() {
                           <div className="flex items-center gap-3">
                             <div className="relative">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={user.avatar} alt={user.name} />
-                                <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                                <AvatarImage src={getAvatarUrl(user)} alt={user.name} />
+                                <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                               </Avatar>
                               <span 
                                 className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white"

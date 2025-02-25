@@ -1,3 +1,4 @@
+// src/components/floor-plan/message-dialog.tsx
 'use client'
 
 import { useState } from 'react'
@@ -13,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { MessageSquare, Send } from 'lucide-react'
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
 
 // Message type definition
 interface Message {
@@ -99,8 +101,8 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
                 <div className="flex gap-2 max-w-[80%]">
                   {!message.fromUser && (
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                      <AvatarImage src={getAvatarUrl(user)} alt={user.name} />
+                      <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                     </Avatar>
                   )}
                   <div>

@@ -1,3 +1,4 @@
+// src/components/floor-plan/index.tsx
 'use client'
 
 import { useState } from 'react'
@@ -9,6 +10,7 @@ import { RoomTooltip } from './room-tooltip'
 import { RoomDialog } from './room-dialog'
 import { UserHoverCard } from './user-hover-card'
 import { MessageDialog } from './message-dialog'
+import { getAvatarUrl } from '@/lib/avatar-utils'
 
 interface FloorPlanProps {
   spaces: Space[];
@@ -179,9 +181,9 @@ export function FloorPlan({
                               </clipPath>
                             </defs>
                             
-                            {/* User avatar */}
+                            {/* User avatar - now using our utility function */}
                             <image
-                              href={user.avatar}
+                              href={getAvatarUrl(user)}
                               x="1"
                               y="1"
                               height="28"
