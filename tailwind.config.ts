@@ -49,7 +49,17 @@ export default {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
-  			}
+  			},
+			  blue: 'hsl(var(--blue))',
+			  indigo: 'hsl(var(--indigo))',
+			  purple: 'hsl(var(--purple))',
+			  pink: 'hsl(var(--pink))',
+			  rose: 'hsl(var(--rose))',
+			  fuchsia: 'hsl(var(--fuchsia))',
+			  violet: 'hsl(var(--violet))',
+			  cyan: 'hsl(var(--cyan))',
+			  teal: 'hsl(var(--teal))',
+			  emerald: 'hsl(var(--emerald))',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
