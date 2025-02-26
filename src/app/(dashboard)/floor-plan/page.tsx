@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { FloorPlan } from '@/components/floor-plan'
-import { Minimap } from '@/components/floor-plan/minimap'
 import { Space, Announcement } from '@/components/floor-plan/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
@@ -132,11 +131,11 @@ export default function FloorPlanPage() {
           
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* Minimap */}
+            {/* Minimap 
             <Minimap 
               spaces={spaces} 
               onRoomSelect={handleRoomSelect} 
-            />
+            />*/}
             
             {/* Tabs for Announcements and Online Users */}
             <Card>
