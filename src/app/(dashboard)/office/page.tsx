@@ -19,7 +19,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-background text-foreground">
       {/* We'll add the navigation bar here later */}
       <main className="p-4">{children}</main>
     </div>

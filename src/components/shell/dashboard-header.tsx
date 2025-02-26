@@ -11,6 +11,8 @@ import { GlobalSearch } from '@/components/search/global-search';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
 
 export function DashboardHeader() {
   const { user, signOut } = useAuth();
@@ -32,13 +34,10 @@ export function DashboardHeader() {
   };
 
   // Get user initials for avatar fallback
-  const getUserInitials = () => {
-    if (!user?.displayName) return 'U';
-    return user.displayName
-      .split(' ')
-      .map(part => part.charAt(0))
-      .join('')
-      .toUpperCase();
+  const getUserDisplayName = () => {
+    if (user?.displayName) return user.displayName;
+    if (user?.email) return user.email.split('@')[0];
+    return 'User';
   };
 
   return (
@@ -55,17 +54,25 @@ export function DashboardHeader() {
         </div>
         
         <div className="ml-auto flex items-center gap-4">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+          
+          {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
           </Button>
           
+          {/* User Menu */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar>
-                  <AvatarImage src={user?.photoURL || ''} alt="User avatar" />
-                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                  <AvatarImage 
+                    src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
+                    alt="User avatar" 
+                  />
+                  <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
                 </Avatar>
               </Button>
             </PopoverTrigger>
@@ -73,12 +80,15 @@ export function DashboardHeader() {
               <div className="grid gap-4">
                 <div className="flex items-center gap-4">
                   <Avatar>
-                    <AvatarImage src={user?.photoURL || ''} alt="User avatar" />
-                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                    <AvatarImage 
+                      src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
+                      alt="User avatar" 
+                    />
+                    <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium">{user?.displayName || user?.email}</p>
-                    <p className="text-xs text-muted-foreground">Online</p>
+                    <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email || 'No email'}</p>
                   </div>
                 </div>
                 <Separator />
@@ -88,7 +98,7 @@ export function DashboardHeader() {
                 </Button>
                 <Button 
                   variant="ghost" 
-                  className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50" 
+                  className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" 
                   onClick={handleSignOut}
                   disabled={isSigningOut}
                 >

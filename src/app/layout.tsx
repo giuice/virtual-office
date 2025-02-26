@@ -1,4 +1,6 @@
+// src/app/layout.tsx
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/providers/theme-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -8,12 +10,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <AuthProvider>
-          {children}
-          <Toaster richColors closeButton position="top-right" />
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            {children}
+            <Toaster richColors closeButton position="top-right" />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

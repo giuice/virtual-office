@@ -1,3 +1,4 @@
+// src/components/floor-plan/types.tsx
 export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout';
 export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked';
 export type UserStatus = 'active' | 'away' | 'presenting' | 'viewing';
@@ -37,19 +38,35 @@ export interface Announcement {
   time: string;
 }
 
-// Theme configuration for consistent colors
+// Theme-aware space colors using CSS variables
 export const spaceColors = {
-  workspace: { color: '#22C55E', lightColor: '#F0FDF4' },
-  conference: { color: '#0EA5E9', lightColor: '#E5F6FD' },
-  social: { color: '#F59E0B', lightColor: '#FEF3C7' },
-  breakout: { color: '#8B5CF6', lightColor: '#F3E8FF' },
-  default: { color: '#6B7280', lightColor: '#F3F4F6' }
+  workspace: { 
+    color: 'hsl(var(--success))', 
+    lightColor: 'hsl(var(--success) / 0.15)' // Green with transparency
+  },
+  conference: { 
+    color: 'hsl(var(--primary))', 
+    lightColor: 'hsl(var(--primary) / 0.15)' // Primary color with transparency
+  },
+  social: { 
+    color: 'hsl(var(--warning))', 
+    lightColor: 'hsl(var(--warning) / 0.15)' // Warning color with transparency
+  },
+  breakout: { 
+    color: 'hsl(var(--secondary))', 
+    lightColor: 'hsl(var(--secondary) / 0.15)' // Secondary color with transparency
+  },
+  default: { 
+    color: 'hsl(var(--muted-foreground))', 
+    lightColor: 'hsl(var(--muted) / 0.5)' // Muted color with transparency
+  }
 };
 
+// Theme-aware user status colors
 export const userStatusColors = {
-  presenting: '#0EA5E9',
-  active: '#22C55E',
-  away: '#F59E0B',
-  viewing: '#8B5CF6',
-  default: '#6B7280'
+  presenting: 'hsl(var(--primary))',    // Primary color
+  active: 'hsl(var(--success))',        // Success/green
+  away: 'hsl(var(--warning))',          // Warning/amber
+  viewing: 'hsl(var(--secondary))',     // Secondary color
+  default: 'hsl(var(--muted-foreground))' // Muted foreground
 };

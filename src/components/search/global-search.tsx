@@ -99,7 +99,7 @@ export function GlobalSearch() {
           onFocus={handleFocus}
           className="pl-10 pr-10"
         />
-        <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         {searchQuery && (
           <Button 
             variant="ghost" 
@@ -114,7 +114,7 @@ export function GlobalSearch() {
 
       {/* Search Results */}
       {showResults && (
-        <div className="absolute mt-1 w-full bg-white rounded-md border shadow-lg z-50">
+        <div className="absolute mt-1 w-full bg-popover rounded-md border shadow-lg z-50">
           <div className="p-2 border-b">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Search Results</span>
@@ -132,7 +132,7 @@ export function GlobalSearch() {
                 {searchResults.map(user => (
                   <div 
                     key={user.id}
-                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md cursor-pointer group"
+                    className="flex items-center justify-between p-2 hover:bg-background rounded-md cursor-pointer group"
                   >
                     <div className="flex items-center space-x-3">
                       <div className="relative">

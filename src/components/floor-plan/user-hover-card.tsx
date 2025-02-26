@@ -20,15 +20,15 @@ export function UserHoverCard({ user }: UserHoverCardProps) {
   const getStatusIcon = () => {
     switch (user.status) {
       case 'active':
-        return <Mic className="h-3 w-3 mr-1 text-green-500" />;
+        return <Mic className="h-3 w-3 mr-1 text-success" />;
       case 'presenting':
-        return <Monitor className="h-3 w-3 mr-1 text-blue-500" />;
+        return <Monitor className="h-3 w-3 mr-1 text-primary" />;
       case 'away':
         return user.activity.toLowerCase().includes('break') 
-          ? <Coffee className="h-3 w-3 mr-1 text-amber-500" />
-          : <MicOff className="h-3 w-3 mr-1 text-amber-500" />;
+          ? <Coffee className="h-3 w-3 mr-1 text-warning" />
+          : <MicOff className="h-3 w-3 mr-1 text-warning" />;
       default:
-        return <MicOff className="h-3 w-3 mr-1 text-gray-500" />;
+        return <MicOff className="h-3 w-3 mr-1 text-muted-foreground" />;
     }
   };
 

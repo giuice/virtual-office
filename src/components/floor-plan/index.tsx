@@ -11,6 +11,7 @@ import { RoomDialog } from './room-dialog'
 import { UserHoverCard } from './user-hover-card'
 import { MessageDialog } from './message-dialog'
 import { getAvatarUrl } from '@/lib/avatar-utils'
+import { StatusAvatar } from '@/components/ui/status-avatar'
 
 interface FloorPlanProps {
   spaces: Space[];
@@ -108,9 +109,10 @@ export function FloorPlan({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="relative w-full h-[500px] bg-gray-50 rounded-lg overflow-hidden">
+          {/* Changed from bg-gray-50 to bg-secondary for dark mode support */}
+          <div className="relative w-full h-[500px] bg-accent rounded-lg overflow-hidden">
             <svg viewBox="0 0 800 600" className="w-full h-full">
-              {/* Grid Pattern */}
+              {/* Grid Pattern - updated stroke color for dark mode */}
               <pattern
                 id="grid"
                 width="40"
@@ -120,7 +122,8 @@ export function FloorPlan({
                 <path
                   d="M 40 0 L 0 0 0 40"
                   fill="none"
-                  stroke="rgba(0,0,0,0.05)"
+                  stroke="currentColor"
+                  strokeOpacity="0.05"
                   strokeWidth="1"
                 />
               </pattern>
@@ -140,18 +143,17 @@ export function FloorPlan({
                         y={space.position.y}
                         width={space.position.width}
                         height={space.position.height}
-                        fill={lightColor}
+                        className="fill-background dark:fill-gray-800"
                         stroke={color}
                         strokeWidth="2"
                         rx="4"
                       />
                       
-                      {/* Room Name */}
+                      {/* Room Name - updated text fill for dark mode */}
                       <text
                         x={space.position.x + 20}
                         y={space.position.y + 30}
-                        fill="#374151"
-                        className="text-sm font-medium"
+                        className="fill-foreground text-sm font-medium"
                       >
                         {space.name}
                       </text>
@@ -203,13 +205,13 @@ export function FloorPlan({
                               </foreignObject>
                             }
                             
-                            {/* Message icon (appears on hover) */}
+                            {/* Message icon (appears on hover) - updated for dark mode */}
                             <foreignObject x="18" y="18" width="16" height="16" className="opacity-0 group-hover:opacity-100">
                               <div
-                                className="bg-white shadow-sm rounded-full p-0.5 cursor-pointer hover:bg-gray-100 transition-colors"
+                                className="bg-background dark:bg-card shadow-sm rounded-full p-0.5 cursor-pointer hover:bg-muted transition-colors"
                                 onClick={(e) => handleMessageUser(e, user)}
                               >
-                                <MessageSquare className="h-3 w-3 text-gray-600" />
+                                <MessageSquare className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                               </div>
                             </foreignObject>
                           </g>
@@ -222,11 +224,11 @@ export function FloorPlan({
             </svg>
           </div>
           
-          {/* Room status bar */}
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-500 border-t pt-4">
+          {/* Room status bar - updated for dark mode */}
+          <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground border-t pt-4">
             <div>
               <span>Click on a room to join • </span>
-              <span className="text-blue-500">{spaces.length} rooms available</span>
+              <span className="text-blue-500 dark:text-blue-400">{spaces.length} rooms available</span>
             </div>
             <Badge variant="outline">
               <Zap className="h-3 w-3 mr-1" />
@@ -243,7 +245,7 @@ export function FloorPlan({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <UserHoverCard user={hoveredUser} />
-                <span className="text-sm text-gray-500">{hoveredUser.activity}</span>
+                <span className="text-sm text-muted-foreground">{hoveredUser.activity}</span>
               </div>
               <Badge variant="outline" className="flex items-center gap-1">
                 <Users className="h-4 w-4" />

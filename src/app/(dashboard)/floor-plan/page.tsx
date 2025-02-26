@@ -177,7 +177,7 @@ export default function FloorPlanPage() {
                               </Badge>
                             </div>
                             <p className="text-sm">{announcement.message}</p>
-                            <p className="text-xs text-gray-500">{announcement.time}</p>
+                            <p className="text-xs text-muted-foreground">{announcement.time}</p>
                           </div>
                         </div>
                       ))}
@@ -187,7 +187,7 @@ export default function FloorPlanPage() {
                   <TabsContent value="online">
                     <div className="space-y-2">
                       {spaces.flatMap(space => space.users).map(user => (
-                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-background rounded-md">
                           <div className="flex items-center gap-3">
                             <div className="relative">
                               <Avatar className="h-8 w-8">
@@ -195,21 +195,20 @@ export default function FloorPlanPage() {
                                 <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                               </Avatar>
                               <span 
-                                className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white"
-                                style={{ 
-                                  backgroundColor: user.status === 'active' 
-                                    ? '#22C55E' 
+                                className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${
+                                  user.status === 'active' 
+                                    ? 'bg-success' 
                                     : user.status === 'away' 
-                                      ? '#F59E0B' 
+                                      ? 'bg-warning' 
                                       : user.status === 'presenting' 
-                                        ? '#0EA5E9' 
-                                        : '#6B7280'
-                                }}
+                                        ? 'bg-primary' 
+                                        : 'bg-muted-foreground'
+                                }`}
                               ></span>
                             </div>
                             <div>
                               <p className="text-sm font-medium">{user.name}</p>
-                              <p className="text-xs text-gray-500">{user.activity}</p>
+                              <p className="text-xs text-muted-foreground">{user.activity}</p>
                             </div>
                           </div>
                         </div>

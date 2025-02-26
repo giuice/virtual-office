@@ -74,14 +74,14 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
         </div>
       </CardHeader>
       <CardContent className="p-3">
-        {/* Minimap SVG */}
-        <div className="relative w-full aspect-video bg-gray-50 rounded-md overflow-hidden border">
+        {/* Minimap SVG - Updated background for dark mode */}
+        <div className="relative w-full aspect-video bg-secondary rounded-md overflow-hidden border">
           <svg 
             viewBox="0 0 800 600" 
             className="w-full h-full"
             style={{ padding: '4px' }}
           >
-            {/* Grid pattern */}
+            {/* Grid pattern - Updated for dark mode */}
             <pattern
               id="minimap-grid"
               width="20"
@@ -91,7 +91,8 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
               <path
                 d="M 20 0 L 0 0 0 20"
                 fill="none"
-                stroke="rgba(0,0,0,0.03)"
+                stroke="currentColor"
+                strokeOpacity="0.03"
                 strokeWidth="1"
               />
             </pattern>
@@ -128,8 +129,8 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                           width={width}
                           height={height}
                           rx="2"
-                          fill={hasHighlightedUsers ? 'rgba(249, 168, 212, 0.4)' : getSpaceLightColor(space.type)}
-                          stroke={hasHighlightedUsers ? '#EC4899' : getSpaceColor(space.type)}
+                          fill={hasHighlightedUsers ? 'hsl(var(--primary) / 0.2)' : 'hsl(var(--card))'}
+                          stroke={hasHighlightedUsers ? 'hsl(var(--primary))' : getSpaceColor(space.type)}
                           strokeWidth={hasHighlightedUsers ? "1.5" : "1"}
                           className={`transition-all duration-200 ${
                             hoveredSpace?.id === space.id ? 'opacity-90 stroke-2' : 'opacity-80'
@@ -142,7 +143,7 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                             x={x + width/2}
                             y={y + 10}
                             textAnchor="middle"
-                            fill="#374151"
+                            className="fill-foreground"
                             fontSize="8"
                             fontWeight="500"
                           >
@@ -166,7 +167,7 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                                 cx={userX}
                                 cy={userY}
                                 r={isHighlighted ? 6 : 4}
-                                fill={isHighlighted ? '#EC4899' : '#6B7280'}
+                                fill={isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
                                 className="cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={(e) => {
                                   e.stopPropagation(); // Prevent triggering room click
@@ -174,7 +175,7 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                                 }}
                               />
                               
-                              {/* Show user name if highlighted */}
+                              {/* Show user name if highlighted - updated for dark mode */}
                               {isHighlighted && (
                                 <>
                                   <rect
@@ -183,15 +184,15 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                                     width={60}
                                     height={12}
                                     rx={2}
-                                    fill="white"
-                                    stroke="#EC4899"
+                                    className="fill-background dark:fill-card"
+                                    stroke="hsl(var(--primary))"
                                     strokeWidth="1"
                                   />
                                   <text
                                     x={userX}
                                     y={userY - 6}
                                     textAnchor="middle"
-                                    fill="#374151"
+                                    className="fill-foreground"
                                     fontSize="6"
                                     fontWeight="500"
                                   >
@@ -206,32 +207,32 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
                     </TooltipTrigger>
                     <TooltipContent side="top" className="p-2 text-xs">
                       <p className="font-medium">{space.name}</p>
-                      <p className="text-gray-500">{space.users.length} users</p>
+                      <p className="text-muted-foreground">{space.users.length} users</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               );
             })}
             
-            {/* Legend */}
+            {/* Legend - updated for dark mode */}
             <g transform="translate(10, 560)">
-              <rect x="0" y="0" width="120" height="30" fill="white" opacity="0.8" rx="4" />
-              <text x="5" y="12" fontSize="6" fill="#374151" fontWeight="500">Room Types:</text>
+              <rect x="0" y="0" width="120" height="30" className="fill-background dark:fill-card opacity-80" rx="4" />
+              <text x="5" y="12" fontSize="6" className="fill-foreground" fontWeight="500">Room Types:</text>
               
               {/* Legend items */}
               <rect x="5" y="18" width="8" height="8" fill={getSpaceLightColor('workspace')} stroke={getSpaceColor('workspace')} strokeWidth="0.5" rx="1" />
-              <text x="18" y="24" fontSize="6" fill="#374151">Workspace</text>
+              <text x="18" y="24" fontSize="6" className="fill-foreground">Workspace</text>
               
               <rect x="65" y="18" width="8" height="8" fill={getSpaceLightColor('conference')} stroke={getSpaceColor('conference')} strokeWidth="0.5" rx="1" />
-              <text x="78" y="24" fontSize="6" fill="#374151">Conference</text>
+              <text x="78" y="24" fontSize="6" className="fill-foreground">Conference</text>
             </g>
           </svg>
           
-          {/* Search overlay */}
+          {/* Search overlay - updated for dark mode */}
           {isSearching && (
-            <div className="absolute top-2 left-2 bg-white px-2 py-1 rounded shadow-sm text-xs flex items-center border">
-              <Search className="h-3 w-3 mr-1 text-gray-400" />
-              <span className="text-gray-600 font-medium">
+            <div className="absolute top-2 left-2 bg-card  px-2 py-1 rounded shadow-sm text-xs flex items-center border">
+              <Search className="h-3 w-3 mr-1 text-muted-foreground" />
+              <span className="text-foreground font-medium">
                 {searchResults.length} user{searchResults.length !== 1 ? 's' : ''} found
               </span>
             </div>
@@ -239,7 +240,7 @@ export function Minimap({ spaces, onRoomSelect }: MinimapProps) {
         </div>
         
         {/* Quick Stats */}
-        <div className="mt-2 flex justify-between text-xs text-gray-500">
+        <div className="mt-2 flex justify-between text-xs text-muted-foreground">
           <div>
             <span className="font-medium">{spaces.length}</span> rooms
           </div>

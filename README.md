@@ -2,7 +2,31 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, 
+
+// INSTALLATION INSTRUCTIONS
+
+// 1. Install the next-themes package
+npm install next-themes
+
+// 2. Create the directories if they don't exist
+mkdir -p src/providers
+mkdir -p src/components/ui
+
+// 3. Copy all the files to their respective locations
+// Make sure all the files are properly placed according to the paths in each file
+
+// 4. Update your package.json dependencies to include next-themes
+// Add this to your dependencies section:
+// "next-themes": "^0.3.0"
+
+// 5. Run your application and test the dark mode toggle
+npm run dev
+
+// IMPORTANT: For the StatusAvatar component to work properly, make sure to add it to the correct path
+// at src/components/ui/status-avatar.tsx
+
+run the development server:
 
 ```bash
 npm run dev

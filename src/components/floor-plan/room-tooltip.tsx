@@ -1,3 +1,4 @@
+// src/components/floor-plan/room-tooltip.tsx
 'use client'
 
 import { Space } from './types'
@@ -10,6 +11,7 @@ import {
   TooltipProvider
 } from '@/components/ui/tooltip'
 import { Users, Lock } from 'lucide-react'
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
 
 interface RoomTooltipProps {
   room: Space
@@ -34,7 +36,7 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
         <TooltipTrigger asChild>
           {children}
         </TooltipTrigger>
-        <TooltipContent side="top" className="bg-white p-4 shadow-lg rounded-lg border max-w-xs">
+        <TooltipContent side="top" className="bg-background dark:bg-gray-800 p-4 shadow-lg rounded-lg border max-w-xs">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-medium text-base">{room.name}</h4>
@@ -44,7 +46,7 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
               </Badge>
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
               <span>{room.users.length}/{room.capacity} people</span>
             </div>
@@ -61,17 +63,17 @@ export function RoomTooltip({ room, children }: RoomTooltipProps) {
             
             {room.users.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-500">People in this room:</p>
+                <p className="text-xs font-medium text-muted-foreground">People in this room:</p>
                 <div className="flex flex-col gap-2">
                   {room.users.map(user => (
                     <div key={user.id} className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar} alt={user.name} />
-                        <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                        <AvatarImage src={getAvatarUrl(user)} alt={user.name} />
+                        <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-xs font-medium">{user.name}</p>
-                        <p className="text-xs text-gray-500">{user.activity}</p>
+                        <p className="text-xs text-muted-foreground">{user.activity}</p>
                       </div>
                     </div>
                   ))}

@@ -1,3 +1,4 @@
+// src/components/floor-plan/room-dialog.tsx
 'use client'
 
 import { useState } from 'react'
@@ -18,6 +19,8 @@ import {
 } from '@/components/ui/dialog'
 import { Mic, MicOff, Monitor, MessageSquare, Users, Lock, Unlock } from 'lucide-react'
 import { MessageDialog } from './message-dialog'
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
+import { StatusAvatar } from '@/components/ui/status-avatar' 
 
 interface RoomDialogProps {
   room: Space | null
@@ -71,11 +74,13 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
           <div className="flex items-center justify-between">
             <DialogTitle>{room.name}</DialogTitle>
             <Badge 
-              style={{ 
-                backgroundColor: getRoomColor().lightColor, 
-                color: getRoomColor().color,
-                borderColor: getRoomColor().color 
-              }}
+              className={`border ${
+                room.type === 'workspace' ? 'bg-success/15 text-success border-success' :
+                room.type === 'conference' ? 'bg-primary/15 text-primary border-primary' :
+                room.type === 'social' ? 'bg-warning/15 text-warning border-warning' :
+                room.type === 'breakout' ? 'bg-secondary/15 text-secondary border-secondary' :
+                'bg-muted/15 text-muted-foreground border-muted-foreground'
+              }`}
             >
               {getRoomTypeLabel(room.type)}
             </Badge>
@@ -98,13 +103,10 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
                   room.users.map(user => (
                     <div key={user.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={user.avatar} alt={user.name} />
-                          <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-                        </Avatar>
+                        <StatusAvatar user={user} size="sm" />
                         <div>
                           <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-gray-500">{user.activity}</p>
+                          <p className="text-xs text-muted-foreground">{user.activity}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -126,7 +128,7 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
                     </div>
                   ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full py-8 text-center text-gray-500">
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-center text-muted-foreground">
                     <Users className="h-10 w-10 mb-2 opacity-20" />
                     <p>No one is in this room yet</p>
                     <p className="text-sm">Be the first to join!</p>
@@ -185,7 +187,7 @@ export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
         </Tabs>
 
         <DialogFooter className="flex items-center justify-between sm:justify-between">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             <span>{room.users.length}/{room.capacity} people</span>
           </div>
           <Button type="submit" onClick={handleJoinRoom}>

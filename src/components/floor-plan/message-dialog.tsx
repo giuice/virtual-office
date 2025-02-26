@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { MessageSquare, Send } from 'lucide-react'
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
+import { StatusAvatar } from '@/components/ui/status-avatar'
 
 // Message type definition
 interface Message {
@@ -100,22 +101,19 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
               >
                 <div className="flex gap-2 max-w-[80%]">
                   {!message.fromUser && (
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={getAvatarUrl(user)} alt={user.name} />
-                      <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
-                    </Avatar>
+                    <StatusAvatar user={user} size="sm" />
                   )}
                   <div>
                     <div 
                       className={`rounded-lg p-3 ${
                         message.fromUser 
                           ? 'bg-primary text-primary-foreground' 
-                          : 'bg-muted'
+                          : 'bg-card text-card-foreground'
                       }`}
                     >
                       <p className="text-sm">{message.content}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {formatTime(message.timestamp)}
                     </p>
                   </div>
