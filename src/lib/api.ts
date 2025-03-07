@@ -187,6 +187,39 @@ export async function getUsersByCompany(companyId: string): Promise<User[]> {
 }
 
 /**
+ * Clean up duplicate companies for a user
+ */
+export async function cleanupDuplicateCompanies(userId: string): Promise<{
+  keptCompanyId?: string;
+  totalRemoved: number;
+}> {
+  try {
+    const response = await fetch('/api/companies/cleanup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to clean up companies');
+    }
+
+    const data = await response.json();
+    return {
+      keptCompanyId: data.keptCompanyId,
+      totalRemoved: data.totalRemoved || 0,
+    };
+  } catch (error) {
+    console.error('API error cleaning up companies:', error);
+    // Don't throw error here, just return 0 removed
+    return { totalRemoved: 0 };
+  }
+}
+
+/**
  * Update a user's role
  */
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {

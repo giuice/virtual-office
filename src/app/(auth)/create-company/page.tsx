@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,13 +11,31 @@ import { Card } from '@/components/ui/card';
 export default function CreateCompanyPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { createNewCompany, isLoading, error } = useCompany();
+  const { createNewCompany, isLoading, error, currentUserProfile } = useCompany();
   const [companyName, setCompanyName] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Redirect to dashboard if already logged in
-  if (!authLoading && !user) {
-    router.push('/login');
+  // Handle authentication redirect
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
+  
+  // Handle company redirect
+  useEffect(() => {
+    if (!isLoading && currentUserProfile?.companyId) {
+      router.push('/dashboard');
+    }
+  }, [isLoading, currentUserProfile, router]);
+
+  // Early return if loading
+  if (authLoading || isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  // Don't render the form if user is not logged in or already has a company
+  if (!user || currentUserProfile?.companyId) {
     return null;
   }
 
@@ -32,7 +50,7 @@ export default function CreateCompanyPage() {
     try {
       setLocalError(null);
       const companyId = await createNewCompany(companyName);
-      router.push('/office'); // Redirect to office after company created
+      router.push('/dashboard'); // Redirect to dashboard after company created
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Error creating company');
     }

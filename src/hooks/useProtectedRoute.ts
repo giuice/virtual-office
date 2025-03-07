@@ -29,13 +29,13 @@ export const useProtectedRoute = (requireCompany: boolean = true) => {
     }
 
     // If company is required but user doesn't have one
-    if (requireCompany && !company && !companyLoading) {
+    if (requireCompany && !currentUserProfile?.companyId && !companyLoading) {
       router.push('/create-company');
       return;
     }
 
     setIsReady(true);
-  }, [authLoading, companyLoading, user, company, router, requireCompany]);
+  }, [authLoading, companyLoading, user, currentUserProfile, router, requireCompany]);
 
   return {
     isAuthenticated: !!user,

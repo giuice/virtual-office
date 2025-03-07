@@ -61,10 +61,10 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      <DashboardHeader
+      {/* <DashboardHeader
         heading={`Welcome, ${currentUserProfile?.displayName || 'User'}!`}
         description={`${company?.name || 'Your company'} virtual office dashboard`}
-      />
+      /> */}
       
       <div className="grid gap-8">
         {/* Company Overview Card */}

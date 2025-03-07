@@ -17,7 +17,8 @@ import {
   createCompany,
   getCompany,
   updateCompany,
-  getUsersByCompany
+  getUsersByCompany,
+  cleanupDuplicateCompanies
 } from '@/lib/api';
 
 interface CompanyContextType {
@@ -61,6 +62,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         setError(null);
 
+        // First, clean up any duplicate companies the user might have
+        if (user.uid) {
+          try {
+            const { totalRemoved } = await cleanupDuplicateCompanies(user.uid);
+            if (totalRemoved > 0) {
+              console.log(`Cleaned up ${totalRemoved} duplicate companies for user ${user.uid}`);
+            }
+          } catch (cleanupError) {
+            console.error('Error cleaning up companies:', cleanupError);
+            // Continue with the rest of the process even if cleanup fails
+          }
+        }
+
         // Get user profile - using the API client
         const userProfile = await getUserByFirebaseId(user.uid);
         setCurrentUserProfile(userProfile);
@@ -95,7 +109,27 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Create company
+      // Check if user already has a company association
+      const existingProfile = await getUserByFirebaseId(user.uid);
+      if (existingProfile?.companyId) {
+        console.log('User already has a company, returning existing company ID');
+        
+        // If the user already has a company, fetch it
+        const existingCompany = await getCompany(existingProfile.companyId);
+        if (existingCompany) {
+          // Update states with existing data
+          setCompany(existingCompany);
+          setCurrentUserProfile(existingProfile);
+          
+          // Get company users
+          const users = await getUsersByCompany(existingProfile.companyId);
+          setCompanyUsers(users);
+          
+          return existingProfile.companyId;
+        }
+      }
+
+      // Create new company
       const companyData: Omit<Company, 'id' | 'createdAt'> = {
         name,
         adminIds: [user.uid],
@@ -132,8 +166,31 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         userProfile = await getUserByFirebaseId(user.uid);
       } else {
         // Update existing user profile with new company
-        await updateUserStatus(user.uid, 'online', 'Just created a company');
-        userProfile = { ...userProfile, companyId, role: 'admin', status: 'online' };
+        await updateUserStatus(
+          user.uid, 
+          'online', 
+          'Just created a company'
+        );
+        
+        // Update the user's company ID
+        await fetch(`/api/users/update?id=${user.uid}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            companyId,
+            role: 'admin',
+            status: 'online'
+          }),
+        });
+        
+        userProfile = { 
+          ...userProfile, 
+          companyId, 
+          role: 'admin', 
+          status: 'online' 
+        };
       }
 
       // Get company data
