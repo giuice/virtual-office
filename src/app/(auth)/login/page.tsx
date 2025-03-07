@@ -1,13 +1,14 @@
 // src/app/(auth)/login/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 
 export default function LoginPage() {
@@ -15,8 +16,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user } = useAuth();
+  const { company, isLoading: companyLoading } = useCompany();
   const { showSuccess, showError } = useNotification();
+
+  // Check if the user is authenticated and redirect accordingly
+  useEffect(() => {
+    // Skip if loading or if no user is authenticated
+    if (!user || companyLoading) return;
+
+    // If user is logged in but doesn't have a company, redirect to company creation
+    if (!company) {
+      router.push('/create-company');
+    } else {
+      // User has a company, redirect to office
+      router.push('/office');
+    }
+  }, [user, company, companyLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -25,12 +41,11 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       showSuccess({ description: 'Successfully logged in!' });
-      router.push('/office');
+      // Redirects will be handled by the useEffect above
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to login'
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -40,12 +55,11 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully logged in with Google!' });
-      router.push('/office');
+      // Redirects will be handled by the useEffect above
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to login with Google'
       });
-    } finally {
       setIsLoading(false);
     }
   };

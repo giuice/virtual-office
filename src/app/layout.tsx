@@ -1,5 +1,6 @@
 // src/app/layout.tsx
 import { AuthProvider } from '@/contexts/AuthContext';
+import { CompanyProvider } from '@/contexts/CompanyContext';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -19,8 +20,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
-            <Toaster richColors closeButton position="top-right" />
+            <CompanyProvider>
+              {children}
+              <Toaster richColors closeButton position="top-right" />
+            </CompanyProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

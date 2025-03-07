@@ -1,8 +1,8 @@
 // src/types/auth.ts
-import { User } from 'firebase/auth';
+import { User as FirebaseUser } from 'firebase/auth';
 
 export interface AuthState {
-  user: User | null;
+  user: FirebaseUser | null;
   loading: boolean;
   error: string | null;
 }
@@ -10,6 +10,6 @@ export interface AuthState {
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
 }

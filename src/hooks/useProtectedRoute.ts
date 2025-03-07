@@ -1,17 +1,48 @@
 // src/hooks/useProtectedRoute.ts
-import { useEffect } from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 
-export const useProtectedRoute = () => {
-  const { user, loading } = useAuth();
+/**
+ * A hook to protect routes that require authentication and company association
+ * @param requireCompany If true, redirects to company creation if user doesn't have a company
+ */
+export const useProtectedRoute = (requireCompany: boolean = true) => {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    // Skip checks during loading to avoid flicker
+    if (authLoading || (requireCompany && companyLoading)) {
+      return;
     }
-  }, [user, loading, router]);
 
-  return { isAuthenticated: !!user, loading };
+    // If no user is authenticated, redirect to login
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // If company is required but user doesn't have one
+    if (requireCompany && !company && !companyLoading) {
+      router.push('/create-company');
+      return;
+    }
+
+    setIsReady(true);
+  }, [authLoading, companyLoading, user, company, router, requireCompany]);
+
+  return {
+    isAuthenticated: !!user,
+    isReady,
+    loading: authLoading || companyLoading,
+    user,
+    company,
+    userProfile: currentUserProfile,
+  };
 };

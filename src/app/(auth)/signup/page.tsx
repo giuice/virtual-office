@@ -12,6 +12,7 @@ import { useNotification } from '@/hooks/useNotification';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,9 +31,10 @@ export default function SignupPage() {
     }
 
     try {
-      await signUp(email, password);
+      // Pass display name to signUp method which will update the Firebase profile
+      await signUp(email, password, displayName);
       showSuccess({ description: 'Account created successfully!' });
-      router.push('/office');
+      router.push('/create-company');
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to create account'
@@ -47,7 +49,7 @@ export default function SignupPage() {
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully signed up with Google!' });
-      router.push('/office');
+      router.push('/create-company');
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to sign up with Google'
@@ -76,6 +78,20 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="displayName" className="text-sm font-medium">
+                Display Name
+              </label>
+              <Input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter your name"
                 required
                 disabled={isLoading}
               />

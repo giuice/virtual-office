@@ -9,9 +9,11 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { AuthContextType, AuthState } from '@/types/auth';
+import { getUserByFirebaseId, updateUserStatus, createUser } from '@/lib/api'; // Import the client-side API functions
 
 const initialState: AuthState = {
   user: null,
@@ -24,10 +26,31 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(initialState);
 
+  // Update user status when authentication state changes
+  const updateStatus = async (user: AuthState['user'], status: 'online' | 'offline') => {
+    if (user) {
+      try {
+        // Check if user has a profile in the database
+        const userProfile = await getUserByFirebaseId(user.uid);
+        if (userProfile) {
+          // Update status
+          await updateUserStatus(user.uid, status);
+        }
+      } catch (error) {
+        console.error('Error updating user status:', error);
+      }
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, 
       (user) => {
         setState((prev) => ({ ...prev, user, loading: false }));
+        
+        // Update user status to online when they log in
+        if (user) {
+          updateStatus(user, 'online');
+        }
       },
       (error) => {
         setState((prev) => ({ 
@@ -38,8 +61,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    return () => unsubscribe();
-  }, []);
+    // Update user status to offline when they close the tab or navigate away
+    const handleBeforeUnload = () => {
+      if (state.user) {
+        updateStatus(state.user, 'offline');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [state.user]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -55,25 +90,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, displayName?: string): Promise<void> => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error) {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      if (user) {
+        // Use the server-side API to create a new user
+        await createUser({
+          id: user.uid,
+          email,
+          displayName: displayName || '',
+          companyId: ''
+        });
+
+        if (displayName) {
+          await updateProfile(user, { displayName });
+        }
+      }
+    } catch (error: any) {
       setState((prev) => ({ 
         ...prev, 
-        error: error instanceof Error ? error.message : 'An error occurred',
+        error: error.message, 
         loading: false 
       }));
       throw error;
+    } finally {
+      setState((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (): Promise<void> => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      
+      // Check if user exists in our database, if not create them
+      if (result.user) {
+        const userProfile = await getUserByFirebaseId(result.user.uid);
+        if (!userProfile) {
+          // Use the server-side API to create a new user
+          await createUser({
+            id: result.user.uid,
+            email: result.user.email || '',
+            displayName: result.user.displayName || '',
+            companyId: ''
+          });
+        }
+      }
     } catch (error) {
       setState((prev) => ({ 
         ...prev, 
@@ -87,6 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
+      
+      // Update status to offline before signing out
+      if (state.user) {
+        await updateStatus(state.user, 'offline');
+      }
+      
       await firebaseSignOut(auth);
     } catch (error) {
       setState((prev) => ({ 

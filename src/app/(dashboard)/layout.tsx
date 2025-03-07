@@ -9,7 +9,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, loading } = useProtectedRoute();
+  // Use the protected route hook with company check
+  const { isAuthenticated, loading, isReady } = useProtectedRoute();
 
   if (loading) {
     return (
@@ -22,7 +23,7 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isReady) {
     return null; // The useProtectedRoute hook will handle the redirect
   }
 
