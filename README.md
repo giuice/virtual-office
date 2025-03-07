@@ -1,60 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Virtual Office
+
+A Next.js application providing a virtual workspace for remote teams, with real-time collaboration features.
+
+## Features
+
+- **Company Management**: Create and manage virtual companies
+- **User Profiles**: Manage user identities and statuses
+- **Virtual Floor Plan**: Navigate the office visually
+- **User Statuses**: See who's online, busy, or away
+- **Message Feed**: Company-wide communication
+- **Database Integration**: AWS DynamoDB for persistent storage
 
 ## Getting Started
 
-First, 
+First, set up your environment variables:
 
-// INSTALLATION INSTRUCTIONS
+```bash
+# Copy the example environment file
+cp env.example .env.local
 
-// 1. Install the next-themes package
-npm install next-themes
+# Edit .env.local with your AWS and Firebase credentials
+```
 
-// 2. Create the directories if they don't exist
-mkdir -p src/providers
-mkdir -p src/components/ui
+Then install dependencies:
 
-// 3. Copy all the files to their respective locations
-// Make sure all the files are properly placed according to the paths in each file
+```bash
+npm install
+```
 
-// 4. Update your package.json dependencies to include next-themes
-// Add this to your dependencies section:
-// "next-themes": "^0.3.0"
-
-// 5. Run your application and test the dark mode toggle
-npm run dev
-
-// IMPORTANT: For the StatusAvatar component to work properly, make sure to add it to the correct path
-// at src/components/ui/status-avatar.tsx
-
-run the development server:
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Before using the app, you need to set up the DynamoDB tables:
 
-## Learn More
+1. Make sure your AWS credentials are configured in `.env.local`
+2. Run the setup endpoint:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+curl http://localhost:3000/api/setup-dynamo-tables
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Admin Tools
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Company Cleanup Tool
 
-## Deploy on Vercel
+If you encounter issues with duplicate companies, you can use the cleanup tool:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Access the tool at [http://localhost:3000/tools/cleanup-companies](http://localhost:3000/tools/cleanup-companies)
+2. The tool will:
+   - Identify users with multiple companies
+   - Keep the most recent company
+   - Remove duplicates
+   - Update user profiles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentation
+
+- **Database Schema**: See [docs/database.md](./docs/database.md)
+- **Architecture Decisions**: See [docs/adr/](./docs/adr/)
+- **Changelog**: See [changelog.md](./changelog.md)
+
+## Recent Updates
+
+- Fixed issue with duplicate company creation
+- Added company cleanup functionality
+- Enhanced route protection to prevent redirection loops
+- Improved database integrity checks
+
+## Development
+
+This project uses:
+
+- Next.js App Router
+- AWS DynamoDB for database
+- Firebase for authentication
+- Tailwind CSS for styling
+- TypeScript for type safety

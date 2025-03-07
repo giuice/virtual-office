@@ -135,6 +135,7 @@ Stores meeting notes and transcripts.
 - `POST /api/companies/create` - Create a new company
 - `GET /api/companies/get?id={companyId}` - Get company by ID
 - `PATCH /api/companies/update?id={companyId}` - Update company details
+- `POST /api/companies/cleanup` - Remove duplicate companies for users
 
 ### User Endpoints
 
@@ -192,3 +193,28 @@ const companyData = {
 };
 const companyId = await createCompany(companyData);
 ```
+
+### Clean up duplicate companies
+
+```javascript
+// Example: Clean up duplicate companies for a user
+await cleanupDuplicateCompanies('user-id-here');
+
+// This keeps only the most recent company and updates the user profile
+```
+
+## Data Integrity
+
+The database is designed with the following integrity constraints:
+
+1. **Company-User Relationship**: Users should belong to exactly one company, enforced by:
+   - Route protection checking for `currentUserProfile?.companyId`
+   - Validation in company creation flow to prevent multiple companies per user
+   - Cleanup functionality to resolve any duplicate company issues
+
+2. **Company Uniqueness**: Duplicate company prevention is implemented via:
+   - Checks for existing companies before creation
+   - User profile updates with proper companyId association
+   - Admin cleanup tool for manual database maintenance
+
+See [ADR-001: Company Duplication Prevention](/docs/adr/001-company-duplication-prevention.md) for more details on the implementation of these safeguards.

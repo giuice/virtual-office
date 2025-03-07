@@ -186,3 +186,63 @@ We successfully migrated from Firebase Firestore to AWS DynamoDB by:
 2. Improve error handling with more specific error types
 3. Implement DynamoDB Streams for real-time notifications
 4. Add caching layer for frequent DynamoDB queries
+
+## 2025-03-08: Fixed Duplicate Company Creation Issue (Bugfix)
+
+### Fixed
+- Critical issue with duplicate company creation in DynamoDB
+- Protected route logic causing redirection loops
+- Company creation flow allowing multiple companies per user
+
+### Added
+- Company cleanup functionality to remove duplicate entries
+- Admin tools for database maintenance
+- Safeguards against future duplicate creation
+- Improved error handling in company-related operations
+
+### Key Components Fixed
+- `/src/hooks/useProtectedRoute.ts`: Updated to check for `currentUserProfile?.companyId` instead of just `company`
+- `/src/contexts/CompanyContext.tsx`: Added check for existing companies before creating new ones
+- `/src/app/(auth)/create-company/page.tsx`: Added validation to prevent access if user already has a company
+- `/src/lib/api.ts`: Implemented `cleanupDuplicateCompanies()` function for database cleanup
+
+### New Components
+- `/src/pages/api/companies/cleanup.ts`: Server-side API endpoint for removing duplicate companies
+- `/src/app/tools/cleanup-companies/page.tsx`: Web interface for manual company cleanup
+
+### Technical Details
+- Enhanced route protection with proper company association checks
+- Added database integrity checks before company creation
+- Implemented cleanup functionality that preserves most recent company entry
+- Fixed AWS DynamoDB configuration issues affecting company operations
+- Improved user profile updates to correctly associate with company ID
+
+### What We Did
+We fixed a critical issue causing duplicate company creation by:
+
+1. Correcting the route protection logic in `useProtectedRoute.ts`:
+   - Now checking `currentUserProfile?.companyId` instead of just `company`
+   - Preventing unnecessary redirects to company creation
+
+2. Enhancing company creation flow in `CompanyContext.tsx`:
+   - Adding checks for existing companies before creating new ones
+   - Improving user profile updates with proper companyId association
+
+3. Adding database cleanup functionality:
+   - Creating `/api/companies/cleanup.ts` API endpoint for removing duplicates
+   - Implementing `cleanupDuplicateCompanies()` function in `api.ts`
+   - Adding cleanup call during user login to fix existing issues
+
+4. Fixing redirection in `create-company/page.tsx`:
+   - Adding validation to prevent access if user already has a company
+   - Changing redirect path to dashboard after successful creation
+
+5. Creating an admin cleanup tool at `/tools/cleanup-companies/page.tsx`:
+   - Building a web interface to manually clean up duplicate companies
+   - Implementing logic to keep the most recent company and remove others
+
+### Next Steps
+1. Add database integrity constraints to prevent future duplicate issues
+2. Implement comprehensive error handling for company operations
+3. Add database monitoring for detecting abnormal patterns
+4. Enhance user feedback during company-related operations
