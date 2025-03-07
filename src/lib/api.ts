@@ -1,7 +1,7 @@
 // src/lib/api.ts
 // Client-side API functions for interacting with server-side endpoints
 
-import { Company, User } from '@/types/database';
+import { Company, User, UserRole } from '@/types/database';
 
 /**
  * Create a new user in the database via the server-side API
@@ -182,6 +182,52 @@ export async function getUsersByCompany(companyId: string): Promise<User[]> {
     return data.users;
   } catch (error) {
     console.error('API error getting users by company:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a user's role
+ */
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+  try {
+    const response = await fetch(`/api/users/update?id=${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update user role');
+    }
+  } catch (error) {
+    console.error('API error updating user role:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove a user from a company
+ */
+export async function removeUserFromCompany(userId: string, companyId: string): Promise<void> {
+  try {
+    const response = await fetch(`/api/users/remove-from-company`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, companyId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to remove user from company');
+    }
+  } catch (error) {
+    console.error('API error removing user from company:', error);
     throw error;
   }
 }

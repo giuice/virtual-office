@@ -31,8 +31,8 @@ const navItems: NavItem[] = [
     icon: HomeIcon,
   },
   {
-    title: 'Team',
-    href: '/team',
+    title: 'Company',
+    href: '/company',
     icon: Users2Icon,
   },
   {

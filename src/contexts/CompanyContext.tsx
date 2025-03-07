@@ -12,6 +12,8 @@ import {
   getUserByFirebaseId, 
   createUser, 
   updateUserStatus,
+  updateUserRole as apiUpdateUserRole,
+  removeUserFromCompany as apiRemoveUserFromCompany,
   createCompany,
   getCompany,
   updateCompany,
@@ -30,6 +32,8 @@ interface CompanyContextType {
   // User management
   createUserProfile: (userData: Partial<User>) => Promise<string>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
+  updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
+  removeUserFromCompany: (userId: string) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -257,6 +261,94 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Update user role
+  const updateUserRole = async (userId: string, newRole: UserRole): Promise<void> => {
+    if (!user || !company) {
+      throw new Error('User must be authenticated with a company');
+    }
+
+    // Check if current user is admin
+    if (!company.adminIds.includes(user.uid)) {
+      throw new Error('Only admins can update user roles');
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Use API client to update user role
+      await apiUpdateUserRole(userId, newRole);
+      
+      // If user is being promoted to admin, add to company adminIds
+      if (newRole === 'admin' && !company.adminIds.includes(userId)) {
+        const updatedAdminIds = [...company.adminIds, userId];
+        await updateCompany(company.id, { adminIds: updatedAdminIds });
+        setCompany({ ...company, adminIds: updatedAdminIds });
+      }
+      
+      // If user is being demoted from admin, remove from company adminIds
+      if (newRole === 'member' && company.adminIds.includes(userId)) {
+        const updatedAdminIds = company.adminIds.filter(id => id !== userId);
+        await updateCompany(company.id, { adminIds: updatedAdminIds });
+        setCompany({ ...company, adminIds: updatedAdminIds });
+      }
+      
+      // Update user in state
+      const updatedUsers = companyUsers.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      );
+      setCompanyUsers(updatedUsers);
+    } catch (err) {
+      console.error('Error updating user role:', err);
+      setError(err instanceof Error ? err.message : 'Error updating user role');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Remove user from company
+  const removeUserFromCompany = async (userId: string): Promise<void> => {
+    if (!user || !company) {
+      throw new Error('User must be authenticated with a company');
+    }
+
+    // Check if current user is admin
+    if (!company.adminIds.includes(user.uid)) {
+      throw new Error('Only admins can remove users');
+    }
+
+    // Prevent removing yourself
+    if (userId === user.uid) {
+      throw new Error('You cannot remove yourself from the company');
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Use API client to remove user from company
+      await apiRemoveUserFromCompany(userId, company.id);
+      
+      // If user is admin, remove from company adminIds
+      if (company.adminIds.includes(userId)) {
+        const updatedAdminIds = company.adminIds.filter(id => id !== userId);
+        await updateCompany(company.id, { adminIds: updatedAdminIds });
+        setCompany({ ...company, adminIds: updatedAdminIds });
+      }
+      
+      // Remove user from state
+      const updatedUsers = companyUsers.filter(u => u.id !== userId);
+      setCompanyUsers(updatedUsers);
+    } catch (err) {
+      console.error('Error removing user from company:', err);
+      setError(err instanceof Error ? err.message : 'Error removing user from company');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = {
     company,
     companyUsers,
@@ -267,6 +359,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     updateCompanyDetails,
     createUserProfile,
     updateUserProfile,
+    updateUserRole,
+    removeUserFromCompany,
   };
 
   return <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>;
