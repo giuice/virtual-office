@@ -1,4 +1,3 @@
-// src/app/(dashboard)/dashboard/page.tsx
 'use client';
 
 import { useCompany } from '@/contexts/CompanyContext';
@@ -12,152 +11,87 @@ import {
   HomeIcon, 
   SettingsIcon, 
   MessageSquareIcon, 
-  CalendarIcon 
+  CalendarIcon,
+  ArrowRightIcon
 } from 'lucide-react';
+import { QuickLinksGrid } from '@/app/(dashboard)/dashboard/components/QuickLinksGrid';
+import { CompanyOverviewCard } from '@/app/(dashboard)/dashboard/components/CompanyOverviewCard';
 
 export default function DashboardPage() {
   const { company, currentUserProfile, companyUsers } = useCompany();
   
-  // Check if the user is an admin
   const isAdmin = company?.adminIds?.includes(currentUserProfile?.id || '') || false;
-  
-  const quickLinks = [
-    {
-      title: 'Floor Plan',
-      description: 'Access the virtual office layout',
-      icon: HomeIcon,
-      href: '/floor-plan',
-      color: 'bg-blue-100 dark:bg-blue-900',
-    },
-    {
-      title: 'Team Members',
-      description: `View all ${companyUsers.length} team members`,
-      icon: Users2Icon,
-      href: '/company',
-      color: 'bg-green-100 dark:bg-green-900',
-    },
-    {
-      title: 'Messages',
-      description: 'Chat with colleagues',
-      icon: MessageSquareIcon,
-      href: '/messages',
-      color: 'bg-yellow-100 dark:bg-yellow-900',
-    },
-    {
-      title: 'Calendar',
-      description: 'Schedule meetings and events',
-      icon: CalendarIcon,
-      href: '/calendar',
-      color: 'bg-purple-100 dark:bg-purple-900',
-    },
-    {
-      title: 'Settings',
-      description: 'Update your profile and preferences',
-      icon: SettingsIcon,
-      href: '/settings',
-      color: 'bg-gray-100 dark:bg-gray-800',
-    },
-  ];
 
   return (
     <DashboardShell>
-      {/* <DashboardHeader
+      <DashboardHeader
         heading={`Welcome, ${currentUserProfile?.displayName || 'User'}!`}
         description={`${company?.name || 'Your company'} virtual office dashboard`}
-      /> */}
-      
-      <div className="grid gap-8">
-        {/* Company Overview Card */}
-        <Card>
+      />
+      <div className="flex-1">
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>{company?.name || 'Company'} Overview</CardTitle>
-            <CardDescription>Quick summary of your virtual office</CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle>Virtual Office Floor Plan</CardTitle>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/floor-plan" className="flex items-center gap-2">
+                  <span>Open Floor Plan</span>
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+            <CardDescription>
+              View and interact with your company's virtual office space
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col bg-muted/50 p-4 rounded-lg">
-              <span className="text-muted-foreground text-sm font-medium">Members</span>
-              <span className="text-3xl font-bold mt-1">{companyUsers.length}</span>
-            </div>
-            
-            <div className="flex flex-col bg-muted/50 p-4 rounded-lg">
-              <span className="text-muted-foreground text-sm font-medium">Online</span>
-              <span className="text-3xl font-bold mt-1">
-                {companyUsers.filter(user => user.status === 'online').length}
-              </span>
-            </div>
-            
-            <div className="flex flex-col bg-muted/50 p-4 rounded-lg">
-              <span className="text-muted-foreground text-sm font-medium">Rooms</span>
-              <span className="text-3xl font-bold mt-1">
-                {company?.settings?.maxRooms || 10}
-              </span>
-            </div>
-            
-            <div className="flex flex-col bg-muted/50 p-4 rounded-lg">
-              <span className="text-muted-foreground text-sm font-medium">Your Role</span>
-              <span className="text-xl font-bold mt-1 capitalize">
-                {currentUserProfile?.role || 'Member'}
-              </span>
+          <CardContent>
+            <div className="h-[200px] bg-accent rounded-md flex items-center justify-center">
+              <div className="text-center">
+                <HomeIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Click the button above to open the interactive floor plan
+                </p>
+              </div>
             </div>
           </CardContent>
-          <CardFooter>
-            {isAdmin && (
-              <Button asChild>
-                <Link href="/company?tab=settings">Manage Company</Link>
-              </Button>
-            )}
-          </CardFooter>
         </Card>
         
-        {/* Quick Links Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.map((link) => (
-            <Card key={link.href} className="overflow-hidden">
-              <CardHeader className={`${link.color} text-foreground`}>
-                <div className="flex items-center gap-2">
-                  <link.icon className="h-5 w-5" />
-                  <CardTitle className="text-lg">{link.title}</CardTitle>
-                </div>
+        <div className="grid gap-8">
+          <CompanyOverviewCard 
+            company={company || undefined}
+            companyUsers={companyUsers}
+            currentUserProfile={currentUserProfile || undefined}
+          />
+          
+          <QuickLinksGrid isAdmin={isAdmin} />
+
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Admin Actions</CardTitle>
+                <CardDescription>
+                  Special actions available to company administrators
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-4">
-                <CardDescription>{link.description}</CardDescription>
+              <CardContent className="space-y-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button asChild variant="outline" className="w-full justify-start">
+                    <Link href="/team">
+                      <Users2Icon className="mr-2 h-4 w-4" />
+                      Manage Team
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full justify-start">
+                    <Link href="/settings">
+                      <SettingsIcon className="mr-2 h-4 w-4" />
+                      Company Settings
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
-              <CardFooter>
-                <Button asChild variant="ghost" className="w-full">
-                  <Link href={link.href}>Open {link.title}</Link>
-                </Button>
-              </CardFooter>
             </Card>
-          ))}
+          )}
         </div>
-        
-        {/* Admin Actions (Only visible to admins) */}
-        {isAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Admin Actions</CardTitle>
-              <CardDescription>
-                Special actions available to company administrators
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button asChild variant="outline" className="w-full justify-start">
-                  <Link href="/company">
-                    <Users2Icon className="mr-2 h-4 w-4" />
-                    Manage Team
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full justify-start">
-                  <Link href="/company?tab=settings">
-                    <SettingsIcon className="mr-2 h-4 w-4" />
-                    Company Settings
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardShell>
   );

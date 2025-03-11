@@ -2,21 +2,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, LogOut, Settings } from 'lucide-react';
+import { Bell, LogOut, Settings, Home } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { GlobalSearch } from '@/components/search/global-search';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
+import Link from 'next/link';
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+  heading?: string;
+  description?: string;
+}
+
+export function DashboardHeader({ heading, description }: DashboardHeaderProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { showSuccess } = useNotification();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -40,12 +47,21 @@ export function DashboardHeader() {
     return 'User';
   };
 
+  const isDashboardPage = pathname === '/dashboard';
+
   return (
     <div className="border-b bg-background">
       <div className="flex h-16 items-center px-4 container">
         <div className="mr-8 flex items-center gap-2">
           <div className="hidden md:flex">
-            <h2 className="text-lg font-semibold">Virtual Office</h2>
+            {isDashboardPage ? (
+              <h2 className="text-lg font-semibold">Virtual Office</h2>
+            ) : (
+              <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold hover:text-primary">
+                <Home className="h-5 w-5" />
+                <span>Virtual Office</span>
+              </Link>
+            )}
           </div>
         </div>
         
@@ -92,9 +108,11 @@ export function DashboardHeader() {
                   </div>
                 </div>
                 <Separator />
-                <Button variant="ghost" className="flex items-center justify-start gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
+                <Button variant="ghost" className="flex items-center justify-start gap-2" asChild>
+                  <Link href="/settings">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
                 </Button>
                 <Button 
                   variant="ghost" 
@@ -110,6 +128,13 @@ export function DashboardHeader() {
           </Popover>
         </div>
       </div>
+      
+      {(heading || description) && (
+        <div className="container py-4">
+          {heading && <h1 className="text-2xl font-bold">{heading}</h1>}
+          {description && <p className="text-muted-foreground">{description}</p>}
+        </div>
+      )}
     </div>
   );
 }
