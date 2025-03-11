@@ -39,6 +39,11 @@
 - 🔄 Schema design for Firestore collections
 - 🔄 API client updates for Firestore
 
+### DynamoDB Enhancement
+- 🔄 Optimizing DynamoDB table structure and access patterns
+- 🔄 Implementing caching strategies for DynamoDB queries
+- 🔄 Refining API client for improved DynamoDB performance
+
 ### Floor Plan Implementation
 - 🔄 Floor plan component development
 - 🔄 Room representation in the virtual office
@@ -92,9 +97,10 @@ The project is in the early development phase with the following status:
 
 ## Known Issues
 
-1. **Database Transition Challenges**:
-   - Need to ensure data consistency during migration
-   - API abstraction needs refinement for database agnosticism
+1. **DynamoDB Optimization Challenges**:
+   - Need to improve query efficiency for larger datasets
+   - API abstraction needs refinement for better performance
+   - Consider implementing caching for frequent queries
 
 2. **Authentication Edge Cases**:
    - Handling authentication token expiration
@@ -114,9 +120,9 @@ The project is in the early development phase with the following status:
 
 ## Next Milestone Goals
 
-1. Complete Firebase Firestore migration
+1. Complete DynamoDB performance optimization
 2. Implement interactive floor plan with basic room functionality
-3. Add real-time presence and status updates
+3. Add real-time presence and status updates using DynamoDB Streams
 4. Develop messaging functionality between users
 5. Create room-based collaboration tools
 
@@ -124,7 +130,7 @@ The project is in the early development phase with the following status:
 
 This document will be updated regularly as the project evolves. Key areas to monitor:
 
-- Database migration completion
+- DynamoDB performance optimization
 - Real-time feature implementation
 - Floor plan interactivity
 - AI feature research and initial implementation

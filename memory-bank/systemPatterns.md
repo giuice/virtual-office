@@ -31,7 +31,6 @@ The Virtual Office application follows a modern web architecture with the follow
 
 ### 2. Database Selection
 - **Current: AWS DynamoDB**: Initial implementation
-- **Transition to Firebase Firestore**: For better real-time capabilities and integration with Firebase Authentication
 - **Schema Design**: Collections for companies, users, rooms, messages, announcements, and meeting notes
 - **Security Rules**: Company-based access control for data isolation
 
@@ -142,7 +141,8 @@ graph TD
 
 ## Planned Technical Evolution
 
-1. **Firebase Migration**: Complete transition from AWS DynamoDB to Firebase Firestore
+1. **DynamoDB Enhancements**: Optimize and scale database operations with DynamoDB
 2. **Real-Time Communication**: Integrate WebRTC and Socket.io for live interaction
-3. **AI Integration**: Add speech-to-text, translation, and meeting notes features
-4. **Performance Optimization**: Implement caching and optimize rendering
+3. **DynamoDB Streams**: Implement real-time data synchronization with DynamoDB Streams
+4. **AI Integration**: Add speech-to-text, translation, and meeting notes features
+5. **Performance Optimization**: Implement caching and optimize rendering

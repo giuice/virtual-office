@@ -25,8 +25,9 @@
 ### Planned Technologies
 - **Socket.io**: For real-time updates
 - **WebRTC**: For video/audio communication
-- **Firebase Cloud Functions**: For background processing
+- **AWS Lambda**: For background processing
 - **AI Services**: For meeting transcription, translation, and summaries
+- **DynamoDB Streams**: For real-time data change notifications
 
 ## Development Setup
 
@@ -147,8 +148,8 @@ FIREBASE_PRIVATE_KEY=xxx
 
 ### External Services
 - **Firebase Authentication**: User login and session management
-- **AWS DynamoDB**: Database operations (current)
-- **Firebase Firestore**: Future database operations
+- **AWS DynamoDB**: Database operations
+- **AWS CloudWatch**: Future monitoring and logging
 
 ### Internal APIs
 - REST API endpoints under `/api` routes:
@@ -161,14 +162,13 @@ FIREBASE_PRIVATE_KEY=xxx
 - **Web Notifications**: For system notifications (planned)
 - **LocalStorage**: For client-side persistence of user preferences
 
-## Migration Plan
+## DynamoDB Optimization Plan
 
-### AWS DynamoDB to Firebase Firestore
-1. Create equivalent Firestore collections for DynamoDB tables
-2. Implement dual-write strategy during transition
-3. Add read fallbacks to ensure data availability
-4. Validate data consistency between systems
-5. Switch reads to Firestore
-6. Remove DynamoDB dependencies
+### Performance and Scale Improvements
+1. Implement caching layer for frequent queries
+2. Add DynamoDB Streams for real-time synchronization
+3. Optimize Global Secondary Indexes for common access patterns
+4. Implement auto-scaling for DynamoDB capacity
+5. Add monitoring and performance alerts
 
-The technical architecture provides a foundation for building a scalable, real-time virtual office experience while allowing for planned migrations and future AI feature integration.
+The technical architecture provides a foundation for building a scalable, real-time virtual office experience while leveraging AWS DynamoDB's performance and future AI feature integration.

@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The Virtual Office project is currently focusing on enhancing the AWS DynamoDB database implementation that has been established. The primary goal is to build upon this foundation to support the core features of the virtual office platform, with particular emphasis on:
+The Virtual Office project is currently focusing on enhancing and optimizing the AWS DynamoDB database implementation that has been established. The primary goal is to build upon this foundation to support the core features of the virtual office platform, with particular emphasis on:
 
 1. **Company-based Data Isolation**: Ensuring that data is properly partitioned by company to maintain security and privacy using DynamoDB's Global Secondary Indexes
 2. **User Authentication and Management**: Strengthening the integration between Firebase Authentication and the DynamoDB backend
@@ -19,13 +19,10 @@ The Virtual Office project is currently focusing on enhancing the AWS DynamoDB d
 
 ## Current Decisions
 
-### Database Migration Strategy
+### Database Improvements Strategy
 
-The project is currently using AWS DynamoDB but planning to migrate to Firebase Firestore for better real-time capabilities and integration with Firebase Authentication. Key considerations in this transition:
+Improvements on AWS Dynamo :
 
-1. **Dual-Write Approach**: During migration, implement a dual-write strategy to ensure data consistency
-2. **Schema Compatibility**: Ensure that the data schema works effectively in both environments during transition
-3. **Performance Impact**: Monitor and minimize any performance impact during the migration process
 4. **API Abstraction**: Maintain a clean API abstraction layer to isolate database implementation details from business logic
 
 ### UI/UX Approach
@@ -44,10 +41,11 @@ The project is currently using AWS DynamoDB but planning to migrate to Firebase 
 
 ### Short-term Priorities
 
-1. **Complete Firebase Firestore Migration**: 
-   - Implement Firestore collections for companies, users, rooms, messages, announcements
-   - Update API client functions to work with Firestore
-   - Create Firebase security rules for company-based access
+1. **DynamoDB Performance Optimization**: 
+   - Implement caching for frequently accessed data
+   - Refine Global Secondary Indexes for common access patterns
+   - Add monitoring and error tracking for database operations
+   - Create comprehensive database backup strategy
 
 2. **Floor Plan Implementation**:
    - Develop interactive floor plan component
@@ -58,6 +56,7 @@ The project is currently using AWS DynamoDB but planning to migrate to Firebase 
    - Add WebSocket connection for real-time presence updates
    - Implement real-time messaging
    - Enable real-time room occupancy tracking
+   - Integrate with DynamoDB Streams for real-time data synchronization
 
 4. **User Experience Improvements**:
    - Complete the user profile management features
@@ -79,9 +78,9 @@ The project is currently using AWS DynamoDB but planning to migrate to Firebase 
 ## Active Technical Challenges
 
 1. **Real-time Synchronization**: Ensuring consistent real-time updates across multiple users
-2. **Database Migration**: Moving from DynamoDB to Firestore without disrupting service
+2. **DynamoDB Performance**: Optimizing queries and table design for better performance
 3. **Performance Optimization**: Maintaining responsive UI with increasing data and real-time features
-4. **Authentication Integration**: Seamlessly connecting Firebase Authentication with the database backend
+4. **Authentication Integration**: Seamlessly connecting Firebase Authentication with the DynamoDB backend
 5. **Cross-Browser Compatibility**: Ensuring WebRTC and other features work across different browsers
 
 ## Current Testing Focus
