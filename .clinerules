@@ -1,0 +1,14 @@
+---CLINE_RULES_START---
+[LAST_ACTION_STATE]
+last_action: "Dependency Tracker Keys Generated"
+current_phase: "Set-up/Maintenance"
+next_action: "Update Active Context"
+next_phase: "Set-up/Maintenance"
+
+[CODE_ROOT_DIRECTORIES]
+- src
+
+[LEARNING_JOURNAL]
+- Initial setup completed on March 13, 2025.
+- Identified code roots: src.
+---CLINE_RULES_END---
