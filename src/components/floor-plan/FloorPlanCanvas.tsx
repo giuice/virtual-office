@@ -1,25 +1,26 @@
 import { Stage, Layer, Rect, Text } from 'react-konva';
-import { Room } from './types';
+import { Space } from './types';
 
 type FloorPlanCanvasProps = {
-  rooms: Room[];
-  onRoomCreate: (room: Room) => void;
+  spaces: Space[];
+  onSpaceSelect: (space: Space) => void;
 };
 
-export const FloorPlanCanvas = ({ rooms, onRoomCreate }: FloorPlanCanvasProps) => {
+export const FloorPlanCanvas = ({ spaces, onSpaceSelect }: FloorPlanCanvasProps) => {
   return (
     <Stage width={window.innerWidth} height={600}>
       <Layer>
-        {rooms.map((room) => (
+        {spaces.map((space) => (
           <Rect
-            key={room.id}
-            x={room.x}
-            y={room.y}
-            width={room.width}
-            height={room.height}
+            key={space.id}
+            x={space.position.x}
+            y={space.position.y}
+            width={space.position.width}
+            height={space.position.height}
             fill="#f0fdf4"
             stroke="#4ade80"
             strokeWidth={2}
+            onClick={() => onSpaceSelect(space)}
           />
         ))}
       </Layer>

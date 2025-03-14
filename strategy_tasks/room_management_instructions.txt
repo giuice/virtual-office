@@ -1,0 +1,71 @@
+# Room Creation & Management Enhancements Instructions
+
+## Objective
+Enhance the room creation and management functionality to provide a more intuitive, feature-rich experience for users creating, editing, and managing rooms in the virtual office floor plan.
+
+## Context
+The current room creation and management functionality is implemented primarily in:
+- `src/components/floor-plan/room-dialog.tsx`: Dialog for room creation and editing
+- `src/components/floor-plan/floor-plan.tsx`: Container component that includes room management logic
+- `src/components/floor-plan/FloorPlanCanvas.tsx`: Canvas component that renders rooms
+- `src/components/floor-plan/types.ts`: TypeScript definitions for room-related components
+
+The existing implementation provides basic room creation but needs enhancement to support more advanced features and improve user experience.
+
+## Dependencies
+- 2Ab: `src/components` (room management components depend on this module)
+- 2Ad: `src/contexts` (may need context for state management)
+- 2Af: `src/lib` (utility functions for room management)
+- Interactive Floor Plan Completion (related task that enhances floor plan interactivity)
+
+## Steps
+1. **Enhance Room Dialog UI/UX**
+   - Redesign the room creation/editing dialog for improved usability
+   - Add form validation with clear error messages
+   - Implement a more intuitive layout with preview capability
+   - Add accessibility features to ensure the dialog is fully accessible
+
+2. **Implement Advanced Room Properties**
+   - Add support for room types (meeting room, open space, private office, etc.)
+   - Implement room capacity settings with visual indicators
+   - Add room status options (available, in-use, reserved, etc.)
+   - Support for room scheduling and reservation
+
+3. **Create Room Templates**
+   - Implement predefined room templates for quick creation
+   - Allow saving custom room configurations as templates
+   - Add template management (create, edit, delete)
+   - Implement template preview functionality
+
+4. **Enhance Room Management Controls**
+   - Add bulk operations for rooms (select multiple, move, delete)
+   - Implement room grouping functionality
+   - Add room filtering and sorting options
+   - Create a dedicated room management panel/sidebar
+
+5. **Implement Room Permissions and Access Control**
+   - Add room locking/unlocking functionality
+   - Implement user access controls for rooms
+   - Create admin-only room management features
+   - Add audit logging for room changes
+
+6. **Optimize Room Data Management**
+   - Implement efficient data structures for room storage
+   - Add real-time synchronization for room changes
+   - Optimize room rendering performance
+   - Implement data validation and error handling
+
+## Expected Output
+- Enhanced room-dialog component with improved UI/UX
+- Updated floor-plan component with advanced room management features
+- New room template system for efficient room creation
+- Comprehensive room management controls
+- Room permission system for access control
+- Optimized room data management for performance
+
+## Notes
+- Consider using a form library like react-hook-form or formik for improved form handling
+- Room templates should be stored in a way that allows for easy sharing between users
+- Ensure all new features maintain compatibility with the existing floor plan implementation
+- Room management should scale well for both small and large floor plans
+- Consider implementing undo/redo functionality for room management operations

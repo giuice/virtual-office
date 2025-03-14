@@ -9,6 +9,7 @@ import { Users, Monitor, Video, MessageSquare } from 'lucide-react'
 import { RoomDialog } from './room-dialog'
 import { RoomTooltip } from './room-tooltip'
 import { UserHoverCard } from './user-hover-card' // We'll create this
+import { FloorPlanCanvas } from './FloorPlanCanvas';
 
 // Keep your existing demoSpaces data...
 // Sample data
@@ -78,6 +79,8 @@ const demoSpaces: Space[] = [
 export function FloorPlan() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
   const [hoveredUser, setHoveredUser] = useState<User | null>(null)
+  const [spaces, setSpaces] = useState<Space[]>(demoSpaces)
+  const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false)
 
   return (
     <div className="space-y-4">
@@ -122,8 +125,27 @@ export function FloorPlan() {
 
       {/* Main Floor Plan Card */}
       <Card className="w-full">
-        {/* Your existing CardHeader and floor plan SVG... */}
+        <FloorPlanCanvas spaces={spaces} onSpaceSelect={setSelectedSpace} />
       </Card>
+      <div className="flex justify-end">
+        <button 
+          className="px-4 py-2 bg-blue-500 text-white rounded"
+          onClick={() => setIsRoomDialogOpen(true)}
+        >
+          Create Room
+        </button>
+      </div>
+      {isRoomDialogOpen && (
+        <RoomDialog 
+           room={null}
+           open={isRoomDialogOpen}
+           onOpenChange={(open: boolean) => setIsRoomDialogOpen(open)}
+           onCreate={(newRoom: Space) => {
+             setSpaces(prev => [...prev, newRoom])
+             setIsRoomDialogOpen(false)
+           }}
+        />
+      )}
 
       {/* User Info Bar */}
       <Card className="w-full">

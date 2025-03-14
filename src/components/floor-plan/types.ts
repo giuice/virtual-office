@@ -1,9 +1,23 @@
-export type Room = {
+export type User = {
+  id: number;
+  name: string;
+  status: string;
+  avatar: string;
+  activity: string;
+};
+
+export type Space = {
   id: string;
   name: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  type: 'desk' | 'meeting' | 'common';
+  type: string;
+  status: string;
+  position: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  capacity: number;
+  features: string[];
+  users: User[];
 };

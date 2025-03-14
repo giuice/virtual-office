@@ -1,0 +1,80 @@
+# Global Blackboard/Announcements System Instructions
+
+## Objective
+Create a comprehensive global blackboard and announcements system that allows company-wide communication, enabling users to post, view, and interact with announcements in real-time across the virtual office application.
+
+## Context
+The virtual office application currently lacks a centralized communication system for company-wide announcements. A global blackboard system is needed to facilitate important communications, announcements, and shared information that should be visible to all users within a company workspace.
+
+This feature will require new components and potentially new routes in the application structure.
+
+## Dependencies
+- 2Aa: `src/app` (for creating new routes for the blackboard)
+- 2Ab: `src/components` (for creating blackboard UI components)
+- 2Ad: `src/contexts` (for announcement state management)
+- 2Af: `src/lib` (for API calls and utility functions)
+
+## Steps
+1. **Design and Implement Announcement Data Model**
+   - Define announcement data structure (title, content, author, timestamp, expiration, etc.)
+   - Create announcement categories/types (important, general, event, etc.)
+   - Implement visibility and targeting options (all users, specific departments, etc.)
+   - Design database schema for announcement storage
+
+2. **Create Blackboard Context and State Management**
+   - Implement a BlackboardContext for global announcement state
+   - Create hooks for announcement operations (post, edit, delete, pin)
+   - Set up real-time announcement synchronization
+   - Implement announcement filtering and sorting
+
+3. **Develop Blackboard UI Components**
+   - Create a main blackboard view component
+   - Implement announcement cards with rich content support
+   - Add announcement creation/editing interface
+   - Design announcement detail view
+
+4. **Implement Blackboard Navigation and Access**
+   - Add blackboard link to main navigation
+   - Create a dedicated blackboard page/route
+   - Implement a mini-blackboard widget for dashboard
+   - Add notification indicators for new announcements
+
+5. **Add Announcement Interaction Features**
+   - Implement announcement reactions (like, acknowledge, etc.)
+   - Add commenting functionality on announcements
+   - Create announcement sharing options
+   - Implement announcement bookmarking
+
+6. **Develop Admin Controls and Management**
+   - Create admin-only announcement management interface
+   - Implement announcement moderation features
+   - Add announcement analytics (views, interactions)
+   - Create announcement templates for quick posting
+
+7. **Integrate with Other Application Features**
+   - Connect announcements with calendar for event announcements
+   - Integrate with notification system
+   - Add announcement references in floor plan (e.g., event locations)
+   - Implement announcement search in global search
+
+8. **Optimize Performance and User Experience**
+   - Implement efficient announcement loading and pagination
+   - Add animations and transitions for a polished experience
+   - Optimize for mobile and desktop views
+   - Ensure accessibility compliance
+
+## Expected Output
+- Comprehensive blackboard system for company-wide announcements
+- Rich announcement creation and viewing interface
+- Real-time announcement updates and notifications
+- Admin controls for announcement management
+- Integration with other application features
+- Responsive and accessible user interface
+
+## Notes
+- Consider using a rich text editor like Draft.js or Slate for announcement content
+- Announcements should support markdown or rich formatting for better readability
+- Consider implementing announcement scheduling for future posting
+- Design the system to handle both persistent and temporary announcements
+- Ensure proper permissions and access controls for announcement management
+- Consider implementing announcement archiving for historical reference

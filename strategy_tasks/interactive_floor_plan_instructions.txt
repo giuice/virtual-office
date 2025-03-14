@@ -1,0 +1,64 @@
+# Interactive Floor Plan Completion Instructions
+
+## Objective
+Implement dynamic interaction features for the floor plan to enhance user experience, including drag-and-drop functionality, zooming capabilities, and detailed room information popups.
+
+## Context
+The floor plan is a central component of the virtual office application, allowing users to navigate and interact with the virtual workspace. Currently, basic floor plan functionality exists in the following files:
+- `src/components/floor-plan/FloorPlanCanvas.tsx`: Main canvas component for rendering the floor plan
+- `src/components/floor-plan/floor-plan.tsx`: Container component for the floor plan
+- `src/components/floor-plan/room-dialog.tsx`: Dialog for room creation and editing
+- `src/components/floor-plan/types.ts`: TypeScript definitions for floor plan components
+- `src/app/(dashboard)/floor-plan/layout.tsx`: Layout for the floor plan page
+- `src/app/(dashboard)/floor-plan/page.tsx`: Page component for the floor plan
+
+The floor plan needs enhanced interactivity to provide a more engaging and intuitive user experience.
+
+## Dependencies
+- 2Ab: `src/components` (floor-plan components depend on this module)
+- 2Ad: `src/contexts` (floor plan may need context for state management)
+- 2Af: `src/lib` (utility functions may be needed for floor plan interactions)
+
+## Steps
+1. **Enhance Drag-and-Drop Functionality**
+   - Implement smooth dragging of room elements within the floor plan
+   - Add snap-to-grid functionality for precise placement
+   - Enable resizing of rooms through drag handles
+   - Implement collision detection to prevent room overlap
+
+2. **Add Zooming and Panning Capabilities**
+   - Implement zoom in/out functionality with mouse wheel and touch gestures
+   - Add zoom controls (buttons for zoom in/out and reset)
+   - Implement panning/scrolling to navigate larger floor plans
+   - Ensure responsive behavior across different screen sizes
+
+3. **Create Detailed Room Information Popups**
+   - Design and implement popups that display when hovering/clicking on rooms
+   - Show room details (name, capacity, current occupants)
+   - Add quick action buttons in popups (join, message, etc.)
+   - Ensure popups are accessible and responsive
+
+4. **Implement User Interaction Feedback**
+   - Add visual feedback for interactions (hover states, selection indicators)
+   - Implement animations for transitions (room creation, movement)
+   - Add sound effects for key interactions (optional)
+   - Ensure all interactions have appropriate accessibility features
+
+5. **Optimize Performance**
+   - Implement efficient rendering techniques for the canvas
+   - Use React.memo or useMemo for optimized component rendering
+   - Implement virtualization for large floor plans
+   - Add performance monitoring and optimization
+
+## Expected Output
+- Enhanced FloorPlanCanvas component with drag-and-drop, zooming, and popup functionality
+- Updated floor-plan component with new interactive features
+- Improved user experience with responsive and intuitive interactions
+- Optimized performance for smooth operation even with complex floor plans
+
+## Notes
+- Consider using a library like react-draggable or react-dnd for drag-and-drop functionality
+- Zoom functionality might benefit from a library like use-gesture or react-zoom-pan-pinch
+- Ensure all new features work well on both desktop and mobile devices
+- Maintain accessibility standards throughout implementation
+- Consider implementing feature flags for gradual rollout of new functionality

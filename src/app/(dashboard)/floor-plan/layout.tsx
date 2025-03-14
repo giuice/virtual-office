@@ -1,5 +1,5 @@
 // app/(dashboard)/floor-plan/layout.tsx
-import { DashboardNav } from '@/components/nav'
+import DashboardNav from '@/components/nav'
 
 export default function FloorPlanLayout({
   children,

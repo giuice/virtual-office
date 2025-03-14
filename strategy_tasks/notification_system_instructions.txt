@@ -1,0 +1,90 @@
+# Integrated Notification System Instructions
+
+## Objective
+Build a comprehensive in-app notification system that alerts users of important events, messages, and updates in real-time across the virtual office application, enhancing user awareness and engagement.
+
+## Context
+The virtual office application currently lacks a centralized notification system. This feature is essential for keeping users informed about relevant activities and events within the virtual workspace, such as new messages, room invitations, announcements, and user status changes.
+
+This feature will require new components and integration with existing features.
+
+## Dependencies
+- 2Aa: `src/app` (for notification routes and API endpoints)
+- 2Ab: `src/components` (for notification UI components)
+- 2Ad: `src/contexts` (for notification state management)
+- 2Af: `src/lib` (for API calls and utility functions)
+- Messaging System (for message notifications)
+- Blackboard System (for announcement notifications)
+- User Profile Management (for user status notifications)
+- Room Management (for room-related notifications)
+
+## Steps
+1. **Design and Implement Notification Data Model**
+   - Define notification data structure (type, content, source, timestamp, etc.)
+   - Create notification categories (message, announcement, system, etc.)
+   - Implement notification priority levels (high, medium, low)
+   - Design database schema for notification storage and retrieval
+
+2. **Create Notification Context and State Management**
+   - Implement a NotificationContext for global notification state
+   - Create hooks for notification operations (create, read, dismiss, etc.)
+   - Set up real-time notification synchronization
+   - Implement notification preferences and filtering
+
+3. **Develop Notification UI Components**
+   - Create notification bell/icon component for global navigation
+   - Implement notification dropdown/panel for viewing notifications
+   - Design individual notification item components
+   - Add notification badge with unread count
+
+4. **Implement Notification Delivery System**
+   - Create notification generation service
+   - Implement real-time delivery using WebSockets
+   - Add notification batching for high-volume periods
+   - Design notification throttling to prevent overwhelming users
+
+5. **Develop Notification Center**
+   - Create a dedicated notification center page/route
+   - Implement notification history and archiving
+   - Add notification filtering and search
+   - Design notification settings and preferences UI
+
+6. **Integrate with Application Features**
+   - Connect with messaging system for message notifications
+   - Integrate with blackboard for announcement notifications
+   - Link with user profiles for status and activity notifications
+   - Connect with rooms for room-related notifications
+
+7. **Implement Push Notifications**
+   - Add browser push notification support
+   - Implement notification permission management
+   - Create notification service worker
+   - Design fallback for unsupported browsers
+
+8. **Add Advanced Notification Features**
+   - Implement notification grouping for related items
+   - Add smart notification timing based on user activity
+   - Create notification templates for consistent formatting
+   - Implement notification analytics for system improvement
+
+9. **Optimize Performance and User Experience**
+   - Ensure efficient notification loading and rendering
+   - Add animations for notification appearance/dismissal
+   - Optimize for mobile and desktop experiences
+   - Ensure accessibility compliance
+
+## Expected Output
+- Comprehensive notification system integrated throughout the application
+- Real-time notification delivery for important events
+- Notification center for history and management
+- Push notification support for browser notifications
+- User preference controls for notification settings
+- Optimized performance and user experience
+
+## Notes
+- Consider using a library like react-toastify for toast notifications
+- Notification system should be designed to scale with growing feature set
+- Ensure notifications are non-intrusive but noticeable
+- Consider implementing a notification queue for handling high volumes
+- Design notifications to be actionable where appropriate
+- Ensure proper error handling for notification delivery failures

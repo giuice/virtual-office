@@ -1,7 +1,7 @@
 // src/contexts/SearchContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useRef } from 'react';
 import { User } from '@/components/floor-plan/types';
 
 interface SearchContextType {
@@ -81,22 +81,29 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [isSearching, setIsSearching] = useState(false);
 
   // Function to handle search
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    setIsSearching(!!query.trim());
-    
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
     }
-    
-    // Filter users based on search query
-    const filteredUsers = mockUsers.filter(user => 
-      user.name.toLowerCase().includes(query.toLowerCase()) ||
-      user.activity.toLowerCase().includes(query.toLowerCase())
-    );
-    
-    setSearchResults(filteredUsers);
+    debounceTimeout.current = setTimeout(() => {
+      const trimmedQuery = query.trim();
+      setIsSearching(!!trimmedQuery);
+      
+      if (!trimmedQuery) {
+        setSearchResults([]);
+        return;
+      }
+  
+      const filteredUsers = mockUsers.filter(user => 
+        user.name.toLowerCase().includes(trimmedQuery.toLowerCase()) ||
+        user.activity.toLowerCase().includes(trimmedQuery.toLowerCase())
+      );
+  
+      setSearchResults(filteredUsers);
+    }, 300);
   };
 
   const clearSearch = () => {

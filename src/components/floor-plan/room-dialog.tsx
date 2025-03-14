@@ -26,9 +26,10 @@ interface RoomDialogProps {
   room: Space | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreate: (newRoom: Space) => void
 }
 
-export function RoomDialog({ room, open, onOpenChange }: RoomDialogProps) {
+export function RoomDialog({ room, open, onOpenChange, onCreate }: RoomDialogProps) {
   const [isMicActive, setIsMicActive] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRoomLocked, setIsRoomLocked] = useState(false)
