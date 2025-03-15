@@ -14,7 +14,7 @@ This document outlines the immediate tasks prioritized for development, based on
 - 🔄 Live user status updates
 
 ### Critical Features (Detailed Instructions Available)
-- ❌ Interactive floor plan completion → [interactive_floor_plan_instructions.txt](./interactive_floor_plan_instructions.txt)
+- ✅ Interactive floor plan completion → [interactive_floor_plan_instructions.txt](./interactive_floor_plan_instructions.txt)
 - ❌ Room creation and management → [room_management_instructions.txt](./room_management_instructions.txt)
 - ❌ Message feed and direct messaging → [messaging_system_instructions.txt](./messaging_system_instructions.txt)
 - ❌ Global blackboard/announcements → [blackboard_system_instructions.txt](./blackboard_system_instructions.txt)

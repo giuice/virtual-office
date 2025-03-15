@@ -1,5 +1,17 @@
 # Changelog
 
+## 3/14/2025 (3:16 PM)
+- **Floor Plan Bug Fixes:**
+  - *FloorPlanCanvas.tsx*: Fixed canvas rendering error with proper initialization and sizing
+  - *page.tsx*: Updated to use DashboardShell component for better layout
+  - Improved drag and resize handlers to better handle zoom levels
+
+## 3/14/2025 (12:40 PM)
+- **Interactive Floor Plan Implementation:**
+  - *FloorPlanCanvas.tsx*: Enhanced with drag-and-drop functionality, zooming capabilities, and visual feedback
+  - *floor-plan.tsx*: Updated to support interactive features and room editing
+  - *types.ts*: Consolidated type definitions and added theme-aware color constants
+
 ## 3/14/2025 (9:23 AM)
 - **Strategy Phase Implementation:**
   - Created detailed instruction files for prioritized tasks:

@@ -5,13 +5,13 @@ import { useState } from 'react'
 import { Space, User } from './types'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Monitor, Video, MessageSquare } from 'lucide-react'
+import { Users, Monitor, Video, MessageSquare, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog'
 import { RoomTooltip } from './room-tooltip'
-import { UserHoverCard } from './user-hover-card' // We'll create this
+import { UserHoverCard } from './user-hover-card'
 import { FloorPlanCanvas } from './FloorPlanCanvas';
 
-// Keep your existing demoSpaces data...
 // Sample data
 const demoSpaces: Space[] = [
   {
@@ -125,16 +125,32 @@ export function FloorPlan() {
 
       {/* Main Floor Plan Card */}
       <Card className="w-full">
-        <FloorPlanCanvas spaces={spaces} onSpaceSelect={setSelectedSpace} />
+        <div className="p-4">
+          <div className="flex justify-end mb-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => setIsRoomDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Create Room
+            </Button>
+          </div>
+          <FloorPlanCanvas 
+            spaces={spaces} 
+            onSpaceSelect={setSelectedSpace} 
+            onSpaceUpdate={(updatedSpace) => {
+              setSpaces(prev => 
+                prev.map(space => space.id === updatedSpace.id ? updatedSpace : space)
+              );
+            }}
+            isEditable={true}
+          />
+        </div>
       </Card>
-      <div className="flex justify-end">
-        <button 
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-          onClick={() => setIsRoomDialogOpen(true)}
-        >
-          Create Room
-        </button>
-      </div>
+
+      {/* Room Dialog */}
       {isRoomDialogOpen && (
         <RoomDialog 
            room={null}
@@ -155,10 +171,10 @@ export function FloorPlan() {
               {hoveredUser ? (
                 <>
                   <UserHoverCard user={hoveredUser} />
-                  <span className="text-sm text-gray-500">{hoveredUser.activity}</span>
+                  <span className="text-sm text-muted-foreground">{hoveredUser.activity}</span>
                 </>
               ) : (
-                <span className="text-sm text-gray-500">Hover over a user to see details</span>
+                <span className="text-sm text-muted-foreground">Hover over a user to see details</span>
               )}
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
