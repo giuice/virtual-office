@@ -1,0 +1,50 @@
+// src/components/floor-plan/room-chat-integration.tsx
+'use client';
+
+import { useState } from 'react';
+import { Space } from '@/components/floor-plan/types';
+import { MessagingProvider } from '@/contexts/messaging/MessagingContext';
+import { RoomMessaging } from '@/components/messaging/room-messaging';
+
+interface RoomChatIntegrationProps {
+  selectedRoom: Space | null;
+  onCloseChat?: () => void;
+  position?: 'right' | 'bottom';
+}
+
+/**
+ * This component integrates the messaging system with the floor plan.
+ * It shows a chat panel for the selected room.
+ */
+export function RoomChatIntegration({
+  selectedRoom,
+  onCloseChat,
+  position = 'right',
+}: RoomChatIntegrationProps) {
+  const [isMessagingOpen, setIsMessagingOpen] = useState(true);
+  
+  // Handle closing the messaging panel
+  const handleClose = () => {
+    setIsMessagingOpen(false);
+    if (onCloseChat) {
+      onCloseChat();
+    }
+  };
+  
+  // If no room is selected, don't render anything
+  if (!selectedRoom) {
+    return null;
+  }
+  
+  return (
+    <MessagingProvider>
+      <RoomMessaging
+        roomId={selectedRoom.id}
+        roomName={selectedRoom.name}
+        isOpen={isMessagingOpen}
+        onClose={handleClose}
+        position={position}
+      />
+    </MessagingProvider>
+  );
+}

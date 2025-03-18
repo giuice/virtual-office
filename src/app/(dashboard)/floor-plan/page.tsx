@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Space, Announcement } from '@/components/floor-plan/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
-import { FloorPlan } from "@/components/floor-plan/floor-plan";
+import { FloorPlan } from "@/components/floor-plan/floor-plan-old";
 
 
 export default function FloorPlanPage() {

@@ -14,7 +14,6 @@ import { RoomManagement } from './room-management'
 import { RoomTemplateSelector } from './room-template-selector'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RoomChatIntegration } from './room-chat-integration'
 
 // Sample data
 const demoSpaces: Space[] = [
@@ -154,9 +153,6 @@ export function FloorPlan() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
   
-  // State for room messaging
-  const [chatRoom, setChatRoom] = useState<Space | null>(null)
-  
   // Filter spaces based on type and search query
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
@@ -184,11 +180,6 @@ export function FloorPlan() {
   const handleDeleteRoom = (roomId: string) => {
     setSpaces(prev => prev.filter(space => space.id !== roomId));
     setSelectedSpace(null);
-    
-    // Also close chat if the deleted room is the current chat room
-    if (chatRoom && chatRoom.id === roomId) {
-      setChatRoom(null);
-    }
   };
   
   // Handle room duplication
@@ -236,19 +227,9 @@ export function FloorPlan() {
     
     setSpaces(prev => [...prev, newRoom]);
   };
-  
-  // Handle opening chat for a room
-  const handleOpenChat = (room: Space) => {
-    setChatRoom(room);
-  };
-  
-  // Handle closing chat
-  const handleCloseChat = () => {
-    setChatRoom(null);
-  };
 
   return (
-    <div className="space-y-4 relative">
+    <div className="space-y-4">
       {/* Status Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -341,29 +322,15 @@ export function FloorPlan() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="default" 
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => setIsRoomDialogOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Create Room
-          </Button>
-          
-          {selectedSpace && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => handleOpenChat(selectedSpace)}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Chat in Room
-            </Button>
-          )}
-        </div>
+        <Button 
+          variant="default" 
+          size="sm"
+          className="flex items-center gap-2"
+          onClick={() => setIsRoomDialogOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Create Room
+        </Button>
       </div>
 
       {/* Main Floor Plan Card */}
@@ -372,11 +339,6 @@ export function FloorPlan() {
           <FloorPlanCanvas 
             spaces={filteredSpaces} 
             onSpaceSelect={(space) => {
-              setSelectedSpace(space);
-              // We don't automatically open the edit dialog, 
-              // so users can select a room for other actions like chat
-            }}
-            onSpaceDoubleClick={(space) => {
               setSelectedSpace(space);
               setIsEditingRoom(true);
             }}
@@ -416,10 +378,6 @@ export function FloorPlan() {
         }}
         onDeleteRoom={handleDeleteRoom}
         onDuplicateRoom={handleDuplicateRoom}
-        onOpenChat={(room) => {
-          handleOpenChat(room);
-          setIsRoomManagementOpen(false);
-        }}
         open={isRoomManagementOpen}
         onOpenChange={setIsRoomManagementOpen}
       />
@@ -430,13 +388,6 @@ export function FloorPlan() {
         onSelectTemplate={handleSelectTemplate}
         open={isTemplateDialogOpen}
         onOpenChange={setIsTemplateDialogOpen}
-      />
-      
-      {/* Room Chat Integration */}
-      <RoomChatIntegration 
-        selectedRoom={chatRoom} 
-        onCloseChat={handleCloseChat}
-        position="right"
       />
 
       {/* User Info Bar */}

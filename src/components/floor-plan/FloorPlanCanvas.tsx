@@ -9,9 +9,10 @@ import { RoomTooltip } from './room-tooltip';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type FloorPlanCanvasProps = {
+export type FloorPlanCanvasProps = {
   spaces: Space[];
   onSpaceSelect: (space: Space) => void;
+  onSpaceDoubleClick?: (space: Space) => void;
   onSpaceUpdate?: (updatedSpace: Space) => void;
   isEditable?: boolean;
 };
@@ -19,6 +20,7 @@ type FloorPlanCanvasProps = {
 export const FloorPlanCanvas = ({ 
   spaces, 
   onSpaceSelect, 
+  onSpaceDoubleClick,
   onSpaceUpdate,
   isEditable = false 
 }: FloorPlanCanvasProps) => {
@@ -341,6 +343,8 @@ export const FloorPlanCanvas = ({
                       draggable={isEditable}
                       onClick={() => handleSelect(space)}
                       onTap={() => handleSelect(space)}
+                      onDblClick={() => onSpaceDoubleClick?.(space)}
+                      onDblTap={() => onSpaceDoubleClick?.(space)}
                       onMouseEnter={() => setHoveredId(space.id)}
                       onMouseLeave={() => setHoveredId(null)}
                       onDragStart={handleDragStart}

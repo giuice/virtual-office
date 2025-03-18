@@ -1,5 +1,5 @@
-export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout';
-export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked';
+export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout' | 'private_office' | 'open_space' | 'lounge' | 'lab';
+export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked' | 'reserved' | 'in_use';
 export type UserStatus = 'active' | 'away' | 'presenting' | 'viewing';
 
 export interface Position {
@@ -17,6 +17,22 @@ export interface User {
   activity: string;
 }
 
+export interface AccessControl {
+  isPublic: boolean;
+  allowedUsers?: number[]; // User IDs that have access
+  allowedRoles?: string[]; // Roles that have access
+  ownerId?: number; // User ID of the owner
+}
+
+export interface Reservation {
+  id: string;
+  userId: number;
+  userName: string;
+  startTime: Date;
+  endTime: Date;
+  purpose: string;
+}
+
 export interface Space {
   id: string;
   name: string;
@@ -26,6 +42,27 @@ export interface Space {
   features: string[];
   position: Position;
   users: User[];
+  description?: string;
+  accessControl?: AccessControl;
+  reservations?: Reservation[];
+  createdBy?: number; // User ID who created the room
+  createdAt?: Date;
+  updatedAt?: Date;
+  isTemplate?: boolean;
+  templateName?: string;
+}
+
+export interface RoomTemplate {
+  id: string;
+  name: string;
+  type: SpaceType;
+  capacity: number;
+  features: string[];
+  description?: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  createdBy?: number;
+  isPublic: boolean;
 }
 
 export interface Announcement {
@@ -54,6 +91,22 @@ export const spaceColors = {
   breakout: { 
     color: 'hsl(var(--secondary))', 
     lightColor: 'hsl(var(--secondary) / 0.15)' // Secondary color with transparency
+  },
+  private_office: {
+    color: 'hsl(var(--destructive))',
+    lightColor: 'hsl(var(--destructive) / 0.15)' // Red with transparency
+  },
+  open_space: {
+    color: 'hsl(var(--accent))',
+    lightColor: 'hsl(var(--accent) / 0.15)' // Accent color with transparency
+  },
+  lounge: {
+    color: 'hsl(var(--popover))',
+    lightColor: 'hsl(var(--popover) / 0.15)' // Popover color with transparency
+  },
+  lab: {
+    color: 'hsl(var(--card))',
+    lightColor: 'hsl(var(--card) / 0.15)' // Card color with transparency
   },
   default: { 
     color: 'hsl(var(--muted-foreground))', 
