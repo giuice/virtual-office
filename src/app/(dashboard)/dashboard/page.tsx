@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { QuickLinksGrid } from '@/app/(dashboard)/dashboard/components/QuickLinksGrid';
 import { CompanyOverviewCard } from '@/app/(dashboard)/dashboard/components/CompanyOverviewCard';
+import { useMessaging } from '@/contexts/MessagingContext'; // Import useMessaging
+import { useState } from 'react'; // Import useState
+import { Input } from '@/components/ui/input'; // Import Input
+import { MessageType, MessageStatus } from '@/types/messaging'; // Import enums
 
 export default function DashboardPage() {
   const { company, currentUserProfile, companyUsers } = useCompany();
@@ -65,6 +69,20 @@ export default function DashboardPage() {
           
           <QuickLinksGrid isAdmin={isAdmin} />
 
+          {/* Temporary Messaging Test Component */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Messaging Test</CardTitle>
+              <CardDescription>
+                Test Socket.IO connection and message sending.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MessagingTestComponent />
+            </CardContent>
+          </Card>
+          {/* End Temporary Messaging Test Component */}
+
           {isAdmin && (
             <Card>
               <CardHeader>
@@ -96,3 +114,44 @@ export default function DashboardPage() {
     </DashboardShell>
   );
 }
+
+// Temporary Test Component - Remove after verification
+const MessagingTestComponent = () => {
+  const { isConnected, sendMessage } = useMessaging();
+  const [messageContent, setMessageContent] = useState('');
+
+  const handleSendTestMessage = () => {
+    if (messageContent.trim()) {
+      sendMessage({
+        // Provide dummy data matching the Omit<Message, 'id' | 'timestamp'> type
+        conversationId: 'test-conversation-123',
+        senderId: 'test-user-456', // Replace with actual user ID later
+        content: messageContent,
+        type: MessageType.TEXT, // Use enum member
+        status: MessageStatus.SENDING, // Use enum member
+        reactions: [],
+        isEdited: false,
+        // replyToId and attachments are optional
+      });
+      setMessageContent(''); // Clear input after sending
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p>Socket.IO Connection Status: {isConnected ? 'Connected' : 'Disconnected'}</p>
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Enter test message"
+          value={messageContent}
+          onChange={(e) => setMessageContent(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSendTestMessage()}
+        />
+        <Button onClick={handleSendTestMessage} disabled={!isConnected || !messageContent.trim()}>
+          Send Test Message
+        </Button>
+      </div>
+    </div>
+  );
+};
