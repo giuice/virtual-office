@@ -1,5 +1,14 @@
 # Changelog
 
+## 3/27/2025 (2:45 PM)
+- **Messaging System Real-Time Setup:**
+  - *package.json*: Added `socket.io` and `socket.io-client` dependencies.
+  - *src/contexts/MessagingContext.tsx*: Created context with basic Socket.IO client setup and connection logic. Fixed type import paths.
+  - *socket-server.js*: Created standalone Node.js server for Socket.IO during development.
+  - *src/app/layout.tsx*: Integrated `MessagingProvider` to make context available globally.
+  - *src/app/(dashboard)/dashboard/page.tsx*: Added temporary test component to verify Socket.IO connection and basic message sending. Fixed JSX structure and type usage in the test component.
+  - Started `socket-server.js` and `npm run dev` servers.
+
 ## 3/18/2025 (6:35 AM)
 - **Messaging System API Implementation:**
   - *src/app/api/messages/create/route.ts*: Created endpoint for sending new messages

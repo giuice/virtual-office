@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
+import { MessagingProvider } from '@/contexts/MessagingContext'; // Import MessagingProvider
 import { ThemeProvider } from '@/providers/theme-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -21,8 +22,10 @@ export default function RootLayout({
         >
           <AuthProvider>
             <CompanyProvider>
-              {children}
-              <Toaster richColors closeButton position="top-right" />
+              <MessagingProvider> {/* Wrap with MessagingProvider */}
+                {children}
+                <Toaster richColors closeButton position="top-right" />
+              </MessagingProvider>
             </CompanyProvider>
           </AuthProvider>
         </ThemeProvider>
