@@ -28,7 +28,7 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
   useEffect(() => {
     // Initialize Socket.IO connection
     // TODO: Replace with actual server URL from environment variables
-    const newSocket = io('http://localhost:3001'); // Example URL
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_IO_URL || 'http://localhost:3001'); // Use environment variable or fallback
 
     newSocket.on('connect', () => {
       console.log('Socket.IO connected:', newSocket.id);
