@@ -1,0 +1,17 @@
+{
+    "2Aa1": {
+        "path": "docs/adr/001-company-duplication-prevention.md",
+        "embedding_file": "2Aa1.embedding",
+        "text": "# ADR 001: Company Duplication Prevention and Cleanup\n\n## Status\n\nAccepted (2025-03-08)\n\n## Context\n\nWe discovered a critical issue where users were creating multiple companies in the DynamoDB databas..."
+    },
+    "1A1": {
+        "path": "docs/database.md",
+        "embedding_file": "1A1.embedding",
+        "text": "# Virtual Office Database Documentation\n\n## DynamoDB Tables\n\nThe Virtual Office application uses AWS DynamoDB for data storage with the following tables:\n\n### 1. `virtual-office-companies`\n\nStores com..."
+    },
+    "1A2": {
+        "path": "docs/doc_tracker.md",
+        "embedding_file": "1A2.embedding",
+        "text": "---KEY_DEFINITIONS_START---\nKey Definitions:\n1A: docs\n1A1: docs/database.md\n2Aa: docs/adr\n2Aa1: docs/adr/001-company-duplication-prevention.md\n---KEY_DEFINITIONS_END---\nlast_KEY_edit: 2Aa1\nlast_GRID_e..."
+    }
+}

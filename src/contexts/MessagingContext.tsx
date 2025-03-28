@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Message, Conversation } from '@/types/messaging'; // Import from the specific messaging types file
+import { Message, Conversation, MessageReaction } from '@/types/messaging'; // Import MessageReaction
+import { useCompany } from './CompanyContext'; // Import useCompany
 
 interface MessagingContextType {
   socket: Socket | null;
@@ -10,6 +11,7 @@ interface MessagingContextType {
   messages: Message[];
   conversations: Conversation[];
   sendMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
+  addReaction: (messageId: string, emoji: string) => void; // Add addReaction type
   // Add more functions as needed: markAsRead, fetchConversations, etc.
 }
 
@@ -24,6 +26,7 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { currentUserProfile } = useCompany(); // Get user profile for senderId
 
   useEffect(() => {
     // Initialize Socket.IO connection
@@ -73,6 +76,67 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
     }
   };
 
+  const addReaction = (messageId: string, emoji: string) => {
+    if (!currentUserProfile) {
+      console.error("Cannot add reaction: User profile not loaded.");
+      return;
+    }
+
+    const userId = currentUserProfile.id;
+
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) => {
+        if (msg.id === messageId) {
+          const existingReactions = msg.reactions || [];
+          // Check if user already reacted with this emoji
+          const userReactionIndex = existingReactions.findIndex(
+            (r) => r.userId === userId && r.emoji === emoji
+          );
+
+          let updatedReactions: MessageReaction[];
+
+          if (userReactionIndex > -1) {
+            // User is removing their reaction
+            updatedReactions = existingReactions.filter(
+              (_, index) => index !== userReactionIndex
+            );
+          } else {
+            // User is adding a new reaction
+            const newReaction: MessageReaction = {
+              emoji,
+              userId,
+              timestamp: new Date(),
+            };
+            updatedReactions = [...existingReactions, newReaction];
+          }
+          
+          // Call the API endpoint to persist the reaction
+          fetch('/api/messages/react', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ messageId, emoji }),
+          })
+          .then(response => {
+            if (!response.ok) {
+              // TODO: Handle API error (e.g., revert optimistic update?)
+              console.error(`API Error (${response.status}): Failed to update reaction.`);
+            }
+            // Optionally handle success, though optimistic update is already done
+          })
+          .catch(error => {
+            // TODO: Handle network error (e.g., revert optimistic update?)
+            console.error('Network error updating reaction:', error);
+          });
+
+          return { ...msg, reactions: updatedReactions };
+        }
+        return msg;
+      })
+    );
+  };
+
   // TODO: Implement other context functions (fetchConversations, markAsRead, etc.)
 
   const value = {
@@ -81,6 +145,7 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
     messages,
     conversations,
     sendMessage,
+    addReaction, // Add addReaction to the context value
   };
 
   return (

@@ -377,8 +377,8 @@ export function FloorPlan() {
               // so users can select a room for other actions like chat
             }}
             onSpaceDoubleClick={(space) => {
-              setSelectedSpace(space);
-              setIsEditingRoom(true);
+              // Open chat panel on double-click instead of edit dialog
+              handleOpenChat(space);
             }}
             onSpaceUpdate={handleUpdateRoom}
             isEditable={true}

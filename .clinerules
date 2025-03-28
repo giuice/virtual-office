@@ -1,8 +1,8 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Completed basic Socket.IO setup for messaging"
+last_action: "Connected onStartReply prop to parent state management in ChatWindow"
 current_phase: "Execution"
-next_action: "Verify messaging connection and implement context state updates"
+next_action: "Connect onSendMessage in MessagingContext to handle the replyToId"
 next_phase: "Execution"
 
 [CODE_ROOT_DIRECTORIES]
@@ -21,4 +21,19 @@ next_phase: "Execution"
 - Updated Memory Bank on March 17, 2025, replacing all placeholder dependencies in dependency_tracker.md with actual dependency information based on codebase analysis. Updated progress.md and activeContext.md to reflect the completion of Room Management Features and the next task (Messaging System).
 - Started Messaging System Implementation on March 18, 2025, creating API endpoints for messages and conversations, enhancing room components for chat integration, and adding necessary dependencies. Created initial endpoints for sending/retrieving messages and conversations with proper typing and validation.
 - Set up basic Socket.IO infrastructure (context, server, provider, test component) for real-time messaging on March 27, 2025.
+- Verified Socket.IO connection and confirmed basic message state updates in MessagingContext on March 27, 2025.
+- Created placeholder UI components (ChatWindow, MessageList, MessageInput, RoomMessaging, ConversationList) in src/components/messaging/ on March 27, 2025.
+- Improved dashboard layout by prioritizing key info and removing large static floor plan card on March 27, 2025.
+- Integrated RoomMessaging and MessageDialog components with MessagingContext for basic message display and sending on March 27, 2025.
+- Updated dependency trackers (doc_tracker.md, dependency_tracker.md) on March 27, 2025. Note: 2 placeholders remain in doc_tracker.md due to tool limitations.
+- Integrated room chat panel opening on floor plan double-click in floor-plan.tsx on March 27, 2025.
+- Integrated user profile data (name/avatar) into MessageList.tsx using CompanyContext on March 27, 2025.
+- Added initial UI for message reactions (button on hover) in MessageList.tsx on March 27, 2025.
+- Added reaction selection popover UI in MessageList.tsx on March 27, 2025.
+- Connected reaction handler (handleSelectReaction) in MessageList.tsx to context function (addReaction) for optimistic updates on March 27, 2025.
+- Created placeholder API endpoint `src/app/api/messages/react/route.ts` on March 27, 2025.
+- Connected `MessagingContext.addReaction` to call the placeholder reaction API endpoint on March 27, 2025.
+- Implemented database logic in reaction API endpoint `/api/messages/react` on March 27, 2025.
+- Implemented initial UI for message threading (reply indicator/button in MessageList, reply context in MessageInput) on March 27, 2025.
+- Added state management for reply context in ChatWindow.tsx on March 27, 2025.
 ---CLINE_RULES_END---

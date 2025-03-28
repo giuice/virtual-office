@@ -37,7 +37,7 @@ function ensureServerSide() {
 }
 
 // Table names
-const TABLES = {
+export const TABLES = { // Added export
   COMPANIES: 'virtual-office-companies',
   USERS: 'virtual-office-users',
   ROOMS: 'virtual-office-rooms',
@@ -52,9 +52,10 @@ export async function addDocument<T>(
   data: Omit<T, 'id'>
 ): Promise<string> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   const id = crypto.randomUUID();
   const convertedData = convertDates(data);
-  const params = {
+  const params = { // Correctly define params object
     TableName: tableName,
     Item: {
       id,
@@ -63,7 +64,7 @@ export async function addDocument<T>(
     }
   };
 
-  await dynamoDb.put(params).promise();
+ await dynamoDb.put(params).promise();
   return id;
 }
 
@@ -74,6 +75,7 @@ export async function setDocument<T>(
   data: Omit<T, 'id'>
 ): Promise<void> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   const params = {
     TableName: tableName,
     Key: { id },
@@ -95,6 +97,7 @@ export async function getDocument<T>(
   id: string
 ): Promise<T | null> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   const params = {
     TableName: tableName,
     Key: { id }
@@ -111,6 +114,7 @@ export async function updateDocument<T>(
   data: Partial<T>
 ): Promise<void> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   // Convert any Firebase Timestamp objects to ISO strings
   const convertedData = convertDates(data);
   
@@ -153,6 +157,7 @@ export async function deleteDocument(
   id: string
 ): Promise<void> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   const params = {
     TableName: tableName,
     Key: { id }
@@ -169,6 +174,7 @@ export async function queryDocuments<T>(
   limitCount?: number
 ): Promise<T[]> {
   ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized"); // Add null check
   
   // First condition field determines the index to use
   const firstField = whereConditions[0]?.[0];
