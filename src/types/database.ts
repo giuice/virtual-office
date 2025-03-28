@@ -112,3 +112,14 @@ export interface MeetingNote {
   createdAt: TimeStampType;
   updatedAt: TimeStampType;
 }
+
+// Invitation Collection
+export interface Invitation {
+  token: string; // Primary Key
+  email: string;
+  companyId: string;
+  role: UserRole;
+  expiresAt: number; // Unix timestamp (for TTL)
+  status: 'pending' | 'accepted' | 'expired';
+  createdAt: string; // ISO String
+}

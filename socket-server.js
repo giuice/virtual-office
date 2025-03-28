@@ -30,21 +30,42 @@ io.on('connection', (socket) => {
     // Basic validation
     if (!message || typeof message !== 'object') {
         console.error(`Invalid message format received from ${socket.id}`);
-        return;
-    }
-    console.log(`Received message on server from ${socket.id}:`, message);
-
-    // Broadcast the message to all other connected clients
+         return;
+     }
+     console.log(`Received message on server from ${socket.id}:`, message);
+ 
+     // Check for replyToId and log it (placeholder for DB storage)
+     if (message.replyToId) {
+       console.log(`  -> Message is a reply to: ${message.replyToId}`);
+     }
+ 
+     // Broadcast the message to all other connected clients
     // In a real app, you'd likely target specific rooms or users based on message.conversationId or message.recipientId
     // Example: Broadcasting to a specific room if message has roomId
     // if (message.roomId) {
     //   socket.to(message.roomId).emit('receive_message', message);
     // } else {
+       // Broadcast the message (including replyToId if present) to all other connected clients
+       // TODO: Implement room/conversation-specific broadcasting
        socket.broadcast.emit('receive_message', message);
     // }
 
     // Optionally, send confirmation back to sender
     // socket.emit('message_sent_confirmation', { messageId: message.id }); // Assuming message has an ID
+  });
+
+  // Handle reaction updates
+  socket.on('update_reaction', (reactionData) => {
+    // Basic validation
+    if (!reactionData || typeof reactionData !== 'object' || !reactionData.messageId || !reactionData.reaction || !reactionData.userId || typeof reactionData.add !== 'boolean') {
+      console.error(`Invalid reaction data received from ${socket.id}:`, reactionData);
+      return;
+    }
+    console.log(`Received reaction update from ${socket.id}:`, reactionData);
+
+    // Broadcast the reaction update to all other connected clients
+    // TODO: Implement room/conversation-specific broadcasting
+    socket.broadcast.emit('reaction_updated', reactionData);
   });
 
   // Example: Joining a room based on conversationId or roomId

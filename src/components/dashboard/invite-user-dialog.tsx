@@ -13,40 +13,57 @@ import { Separator } from '@/components/ui/separator';
 export function InviteUserDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  // Removed displayName state
   const [role, setRole] = useState<UserRole>('member');
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { company, createUserProfile } = useCompany();
+
+  // Removed createUserProfile from context usage
+  const { company } = useCompany();
   const { showSuccess, showError } = useNotification();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email || !displayName) {
-      showError({ description: 'Please provide both email and name' });
+
+    // Validate only email
+    if (!email) {
+      showError({ description: 'Please provide an email address' });
+      return;
+    }
+    if (!company) {
+      showError({ description: 'Company context is not available' });
       return;
     }
 
     try {
       setIsLoading(true);
-      
-      await createUserProfile({
-        email,
-        displayName,
-        role,
+
+      // Call the new API endpoint
+      const response = await fetch('/api/invitations/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          role,
+          companyId: company.id,
+        }),
       });
-      
-      showSuccess({ description: `User ${displayName} has been invited!` });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send invitation');
+      }
+
+      showSuccess({ description: `Invitation sent to ${email}!` });
+
       // Reset form and close dialog
       setEmail('');
-      setDisplayName('');
       setRole('member');
       setIsOpen(false);
     } catch (error) {
-      showError({ 
-        description: error instanceof Error ? error.message : 'Failed to invite user' 
+      showError({
+        description: error instanceof Error ? error.message : 'Failed to send invitation'
       });
     } finally {
       setIsLoading(false);
@@ -80,34 +97,18 @@ export function InviteUserDialog() {
               required
             />
             <p className="text-xs text-muted-foreground">
-              The user will receive an invitation email at this address
+              The user will receive an invitation email at this address (Email sending not yet implemented)
             </p>
           </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="displayName" className="text-sm font-medium">
-              Name
-            </label>
-            <Input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Enter display name"
-              disabled={isLoading}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              This name will be visible to others in the virtual office
-            </p>
-          </div>
-          
+
+          {/* Removed Display Name input field */}
+
           <div className="space-y-2">
             <label htmlFor="role" className="text-sm font-medium">
               Role
             </label>
             <div className="flex space-x-4 mb-2">
-              <div 
+              <div
                 className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
                   role === 'member' ? 'border-primary bg-primary/5' : 'border-border'
                 }`}
@@ -120,8 +121,8 @@ export function InviteUserDialog() {
                   Can use the office but cannot manage users or settings
                 </p>
               </div>
-              
-              <div 
+
+              <div
                 className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
                   role === 'admin' ? 'border-primary bg-primary/5' : 'border-border'
                 }`}
@@ -135,16 +136,16 @@ export function InviteUserDialog() {
                 </p>
               </div>
             </div>
-            
+
             <input
               type="hidden"
               id="role"
               value={role}
             />
           </div>
-          
+
           <Separator className="my-4" />
-          
+
           <div className="flex justify-end space-x-2 pt-2">
             <Button
               type="button"
@@ -155,7 +156,7 @@ export function InviteUserDialog() {
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Inviting...' : 'Invite User'}
+              {isLoading ? 'Sending Invite...' : 'Send Invite'}
             </Button>
           </div>
         </form>

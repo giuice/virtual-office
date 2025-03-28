@@ -10,7 +10,8 @@ interface MessagingContextType {
   isConnected: boolean;
   messages: Message[];
   conversations: Conversation[];
-  sendMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
+  // Update sendMessage signature to include optional replyToId
+  sendMessage: (messageData: Omit<Message, 'id' | 'timestamp' | 'replyToId'>, replyToId?: string) => void;
   addReaction: (messageId: string, emoji: string) => void; // Add addReaction type
   // Add more functions as needed: markAsRead, fetchConversations, etc.
 }
@@ -49,6 +50,46 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
       setMessages((prevMessages) => [...prevMessages, message]);
     });
 
+    // Listen for reaction updates from other users
+    newSocket.on('reaction_updated', (reactionData: { messageId: string; reaction: string; userId: string; add: boolean }) => {
+      console.log('Received reaction update:', reactionData);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) => {
+          if (msg.id === reactionData.messageId) {
+            // Avoid applying update if it's from the current user (already handled optimistically)
+            if (reactionData.userId === currentUserProfile?.id) {
+              return msg;
+            }
+
+            const existingReactions = msg.reactions || [];
+            let updatedReactions: MessageReaction[];
+
+            if (reactionData.add) {
+              // Add reaction from another user
+              const newReaction: MessageReaction = {
+                emoji: reactionData.reaction,
+                userId: reactionData.userId,
+                timestamp: new Date(), // Use current time or server time if available
+              };
+              // Avoid adding duplicates if somehow received multiple times
+              if (!existingReactions.some(r => r.userId === newReaction.userId && r.emoji === newReaction.emoji)) {
+                updatedReactions = [...existingReactions, newReaction];
+              } else {
+                updatedReactions = existingReactions;
+              }
+            } else {
+              // Remove reaction from another user
+              updatedReactions = existingReactions.filter(
+                (r) => !(r.userId === reactionData.userId && r.emoji === reactionData.reaction)
+              );
+            }
+            return { ...msg, reactions: updatedReactions };
+          }
+          return msg;
+        })
+      );
+    });
+
     // TODO: Add listeners for other events (e.g., conversation updates, errors)
 
     setSocket(newSocket);
@@ -59,16 +100,19 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
     };
   }, []);
 
-  const sendMessage = (messageData: Omit<Message, 'id' | 'timestamp'>) => {
-    if (socket && isConnected) {
-      // TODO: Add sender information (e.g., from user context)
-      const messageToSend = {
+  // Update sendMessage to accept and handle replyToId
+  const sendMessage = (messageData: Omit<Message, 'id' | 'timestamp' | 'replyToId'>, replyToId?: string) => {
+    if (socket && isConnected && currentUserProfile) { // Ensure currentUserProfile exists
+      const messageToSend: Partial<Message> & { content: string; conversationId: string } = { // Use Partial<Message> for flexibility
         ...messageData,
-        // senderId: currentUser.id, // Example
-        timestamp: new Date().toISOString(),
+        senderId: currentUserProfile.id, // Add senderId from context
+        timestamp: new Date(), // Assign Date object directly
+        ...(replyToId && { replyToId }), // Conditionally add replyToId
       };
+      console.log("Sending message:", messageToSend); // Debug log
       socket.emit('send_message', messageToSend);
       // Optionally add optimistic update to local state
+      // Note: Optimistic update needs careful handling of the full Message object structure
       // setMessages((prevMessages) => [...prevMessages, { ...messageToSend, id: 'temp-id-' + Date.now() }]);
     } else {
       console.error('Socket not connected, cannot send message.');
@@ -124,10 +168,21 @@ export const MessagingProvider: React.FC<MessagingProviderProps> = ({ children }
               console.error(`API Error (${response.status}): Failed to update reaction.`);
             }
             // Optionally handle success, though optimistic update is already done
+            // Emit socket event after successful API call
+            if (socket) {
+              socket.emit('update_reaction', {
+                messageId,
+                reaction: emoji,
+                userId,
+                add: userReactionIndex === -1, // true if adding, false if removing
+              });
+            }
           })
           .catch(error => {
             // TODO: Handle network error (e.g., revert optimistic update?)
             console.error('Network error updating reaction:', error);
+            // Consider reverting optimistic update here
+            // setMessages(prevMessages); // Revert to state before optimistic update
           });
 
           return { ...msg, reactions: updatedReactions };

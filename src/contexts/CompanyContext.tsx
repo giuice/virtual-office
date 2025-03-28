@@ -3,10 +3,11 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import * as crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid'; // <-- ADD THIS IMPORT
 import { User as FirebaseUser } from 'firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { Company, User } from '@/types/database';
+import { Company, User, UserRole } from '@/types/database'; // <-- ADDED UserRole HERE
 // Using API client instead of direct DynamoDB access
 import { 
   getUserByFirebaseId, 
@@ -31,7 +32,7 @@ interface CompanyContextType {
   createNewCompany: (name: string) => Promise<string>;
   updateCompanyDetails: (data: Partial<Company>) => Promise<void>;
   // User management
-  createUserProfile: (userData: Partial<User>) => Promise<string>;
+  // createUserProfile: (userData: Partial<User>) => Promise<string>; // Removed - Handled by accept invite flow
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
   removeUserFromCompany: (userId: string) => Promise<void>;
@@ -240,49 +241,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Create user profile
-  const createUserProfile = async (userData: Partial<User>): Promise<string> => {
-    if (!user) {
-      throw new Error('User must be authenticated');
-    }
-
-    if (!company) {
-      throw new Error('Company is required');
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const newUserData = {
-        email: userData.email || user.email || '',
-        displayName: userData.displayName || user.displayName || 'User',
-        avatarUrl: userData.avatarUrl || user.photoURL || undefined,
-        status: 'offline' as const,
-        role: userData.role || 'member',
-        companyId: company.id,
-        preferences: userData.preferences || {
-          theme: 'light',
-          notifications: true,
-        },
-      };
-
-      // Use API client to create user
-      const userId = await createUser({ ...newUserData, id: crypto.randomUUID() });
-      
-      // Get updated user list
-      const users = await getUsersByCompany(company.id);
-      setCompanyUsers(users);
-
-      return userId;
-    } catch (err) {
-      console.error('Error creating user profile:', err);
-      setError(err instanceof Error ? err.message : 'Error creating user profile');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Removed createUserProfile function - Handled by accept invite flow
+  // const createUserProfile = async (...) => { ... };
 
   // Update user profile
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
@@ -414,7 +374,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     error,
     createNewCompany,
     updateCompanyDetails,
-    createUserProfile,
+    // createUserProfile, // Removed from value
     updateUserProfile,
     updateUserRole,
     removeUserFromCompany,

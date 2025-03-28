@@ -1,8 +1,8 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Connected onStartReply prop to parent state management in ChatWindow"
+last_action: "Refactored user invitation flow to use tokens and Firebase UID"
 current_phase: "Execution"
-next_action: "Connect onSendMessage in MessagingContext to handle the replyToId"
+next_action: "Test new invitation flow or implement email sending"
 next_phase: "Execution"
 
 [CODE_ROOT_DIRECTORIES]
@@ -36,4 +36,8 @@ next_phase: "Execution"
 - Implemented database logic in reaction API endpoint `/api/messages/react` on March 27, 2025.
 - Implemented initial UI for message threading (reply indicator/button in MessageList, reply context in MessageInput) on March 27, 2025.
 - Added state management for reply context in ChatWindow.tsx on March 27, 2025.
+- Ensured correct Date object assignment in MessagingContext to avoid TypeScript errors.
+- Updated simple socket server to acknowledge replyToId for basic threading support.
+- Implemented Socket.IO listeners and emitters for real-time reaction updates in both backend (`socket-server.js`) and frontend (`MessagingContext.tsx`). Ensured `replyToId` is broadcast.
+- Refactored user invitation to use token-based flow, fixing ID mismatch. Added DB functions, API endpoints, and frontend page/component updates.
 ---CLINE_RULES_END---
