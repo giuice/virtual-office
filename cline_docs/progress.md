@@ -19,6 +19,16 @@
       - Added room chat integration through FloorPlanCanvas.tsx
       - Extended room-management.tsx to support chat functionality
     - Added uuid dependency for generating unique IDs for messages and conversations
+    - Integrated room chat panel with floor plan double-click interaction (`floor-plan.tsx`).
+    - Integrated user profile data (name/avatar) into message display (`MessageList.tsx`) using `CompanyContext`.
+    - Added initial UI for message reactions (button on hover) in `MessageList.tsx`.
+    - Added reaction selection popover UI in `MessageList.tsx`.
+    - Connected reaction UI to context (`MessagingContext.addReaction`) for optimistic updates.
+    - Created placeholder API endpoint for reactions (`src/app/api/messages/react/route.ts`).
+    - Connected `MessagingContext.addReaction` to call the placeholder reaction API endpoint.
+    - Implemented database logic in reaction API endpoint (`/api/messages/react`) using `getDocument`/`updateDocument`.
+    - Implemented initial UI for message threading (reply indicator and button in `MessageList.tsx`, reply context in `MessageInput.tsx`).
+    - Added state management for reply context in `ChatWindow.tsx`.
     
   - **Room Management Features Implementation (March 15, 2025):**
     - Enhanced room-dialog.tsx with form validation, template selection, and advanced room properties management
@@ -80,4 +90,4 @@
 4. Conduct regular reviews to ensure alignment with project objectives
 5. Update documentation as implementation progresses
 
-_Last updated on March 18, 2025, 6:30 AM (UTC-3:00)_
+_Last updated on March 27, 2025, 10:46 PM (UTC-3:00)_

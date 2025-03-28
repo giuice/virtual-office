@@ -16,7 +16,7 @@ last_GRID_edit: 2Aa
 ---GRID_START---
 X 1A 2Aa 2Ab 2Ac 2Ad 2Ae 2Af 2Ag 2Ah 2Ai
 1A = op9
-2Aa = po<nn<<n3
+2Aa = <o<nn<<n3
 2Ab = n<on<n>n3
 2Ac = n3on6
 2Ad = nn<non5

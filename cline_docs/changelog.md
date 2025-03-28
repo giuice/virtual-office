@@ -1,5 +1,74 @@
 # Changelog
 
+## 3/27/2025 (10:44 PM)
+- **Messaging System Threading State:**
+  - *ChatWindow.tsx*: Added state (`replyingToMessage`) and handlers (`handleStartReply`, `handleCancelReply`) for managing reply context. Passed necessary props down to `MessageList` and `MessageInput`.
+
+## 3/27/2025 (10:38 PM)
+- **Messaging System Threading UI:**
+  - *MessageList.tsx*: Added `onStartReply` prop, reply button, and visual indicator for replied messages.
+  - *MessageInput.tsx*: Modified props to accept `replyingToMessage` and `onCancelReply`. Added UI to display reply context and cancel button. Updated `handleSend` to pass `replyToId`.
+
+## 3/27/2025 (10:30 PM)
+- **Messaging System Reaction API (DB Logic):**
+  - *src/app/api/messages/react/route.ts*: Implemented database logic using `getDocument` and `updateDocument` to fetch the message, calculate updated reactions, and save the changes to DynamoDB. Authentication still uses a placeholder.
+
+## 3/27/2025 (10:18 PM)
+- **Messaging System Reaction API Call:**
+  - *src/contexts/MessagingContext.tsx*: Added `fetch` call within `addReaction` function to send reaction data to the `/api/messages/react` endpoint.
+
+## 3/27/2025 (10:14 PM)
+- **Messaging System Reaction API (Placeholder):**
+  - Created placeholder API route `src/app/api/messages/react/route.ts` with a basic POST handler to receive reaction requests.
+
+## 3/27/2025 (10:10 PM)
+- **Messaging System Reaction Handler Connection:**
+  - *src/contexts/MessagingContext.tsx*: Added `addReaction` function (with optimistic update logic) and exposed it via context.
+  - *src/components/messaging/MessageList.tsx*: Imported `useMessaging` and updated `handleSelectReaction` to call the context's `addReaction` function.
+
+## 3/27/2025 (10:01 PM)
+- **Messaging System Reaction UI (Popover):**
+  - *src/components/messaging/MessageList.tsx*: Imported Popover components. Renamed handler to `handleSelectReaction`. Wrapped reaction button in `PopoverTrigger`. Added `PopoverContent` with emoji buttons connected to the new handler.
+
+## 3/27/2025 (9:56 PM)
+- **Messaging System Reaction UI (Initial):**
+  - *src/components/messaging/MessageList.tsx*: Added imports for `Button` and `SmilePlus`. Added a placeholder `handleAddReaction` function. Added a reaction button that appears on message hover and calls the placeholder function.
+
+## 3/27/2025 (9:50 PM)
+- **Messaging System User Profile Integration:**
+  - *src/components/messaging/MessageList.tsx*: Updated to use `companyUsers` from `CompanyContext` to display the correct sender name and avatar for messages, replacing the placeholder logic.
+
+## 3/27/2025 (9:44 PM)
+- **Messaging System Floor Plan Integration:**
+  - *src/components/floor-plan/floor-plan.tsx*: Modified `onSpaceDoubleClick` handler to call `handleOpenChat` instead of opening the room edit dialog. This integrates the room chat panel with the double-click interaction on the floor plan canvas.
+
+## 3/27/2025 (9:21 PM)
+- **Dependency Tracker Maintenance:**
+  - Updated `docs/doc_tracker.md` and `cline_docs/dependency_tracker.md`. Resolved all placeholders in `dependency_tracker.md`. Two placeholders remain in `doc_tracker.md` due to tool limitations.
+
+## 3/27/2025 (8:37 PM)
+- **Messaging System UI Integration:**
+  - *src/components/messaging/RoomMessaging.tsx*: Confirmed integration with `MessagingContext` for room messages.
+  - *src/components/floor-plan/message-dialog.tsx*: Refactored to use `ChatWindow` and integrated with `MessagingContext` for direct messages. Fixed user ID type mismatch.
+
+## 3/27/2025 (8:03 PM)
+- **Dashboard Layout Improvement:**
+  - *src/app/(dashboard)/dashboard/page.tsx*: Refactored layout to prioritize overview and quick links. Removed large static floor plan card and temporary messaging test component.
+
+## 3/27/2025 (7:48 PM)
+- **Messaging System UI Components:**
+  - Created initial structure and placeholder components in `src/components/messaging/`:
+    - `ChatWindow.tsx`: Main container for conversation view.
+    - `MessageList.tsx`: Component for rendering messages. Fixed avatar utility type issues.
+    - `MessageInput.tsx`: Component for message composition.
+    - `RoomMessaging.tsx`: Wrapper component for displaying room chat panels.
+    - `ConversationList.tsx`: Placeholder for listing direct message conversations.
+
+## 3/27/2025 (7:27 PM)
+- **Messaging System Verification:**
+  - Verified Socket.IO connection between client (`MessagingContext`) and server (`socket-server.js`) using the test component on the dashboard page.
+  - Confirmed that the `MessagingContext` correctly receives messages via the `receive_message` event and updates its internal `messages` state.
+
 ## 3/27/2025 (2:45 PM)
 - **Messaging System Real-Time Setup:**
   - *package.json*: Added `socket.io` and `socket.io-client` dependencies.
