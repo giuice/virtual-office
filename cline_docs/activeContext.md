@@ -1,7 +1,7 @@
 # Active Context
 
-**Date:** 3/27/2025
-**Last Updated:** 3/27/2025, 10:44 PM (UTC-3:00)
+**Date:** 3/28/2025
+**Last Updated:** 3/28/2025, 1:42 PM (UTC-3:00)
 
 ## Project Status
 - **Current Phase:** Execution
@@ -12,7 +12,26 @@
   - `doc_tracker.md` updated, but 2 placeholders remain due to tool limitations.
 
 ## Recent Changes
-- **Messaging System Implementation:**
+- **Messaging System Real-Time Updates (Socket.IO):**
+  - *socket-server.js*:
+    - Added `update_reaction` event listener to receive reaction updates from clients.
+    - Implemented broadcasting of `reaction_updated` event to other clients upon receiving `update_reaction`.
+    - Ensured `send_message` handler correctly broadcasts the `replyToId` when present in the message payload.
+  - *src/contexts/MessagingContext.tsx*:
+    - Modified `addReaction` function to emit `update_reaction` event to the server *after* the API call succeeds.
+    - Added a socket listener for `reaction_updated` event from the server to handle reaction updates from *other* users, updating local state while avoiding conflicts with optimistic updates.
+    - Verified `receive_message` listener handles `replyToId` correctly (implicit in existing logic).
+- **User Invitation Flow Refactor (Token-Based):**
+  - **Issue:** Identified that invited users were prompted to create a company because the initial user profile creation used a generated UUID, while the application lookup used the Firebase UID after login.
+  - **Solution:** Implemented a token-based invitation flow (Option C).
+  - *src/types/database.ts*: Added `Invitation` interface definition.
+  - *src/lib/dynamo.ts*: Added `INVITATIONS` table name. Implemented `createInvitation`, `getInvitationByToken`, `updateInvitationStatus` functions. Fixed TypeScript errors related to `expiresAt` type handling.
+  - *src/pages/api/invitations/create.ts*: Created new API endpoint to generate invitation tokens and save invitation records to the database.
+  - *src/pages/api/invitations/accept.ts*: Created new API endpoint to validate tokens, link authenticated users (using Firebase UID as primary key), and create/update user profiles.
+  - *src/components/dashboard/invite-user-dialog.tsx*: Modified to call `/api/invitations/create` instead of `createUserProfile`. Removed `displayName` field.
+  - *src/pages/accept-invite.tsx*: Created new page to handle invitation links, prompt login/signup, and call `/api/invitations/accept` post-authentication. Fixed TypeScript errors related to `AuthContext` loading state and `useSearchParams` null check. Removed non-existent `Alert` component usage.
+  - *src/contexts/CompanyContext.tsx*: Removed unused `createUserProfile` function. Fixed previous TypeScript errors related to `uuid` and `UserRole` imports.
+- **Messaging System Implementation (Previous):**
   - *ChatWindow.tsx*: Added state (`replyingToMessage`) and handlers (`handleStartReply`, `handleCancelReply`) for managing reply context. Passed necessary props down to `MessageList` and `MessageInput`.
   - *src/components/messaging/MessageList.tsx*: Added `onStartReply` prop, reply button, and visual indicator for replied messages.
   - *src/components/messaging/MessageInput.tsx*: Modified props to accept `replyingToMessage` and `onCancelReply`. Added UI to display reply context and cancel button. Updated `handleSend` to pass `replyToId`. Fixed `useRef` import.
@@ -21,6 +40,7 @@
   - Created placeholder API route `src/app/api/messages/react/route.ts` for handling reactions.
   - *src/contexts/MessagingContext.tsx*: Added `addReaction` function (with optimistic update logic) and exposed it via context.
   - *src/components/messaging/MessageList.tsx*: Connected `handleSelectReaction` to call the context's `addReaction` function.
+  - *socket-server.js*: Updated `send_message` handler to check for and log `replyToId` (placeholder for backend processing).
   - *src/components/messaging/MessageList.tsx*: Added reaction selection popover UI. Imported Popover components, wrapped reaction button in trigger, added PopoverContent with emoji buttons connected to placeholder `handleSelectReaction` function.
   - *src/components/messaging/MessageList.tsx*: Added initial UI for message reactions (button appears on hover, calls placeholder function).
   - *src/components/messaging/MessageList.tsx*: Updated to use `companyUsers` from `CompanyContext` to display the correct sender name and avatar for messages, replacing the placeholder logic.
@@ -118,6 +138,10 @@
         - Added reply button and visual indicator in `MessageList.tsx`.
         - Updated `MessageInput.tsx` to display reply context and pass `replyToId`.
         - Added state management for `replyingToMessage` in `ChatWindow.tsx`.
+    - **Implemented real-time updates via Socket.IO:**
+        - Updated `socket-server.js` to handle `update_reaction` events and broadcast `reaction_updated`. Ensured `replyToId` is broadcast in `receive_message`.
+        - Updated `MessagingContext.tsx` to emit `update_reaction` after successful API call and listen for `reaction_updated` from other users.
+- **User Invitation Flow:** Refactored to use a token-based system, resolving the ID mismatch issue between invited users and Firebase authentication. Created necessary backend API endpoints, database functions, and frontend pages/components.
 - **Dependency Trackers Updated:** Performed maintenance, resolving most placeholders.
 - **Improved Dashboard Layout:** Reorganized `dashboard/page.tsx` for better information hierarchy.
 
@@ -163,10 +187,16 @@
    - **Completed room chat integration with floor plan double-click.** Direct message integration (`message-dialog.tsx`) needs separate trigger (e.g., clicking a user avatar).
    - **Completed integration of user profiles (name/avatar) in `MessageList`.**
    - **Implemented message reactions (UI, optimistic update, API endpoint with DB logic).** (Note: API authentication is placeholder).
-   - **Implemented initial message threading UI & State management in `ChatWindow`.**
-   - **Next:** Connect `onSendMessage` in `MessagingContext` to handle the `replyToId`.
-   - *(Future)* Implement real-time reaction/threading updates via Socket.IO.
-   - *(Future)* Replace placeholder authentication in reaction API.
+    - **Implemented initial message threading UI & State management in `ChatWindow`.**
+    - **Connected `onSendMessage` in `MessagingContext` to handle the `replyToId`:** Updated context function signature and implementation to accept and emit `replyToId`. Fixed resulting TypeScript error related to Date type.
+    - **Updated backend socket server (`socket-server.js`)** to acknowledge `replyToId` in the `send_message` event handler (logging only for now).
+    - **Implemented real-time broadcasting for reaction and threading updates via Socket.IO.**
+    - **Refactored user invitation flow to use tokens and Firebase UID.**
+    - **Next:** Test the new invitation flow. Implement email sending for invitations. Implement room/conversation-specific broadcasting in `socket-server.js`. Proceed to next feature (e.g., Blackboard).
+    - *(Future)* Replace placeholder authentication in reaction API.
+    - *(Future)* Integrate socket server logic with actual database persistence for messages, reactions, and threads.
+    - *(Future)* Add proper authentication/authorization checks to invitation API endpoints.
+    - *(Future)* Implement UI for the `/accept-invite` page (replace placeholder).
 2. Test the Room Management implementation with real users.
 3. Update task_list.md to reflect completed tasks.
 4. Continue with the implementation of remaining features in the prioritized order.

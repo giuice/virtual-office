@@ -1,5 +1,29 @@
 # Changelog
 
+## 3/28/2025 (1:43 PM)
+- **User Invitation Flow Refactor:**
+  - Implemented token-based invitation system to fix user ID mismatch issue.
+  - *src/types/database.ts*: Added `Invitation` interface.
+  - *src/lib/dynamo.ts*: Added `INVITATIONS` table name and functions (`createInvitation`, `getInvitationByToken`, `updateInvitationStatus`). Fixed `expiresAt` type handling.
+  - *src/pages/api/invitations/create.ts*: Created endpoint to generate/store invitation tokens.
+  - *src/pages/api/invitations/accept.ts*: Created endpoint to validate tokens and link/create users with Firebase UID as primary key.
+  - *src/components/dashboard/invite-user-dialog.tsx*: Updated to call `/api/invitations/create`. Removed `displayName` field.
+  - *src/pages/accept-invite.tsx*: Created page to handle invite links, prompt auth, and call `/api/invitations/accept`. Fixed TS errors.
+  - *src/contexts/CompanyContext.tsx*: Removed unused `createUserProfile` function. Fixed TS errors related to `uuid` and `UserRole` imports.
+
+## 3/28/2025 (9:24 AM)
+- **Messaging System Real-Time Updates (Socket.IO):**
+  - *socket-server.js*: Added `update_reaction` listener and broadcast logic for `reaction_updated`. Ensured `replyToId` is broadcast in `send_message`.
+  - *src/contexts/MessagingContext.tsx*: Added `reaction_updated` listener to handle updates from other users. Modified `addReaction` to emit `update_reaction` after successful API call.
+
+## 3/28/2025 (8:56 AM)
+- **Messaging System Threading Backend (Placeholder):**
+  - *socket-server.js*: Updated `send_message` handler to check for and log `replyToId`.
+
+## 3/28/2025 (8:52 AM)
+- **Messaging System Threading Frontend:**
+  - *src/contexts/MessagingContext.tsx*: Updated `sendMessage` function signature and implementation to accept and emit `replyToId`. Fixed resulting TypeScript error related to Date type.
+
 ## 3/27/2025 (10:44 PM)
 - **Messaging System Threading State:**
   - *ChatWindow.tsx*: Added state (`replyingToMessage`) and handlers (`handleStartReply`, `handleCancelReply`) for managing reply context. Passed necessary props down to `MessageList` and `MessageInput`.

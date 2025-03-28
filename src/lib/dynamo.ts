@@ -7,7 +7,9 @@ import {
   Room, 
   Message, 
   Announcement, 
-  MeetingNote
+  MeetingNote,
+  Invitation, // <-- Added Invitation type
+  UserRole    // <-- Added UserRole type
 } from '@/types/database';
 import AWS_CONFIG from './aws-config';
 
@@ -44,6 +46,7 @@ export const TABLES = { // Added export
   MESSAGES: 'virtual-office-messages',
   ANNOUNCEMENTS: 'virtual-office-announcements',
   MEETING_NOTES: 'virtual-office-meeting-notes',
+  INVITATIONS: 'virtual-office-invitations', // <-- Added Invitations table
 };
 
 // Generic add document function
@@ -448,4 +451,78 @@ export async function getMeetingNotesByRoom(roomId: string): Promise<MeetingNote
 export async function updateMeetingNote(noteId: string, data: Partial<MeetingNote>): Promise<void> {
   ensureServerSide();
   return updateDocument<MeetingNote>(TABLES.MEETING_NOTES, noteId, data);
+}
+
+// Define input type for createInvitation allowing Date for expiresAt
+type CreateInvitationInput = Omit<Invitation, 'createdAt' | 'status' | 'expiresAt'> & {
+  expiresAt: number | Date; // Allow Date or number initially
+};
+
+// Invitation specific functions
+export async function createInvitation(invitationData: CreateInvitationInput): Promise<void> {
+  ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized");
+
+  // Validate and convert expiresAt before creating the final item object
+  let expiresAtTimestamp: number;
+  // Now this check is valid based on the CreateInvitationInput type
+  if (typeof invitationData.expiresAt === 'number') {
+    expiresAtTimestamp = invitationData.expiresAt;
+  } else if (invitationData.expiresAt instanceof Date) {
+    console.warn("expiresAt was provided as Date, converting to Unix timestamp.");
+    expiresAtTimestamp = Math.floor(invitationData.expiresAt.getTime() / 1000);
+  } else {
+    // This case should ideally not happen if input adheres to CreateInvitationInput,
+    // but keep it for robustness or if input comes from less strict sources.
+    console.error("Invalid expiresAt provided:", invitationData.expiresAt);
+    throw new Error("expiresAt must be a number (Unix timestamp) or a Date object");
+  }
+
+  // Construct the final item conforming to the Invitation type (expiresAt is number)
+  const item: Invitation = {
+    token: invitationData.token,
+    email: invitationData.email,
+    companyId: invitationData.companyId,
+    role: invitationData.role,
+    expiresAt: expiresAtTimestamp, // Use the validated/converted timestamp (now definitely a number)
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  const params = {
+    TableName: TABLES.INVITATIONS,
+    Item: item,
+  };
+  await dynamoDb.put(params).promise();
+}
+
+export async function getInvitationByToken(token: string): Promise<Invitation | null> {
+  ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized");
+
+  const params = {
+     TableName: TABLES.INVITATIONS,
+     Key: { token } // Use 'token' as the key name
+  };
+  
+  const result = await dynamoDb.get(params).promise();
+  return result.Item as Invitation | null;
+}
+
+export async function updateInvitationStatus(token: string, status: Invitation['status']): Promise<void> {
+  ensureServerSide();
+  if (!dynamoDb) throw new Error("DynamoDB client not initialized");
+
+  const params = {
+    TableName: TABLES.INVITATIONS,
+    Key: { token }, // Use 'token' as the key name
+    UpdateExpression: 'set #status = :status',
+    ExpressionAttributeNames: {
+      '#status': 'status'
+    },
+    ExpressionAttributeValues: {
+      ':status': status
+    }
+  };
+  await dynamoDb.update(params).promise();
 }
