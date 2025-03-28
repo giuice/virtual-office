@@ -1,6 +1,6 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Refactored user invitation flow to use tokens and Firebase UID"
+last_action: "Updated dependency trackers using analyze-project"
 current_phase: "Execution"
 next_action: "Test new invitation flow or implement email sending"
 next_phase: "Execution"
@@ -40,4 +40,5 @@ next_phase: "Execution"
 - Updated simple socket server to acknowledge replyToId for basic threading support.
 - Implemented Socket.IO listeners and emitters for real-time reaction updates in both backend (`socket-server.js`) and frontend (`MessagingContext.tsx`). Ensured `replyToId` is broadcast.
 - Refactored user invitation to use token-based flow, fixing ID mismatch. Added DB functions, API endpoints, and frontend page/component updates.
+- Regularly running `analyze-project` after significant code changes keeps the dependency trackers (`module_relationship_tracker.md`, mini-trackers) accurate and prevents potential issues during development.
 ---CLINE_RULES_END---

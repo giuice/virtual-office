@@ -1,0 +1,117 @@
+# Module: api
+
+## Purpose & Responsibility
+{1-2 paragraphs on module purpose & responsibility}
+
+## Interfaces
+* `{InterfaceName}`: {purpose}
+* `{Method1}`: {description}
+* `{Method2}`: {description}
+* Input: [Data received]
+* Output: [Data provided]
+...
+
+## Implementation Details
+* Files: [List with 1-line descriptions]
+* Important algorithms: [List with 1-line descriptions]
+* Data Models
+    * `{Model1}`: {description}
+    * `{Model2}`: {description}
+
+## Current Implementation Status
+* Completed: [List of completed items]
+* In Progress: [Current work]
+* Pending: [Future work]
+
+## Implementation Plans & Tasks
+* `implementation_plan_{filename1}.md`
+* [Task1]: {brief description}
+* [Task2]: {brief description}
+* `implementation_plan_{filename2}.md`
+* [Task1]: {brief description}
+* [Task2]: {brief description} 
+...
+
+## Mini Dependency Tracker
+---mini_tracker_start---
+
+---KEY_DEFINITIONS_START---
+Key Definitions:
+2Ad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/authcontext.tsx
+2Ad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/companycontext.tsx
+2Ae2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks/useprotectedroute.ts
+2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
+2Af3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/aws-config.ts
+2Af5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo.ts
+2Af6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/messaging-api.ts
+2Ag1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/accept-invite.tsx
+2Ai1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/auth.ts
+2Ai2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/database.ts
+3Afa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts
+3Aga1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/setup-dynamo-tables.ts
+3Aga2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/test-aws.ts
+4Aaab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx
+4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
+4Agaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth/signup.ts
+4Agab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/cleanup.ts
+4Agab2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/create.ts
+4Agab3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/get.ts
+4Agab4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/update.ts
+4Agac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts
+4Agac2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/create.ts
+4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/by-company.ts
+4Agad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/create.ts
+4Agad3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/get-by-firebase-id.ts
+4Agad4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/remove-from-company.ts
+4Agad5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts
+5Aacaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
+5Aacab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/get/route.ts
+5Aacba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts
+5Aacbb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get/route.ts
+5Aacbc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts
+5Agada1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
+5Agada2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts
+---KEY_DEFINITIONS_END---
+
+last_KEY_edit: Assigned keys: 2Ad1, 2Ad2, 2Ae2, 2Af1, 2Af3, 2Af5, 2Af6, 2Ag1, 2Ai1, 2Ai2, 3Afa1, 3Aga1, 3Aga2, 4Aaab1, 4Aaac1, 4Agaa1, 4Agab1, 4Agab2, 4Agab3, 4Agab4, 4Agac1, 4Agac2, 4Agad1, 4Agad2, 4Agad3, 4Agad4, 4Agad5, 5Aacaa1, 5Aacab1, 5Aacba1, 5Aacbb1, 5Aacbc1, 5Agada1, 5Agada2
+last_GRID_edit: Initial creation
+
+---GRID_START---
+X 2Ad1 2Ad2 2Ae2 2Af1 2Af3 2Af5 2Af6 2Ag1 2Ai1 2Ai2 3Afa1 3Aga1 3Aga2 4Aaab1 4Aaac1 4Agaa1 4Agab1 4Agab2 4Agab3 4Agab4 4Agac1 4Agac2 4Agad1 4Agad2 4Agad3 4Agad4 4Agad5 5Aacaa1 5Aacab1 5Aacba1 5Aacbb1 5Aacbc1 5Agada1 5Agada2
+2Ad1 = op33
+2Ad2 = pop32
+2Ae2 = ppop31
+2Af1 = p3op30
+2Af3 = p4op29
+2Af5 = p5op28
+2Af6 = p6op27
+2Ag1 = p7op26
+2Ai1 = p8op25
+2Ai2 = p9op24
+3Afa1 = p10op23
+3Aga1 = p11op22
+3Aga2 = p12op21
+4Aaab1 = p13op20
+4Aaac1 = p14op19
+4Agaa1 = p15op18
+4Agab1 = p16op17
+4Agab2 = p17op16
+4Agab3 = p18op15
+4Agab4 = p19op14
+4Agac1 = p20op13
+4Agac2 = p21op12
+4Agad1 = p22op11
+4Agad2 = p23op10
+4Agad3 = p24op9
+4Agad4 = p25op8
+4Agad5 = p26op7
+5Aacaa1 = p27op6
+5Aacab1 = p28op5
+5Aacba1 = p29op4
+5Aacbb1 = p30op3
+5Aacbc1 = p31opp
+5Agada1 = p32op
+5Agada2 = p33o
+---GRID_END---
+
+---mini_tracker_end---
