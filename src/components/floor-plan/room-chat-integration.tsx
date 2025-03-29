@@ -1,13 +1,14 @@
 // src/components/floor-plan/room-chat-integration.tsx
+// src/components/floor-plan/room-chat-integration.tsx
 'use client';
 
 import { useState } from 'react';
-import { Space } from '@/components/floor-plan/types';
+import { Space } from '@/types/database'; // Use global Space type
 import { MessagingProvider } from '@/contexts/messaging/MessagingContext';
 import { RoomMessaging } from '@/components/messaging/room-messaging';
 
 interface RoomChatIntegrationProps {
-  selectedRoom: Space | null;
+  selectedRoom: Space | null; // Expect global Space type
   onCloseChat?: () => void;
   position?: 'right' | 'bottom';
 }

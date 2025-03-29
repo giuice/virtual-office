@@ -1,13 +1,14 @@
 // src/pages/accept-invite.tsx
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation'; // Use next/navigation for App Router compatibility if needed, or 'next/router' for Pages Router
-import { useAuth } from '@/contexts/AuthContext'; // Assuming AuthContext handles Firebase auth state
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'; // Import AuthProvider
 // TODO: Identify and import the actual Firebase Auth UI component
 // import FirebaseAuthUI from '@/components/auth/FirebaseAuthUI';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function AcceptInvitePage() {
+// Define the inner component that uses the hook
+function AcceptInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // Hook to get URL search parameters
   const { user, loading: authLoading } = useAuth(); // Use 'loading' from AuthContext
@@ -20,9 +21,11 @@ export default function AcceptInvitePage() {
     // Add null check for searchParams
     if (searchParams) {
       const inviteToken = searchParams.get('token');
+      console.log('[AcceptInvitePage] Extracted token from URL:', inviteToken); // Added log
       if (inviteToken) {
         setToken(inviteToken);
       } else {
+        console.error('[AcceptInvitePage] Invitation token missing in URL.'); // Added log
         setError('Invitation token is missing in the URL.');
       }
     } else {
@@ -40,7 +43,10 @@ export default function AcceptInvitePage() {
     // Check if authentication is complete, we have a user, a token, and are not already processing
     if (!authLoading && user && token && !isProcessing) {
       setIsProcessing(true); // Prevent multiple calls
-      console.log(`User ${user.uid} authenticated, attempting to accept invite with token ${token}`);
+      console.log(`[AcceptInvitePage] User ${user.uid} authenticated with token ${token}. Preparing to call accept API.`); // Added log
+
+      const payload = { token, firebaseUid: user.uid };
+      console.log('[AcceptInvitePage] Calling /api/invitations/accept with payload:', payload); // Added log
 
       // Call the backend API to accept the invitation
       fetch('/api/invitations/accept', {
@@ -48,7 +54,7 @@ export default function AcceptInvitePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token, firebaseUid: user.uid }),
+        body: JSON.stringify(payload), // Use payload variable
       })
       .then(async (response) => {
         if (!response.ok) {
@@ -132,17 +138,26 @@ export default function AcceptInvitePage() {
   }
 
   // Fallback/Unexpected state - maybe token is missing and no error set yet, or user logged in without token
-   return (
-     <div className="flex min-h-screen items-center justify-center bg-background">
-       <Card className="w-full max-w-md">
-         <CardHeader>
-           <CardTitle>Accept Invitation</CardTitle>
-         </CardHeader>
-         <CardContent>
-           <p>Loading invitation details...</p>
-           {/* This state might indicate an issue if it persists */}
-         </CardContent>
-       </Card>
-     </div>
-   );
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Accept Invitation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Loading invitation details...</p>
+          {/* This state might indicate an issue if it persists */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Wrap the content component with the provider
+export default function AcceptInvitePage() {
+  return (
+    <AuthProvider>
+      <AcceptInviteContent />
+    </AuthProvider>
+  );
 }

@@ -1,11 +1,15 @@
 // src/components/floor-plan/room-dialog.tsx
+// src/components/floor-plan/room-dialog.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Space, User, SpaceType, SpaceStatus, RoomTemplate, spaceColors } from './types'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from 'react';
+// Import global Space and related types
+import { Space, SpaceType, SpaceStatus, AccessControl, Reservation, User as GlobalUser } from '@/types/database'; 
+// Keep local types if needed for UI elements or until refactored
+import { User as LocalUser, RoomTemplate, spaceColors } from './types'; 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -35,16 +39,17 @@ import {
   Settings, 
   Trash2
 } from 'lucide-react'
-import { MessageDialog } from './message-dialog'
-import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'
-import { StatusAvatar } from '@/components/ui/status-avatar'
+import { MessageDialog } from './message-dialog';
+import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
+import { StatusAvatar } from '@/components/ui/status-avatar';
+import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany to get user details
 
 interface RoomDialogProps {
-  room: Space | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreate: (newRoom: Space) => void
-  onUpdate?: (updatedRoom: Space) => void
+  room: Space | null; // Expect global Space
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (newRoomData: Partial<Space>) => void; // Expect partial global Space data
+  onUpdate?: (updatedRoom: Space) => void; // Expect global Space
   isCreating?: boolean
 }
 
@@ -56,7 +61,10 @@ export function RoomDialog({
   onUpdate,
   isCreating = false 
 }: RoomDialogProps) {
-  // Room state
+  // Get companyUsers from context to resolve user details
+  const { companyUsers } = useCompany();
+
+  // Room state - Use global Space type
   const [roomData, setRoomData] = useState<Partial<Space>>({
     id: '',
     name: '',
@@ -65,11 +73,11 @@ export function RoomDialog({
     capacity: 4,
     features: [],
     position: { x: 100, y: 100, width: 200, height: 150 },
-    users: [],
+    userIds: [], // Changed from users to userIds
     description: '',
     accessControl: { isPublic: true },
     reservations: []
-  })
+  });
   
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -81,34 +89,35 @@ export function RoomDialog({
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRoomLocked, setIsRoomLocked] = useState(false)
   
-  // For direct messaging
-  const [messageUser, setMessageUser] = useState<User | null>(null)
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
-  
+  // For direct messaging - Keep using LocalUser for now if MessageDialog expects it
+  const [messageUser, setMessageUser] = useState<LocalUser | null>(null);
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+
   // Initialize form with room data if editing
   useEffect(() => {
     if (room && !isCreating) {
       setRoomData({
         ...room,
+        userIds: room.userIds || [], // Ensure userIds is initialized
         accessControl: room.accessControl || { isPublic: true },
         reservations: room.reservations || []
-      })
-      setIsRoomLocked(room.status === 'locked')
+      });
+      setIsRoomLocked(room.status === 'locked');
     } else {
       // Reset form for new room
       setRoomData({
-        id: `room-${Date.now()}`,
+        id: `room-${Date.now()}`, // Generate ID client-side for now, API might override
         name: '',
         type: 'workspace',
         status: 'available',
         capacity: 4,
         features: [],
         position: { x: 100, y: 100, width: 200, height: 150 },
-        users: [],
+        userIds: [], // Initialize userIds
         description: '',
         accessControl: { isPublic: true },
         reservations: []
-      })
+      });
       setIsRoomLocked(false)
     }
   }, [room, isCreating])
@@ -132,13 +141,14 @@ export function RoomDialog({
     }
     
     setErrors(newErrors)
-    setFormValid(Object.keys(newErrors).length === 0)
-  }, [roomData])
-  
-  const handleMessageUser = (user: User) => {
+    setFormValid(Object.keys(newErrors).length === 0);
+  }, [roomData]);
+
+  // TODO: Update handleMessageUser if MessageDialog is updated to use GlobalUser
+  const handleMessageUser = (user: LocalUser) => { // Still uses LocalUser
     setMessageUser(user);
     setIsMessageDialogOpen(true);
-  }
+  };
   
   // Helper function to get room color
   const getRoomColor = (type: SpaceType = 'workspace') => {
@@ -167,38 +177,39 @@ export function RoomDialog({
     onOpenChange(false);
   }
   
-  // Save room function
+  // Save room function - Prepare data for API
   const handleSaveRoom = () => {
     if (!formValid) return;
-    
+
     // Update room status based on lock state
-    const status = isRoomLocked ? 'locked' : (roomData.status || 'available');
-    
-    const newRoom: Space = {
-      id: roomData.id || `room-${Date.now()}`,
+    const finalStatus = isRoomLocked ? 'locked' : (roomData.status || 'available');
+
+    // Construct the data object based on the global Space type
+    const roomPayload: Partial<Space> = {
+      // id is handled by API or set in useEffect for creation
       name: roomData.name || 'Untitled Room',
       type: roomData.type || 'workspace',
-      status,
+      status: finalStatus,
       capacity: roomData.capacity || 4,
       features: roomData.features || [],
       position: roomData.position || { x: 100, y: 100, width: 200, height: 150 },
-      users: roomData.users || [],
+      userIds: roomData.userIds || [], // Use userIds
       description: roomData.description,
       accessControl: roomData.accessControl || { isPublic: true },
       reservations: roomData.reservations || [],
-      createdBy: 1, // Mock user ID
-      createdAt: new Date(),
-      updatedAt: new Date()
+      // createdBy, createdAt, updatedAt are handled by API/context
     };
-    
+
     if (isCreating) {
-      onCreate(newRoom);
-    } else if (onUpdate) {
-      onUpdate(newRoom);
+      // Pass partial data for creation
+      onCreate(roomPayload);
+    } else if (onUpdate && roomData.id) {
+      // Pass full object (including ID) for update
+      onUpdate({ ...roomPayload, id: roomData.id } as Space);
     }
-    
+
     onOpenChange(false);
-  }
+  };
   
   // Available features for selection
   const availableFeatures = [
@@ -427,7 +438,7 @@ export function RoomDialog({
             <div className="mt-4">
               <Tabs defaultValue="people">
                 <TabsList className="grid grid-cols-3">
-                  <TabsTrigger value="people">People ({roomData.users?.length || 0})</TabsTrigger>
+                  <TabsTrigger value="people">People ({roomData.userIds?.length || 0})</TabsTrigger> {/* Changed users to userIds */}
                   <TabsTrigger value="controls">Room Controls</TabsTrigger>
                   <TabsTrigger value="info">Room Info</TabsTrigger>
                 </TabsList>
@@ -435,34 +446,46 @@ export function RoomDialog({
                 <TabsContent value="people" className="mt-4">
                   <ScrollArea className="h-[200px] rounded-md border p-4">
                     <div className="space-y-4">
-                      {roomData.users && roomData.users.length > 0 ? (
-                        roomData.users.map(user => (
-                          <div key={user.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <StatusAvatar user={user} size="sm" />
-                              <div>
-                                <p className="font-medium">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">{user.activity}</p>
+                      {/* Map over userIds and find user details in companyUsers */}
+                      {roomData.userIds && roomData.userIds.length > 0 ? (
+                        roomData.userIds.map(userId => {
+                          const user = companyUsers.find(u => u.id === userId);
+                          if (!user) return null; // Skip if user not found in context yet
+
+                          // Adapt LocalUser structure for StatusAvatar/MessageDialog if needed
+                          const localUser: LocalUser = {
+                            id: 0, // LocalUser expects number ID, use placeholder or refactor components
+                            name: user.displayName,
+                            avatar: user.avatarUrl || '',
+                            status: 'active', // LocalUser has different status types, map or use placeholder
+                            activity: user.statusMessage || user.status || ''
+                          };
+
+                          return (
+                            <div key={user.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {/* StatusAvatar might need update if it expects LocalUser */}
+                                <StatusAvatar user={localUser} size="sm" />
+                                <div>
+                                  <p className="font-medium">{user.displayName}</p>
+                                  <p className="text-xs text-muted-foreground">{user.statusMessage || user.status}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* TODO: Add presenting status check if needed */}
+                                {/* {user.status === 'presenting' && ( ... )} */}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Message user"
+                                  onClick={() => handleMessageUser(localUser)} // Pass adapted LocalUser
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {user.status === 'presenting' && (
-                                <Badge variant="outline" className="flex items-center gap-1">
-                                  <Monitor className="h-3 w-3" />
-                                  <span>Presenting</span>
-                                </Badge>
-                              )}
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                title="Message user"
-                                onClick={() => handleMessageUser(user)}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full py-8 text-center text-muted-foreground">
                           <Users className="h-10 w-10 mb-2 opacity-20" />
@@ -560,10 +583,11 @@ export function RoomDialog({
               
               <DialogFooter className="mt-6">
                 <div className="text-sm text-muted-foreground">
-                  <span>{roomData.users?.length || 0}/{roomData.capacity || 4} people</span>
+                  {/* Use userIds.length */}
+                  <span>{roomData.userIds?.length || 0}/{roomData.capacity || 4} people</span>
                 </div>
                 <Button type="submit" onClick={handleJoinRoom}>
-                  Join Room
+                  Join Room {/* TODO: Implement actual join logic */}
                 </Button>
               </DialogFooter>
             </div>

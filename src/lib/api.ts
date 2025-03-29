@@ -1,7 +1,7 @@
 // src/lib/api.ts
 // Client-side API functions for interacting with server-side endpoints
 
-import { Company, User, UserRole } from '@/types/database';
+import { Company, User, UserRole, Space } from '@/types/database'; // Added Space
 
 /**
  * Create a new user in the database via the server-side API
@@ -36,6 +36,30 @@ export async function createUser(userData: {
     return data.userId;
   } catch (error) {
     console.error('API error creating user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get spaces by company ID via the server-side API
+ */
+export async function getSpacesByCompany(companyId: string): Promise<Space[]> {
+  try {
+    const response = await fetch(`/api/spaces/get?companyId=${companyId}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get spaces');
+    }
+
+    const data = await response.json();
+    // Ensure users array exists, even if empty
+    return data.spaces.map((space: any) => ({
+      ...space,
+      users: space.users || [] 
+    }));
+  } catch (error) {
+    console.error('API error getting spaces by company:', error);
     throw error;
   }
 }

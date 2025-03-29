@@ -32,6 +32,8 @@ export default async function handler(
         return res.status(400).json({ error: 'Invalid role specified' });
     }
 
+    console.log('[API /invitations/create] Received request:', { email, role, companyId }); // Added log
+
     // TODO: Verify companyId exists and requesting user is an admin
     // const company = await getCompany(companyId);
     // if (!company) {
@@ -47,6 +49,9 @@ export default async function handler(
     // Set expiration (e.g., 7 days from now)
     const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // Expires in 7 days (Unix timestamp)
 
+    console.log('[API /invitations/create] Generated token:', token); // Added log
+    console.log('[API /invitations/create] Calculated expiresAt:', expiresAt); // Added log
+
     const invitationData: Omit<Invitation, 'createdAt' | 'status'> = {
       token,
       email,
@@ -54,6 +59,8 @@ export default async function handler(
       role: role as UserRole,
       expiresAt,
     };
+
+    console.log('[API /invitations/create] Saving invitation data:', invitationData); // Added log
 
     // Save invitation to database
     await createInvitation(invitationData);

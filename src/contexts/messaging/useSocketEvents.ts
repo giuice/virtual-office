@@ -7,11 +7,20 @@ import {
   Message,
   Conversation, 
   MessageStatus,
-  TypingIndicator
+  // Removed TypingIndicator import
 } from '@/types/messaging';
-import { sendTypingIndicator as apiSendTypingIndicator } from '@/lib/messaging-api';
+// Removed incorrect named imports - functions don't exist in messaging-api.ts
+// import { sendTypingIndicator as apiSendTypingIndicator } from '@/lib/messaging-api';
+// import { updateMessageStatus } from '@/lib/messaging-api';
+import { messagingApi } from '@/lib/messaging-api'; // Import the actual API object (though it lacks needed methods)
 import { SocketEvents } from './types';
-import { updateMessageStatus } from '@/lib/messaging-api';
+
+// Define TypingIndicator interface locally
+interface TypingIndicator {
+  conversationId: string;
+  userId: string;
+  timestamp: Date;
+}
 
 export function useSocketEvents(
   activeConversationId: string | null,
@@ -51,7 +60,9 @@ export function useSocketEvents(
           
           // Mark as delivered if from another user
           if (newMessage.senderId !== user.uid) {
-            updateMessageStatus(newMessage.id, MessageStatus.DELIVERED);
+            // TODO: Implement updateMessageStatus in messagingApi and uncomment
+            // await messagingApi.updateMessageStatus(newMessage.id, MessageStatus.DELIVERED);
+            console.warn('updateMessageStatus API call not implemented yet.');
           }
         }
         
@@ -135,9 +146,11 @@ export function useSocketEvents(
     if (!user) return;
     
     // Send typing indicator to server
-    apiSendTypingIndicator(conversationId, user.uid);
+    // TODO: Implement sendTypingIndicator in messagingApi and uncomment
+    // await messagingApi.sendTypingIndicator(conversationId, user.uid);
+    console.warn('sendTypingIndicator API call not implemented yet.');
     
-    // Also emit via socket for real-time updates
+    // Also emit via socket for real-time updates (This part is likely correct)
     if (socketRef.current) {
       socketRef.current.emit(SocketEvents.TYPING_INDICATOR, {
         conversationId,
