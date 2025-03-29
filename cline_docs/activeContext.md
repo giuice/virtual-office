@@ -1,7 +1,7 @@
 # Active Context
 
-**Date:** 3/28/2025
-**Last Updated:** 3/28/2025, 1:42 PM (UTC-3:00)
+**Date:** 3/29/2025
+**Last Updated:** 3/29/2025, 4:05 PM (UTC-3:00)
 
 ## Project Status
 - **Current Phase:** Execution
@@ -13,6 +13,26 @@
   - `doc_tracker.md` status unchanged (no doc directories configured for analysis).
 
 ## Recent Changes
+- **Floor Plan Debugging & Messaging Fixes (3/29/2025):**
+    - **Floor Plan:** Identified that `/floor-plan` page was importing `floor-plan-old.tsx` (with demo data) instead of `floor-plan.tsx` (using context). Corrected the import path in `src/app/(dashboard)/floor-plan/page.tsx`. Confirmed via logs that the database returns an empty `spaces` array, which is now correctly passed to the `FloorPlanCanvas`.
+    - **Messaging Build Errors:** Fixing the floor plan import revealed build errors in messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) due to incorrect imports and missing functions/types.
+    - **Fixes Applied:**
+        - Corrected import syntax in hooks to use the named `messagingApi` export from `src/lib/messaging-api.ts`.
+        - Corrected type imports (`FileAttachment` instead of `MessageAttachment`) and definitions (`PaginationOptions` defined inline, `TypingIndicator` defined locally) in `useMessages.ts` and `useSocketEvents.ts`.
+        - Commented out calls to unimplemented API functions in hooks (`addReaction`, `removeReaction`, `uploadAttachment`, `setConversationArchiveStatus`, `markConversationAsRead`, `updateMessageStatus`, `sendTypingIndicator`) with TODO notes.
+        - Removed non-existent `lastMessage` property assignment in `useConversations.ts`.
+- **Floor Plan Data Refactor (3/29/2025):**
+    - Identified that `floor-plan.tsx` was using hardcoded demo data (`demoSpaces`) instead of fetching real data.
+    - Added `Space` type definition to `src/types/database.ts` and deprecated the old `Room` type.
+    - Created API endpoint (`/api/spaces/get`) and API client function (`getSpacesByCompany`) to fetch spaces.
+    - Updated `CompanyContext` to fetch and provide `spaces` data.
+    - Refactored `floor-plan.tsx`, `FloorPlanCanvas.tsx`, `RoomDialog.tsx`, and `RoomManagement.tsx` to use the global `Space` type and consume data from `CompanyContext`. This is expected to fix the bug where users were not displaying correctly in rooms.
+- **Invitation Flow Fix (3/29/2025):** Resolved `useAuth must be used within an AuthProvider` error in `src/pages/accept-invite.tsx`.
+- **Invitation Flow Logging (3/28/2025):** Added `console.log` statements to key files:
+    - `src/pages/api/invitations/create.ts`
+    - `src/pages/api/invitations/accept.ts`
+    - `src/components/dashboard/invite-user-dialog.tsx`
+    - `src/pages/accept-invite.tsx`
 - **Dependency Tracker Maintenance (3/28/2025):** Ran `python -m cline_utils.dependency_system.dependency_processor analyze-project` to update module and mini-trackers based on recent code changes.
 - **Messaging System Real-Time Updates (Socket.IO):**
   - *socket-server.js*:
@@ -194,7 +214,12 @@
     - **Updated backend socket server (`socket-server.js`)** to acknowledge `replyToId` in the `send_message` event handler (logging only for now).
     - **Implemented real-time broadcasting for reaction and threading updates via Socket.IO.**
     - **Refactored user invitation flow to use tokens and Firebase UID.**
-    - **Next:** Test the new invitation flow. Implement email sending for invitations. Implement room/conversation-specific broadcasting in `socket-server.js`. Proceed to next feature (e.g., Blackboard).
+    - **Added logging to invitation flow components and API endpoints.**
+    - **Fixed `AuthProvider` issue on `accept-invite` page.**
+    - **Next:** Implement missing messaging API functions (Phase 1 of agreed plan): Add backend endpoints and client functions for reactions, status updates, typing indicators, archiving, read status, etc. Then uncomment calls in hooks.
+    - *(Phase 2)* Implement "Create Room" functionality (API endpoint, DB logic, context function, connect UI).
+    - *(Phase 3/Future)* Refactor messaging components and context for clarity and remove duplicates.
+    - *(Future)* Refactor room management functions (update, delete, duplicate) in `floor-plan.tsx` to use API calls instead of modifying local state.
     - *(Future)* Replace placeholder authentication in reaction API.
     - *(Future)* Integrate socket server logic with actual database persistence for messages, reactions, and threads.
     - *(Future)* Add proper authentication/authorization checks to invitation API endpoints.
@@ -209,3 +234,6 @@
 - Package dependencies:
   - Added uuid and @types/uuid for generating unique IDs.
   - Added `socket.io` and `socket.io-client` for real-time messaging.
+
+## Development Guidelines
+- **Component Size:** Components exceeding 300-400 lines significantly hinder AI processing. Aggressively decompose large components into smaller, single-responsibility units using SOLID, DRY, and Separation of Concerns principles. Prioritize this during refactoring and new component creation.

@@ -4,16 +4,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Group, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Space, spaceColors } from './types';
+import { Space, User as GlobalUser } from '@/types/database'; // Use global Space type and User
+import { spaceColors } from './types'; // Keep local colors for now
 import { RoomTooltip } from './room-tooltip';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
 
 export type FloorPlanCanvasProps = {
-  spaces: Space[];
-  onSpaceSelect: (space: Space) => void;
-  onSpaceDoubleClick?: (space: Space) => void;
-  onSpaceUpdate?: (updatedSpace: Space) => void;
+  spaces: Space[]; // Expects global Space[]
+  onSpaceSelect: (space: Space) => void; // Expects global Space
+  onSpaceDoubleClick?: (space: Space) => void; // Expects global Space
+  onSpaceUpdate?: (updatedSpace: Space) => void; // Expects global Space
   isEditable?: boolean;
 };
 
@@ -32,6 +34,7 @@ export const FloorPlanCanvas = ({
   const [isResizing, setIsResizing] = useState(false);
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { companyUsers } = useCompany(); // Get companyUsers from context
 
   // Grid settings
   const gridSize = 20; // Size of grid cells in pixels
@@ -363,15 +366,45 @@ export const FloorPlanCanvas = ({
                       ellipsis={true}
                     />
                     
-                    {/* User count */}
+                    {/* User count - Use userIds.length */}
                     <Text
-                      x={space.position.x + 10}
+                      x={space.position.x + 10} // Corrected typo: + 1 0 -> + 10
                       y={space.position.y + space.position.height - 25}
-                      text={`${space.users.length}/${space.capacity} users`}
+                      text={`${space.userIds?.length}/${space.capacity} users`} 
                       fontSize={12}
                       fontFamily="'Inter', sans-serif"
                       fill="hsl(var(--muted-foreground))"
                     />
+
+                    {/* User Indicators - Add check for space.userIds */}
+                    {Array.isArray(space.userIds) && space.userIds.map((userId, index) => {
+                      const user = companyUsers.find(u => u.id === userId);
+                      if (!user) return null; // Skip if user data not found yet
+
+                      // Simple layout: place circles in a row near the bottom
+                      const userIndicatorRadius = 5;
+                      const padding = 5;
+                      const indicatorX = space.position.x + padding + userIndicatorRadius + index * (userIndicatorRadius * 2 + padding);
+                      const indicatorY = space.position.y + space.position.height - padding - userIndicatorRadius - 30; // Position above user count text
+
+                      // Ensure indicators stay within bounds (simple check)
+                      if (indicatorX + userIndicatorRadius > space.position.x + space.position.width - padding) {
+                        return null; // Don't render if it overflows horizontally
+                      }
+
+                      return (
+                        <Circle
+                          key={userId}
+                          x={indicatorX}
+                          y={indicatorY}
+                          radius={userIndicatorRadius}
+                          fill={user.status === 'online' ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))'} // Example: Green for online, gray otherwise
+                          stroke="white"
+                          strokeWidth={1}
+                          // TODO: Add tooltip or hover effect to show user name
+                        />
+                      );
+                    })}
                     
                     {/* Resize handles (only shown when selected and editable) */}
                     {isSelected && isEditable && (

@@ -1,110 +1,26 @@
 // components/floor-plan/floor-plan.tsx
 'use client'
 
-import { useState } from 'react'
-import { Space, User, SpaceType, RoomTemplate } from './types'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react'
+import { useState, useEffect } from 'react';
+// Import global Space type and local types separately
+import { Space, User as GlobalUser } from '@/types/database'; // Use global Space and User
+import { User as LocalUser, SpaceType as LocalSpaceType, RoomTemplate } from './types'; // Keep local types if needed elsewhere
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog'
 import { UserHoverCard } from './user-hover-card'
 import { FloorPlanCanvas } from './FloorPlanCanvas'
 import { RoomManagement } from './room-management'
-import { RoomTemplateSelector } from './room-template-selector'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RoomChatIntegration } from './room-chat-integration'
+import { RoomTemplateSelector } from './room-template-selector';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RoomChatIntegration } from './room-chat-integration';
+import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
 
-// Sample data
-const demoSpaces: Space[] = [
-  {
-    id: 'dev-team-1',
-    name: 'Development Team Area',
-    type: 'workspace',
-    status: 'active',
-    position: { x: 100, y: 100, width: 300, height: 200 },
-    capacity: 8,
-    features: ['screens', 'whiteboard'],
-    users: [
-      {
-        id: 1,
-        name: 'John Dev',
-        status: 'active',
-        avatar: '/api/placeholder/32/32',
-        activity: 'Coding'
-      },
-      {
-        id: 2,
-        name: 'Sarah Tech',
-        status: 'active',
-        avatar: '/api/placeholder/32/32',
-        activity: 'In meeting'
-      }
-    ]
-  },
-  {
-    id: 'meeting-room-1',
-    name: 'Main Conference Room',
-    type: 'conference',
-    status: 'active',
-    position: { x: 450, y: 100, width: 250, height: 150 },
-    capacity: 12,
-    features: ['video', 'screen-sharing', 'whiteboard'],
-    users: [
-      {
-        id: 3,
-        name: 'Alice Manager',
-        status: 'presenting',
-        avatar: '/api/placeholder/32/32',
-        activity: 'Presenting'
-      },
-      {
-        id: 4,
-        name: 'Bob Analyst',
-        status: 'viewing',
-        avatar: '/api/placeholder/32/32',
-        activity: 'Viewing presentation'
-      }
-    ]
-  },
-  {
-    id: 'break-room',
-    name: 'Break Room',
-    type: 'social',
-    status: 'available',
-    position: { x: 100, y: 350, width: 200, height: 150 },
-    capacity: 6,
-    features: ['coffee', 'snacks'],
-    users: []
-  },
-  {
-    id: 'private-office-1',
-    name: 'CEO Office',
-    type: 'private_office',
-    status: 'locked',
-    position: { x: 450, y: 350, width: 150, height: 150 },
-    capacity: 1,
-    features: ['desk', 'privacy', 'whiteboard'],
-    users: [],
-    accessControl: {
-      isPublic: false,
-      allowedUsers: [1, 3]
-    }
-  },
-  {
-    id: 'open-space-1',
-    name: 'Innovation Hub',
-    type: 'open_space',
-    status: 'available',
-    position: { x: 650, y: 100, width: 300, height: 300 },
-    capacity: 20,
-    features: ['whiteboard', 'flexible-seating', 'screens'],
-    users: []
-  }
-]
-
-// Sample room templates
+// Sample room templates (Keep for now, might move later)
 const roomTemplates: RoomTemplate[] = [
   {
     id: 'template-1',
@@ -142,13 +58,15 @@ const roomTemplates: RoomTemplate[] = [
 ]
 
 export function FloorPlan() {
-  // State for rooms and UI
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
-  const [hoveredUser, setHoveredUser] = useState<User | null>(null)
-  const [spaces, setSpaces] = useState<Space[]>(demoSpaces)
-  const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false)
-  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState<boolean>(false)
-  const [isRoomManagementOpen, setIsRoomManagementOpen] = useState<boolean>(false)
+  // Get data from context
+  const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
+
+  // State for UI interactions
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null); // Use global Space type
+  const [hoveredUser, setHoveredUser] = useState<LocalUser | null>(null); // Keep LocalUser for hover card if its structure differs
+  const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState<boolean>(false);
+  const [isRoomManagementOpen, setIsRoomManagementOpen] = useState<boolean>(false);
   const [templates, setTemplates] = useState<RoomTemplate[]>(roomTemplates)
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -157,7 +75,7 @@ export function FloorPlan() {
   // State for room messaging
   const [chatRoom, setChatRoom] = useState<Space | null>(null)
   
-  // Filter spaces based on type and search query
+  // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
     const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -165,79 +83,54 @@ export function FloorPlan() {
     return matchesType && matchesSearch;
   });
   
-  // Handle room creation
-  const handleCreateRoom = (newRoom: Space) => {
-    setSpaces(prev => [...prev, newRoom]);
+  // TODO: Refactor room management functions (create, update, delete, duplicate)
+  // to interact with the backend API via context or direct API calls,
+  // instead of modifying local state directly.
+  // For now, these functions will not work correctly as they modify the old local state.
+
+  // TODO: Refactor room management functions (create, update, delete, duplicate)
+  // to interact with the backend API via context or direct API calls.
+  // These functions now expect the global Space type.
+
+  const handleCreateRoom = (newRoomData: Partial<Space>) => { // Expect partial data for creation
+    console.warn("handleCreateRoom needs API integration");
+    // Example API call structure (needs implementation in context/API):
+    // createSpaceInContext({ ...newRoomData, companyId: company?.id, createdBy: currentUserProfile?.id });
     setIsRoomDialogOpen(false);
   };
-  
-  // Handle room update
-  const handleUpdateRoom = (updatedRoom: Space) => {
-    setSpaces(prev => 
-      prev.map(space => space.id === updatedRoom.id ? updatedRoom : space)
-    );
+
+  const handleUpdateRoom = (updatedRoom: Space) => { // Expect full Space object for update
+    console.warn("handleUpdateRoom needs API integration");
+    // Example API call structure (needs implementation in context/API):
+    // updateSpaceInContext(updatedRoom.id, updatedRoom);
     setSelectedSpace(null);
     setIsEditingRoom(false);
   };
-  
-  // Handle room deletion
+
   const handleDeleteRoom = (roomId: string) => {
-    setSpaces(prev => prev.filter(space => space.id !== roomId));
+    console.warn("handleDeleteRoom needs API integration");
+    // Example API call structure (needs implementation in context/API):
+    // deleteSpaceInContext(roomId);
     setSelectedSpace(null);
-    
-    // Also close chat if the deleted room is the current chat room
     if (chatRoom && chatRoom.id === roomId) {
       setChatRoom(null);
     }
   };
-  
-  // Handle room duplication
-  const handleDuplicateRoom = (room: Space) => {
-    const newRoom: Space = {
-      ...room,
-      id: `${room.id}-copy-${Date.now()}`,
-      name: `${room.name} (Copy)`,
-      position: {
-        ...room.position,
-        x: room.position.x + 50,
-        y: room.position.y + 50
-      },
-      users: []
-    };
-    
-    setSpaces(prev => [...prev, newRoom]);
+
+  const handleDuplicateRoom = (room: Space) => { // Expect global Space
+    console.warn("handleDuplicateRoom needs API integration");
+    // Example API call structure (needs implementation in context/API):
+    // duplicateSpaceInContext(room);
   };
-  
-  // Handle template selection
+
+  // Handle template selection (Needs API integration)
   const handleSelectTemplate = (template: RoomTemplate) => {
-    // Create a new room from the template
-    const newRoom: Space = {
-      id: `room-${Date.now()}`,
-      name: template.name,
-      type: template.type,
-      status: 'available',
-      capacity: template.capacity,
-      features: template.features,
-      position: {
-        x: 100,
-        y: 100,
-        width: template.defaultWidth,
-        height: template.defaultHeight
-      },
-      users: [],
-      description: template.description,
-      accessControl: { isPublic: true },
-      createdBy: 1, // Mock user ID
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isTemplate: false,
-      templateName: template.name
-    };
-    
-    setSpaces(prev => [...prev, newRoom]);
+    console.warn("handleSelectTemplate needs API integration");
+    // Example API call structure (needs implementation in context/API):
+    // createSpaceFromTemplateInContext(template);
   };
-  
-  // Handle opening chat for a room
+
+  // Handle opening chat for a room (Expects global Space)
   const handleOpenChat = (room: Space) => {
     setChatRoom(room);
   };
@@ -368,27 +261,30 @@ export function FloorPlan() {
 
       {/* Main Floor Plan Card */}
       <Card className="w-full">
-        <div className="p-4">
-          <FloorPlanCanvas 
-            spaces={filteredSpaces} 
-            onSpaceSelect={(space) => {
-              setSelectedSpace(space);
+        <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+          {isCompanyLoading ? (
+            <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
+          ) : (
+            <FloorPlanCanvas
+              spaces={filteredSpaces} // Pass global Space[]
+              onSpaceSelect={(space: Space) => { // Ensure type is global Space
+                setSelectedSpace(space);
               // We don't automatically open the edit dialog, 
               // so users can select a room for other actions like chat
             }}
             onSpaceDoubleClick={(space) => {
-              // Open chat panel on double-click instead of edit dialog
+              // Open chat panel on double-click
               handleOpenChat(space);
             }}
-            onSpaceUpdate={handleUpdateRoom}
-            isEditable={true}
-          />
+            onSpaceUpdate={handleUpdateRoom} // Pass updated handler
+            isEditable={true} // TODO: Make this dependent on user role (admin)
+          />)}
         </div>
       </Card>
 
-      {/* Room Dialog for Creating/Editing */}
-      <RoomDialog 
-        room={isEditingRoom ? selectedSpace : null}
+      {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
+      <RoomDialog
+        room={isEditingRoom ? selectedSpace : null} // Pass global Space or null
         open={isRoomDialogOpen || isEditingRoom}
         onOpenChange={(open) => {
           if (!open) {
@@ -402,21 +298,22 @@ export function FloorPlan() {
         isCreating={!isEditingRoom}
       />
 
-      {/* Room Management Dialog */}
+      {/* Room Management Dialog - Pass global Space[] */}
       <RoomManagement
-        spaces={spaces}
+        spaces={spaces} // Pass global Space[]
         onCreateRoom={() => {
-          setIsRoomDialogOpen(true);
+          setIsRoomDialogOpen(true); // Open the standard create/edit dialog
+          setIsEditingRoom(false); // Ensure it's in create mode
           setIsRoomManagementOpen(false);
         }}
-        onEditRoom={(room) => {
+        onEditRoom={(room: Space) => { // Expect global Space
           setSelectedSpace(room);
-          setIsEditingRoom(true);
+          setIsEditingRoom(true); // Open the standard create/edit dialog in edit mode
           setIsRoomManagementOpen(false);
         }}
-        onDeleteRoom={handleDeleteRoom}
-        onDuplicateRoom={handleDuplicateRoom}
-        onOpenChat={(room) => {
+        onDeleteRoom={handleDeleteRoom} // Pass updated handler
+        onDuplicateRoom={handleDuplicateRoom} // Pass updated handler
+        onOpenChat={(room: Space) => { // Expect global Space
           handleOpenChat(room);
           setIsRoomManagementOpen(false);
         }}
@@ -439,7 +336,8 @@ export function FloorPlan() {
         position="right"
       />
 
-      {/* User Info Bar */}
+      {/* User Info Bar - Correctly commented out */}
+      {/*
       <Card className="w-full">
         <CardContent className="py-3">
           <div className="flex items-center justify-between">
@@ -455,11 +353,12 @@ export function FloorPlan() {
             </div>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              24 Online
+              {companyUsers.filter(u => u.status === 'online').length} Online
             </Badge>
           </div>
         </CardContent>
       </Card>
+      */}
     </div>
   )
 }

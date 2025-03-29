@@ -37,17 +37,20 @@ export function InviteUserDialog() {
     try {
       setIsLoading(true);
 
+      const payload = {
+        email,
+        role,
+        companyId: company.id,
+      };
+      console.log('[InviteUserDialog] Sending invitation request with payload:', payload); // Added log
+
       // Call the new API endpoint
       const response = await fetch('/api/invitations/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          role,
-          companyId: company.id,
-        }),
+        body: JSON.stringify(payload), // Use payload variable
       });
 
       if (!response.ok) {

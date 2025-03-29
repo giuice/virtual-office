@@ -1,11 +1,14 @@
 // src/components/floor-plan/room-management.tsx
+// src/components/floor-plan/room-management.tsx
 'use client'
 
-import { useState } from 'react'
-import { Space, SpaceType, RoomTemplate } from './types'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Trash2, Copy, Edit, Plus, Settings, MessageSquare } from 'lucide-react'
+import { useState } from 'react';
+// Import global Space type and local types if still needed
+import { Space, SpaceType } from '@/types/database'; // Use global Space and SpaceType
+import { RoomTemplate } from './types'; // Keep local RoomTemplate for now
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Copy, Edit, Plus, Settings, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,15 +21,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from '@/components/ui/dialog';
 
 export interface RoomManagementProps {
-  spaces: Space[]
-  onCreateRoom: () => void
-  onEditRoom: (room: Space) => void
-  onDeleteRoom: (roomId: string) => void
-  onDuplicateRoom: (room: Space) => void
-  onOpenChat?: (room: Space) => void
+  spaces: Space[]; // Expect global Space[]
+  onCreateRoom: () => void;
+  onEditRoom: (room: Space) => void; // Expect global Space
+  onDeleteRoom: (roomId: string) => void;
+  onDuplicateRoom: (room: Space) => void; // Expect global Space
+  onOpenChat?: (room: Space) => void; // Expect global Space
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -195,10 +198,11 @@ export function RoomManagement({
                           <span>{space.capacity} capacity</span>
                           <span>•</span>
                           <span>{getRoomStatusLabel(space.status)}</span>
-                          {space.users.length > 0 && (
+                          {/* Use userIds.length */}
+                          {space.userIds?.length > 0 && ( 
                             <>
                               <span>•</span>
-                              <span>{space.users.length} users</span>
+                              <span>{space.userIds?.length} users</span>
                             </>
                           )}
                         </div>

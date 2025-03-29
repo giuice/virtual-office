@@ -1,8 +1,8 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Updated dependency trackers using analyze-project"
+last_action: "Fixed floor plan import and messaging build errors. Agreed on plan to implement missing messaging API functions."
 current_phase: "Execution"
-next_action: "Test new invitation flow or implement email sending"
+next_action: "Implement missing messaging API functions (Phase 1)"
 next_phase: "Execution"
 
 [CODE_ROOT_DIRECTORIES]
@@ -41,4 +41,9 @@ next_phase: "Execution"
 - Implemented Socket.IO listeners and emitters for real-time reaction updates in both backend (`socket-server.js`) and frontend (`MessagingContext.tsx`). Ensured `replyToId` is broadcast.
 - Refactored user invitation to use token-based flow, fixing ID mismatch. Added DB functions, API endpoints, and frontend page/component updates.
 - Regularly running `analyze-project` after significant code changes keeps the dependency trackers (`module_relationship_tracker.md`, mini-trackers) accurate and prevents potential issues during development.
+- Adding console logs to relevant frontend and backend components is a useful technique for tracing the execution flow during manual testing, especially for multi-step processes like user invitations.
+- Pages within `src/pages` (Pages Router) are not automatically wrapped by providers defined in `src/app/layout.tsx` (App Router). Context-dependent pages in `src/pages` need their own provider wrapping if `src/pages/_app.tsx` is not used.
+- **CRITICAL:** Components exceeding 300-400 lines significantly hinder AI processing. Aggressively decompose large components into smaller, single-responsibility units using SOLID, DRY, and Separation of Concerns principles. Prioritize this during refactoring and new component creation.
+- Identified that `src/lib/messaging-api.ts` is missing several functions needed by the messaging hooks (reactions, status updates, typing indicators, archiving, read status). These need to be implemented along with corresponding backend API routes.
+- Corrected import paths and type definitions in messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) to resolve build errors after fixing floor plan import.
 ---CLINE_RULES_END---

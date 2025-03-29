@@ -4,8 +4,12 @@ import { Timestamp } from 'firebase/firestore';
 // User role types
 export type UserRole = 'admin' | 'member';
 
-// User status types
+// User status types (Keep existing UserStatus, floor plan uses a different set)
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
+
+// Floor Plan / Space related types
+export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout' | 'private_office' | 'open_space' | 'lounge' | 'lab';
+export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked' | 'reserved' | 'in_use';
 
 // Message types
 export type MessageType = 'text' | 'image' | 'file' | 'transcript';
@@ -22,7 +26,7 @@ export interface Company {
   settings: {
     allowGuestAccess?: boolean;
     maxRooms?: number;
-    defaultRoomSettings?: Partial<Room>;
+    defaultRoomSettings?: Partial<Space>; // Changed Room to Space
     theme?: string;
   };
 }
@@ -46,7 +50,55 @@ export interface User {
   createdAt: TimeStampType;
 }
 
-// Room Collection
+// Position type for floor plan elements
+export interface Position {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Access Control for Spaces
+export interface AccessControl {
+  isPublic: boolean;
+  allowedUsers?: string[]; // User IDs that have access
+  allowedRoles?: string[]; // Roles that have access
+  ownerId?: string; // User ID of the owner
+}
+
+// Reservation for Spaces
+export interface Reservation {
+  id: string;
+  userId: string; // User ID who made the reservation
+  userName: string; // User name (denormalized for display)
+  startTime: TimeStampType;
+  endTime: TimeStampType;
+  purpose?: string;
+}
+
+// Space Collection (Replaces the simpler Room type)
+export interface Space {
+  id: string;
+  companyId: string; // Link to company
+  name: string;
+  type: SpaceType;
+  status: SpaceStatus;
+  capacity: number;
+  features: string[];
+  position: Position;
+  userIds: string[]; // User IDs currently in the space
+  description?: string;
+  accessControl?: AccessControl;
+  reservations?: Reservation[];
+  createdBy?: string; // User ID who created the room
+  createdAt?: TimeStampType;
+  updatedAt?: TimeStampType;
+  isTemplate?: boolean; // If this space is a template itself
+  templateName?: string; // Name of the template used, if any
+}
+
+// Room Collection (DEPRECATED - Use Space instead)
+/*
 export interface Room {
   id: string;
   companyId: string;
@@ -64,6 +116,7 @@ export interface Room {
   createdBy: string; // User ID
   createdAt: TimeStampType;
 }
+*/
 
 // Message Collection
 export interface Message {
@@ -122,4 +175,20 @@ export interface Invitation {
   expiresAt: number; // Unix timestamp (for TTL)
   status: 'pending' | 'accepted' | 'expired';
   createdAt: string; // ISO String
+}
+
+// Room Template (Not stored in main DB, maybe separate config or derived)
+// Note: This might not be stored directly in the main database
+// but could be part of company settings or a separate collection.
+export interface RoomTemplate {
+  id: string;
+  name: string;
+  type: SpaceType;
+  capacity: number;
+  features: string[];
+  description?: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  createdBy?: string; // User ID
+  isPublic: boolean;
 }

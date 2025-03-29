@@ -1,17 +1,17 @@
 // src/contexts/CompanyContext.tsx
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'; // Added useCallback
 import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid'; // <-- ADD THIS IMPORT
+import { v4 as uuidv4 } from 'uuid';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { Company, User, UserRole } from '@/types/database'; // <-- ADDED UserRole HERE
+import { Company, User, UserRole, Space } from '@/types/database'; // Added Space
 // Using API client instead of direct DynamoDB access
-import { 
-  getUserByFirebaseId, 
-  createUser, 
+import {
+  getUserByFirebaseId,
+  createUser,
   updateUserStatus,
   updateUserRole as apiUpdateUserRole,
   removeUserFromCompany as apiRemoveUserFromCompany,
@@ -19,12 +19,14 @@ import {
   getCompany,
   updateCompany,
   getUsersByCompany,
+  getSpacesByCompany, // Added getSpacesByCompany
   cleanupDuplicateCompanies
 } from '@/lib/api';
 
 interface CompanyContextType {
   company: Company | null;
   companyUsers: User[];
+  spaces: Space[]; // Added spaces state
   currentUserProfile: User | null;
   isLoading: boolean;
   error: string | null;
@@ -44,61 +46,78 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]); // Added spaces state
   const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user profile and company when auth user changes
-  useEffect(() => {
-    const loadUserAndCompany = async () => {
-      if (!user) {
-        setCompany(null);
-        setCurrentUserProfile(null);
-        setCompanyUsers([]);
-        setIsLoading(false);
-        return;
-      }
+  // Load user profile, company, users, and spaces
+  const loadCompanyData = useCallback(async (userId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
+      // First, clean up any duplicate companies the user might have
       try {
-        setIsLoading(true);
-        setError(null);
-
-        // First, clean up any duplicate companies the user might have
-        if (user.uid) {
-          try {
-            const { totalRemoved } = await cleanupDuplicateCompanies(user.uid);
-            if (totalRemoved > 0) {
-              console.log(`Cleaned up ${totalRemoved} duplicate companies for user ${user.uid}`);
-            }
-          } catch (cleanupError) {
-            console.error('Error cleaning up companies:', cleanupError);
-            // Continue with the rest of the process even if cleanup fails
-          }
+        const { totalRemoved } = await cleanupDuplicateCompanies(userId);
+        if (totalRemoved > 0) {
+          console.log(`Cleaned up ${totalRemoved} duplicate companies for user ${userId}`);
         }
-
-        // Get user profile - using the API client
-        const userProfile = await getUserByFirebaseId(user.uid);
-        setCurrentUserProfile(userProfile);
-
-        if (userProfile && userProfile.companyId) {
-          // Get company details - using the API client
-          const companyData = await getCompany(userProfile.companyId);
-          setCompany(companyData);
-
-          // Get company users - using the API client
-          const users = await getUsersByCompany(userProfile.companyId);
-          setCompanyUsers(users);
-        }
-      } catch (err) {
-        console.error('Error loading user and company data:', err);
-        setError(err instanceof Error ? err.message : 'Error loading data');
-      } finally {
-        setIsLoading(false);
+      } catch (cleanupError) {
+        console.error('Error cleaning up companies:', cleanupError);
+        // Continue with the rest of the process even if cleanup fails
       }
-    };
 
-    loadUserAndCompany();
-  }, [user]);
+      // Get user profile
+      const userProfile = await getUserByFirebaseId(userId);
+      setCurrentUserProfile(userProfile);
+
+      if (userProfile?.companyId) {
+        // Get company details
+        const companyData = await getCompany(userProfile.companyId);
+        setCompany(companyData);
+
+        // Get company users
+        const users = await getUsersByCompany(userProfile.companyId);
+        setCompanyUsers(users);
+
+        // Get company spaces (rooms)
+        const fetchedSpaces = await getSpacesByCompany(userProfile.companyId);
+        setSpaces(fetchedSpaces); // Set the spaces state
+
+      } else {
+        // Reset company-related state if user has no company
+        setCompany(null);
+        setCompanyUsers([]);
+        setSpaces([]);
+      }
+    } catch (err) {
+      console.error('Error loading company data:', err);
+      setError(err instanceof Error ? err.message : 'Error loading data');
+      // Reset state on error
+      setCompany(null);
+      setCurrentUserProfile(null);
+      setCompanyUsers([]);
+      setSpaces([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // Empty dependency array as it uses userId passed as argument
+
+  // Effect to trigger loading when auth user changes
+  useEffect(() => {
+    if (user) {
+      loadCompanyData(user.uid);
+    } else {
+      // Reset all state if user logs out
+      setCompany(null);
+      setCurrentUserProfile(null);
+      setCompanyUsers([]);
+      setSpaces([]);
+      setIsLoading(false);
+      setError(null);
+    }
+  }, [user, loadCompanyData]); // Depend on user and the memoized load function
 
   // Create a new company
   const createNewCompany = async (name: string): Promise<string> => {
@@ -115,19 +134,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       if (existingProfile?.companyId) {
         console.log('User already has a company, returning existing company ID');
         
-        // If the user already has a company, fetch it
-        const existingCompany = await getCompany(existingProfile.companyId);
-        if (existingCompany) {
-          // Update states with existing data
-          setCompany(existingCompany);
-          setCurrentUserProfile(existingProfile);
-          
-          // Get company users
-          const users = await getUsersByCompany(existingProfile.companyId);
-          setCompanyUsers(users);
-          
-          return existingProfile.companyId;
-        }
+        // If the user already has a company, reload all data
+        await loadCompanyData(user.uid);
+        return existingProfile.companyId;
       }
 
       // Create new company
@@ -197,14 +206,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       // Get company data
       const companyData2 = await getCompany(companyId);
       
-      // Update states
-      setCompany(companyData2);
-      setCurrentUserProfile(userProfile);
-      setCompanyUsers([userProfile!]);
+      // Reload all company data after creation
+      await loadCompanyData(user.uid);
 
       return companyId;
     } catch (err) {
-      console.error('Error creating company:', err);
+      console.error('Error creating/updating company:', err);
       setError(err instanceof Error ? err.message : 'Error creating company');
       throw err;
     } finally {
@@ -369,12 +376,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const value = {
     company,
     companyUsers,
+    spaces, // Expose spaces
     currentUserProfile,
     isLoading,
     error,
     createNewCompany,
     updateCompanyDetails,
-    // createUserProfile, // Removed from value
     updateUserProfile,
     updateUserRole,
     removeUserFromCompany,

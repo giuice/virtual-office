@@ -5,17 +5,11 @@ import {
   Message, 
   MessageStatus, 
   MessageType, 
-  MessageAttachment,
-  PaginationOptions
+  FileAttachment, // Corrected type name
+  // Removed PaginationOptions as it's not exported
 } from '@/types/messaging';
-import {
-  getMessages,
-  createMessage,
-  updateMessageStatus,
-  uploadMessageAttachment,
-  addMessageReaction,
-  removeMessageReaction
-} from '@/lib/messaging-api';
+// Removed all old named imports
+import { messagingApi } from '@/lib/messaging-api'; // Import the named export 'messagingApi'
 
 export function useMessages(activeConversationId: string | null) {
   const { user } = useAuth();
@@ -25,7 +19,12 @@ export function useMessages(activeConversationId: string | null) {
   const [loadingMessages, setLoadingMessages] = useState<boolean>(false);
   const [errorMessages, setErrorMessages] = useState<string | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
-  const [messagePagination, setMessagePagination] = useState<PaginationOptions>({
+  // Define pagination state inline as the type is not exported
+  const [messagePagination, setMessagePagination] = useState<{
+    limit: number;
+    direction: 'older' | 'newer';
+    cursor?: string;
+  }>({
     limit: 20,
     direction: 'older',
   });
@@ -38,11 +37,10 @@ export function useMessages(activeConversationId: string | null) {
       setLoadingMessages(true);
       setErrorMessages(null);
       
-      const result = await getMessages(activeConversationId, {
-        pagination: {
-          limit: 20,
-          direction: 'older',
-        },
+      // Pass pagination options directly
+      const result = await messagingApi.getMessages(activeConversationId, { 
+        limit: 20,
+        direction: 'older',
       });
       
       setMessages(result.messages);
@@ -81,9 +79,8 @@ export function useMessages(activeConversationId: string | null) {
     try {
       setLoadingMessages(true);
       
-      const result = await getMessages(activeConversationId, {
-        pagination: messagePagination,
-      });
+      // Pass pagination options directly
+      const result = await messagingApi.getMessages(activeConversationId, messagePagination); 
       
       setMessages(prev => [...result.messages, ...prev]);
       setHasMoreMessages(result.hasMore);
@@ -102,7 +99,7 @@ export function useMessages(activeConversationId: string | null) {
   // Function to send a message
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
-    attachments?: MessageAttachment[];
+    attachments?: FileAttachment[]; // Corrected type name
     type?: MessageType;
   }) => {
     if (!user || !activeConversationId || !content.trim()) return;
@@ -124,12 +121,14 @@ export function useMessages(activeConversationId: string | null) {
         timestamp: new Date(),
         status: MessageStatus.SENDING,
         type: options?.type || MessageType.TEXT,
+        reactions: [], // Added missing property
+        isEdited: false, // Added missing property
       };
       
       setMessages(prev => [...prev, optimisticMessage]);
       
-      // Send message to server
-      const savedMessage = await createMessage(messageData);
+      // Send message to server - Use sendMessage
+      const savedMessage = await messagingApi.sendMessage(messageData); 
       
       // Replace optimistic message with saved message
       setMessages(prev => 
@@ -176,9 +175,11 @@ export function useMessages(activeConversationId: string | null) {
     if (!user) return;
     
     try {
-      await addMessageReaction(messageId, user.uid, emoji);
-      
-      // Update local state
+      // TODO: Implement addMessageReaction in messagingApi and uncomment
+      // await messagingApi.addMessageReaction(messageId, user.uid, emoji); 
+      console.warn('addMessageReaction API call not implemented yet.');
+
+      // Update local state (Optimistic update remains)
       setMessages(prev => 
         prev.map(message => {
           if (message.id === messageId) {
@@ -213,9 +214,11 @@ export function useMessages(activeConversationId: string | null) {
     if (!user) return;
     
     try {
-      await removeMessageReaction(messageId, user.uid, emoji);
+      // TODO: Implement removeMessageReaction in messagingApi and uncomment
+      // await messagingApi.removeMessageReaction(messageId, user.uid, emoji); 
+      console.warn('removeMessageReaction API call not implemented yet.');
       
-      // Update local state
+      // Update local state (Optimistic update remains)
       setMessages(prev => 
         prev.map(message => {
           if (message.id === messageId && message.reactions) {
@@ -237,18 +240,24 @@ export function useMessages(activeConversationId: string | null) {
   }, [user]);
   
   // Function to upload an attachment
-  const uploadAttachment = useCallback(async (file: File): Promise<MessageAttachment> => {
+  const uploadAttachment = useCallback(async (file: File): Promise<FileAttachment> => { // Corrected return type
     if (!activeConversationId) {
       throw new Error('No active conversation');
     }
     
     try {
-      return await uploadMessageAttachment(file, activeConversationId);
+      // TODO: Implement uploadMessageAttachment in messagingApi and uncomment
+      // return await messagingApi.uploadMessageAttachment(file, activeConversationId); 
+      console.warn('uploadMessageAttachment API call not implemented yet.');
+      throw new Error('Attachment upload not implemented'); // Prevent further execution
     } catch (error) {
       console.error('Error uploading attachment:', error);
       throw error;
     }
   }, [activeConversationId]);
+
+  // Note: updateMessageStatus and uploadMessageAttachment were not used in this hook, 
+  // but if they were, they would also need to be prefixed with messagingApi.
   
   return {
     messages,

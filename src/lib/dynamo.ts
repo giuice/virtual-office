@@ -1,15 +1,15 @@
 // src/lib/dynamo.ts
 import { DynamoDB } from 'aws-sdk';
 import * as crypto from 'crypto';
-import { 
-  Company, 
-  User, 
-  Room, 
-  Message, 
-  Announcement, 
+import {
+  Company,
+  User,
+  Space, // Changed Room to Space
+  Message,
+  Announcement,
   MeetingNote,
-  Invitation, // <-- Added Invitation type
-  UserRole    // <-- Added UserRole type
+  Invitation,
+  UserRole
 } from '@/types/database';
 import AWS_CONFIG from './aws-config';
 
@@ -42,11 +42,11 @@ function ensureServerSide() {
 export const TABLES = { // Added export
   COMPANIES: 'virtual-office-companies',
   USERS: 'virtual-office-users',
-  ROOMS: 'virtual-office-rooms',
+  SPACES: 'virtual-office-rooms', // Changed ROOMS to SPACES
   MESSAGES: 'virtual-office-messages',
   ANNOUNCEMENTS: 'virtual-office-announcements',
   MEETING_NOTES: 'virtual-office-meeting-notes',
-  INVITATIONS: 'virtual-office-invitations', // <-- Added Invitations table
+  INVITATIONS: 'virtual-office-invitations',
 };
 
 // Generic add document function
@@ -382,25 +382,31 @@ export async function updateUserStatus(userId: string, status: User['status'], s
   await dynamoDb.update(params).promise();
 }
 
-// Room specific functions
-export async function createRoom(roomData: Omit<Room, 'id' | 'createdAt'>): Promise<string> {
+// Space specific functions (Previously Room)
+export async function createSpace(spaceData: Omit<Space, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   ensureServerSide();
-  return addDocument<Room>(TABLES.ROOMS, roomData as any);
+  const dataWithTimestamps = {
+    ...spaceData,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  return addDocument<Space>(TABLES.SPACES, dataWithTimestamps as any); // Use Space and TABLES.SPACES
 }
 
-export async function getRoomsByCompany(companyId: string): Promise<Room[]> {
+export async function getSpacesByCompany(companyId: string): Promise<Space[]> {
   ensureServerSide();
-  return queryDocuments<Room>(TABLES.ROOMS, [['companyId', '==', companyId]]);
+  return queryDocuments<Space>(TABLES.SPACES, [['companyId', '==', companyId]]); // Use Space and TABLES.SPACES
 }
 
-export async function updateRoom(roomId: string, data: Partial<Room>): Promise<void> {
+export async function updateSpace(spaceId: string, data: Partial<Space>): Promise<void> {
   ensureServerSide();
-  return updateDocument<Room>(TABLES.ROOMS, roomId, data);
+  const dataWithTimestamp = { ...data, updatedAt: new Date().toISOString() };
+  return updateDocument<Space>(TABLES.SPACES, spaceId, dataWithTimestamp); // Use Space and TABLES.SPACES
 }
 
-export async function updateRoomOccupants(roomId: string, occupants: string[]): Promise<void> {
+export async function updateSpaceUsers(spaceId: string, userIds: string[]): Promise<void> {
   ensureServerSide();
-  return updateDocument<Room>(TABLES.ROOMS, roomId, { occupants });
+  return updateDocument<Space>(TABLES.SPACES, spaceId, { userIds, updatedAt: new Date().toISOString() }); // Use Space, userIds, and TABLES.SPACES
 }
 
 // Message specific functions
