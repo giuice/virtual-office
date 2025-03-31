@@ -4,19 +4,19 @@
   "keys": {
     "1A": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src",
-      "mtime": 1741798962.9896014
+      "mtime": 1743186583.636489
     },
     "2Aa": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app",
-      "mtime": 1743107388.8709538
+      "mtime": 1743186583.7881181
     },
     "3Aaa": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)",
-      "mtime": 1741786265.6150208
+      "mtime": 1743186583.8516467
     },
     "4Aaaa": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/create-company",
-      "mtime": 1741786265.6150208
+      "mtime": 1743186583.8882797
     },
     "4Aaaa1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/create-company/page.tsx",
@@ -28,7 +28,7 @@
     },
     "4Aaab": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login",
-      "mtime": 1741786265.6160195
+      "mtime": 1743186583.9190454
     },
     "4Aaab1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx",
@@ -36,7 +36,7 @@
     },
     "4Aaac": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup",
-      "mtime": 1741786265.6160195
+      "mtime": 1743186583.9441001
     },
     "4Aaac1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx",
@@ -44,11 +44,11 @@
     },
     "3Aab": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)",
-      "mtime": 1741786265.6200197
+      "mtime": 1743186584.005029
     },
     "4Aaba": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/company",
-      "mtime": 1741786265.61702
+      "mtime": 1743186584.04088
     },
     "4Aaba1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/company/page.tsx",
@@ -56,11 +56,11 @@
     },
     "4Aabb": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard",
-      "mtime": 1743107388.869881
+      "mtime": 1743186584.0811143
     },
     "5Aabba": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components",
-      "mtime": 1741786265.6190193
+      "mtime": 1743186584.1124916
     },
     "5Aabba1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components/companyoverviewcard.tsx",
@@ -76,7 +76,7 @@
     },
     "4Aabc": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan",
-      "mtime": 1740399085.7348144
+      "mtime": 1743186584.1477697
     },
     "4Aabc1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan/layout.tsx",
@@ -84,7 +84,7 @@
     },
     "4Aabc2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan/page.tsx",
-      "mtime": 1742046096.7738202
+      "mtime": 1743272308.0786664
     },
     "3Aab1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/layout.tsx",
@@ -92,7 +92,7 @@
     },
     "4Aabd": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/office",
-      "mtime": 1741786265.6200197
+      "mtime": 1743186584.1774871
     },
     "4Aabd1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/office/page.tsx",
@@ -100,7 +100,7 @@
     },
     "4Aabe": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/settings",
-      "mtime": 1741786265.6210203
+      "mtime": 1743186584.2105594
     },
     "4Aabe1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/settings/page.tsx",
@@ -108,35 +108,51 @@
     },
     "3Aac": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api",
-      "mtime": 1742253687.3659785
+      "mtime": 1743186584.245442
     },
     "4Aaca": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations",
-      "mtime": 1742253883.2507422
+      "mtime": 1743277239.7097478
     },
     "5Aacaa": {
-      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create",
-      "mtime": 1742253687.366976
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/archive",
+      "mtime": 1743280316.668438
     },
     "5Aacaa1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/archive/route.ts",
+      "mtime": 1743281251.7648163
+    },
+    "5Aacab": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create",
+      "mtime": 1743186584.2956142
+    },
+    "5Aacab1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts",
       "mtime": 1742253694.3521893
     },
-    "5Aacab": {
+    "5Aacac": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/get",
-      "mtime": 1742253883.2517438
+      "mtime": 1743186584.3249397
     },
-    "5Aacab1": {
+    "5Aacac1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/get/route.ts",
       "mtime": 1742289866.4073803
     },
+    "5Aacad": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/read",
+      "mtime": 1743280316.7146444
+    },
+    "5Aacad1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/read/route.ts",
+      "mtime": 1743281293.067935
+    },
     "4Aacb": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages",
-      "mtime": 1743124468.2296505
+      "mtime": 1743277190.8637154
     },
     "5Aacba": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create",
-      "mtime": 1742251908.2945797
+      "mtime": 1743186584.3994584
     },
     "5Aacba1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts",
@@ -144,7 +160,7 @@
     },
     "5Aacbb": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get",
-      "mtime": 1742253066.9782884
+      "mtime": 1743186584.4519465
     },
     "5Aacbb1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get/route.ts",
@@ -152,11 +168,27 @@
     },
     "5Aacbc": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react",
-      "mtime": 1743124468.2301767
+      "mtime": 1743186584.4811444
     },
     "5Aacbc1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts",
-      "mtime": 1743125400.4870923
+      "mtime": 1743298816.7661269
+    },
+    "5Aacbd": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/status",
+      "mtime": 1743280316.789596
+    },
+    "5Aacbd1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/status/route.ts",
+      "mtime": 1743281099.660902
+    },
+    "5Aacbe": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing",
+      "mtime": 1743280316.8078487
+    },
+    "5Aacbe1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing/route.ts",
+      "mtime": 1743277208.5706506
     },
     "2Aa1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/favicon.ico",
@@ -176,15 +208,15 @@
     },
     "3Aad": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/setup-aws",
-      "mtime": 1741786265.6220198
+      "mtime": 1743186584.5067618
     },
     "3Aad1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/setup-aws/page.tsx",
-      "mtime": 1741899623.5909657
+      "mtime": 1743277030.6789196
     },
     "3Aae": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/test-aws",
-      "mtime": 1741786265.6230195
+      "mtime": 1743186584.5327544
     },
     "3Aae1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/test-aws/page.tsx",
@@ -192,11 +224,11 @@
     },
     "3Aaf": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools",
-      "mtime": 1741786265.6230195
+      "mtime": 1743186584.5605257
     },
     "4Aafa": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools/cleanup-companies",
-      "mtime": 1741786265.6230195
+      "mtime": 1743186584.6048837
     },
     "4Aafa1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools/cleanup-companies/page.tsx",
@@ -204,7 +236,7 @@
     },
     "2Ab": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components",
-      "mtime": 1742251384.5227323
+      "mtime": 1743186584.8416889
     },
     "2Ab1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/errorboundary.tsx",
@@ -212,7 +244,7 @@
     },
     "3Aba": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard",
-      "mtime": 1741786265.6250205
+      "mtime": 1743186584.9186294
     },
     "3Aba1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-members.tsx",
@@ -224,7 +256,7 @@
     },
     "3Aba3": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/invite-user-dialog.tsx",
-      "mtime": 1743174029.7481136
+      "mtime": 1743215104.596606
     },
     "3Aba4": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/message-feed.tsx",
@@ -236,11 +268,11 @@
     },
     "3Abb": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan",
-      "mtime": 1742251638.9356086
+      "mtime": 1743275368.176739
     },
     "3Abb1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floorplancanvas.tsx",
-      "mtime": 1742251847.614264
+      "mtime": 1743272402.0384464
     },
     "3Abb2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/roomcomponent.tsx",
@@ -251,64 +283,60 @@
       "mtime": 1741786265.6260197
     },
     "3Abb4": {
-      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floor-plan-old.tsx",
-      "mtime": 1742045671.4588714
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floor-plan.tsx",
+      "mtime": 1743272384.2579958
     },
     "3Abb5": {
-      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floor-plan.tsx",
-      "mtime": 1743122678.9164846
-    },
-    "3Abb6": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/index.tsx",
       "mtime": 1740570300.3173256
     },
-    "3Abb7": {
+    "3Abb6": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/message-dialog.tsx",
       "mtime": 1743118539.8055186
     },
-    "3Abb8": {
+    "3Abb7": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-chat-integration.tsx",
-      "mtime": 1743121922.1447093
+      "mtime": 1743256318.8949559
+    },
+    "3Abb8": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx",
+      "mtime": 1743255783.2666252
     },
     "3Abb9": {
-      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx",
-      "mtime": 1742045358.8945646
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-management.tsx",
+      "mtime": 1743257416.148031
     },
     "3Abb10": {
-      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-management.tsx",
-      "mtime": 1742251884.2224956
-    },
-    "3Abb11": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-template-selector.tsx",
       "mtime": 1742045528.6720243
     },
-    "3Abb12": {
+    "3Abb11": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-templates.tsx",
       "mtime": 1742045002.6977296
     },
-    "3Abb13": {
+    "3Abb12": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-tooltip.tsx",
       "mtime": 1740566548.904568
     },
-    "3Abb14": {
+    "3Abb13": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/types.ts",
       "mtime": 1742044881.6951613
     },
-    "3Abb15": {
+    "3Abb14": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/types.tsx",
       "mtime": 1740569183.5757523
     },
-    "3Abb16": {
+    "3Abb15": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-avatar.tsx",
       "mtime": 1740397886.022805
     },
-    "3Abb17": {
+    "3Abb16": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-hover-card.tsx",
       "mtime": 1740569338.184337
     },
     "3Abc": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging",
-      "mtime": 1743115593.5340178
+      "mtime": 1743186585.1748245
     },
     "3Abc1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/chatwindow.tsx",
@@ -356,7 +384,7 @@
     },
     "3Abd": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/search",
-      "mtime": 1741900294.187528
+      "mtime": 1743186585.2365186
     },
     "3Abd1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/search/searchbar.tsx",
@@ -368,7 +396,7 @@
     },
     "3Abe": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell",
-      "mtime": 1741786265.627019
+      "mtime": 1743186585.2962687
     },
     "3Abe1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell/dashboard-header.tsx",
@@ -388,7 +416,7 @@
     },
     "3Abf": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui",
-      "mtime": 1742251528.4520707
+      "mtime": 1743186585.4049766
     },
     "3Abf1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/avatar.tsx",
@@ -476,11 +504,11 @@
     },
     "2Ac": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/config",
-      "mtime": 1741801808.6686347
+      "mtime": 1743186585.441521
     },
     "2Ad": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts",
-      "mtime": 1743107388.8709538
+      "mtime": 1743186585.5309026
     },
     "2Ad1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/authcontext.tsx",
@@ -488,7 +516,7 @@
     },
     "2Ad2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/companycontext.tsx",
-      "mtime": 1743179982.448907
+      "mtime": 1743272364.0720603
     },
     "2Ad3": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messagingcontext.tsx",
@@ -500,7 +528,7 @@
     },
     "3Ada": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging",
-      "mtime": 1742251347.47469
+      "mtime": 1743186585.6103723
     },
     "3Ada1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/messagingcontext.tsx",
@@ -512,19 +540,19 @@
     },
     "3Ada3": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/useconversations.ts",
-      "mtime": 1742251274.7119963
+      "mtime": 1743273971.340631
     },
     "3Ada4": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/usemessages.ts",
-      "mtime": 1742251311.6468134
+      "mtime": 1743273465.3032622
     },
     "3Ada5": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/usesocketevents.ts",
-      "mtime": 1742251339.3654397
+      "mtime": 1743274592.2794824
     },
     "2Ae": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks",
-      "mtime": 1741786265.6290195
+      "mtime": 1743186585.6719031
     },
     "2Ae1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks/usenotification.ts",
@@ -536,11 +564,11 @@
     },
     "2Af": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib",
-      "mtime": 1742246157.3297648
+      "mtime": 1743278098.9159327
     },
     "2Af1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts",
-      "mtime": 1741786265.6290195
+      "mtime": 1743255301.577089
     },
     "2Af2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/avatar-utils.ts",
@@ -550,25 +578,77 @@
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/aws-config.ts",
       "mtime": 1741786265.6290195
     },
+    "3Afa": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo",
+      "mtime": 1743281382.8635805
+    },
+    "3Afa1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/announcements.ts",
+      "mtime": 1743279450.4928625
+    },
+    "3Afa2": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/client.ts",
+      "mtime": 1743278107.2992616
+    },
+    "3Afa3": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/companies.ts",
+      "mtime": 1743278385.4245057
+    },
+    "3Afa4": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/conversations.ts",
+      "mtime": 1743299033.9320993
+    },
+    "3Afa5": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/index.ts",
+      "mtime": 1743279589.46945
+    },
+    "3Afa6": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/invitations.ts",
+      "mtime": 1743279404.6760423
+    },
+    "3Afa7": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/meetingnotes.ts",
+      "mtime": 1743279560.942564
+    },
+    "3Afa8": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/messages.ts",
+      "mtime": 1743298829.772516
+    },
+    "3Afa9": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/operations.ts",
+      "mtime": 1743281451.6081188
+    },
+    "3Afa10": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/spaces.ts",
+      "mtime": 1743278443.9916205
+    },
+    "3Afa11": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/users.ts",
+      "mtime": 1743278345.4114695
+    },
+    "3Afa12": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/utils.ts",
+      "mtime": 1743280946.120098
+    },
     "2Af4": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo.d.ts",
       "mtime": 1741786265.6300206
     },
     "2Af5": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo.ts",
-      "mtime": 1743173912.6577644
+      "mtime": 1743279612.492664
     },
-    "3Afa": {
+    "3Afb": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase",
-      "mtime": 1741786265.630492
+      "mtime": 1743186585.8098793
     },
-    "3Afa1": {
+    "3Afb1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts",
       "mtime": 1741786265.630492
     },
     "2Af6": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/messaging-api.ts",
-      "mtime": 1742290622.594032
+      "mtime": 1743276859.2335992
     },
     "2Af7": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/utils.ts",
@@ -576,19 +656,19 @@
     },
     "2Ag": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages",
-      "mtime": 1743174310.4395268
+      "mtime": 1743186585.8981934
     },
     "2Ag1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/accept-invite.tsx",
-      "mtime": 1743179855.4746525
+      "mtime": 1743254290.854925
     },
     "3Aga": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api",
-      "mtime": 1743173797.9061737
+      "mtime": 1743255473.365158
     },
     "4Agaa": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth",
-      "mtime": 1741786265.6316593
+      "mtime": 1743186586.0198274
     },
     "4Agaa1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth/signup.ts",
@@ -596,7 +676,7 @@
     },
     "4Agab": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies",
-      "mtime": 1741786265.6326652
+      "mtime": 1743186586.0642812
     },
     "4Agab1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/cleanup.ts",
@@ -616,63 +696,71 @@
     },
     "4Agac": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations",
-      "mtime": 1743173930.2351203
+      "mtime": 1743186586.117447
     },
     "4Agac1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts",
-      "mtime": 1743173981.0749016
+      "mtime": 1743215079.5914257
     },
     "4Agac2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/create.ts",
-      "mtime": 1743173812.1600168
+      "mtime": 1743215041.0611112
     },
     "3Aga1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/setup-dynamo-tables.ts",
       "mtime": 1741786265.6326652
     },
+    "4Agad": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces",
+      "mtime": 1743280317.5491648
+    },
+    "4Agad1": {
+      "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/get.ts",
+      "mtime": 1743272350.146317
+    },
     "3Aga2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/test-aws.ts",
       "mtime": 1741786265.6336658
     },
-    "4Agad": {
+    "4Agae": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users",
-      "mtime": 1741786265.6356652
+      "mtime": 1743186586.1596673
     },
-    "5Agada": {
+    "5Agaea": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]",
-      "mtime": 1741786265.6336658
+      "mtime": 1743186586.1941638
     },
-    "5Agada1": {
+    "5Agaea1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts",
       "mtime": 1741786265.6336658
     },
-    "5Agada2": {
+    "5Agaea2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts",
       "mtime": 1741786265.6336658
     },
-    "4Agad1": {
+    "4Agae1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/by-company.ts",
       "mtime": 1741786265.6346653
     },
-    "4Agad2": {
+    "4Agae2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/create.ts",
       "mtime": 1741786265.6346653
     },
-    "4Agad3": {
+    "4Agae3": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/get-by-firebase-id.ts",
       "mtime": 1741786265.6356652
     },
-    "4Agad4": {
+    "4Agae4": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/remove-from-company.ts",
       "mtime": 1741786265.6356652
     },
-    "4Agad5": {
+    "4Agae5": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts",
       "mtime": 1741786265.6356652
     },
     "2Ah": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/providers",
-      "mtime": 1740516155.7081594
+      "mtime": 1743186586.224116
     },
     "2Ah1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/providers/theme-provider.tsx",
@@ -680,7 +768,7 @@
     },
     "2Ai": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types",
-      "mtime": 1742246136.9689305
+      "mtime": 1743186586.2581453
     },
     "2Ai1": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/auth.ts",
@@ -688,7 +776,7 @@
     },
     "2Ai2": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/database.ts",
-      "mtime": 1743173852.3318877
+      "mtime": 1743280632.0240161
     },
     "2Ai3": {
       "path": "f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/messaging.ts",

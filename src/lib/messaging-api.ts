@@ -188,5 +188,153 @@ export const messagingApi = {
       console.error('Error getting or creating room conversation:', error);
       throw error;
     }
+  },
+
+  /**
+   * Add a reaction to a message
+   */
+  async addReaction(messageId: string, reaction: string, userId: string): Promise<void> {
+    try {
+      const response = await fetch('/api/messages/react', {
+        method: 'POST', // Assuming POST adds a reaction
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId, reaction, userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add reaction');
+      }
+      // No specific data expected on success for adding reaction
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Remove a reaction from a message
+   */
+  async removeReaction(messageId: string, reaction: string, userId: string): Promise<void> {
+    try {
+      // Assuming DELETE method or a flag in body distinguishes removal.
+      // Let's try DELETE first, adjust if backend expects differently.
+      const response = await fetch('/api/messages/react', {
+        method: 'DELETE', // Assuming DELETE removes a reaction
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId, reaction, userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove reaction');
+      }
+      // No specific data expected on success for removing reaction
+    } catch (error) {
+      console.error('Error removing reaction:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update the status of a message (e.g., delivered, read)
+   */
+  async updateMessageStatus(messageId: string, status: MessageStatus, userId: string): Promise<void> {
+    try {
+      const response = await fetch('/api/messages/status', { // Assuming this endpoint
+        method: 'PATCH', // Assuming PATCH for status update
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId, status, userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update message status');
+      }
+      // No specific data expected on success
+    } catch (error) {
+      console.error('Error updating message status:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Send a typing indicator for a conversation
+   */
+  async sendTypingIndicator(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
+    try {
+      // This might be handled purely via sockets, but adding an API call placeholder
+      const response = await fetch('/api/messages/typing', { // Assuming this endpoint
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId, userId, isTyping }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send typing indicator');
+      }
+      // No specific data expected on success
+    } catch (error) {
+      console.error('Error sending typing indicator:', error);
+      // Don't necessarily throw for typing indicators, might fail silently
+      // throw error; 
+    }
+  },
+
+  /**
+   * Archive or unarchive a conversation
+   */
+  async setConversationArchiveStatus(conversationId: string, userId: string, isArchived: boolean): Promise<void> {
+    try {
+      const response = await fetch('/api/conversations/archive', { // Assuming this endpoint
+        method: 'PATCH', // Assuming PATCH for updating archive status
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId, userId, isArchived }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to ${isArchived ? 'archive' : 'unarchive'} conversation`);
+      }
+      // No specific data expected on success
+    } catch (error) {
+      console.error(`Error ${isArchived ? 'archiving' : 'unarchiving'} conversation:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Mark a conversation as read for a specific user
+   */
+  async markConversationAsRead(conversationId: string, userId: string): Promise<void> {
+    try {
+      const response = await fetch('/api/conversations/read', { // Assuming this endpoint
+        method: 'PATCH', // Assuming PATCH for marking as read
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId, userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to mark conversation as read');
+      }
+      // No specific data expected on success
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
+      throw error;
+    }
   }
 };

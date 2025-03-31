@@ -44,20 +44,18 @@ Key Definitions:
 2Ad4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/searchcontext.tsx
 2Ae1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks/usenotification.ts
 2Ae2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks/useprotectedroute.ts
-2Af5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo.ts
+2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
 2Af6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/messaging-api.ts
-2Ag1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/accept-invite.tsx
+2Ai2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/database.ts
 2Ai3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/messaging.ts
-3Aae1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/test-aws/page.tsx
 3Aba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-members.tsx
 3Aba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-settings.tsx
 3Aba3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/invite-user-dialog.tsx
 3Aba4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/message-feed.tsx
 3Aba5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/user-profile.tsx
 3Abb3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/roomscontext.tsx
-3Abb6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/index.tsx
-3Abb8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-chat-integration.tsx
-3Abb9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx
+3Abb5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/index.tsx
+3Abb7: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-chat-integration.tsx
 3Abc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/chatwindow.tsx
 3Abc10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/room-messaging.tsx
 3Abc2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/conversationlist.tsx
@@ -72,7 +70,10 @@ Key Definitions:
 3Ada3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/useconversations.ts
 3Ada4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/usemessages.ts
 3Ada5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/messaging/usesocketevents.ts
-3Aga1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/setup-dynamo-tables.ts
+3Afa11: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/users.ts
+3Afa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/companies.ts
+3Afa4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/conversations.ts
+3Afa8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/messages.ts
 4Aaaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/create-company/page.tsx
 4Aaab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx
 4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
@@ -80,78 +81,95 @@ Key Definitions:
 4Aabb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/page.tsx
 4Aabd1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/office/page.tsx
 4Aafa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools/cleanup-companies/page.tsx
+4Agaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth/signup.ts
 4Agab3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/get.ts
 4Agab4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/update.ts
 4Agac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts
-4Agad3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/get-by-firebase-id.ts
-4Agad5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts
-5Aacab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/get/route.ts
+4Agac2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/create.ts
+4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/get.ts
+4Agae2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/create.ts
+4Agae3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/get-by-firebase-id.ts
+4Agae4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/remove-from-company.ts
+4Agae5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts
+5Aacaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/archive/route.ts
+5Aacac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/get/route.ts
+5Aacad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/read/route.ts
 5Aacba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts
 5Aacbb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get/route.ts
 5Aacbc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts
-5Agada1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
-5Agada2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts
+5Aacbe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing/route.ts
+5Agaea1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
+5Agaea2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Aa3, 2Ad1, 2Ad2, 2Ad3, 2Ad4, 2Ae1, 2Ae2, 2Af5, 2Af6, 2Ag1, 2Ai3, 3Aae1, 3Aba1, 3Aba2, 3Aba3, 3Aba4, 3Aba5, 3Abb3, 3Abb6, 3Abb8, 3Abb9, 3Abc1, 3Abc2, 3Abc4, 3Abc5, 3Abc7, 3Abc9, 3Abc10, 3Abd2, 3Abe1, 3Ada1, 3Ada2, 3Ada3, 3Ada4, 3Ada5, 3Aga1, 4Aaaa1, 4Aaab1, 4Aaac1, 4Aaba1, 4Aabb1, 4Aabd1, 4Aafa1, 4Agab3, 4Agab4, 4Agac1, 4Agad3, 4Agad5, 5Aacab1, 5Aacba1, 5Aacbb1, 5Aacbc1, 5Agada1, 5Agada2
-last_GRID_edit: Applied suggestion: 2Ai3 -> 2Af6 (S)
+last_KEY_edit: Assigned keys: 2Aa3, 2Ad1, 2Ad2, 2Ad3, 2Ad4, 2Ae1, 2Ae2, 2Af1, 2Af6, 2Ai2, 2Ai3, 3Aba1, 3Aba2, 3Aba3, 3Aba4, 3Aba5, 3Abb3, 3Abb5, 3Abb7, 3Abc1, 3Abc2, 3Abc4, 3Abc5, 3Abc7, 3Abc9, 3Abc10, 3Abd2, 3Abe1, 3Ada1, 3Ada2, 3Ada3, 3Ada4, 3Ada5, 3Afa3, 3Afa4, 3Afa8, 3Afa11, 4Aaaa1, 4Aaab1, 4Aaac1, 4Aaba1, 4Aabb1, 4Aabd1, 4Aafa1, 4Agaa1, 4Agab3, 4Agab4, 4Agac1, 4Agac2, 4Agad1, 4Agae2, 4Agae3, 4Agae4, 4Agae5, 5Aacaa1, 5Aacac1, 5Aacad1, 5Aacba1, 5Aacbb1, 5Aacbc1, 5Aacbe1, 5Agaea1, 5Agaea2
+last_GRID_edit: Applied suggestion: 2Ai3 -> 2Ai2 (s)
 
 ---GRID_START---
-X 2Aa3 2Ad1 2Ad2 2Ad3 2Ad4 2Ae1 2Ae2 2Af5 2Af6 2Ag1 2Ai3 3Aae1 3Aba1 3Aba2 3Aba3 3Aba4 3Aba5 3Abb3 3Abb6 3Abb8 3Abb9 3Abc1 3Abc2 3Abc4 3Abc5 3Abc7 3Abc9 3Abc10 3Abd2 3Abe1 3Ada1 3Ada2 3Ada3 3Ada4 3Ada5 3Aga1 4Aaaa1 4Aaab1 4Aaac1 4Aaba1 4Aabb1 4Aabd1 4Aafa1 4Agab3 4Agab4 4Agac1 4Agad3 4Agad5 5Aacab1 5Aacba1 5Aacbb1 5Aacbc1 5Agada1 5Agada2
-2Aa3 = osp3sp6s5pssSppspsSSsSspsspps4SSp12
-2Ad1 = soSp3sppSppssSpSp12spps3pS3ppssppssp5sp
-2Ad2 = pSopspsspspps3psp15spps4pps4SSsp3sSs
-2Ad3 = p3op4spsp5sppspS6sppS5p14sp4
-2Ad4 = ppspop12sp10sp19sp5
-2Ae1 = sp4op4sp4sp10sp4sp22
-2Ae2 = pssp3oppsp3sspsp12sp6S4sSsp11
-2Af5 = ppsp4op27Sp7s5p3s3
-2Af6 = p3sp4opSp4sp5ssp3sp3sS3sp8sspssS3pss
-2Ag1 = pSsp3sppopps3pspsp9ssp6S3ssSsp3sp7
-2Ai3 = p3spsppSpop4sppsspsspssSsppSSs3p13sSp4
-3Aae1 = p11op4sp16spps3p3Sp11
-3Aba1 = s3p6sppoSSsSpSsSps3ps3SppssppS7p11
-3Aba2 = s3p3sppsppSoSsSpSsSppsSssSsSpps3pS7p11
-3Aba3 = sSsp3sppsppSSopSps3pps8ps3pS3sS3p11
-3Aba4 = sp4sppspspsspospSs5psSspSp3sp5sSsp12
-3Aba5 = sSssppsppspsS3sopSsspsSssSSsSspsSspS7p11
-3Abb3 = p4sp12ossp4sp29
-3Abb6 = sp8sspSSsSSsoS3ssSsSSsSpspspps4SSsp11
-3Abb8 = sppsp6sps6SoS3sS4ssSSsSsps6p12
-3Abb9 = Sp11SSs3pSSos6S3p3spps4Sssp11
-3Abc1 = p3Sp4spsp4sppSSsoS6spSssSsp19
-3Abc2 = p3Sp4spspsppsspsSsSoSsSSsspssSSsp5sp13
-3Abc4 = sppSp8s4Sps3SSoS3sS3pSSsps3pSsp12
-3Abc5 = p3Sp6spsSspssSSsSsSosSSppSsSSspssppssp12
-3Abc7 = sppSp6spps4psSsS3soSSspSssSSp3spsp13
-3Abc9 = SppSpsppspSps3SSpSSsS5oSsSSsS3ppsspSssp11
-3Abc10 = Sppsp6spsSssSpS4ssS3os3ppspps4Sssp11
-3Abd2 = sp3sp4spps3pspssSssSps3oSp3spps7p11
-3Abe1 = Ssp4sppsppSSsSSpSsSppSppSsSop3sppS6sp11
-3Ada1 = sppSp4spSp3spsppSpSsS4sppoS4p14sp4
-3Ada2 = p3SpsppSpSp7sSpssps3p3SoS3p13sSsp3
-3Ada3 = s3Sp4Spsps3psppspsS3sSp3SSoSSps3ps3p5ssp4
-3Ada4 = sspSp4Sps6SpsSsS6s3S3oSps7p6sp4
-3Ada5 = pspSp4spsppsspsppsps4SSp3S4oppsppspsp6sp4
-3Aga1 = ppsp4Sp27op7s5p3s3
-4Aaaa1 = sSsp3SppSpsS3pSps3ppssppssSppssppoS6p11
-4Aaab1 = sSsp3SppSpsS3pSps3ppssps3Spps3pSoS5sp10
-4Aaac1 = sSsp3SppSpsS3pSps3ppsps4SppssppSSoS4p9sp
-4Aaba1 = sp5SppsppSSssSps3p6ssSp3sppS3oSSsp11
-4Aabb1 = Sp5sppsppS5pSsSpsSssSSsSpps3pS4oSSp11
-4Aabd1 = Sssp3SppSppS3sSpSssppssps3SppssppS5oSp11
-4Aafa1 = pssp3sppspS4pSpspsp5s4pps3pS3sSSop11
-4Agab3 = ppsp4ssp26spsp5oS4s4SS
-4Agab4 = ppsp4ssp26sp7SoS3s3S3
-4Agac1 = psSp4sp27sp7SSoSSpspS3
-4Agad3 = psSp4s3p25sp7S3oSsspS3
-4Agad5 = ppsp4ssp26sp7S4osspS3
-5Aacab1 = p4sp3Spsp20ssp10sspssoSSpss
-5Aacba1 = p3sp4SpSp19sSs3p8s5SoS3s
-5Aacbb1 = p8Sp22sp11ssp3SSos3
-5Aacbc1 = ppsp4sp27sp7sS4pSsoSS
-5Agada1 = psSp4ssp26sppsp4S5sSsSoS
-5Agada2 = ppsp4ssp26sp7S5s3SSo
+X 2Aa3 2Ad1 2Ad2 2Ad3 2Ad4 2Ae1 2Ae2 2Af1 2Af6 2Ai2 2Ai3 3Aba1 3Aba2 3Aba3 3Aba4 3Aba5 3Abb3 3Abb5 3Abb7 3Abc1 3Abc2 3Abc4 3Abc5 3Abc7 3Abc9 3Abc10 3Abd2 3Abe1 3Ada1 3Ada2 3Ada3 3Ada4 3Ada5 3Afa3 3Afa4 3Afa8 3Afa11 4Aaaa1 4Aaab1 4Aaac1 4Aaba1 4Aabb1 4Aabd1 4Aafa1 4Agaa1 4Agab3 4Agab4 4Agac1 4Agac2 4Agad1 4Agae2 4Agae3 4Agae4 4Agae5 5Aacaa1 5Aacac1 5Aacad1 5Aacba1 5Aacbb1 5Aacbc1 5Aacbe1 5Agaea1 5Agaea2
+2Aa3 = osp3sp5s5pssppspsSSsSsps3p4s4SSp20
+2Ad1 = soSp3sp4ssSpSp11spps3p4S3ppssp3sp3sp8ssp
+2Ad2 = pSopspsspSps3pssp13sppssps4pps5Ss3Ss3psppspSs
+2Ad3 = p3op4spsp4sppsS6sppS5p24sp5
+2Ad4 = ppspop11sp9sp28sp7
+2Ae1 = sp4op4sp3sp9sp4sppsp30
+2Ae2 = pssp3op5sspsp11sp9S4sSsp16spp
+2Af1 = ppsp4osp34s5pSSspsps3ppsSS
+2Af6 = p3sp3sopSp3sp3s3p3sp3sSsSspssp9sspps3pssSsSSpSss
+2Ai2 = ppSp6osp6sp11sp3ssSsp10spspsspsp4spss
+2Ai3 = p3spsppSsop3sppsSsspssSsppSSs3psp20spSp5
+3Aba1 = s3p8oSSsSpSsps3ps3Sppssp5S7p19
+3Aba2 = s3p3sp4SoSsSpSsppsSssSsSpps3p4S7p19
+3Aba3 = sSsp3sp4SSopSpsspps8ps3p4S3sS3p19
+3Aba4 = sp4sppsps3pospSs4psSspSp3sp8sSsp20
+3Aba5 = sSssppsp4S3sopSspsSssSSsSsps3p4S7p19
+3Abb3 = ppspsp11ossp3sp40
+3Abb5 = sp8ssSSsSSsoSSssSsSSsSpspssp4s4SSsp19
+3Abb7 = sppsp4spSs6SoSSsS4ssSSsSSp4s6p20
+3Abc1 = p3Sp4spsp3sppSSoS6spSsSSsp30
+3Abc2 = p3Sp4spssppsspsSSoSsSSsspssSSsp8sp21
+3Abc4 = sppSp7s4SpssSSoS3sS3pSSsp4s3pSsp20
+3Abc5 = p3Sp6ssSspssS3sSosSSppSsS3p4ssppssp20
+3Abc7 = sppSp6sps4psS4soSSspSssSSp6spsp21
+3Abc9 = SppSpsppspSs3SSpS7oSsSSsS3p5sspSssp16spp
+3Abc10 = Sppsp6ssSssSpS3ssS3os3ppssp4s4Sssp19
+3Abd2 = sp3sp6s3psps4Sps3oSp3sp5s7p19
+3Abe1 = Ssp4sp4SSsSSpSsppSppSsSop3ssp4S6sp19
+3Ada1 = sppSp4spSppspsppSSsS4sppoS4p24sp5
+3Ada2 = p3SpsppSsSp6sSssps3p3SoS3pssp18s3Sspspp
+3Ada3 = s3Sp4sps4psppsS4sSp3SSoSSp4s3ps3p11spsppspp
+3Ada4 = sspSp4Sps6psS7s3S3oSp4s7p13sppspp
+3Ada5 = sspSpsppspspsspspsSs3S3spsS4op5sppspsp13sppSpp
+3Afa3 = ppsp6sp23oS3p7Ss6pSssp4spss
+3Afa4 = ppsp5s3p18sp3SoSSp7sps4ppssSsSssSpss
+3Afa8 = p8sSp19sp3SSoSp7s4psspSssps3Spss
+3Afa11 = ppsp6sp23S3op7Sps6Ssp5spss
+4Aaaa1 = sSsp3Sp4S3pSpssppssppssSppssp5oS6p16spp
+4Aaab1 = sSsp3Sp4S3pSpssppssps3Spps3p4SoS5psp14spp
+4Aaac1 = sSsp3Sp4S3pSpssppsps4Sppssp5SSoS4p6sp9Ssp
+4Aaba1 = sp5Sp4SSssSpssp6ssSp3sp5S3oSSsp19
+4Aabb1 = Sp5sp4S5pSspsSssSSsSpps3p4S4oSSp19
+4Aabd1 = Sssp3Sp4S3sSpSsppssps3Sppssp5S5oSp19
+4Aafa1 = pssp3ssp3S3pSpsp6s4pps3p4S3sSSop19
+4Agaa1 = ppsp4sp25SssSp7oS10pSspSsSS
+4Agab3 = ppsp4ssp24spsppsp5SoS9sSssSsSS
+4Agab4 = ppsp4ssp24s4p7SSoS8sSssSsSS
+4Agac1 = psSp4spsp23s4p7S3oS7pSspSsSS
+4Agac2 = ppsp30sspsp7S4osS5pSppSsSS
+4Agad1 = ppsp4Sssp23s4p7S4soS5sSps3SS
+4Agae2 = ppsp4Ssp24spssppsp4S6oS4sSSpS4
+4Agae3 = psSp4s3p26sp7S7oS3sSspSsSS
+4Agae4 = ppsp6sp23SsSSp7S8oSSpSppSpSS
+4Agae5 = ppsp4ssp24s4p7S9oSsSspSsSS
+5Aacaa1 = ppsp5ssp19sp3sSsp8S10oS3sS4
+5Aacac1 = p4sppsSpsp18ssp3sp10sspps3psSoS3pSss
+5Aacad1 = ppsp4ssp20sp4Ssp8S12oSsS4
+5Aacba1 = p3sp3sSpSp17sSs3pssp8s4ppSspsS3oSsSSs
+5Aacbb1 = p8Sp20sp4ssp9ssppsp4sSsSos4
+5Aacbc1 = ppsp6sp23sSSsp7S5sS5pSssosSS
+5Aacbe1 = psp4ssSp15sp4s3Sp4ssSp4s6SspsS4ssoSS
+5Agaea1 = psSp4Sssp23s4ppsp4S11sSSsSSoS
+5Agaea2 = ppsp4Sssp23s4p7S11sSssS3o
 ---GRID_END---
 
 ---mini_tracker_end---

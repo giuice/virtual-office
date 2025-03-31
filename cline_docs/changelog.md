@@ -1,5 +1,79 @@
 # Changelog
 
+## 3/31/2025 (8:44 PM)
+- **PROJECT PIVOT: Database Migration to Supabase**
+  - Decision made to switch from AWS DynamoDB to Supabase due to cost concerns.
+  - Paused implementation of DynamoDB-based messaging features.
+  - Initiating planning phase for Supabase migration.
+
+
+## 3/29/2025 (5:36 PM)
+- **Messaging DB Logic (Status):**
+  - Added `updateMessageStatusInDB` function to `src/lib/dynamo/messages.ts`.
+  - Updated `Message` type in `src/types/database.ts` to include optional `status: MessageStatus` field.
+  - Resolved related TypeScript error.
+
+
+## 3/29/2025 (5:40 PM)
+- **Messaging DB Logic (Reactions):**
+  - Added `addReactionToMessage` and `removeReactionFromMessage` functions to `src/lib/dynamo/messages.ts` using atomic `UpdateExpression`.
+  - Updated `Message` type in `src/types/database.ts` to include optional `reactions: { [emoji: string]: string[] }` field.
+  - Fixed related TypeScript errors using null checks and non-null assertion.
+
+## 3/29/2025 (5:43 PM)
+- **Messaging DB Logic (Conversations):**
+  - Implemented `setConversationArchiveStatusInDB` in `src/lib/dynamo/conversations.ts` using `updateDocument`.
+  - Implemented `markConversationAsReadInDB` in `src/lib/dynamo/conversations.ts` using atomic `UpdateExpression` to set user's unread count to 0.
+  - Added `CONVERSATIONS` table name to `TABLES` constant in `src/lib/dynamo/utils.ts`.
+
+## 3/29/2025 (5:48 PM)
+- **Messaging API Integration:**
+  - Integrated `updateMessageStatusInDB` into `/api/messages/status` route.
+  - Refactored `/api/messages/react` route to use atomic `addReactionToMessage` and `removeReactionFromMessage` functions.
+  - Integrated `setConversationArchiveStatusInDB` into `/api/conversations/archive` route.
+
+## 3/29/2025 (10:44 PM)
+- **DynamoDB Helper Refactor:**
+  - Created `src/lib/dynamo/operations.ts`.
+  - Moved generic functions (`addDocument`, `updateDocument`, `getDocument`, `queryDocuments`) from `messages.ts` and `conversations.ts` to `operations.ts`.
+  - Unified `addDocument` logic.
+
+## 3/29/2025 (10:56 PM)
+- **Dependency Analysis:**
+  - Ran `python -m cline_utils.dependency_system.dependency_processor analyze-project` to update main tracker and mini-trackers after refactoring generic DB helpers.
+
+  - Updated `messages.ts` and `conversations.ts` to import and use the generic functions from `operations.ts`.
+  - Adjusted `getMessagesByRoom` return type handling.
+
+  - Integrated `markConversationAsReadInDB` into `/api/conversations/read` route.
+  - Corrected import paths in all affected API routes.
+
+  - Resolved related TypeScript errors.
+
+
+
+## 3/29/2025 (5:21 PM)
+- **DynamoDB Library Refactor:**
+  - Refactored the large `src/lib/dynamo.ts` file into smaller, entity-specific modules within a new `src/lib/dynamo/` directory (`client.ts`, `utils.ts`, `users.ts`, `companies.ts`, `spaces.ts`, `messages.ts`, `conversations.ts`, `invitations.ts`, `announcements.ts`, `meetingNotes.ts`).
+  - Created an `index.ts` barrel file in `src/lib/dynamo/` to re-export all functions.
+  - Updated the original `src/lib/dynamo.ts` to simply re-export from the new index file, ensuring backward compatibility for existing imports.
+  - This improves code organization and maintainability.
+
+## 3/29/2025 (4:42 PM)
+- **Messaging API Backend Placeholders:**
+  - Created placeholder API route handlers for new messaging functions:
+    - `src/app/api/messages/status/route.ts`
+    - `src/app/api/messages/typing/route.ts`
+    - `src/app/api/conversations/archive/route.ts`
+    - `src/app/api/conversations/read/route.ts`
+  - Added basic validation and TODOs for DB logic and authentication.
+
+## 3/29/2025 (4:38 PM)
+- **Messaging API Client Update:**
+  - Added missing client-side functions to `src/lib/messaging-api.ts` to support reactions, message status updates, typing indicators, conversation archiving, and marking conversations as read.
+  - These functions currently point to placeholder API routes.
+  - Affected file: `src/lib/messaging-api.ts`
+
 ## 3/29/2025 (4:05 PM)
 - **Floor Plan & Messaging Fixes:**
   - Corrected import path in `src/app/(dashboard)/floor-plan/page.tsx` to use `floor-plan.tsx` instead of `floor-plan-old.tsx`, resolving issue where demo data was displayed.

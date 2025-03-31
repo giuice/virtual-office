@@ -1,9 +1,9 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Fixed floor plan import and messaging build errors. Agreed on plan to implement missing messaging API functions."
-current_phase: "Execution"
-next_action: "Implement missing messaging API functions (Phase 1)"
-next_phase: "Execution"
+last_action: "Pivoted project: Switching from DynamoDB to Supabase due to cost concerns."
+current_phase: "Execution" # Phase before transition
+next_action: "Load Strategy Plugin and Plan Supabase Migration"
+next_phase: "Strategy"
 
 [CODE_ROOT_DIRECTORIES]
 - src
@@ -46,4 +46,16 @@ next_phase: "Execution"
 - **CRITICAL:** Components exceeding 300-400 lines significantly hinder AI processing. Aggressively decompose large components into smaller, single-responsibility units using SOLID, DRY, and Separation of Concerns principles. Prioritize this during refactoring and new component creation.
 - Identified that `src/lib/messaging-api.ts` is missing several functions needed by the messaging hooks (reactions, status updates, typing indicators, archiving, read status). These need to be implemented along with corresponding backend API routes.
 - Corrected import paths and type definitions in messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) to resolve build errors after fixing floor plan import.
+- Adding placeholder client-side API functions first helps structure the frontend logic before implementing the corresponding backend routes.
+- Creating placeholder backend route handlers with TODOs helps structure the backend implementation and identify necessary database functions early.
+- Refactoring large utility files (like dynamo.ts) into smaller, entity-specific modules improves code organization and maintainability (SOLID). Using a barrel file (index.ts) ensures backward compatibility.
+- Updating type definitions (`src/types/database.ts`) is crucial when adding new fields to data models to avoid TypeScript errors during implementation.
+- Using atomic `UpdateExpression` in DynamoDB (e.g., for reactions, unread counts) is safer than get-modify-put operations to avoid race conditions.
+- TypeScript null checks (`if (!var)`) might not always satisfy the compiler in later scopes; non-null assertion (`var!`) can be used if nullness is guaranteed by prior logic.
+- Using `apply_diff` is more reliable than `search_and_replace` when the exact content might have subtle variations or when replacing multi-line blocks.
+- Remember to update shared constants (like `TABLES` in `utils.ts`) when adding new entities or features that rely on them.
+- Integrating newly created DB functions into API routes requires careful updating of import paths and function arguments.
+- Refactoring duplicated code (like generic DB helpers) into a central location (`operations.ts`) improves maintainability and reduces redundancy. Need to update imports in all consuming files.
+- Running `analyze-project` after significant refactoring (like moving shared functions) is crucial for keeping dependency trackers accurate.
+- **Project Pivot (3/31):** Switched focus from DynamoDB to Supabase due to cost concerns. Paused DynamoDB feature work and initiated planning for Supabase migration.
 ---CLINE_RULES_END---

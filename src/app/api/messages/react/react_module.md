@@ -38,38 +38,46 @@
 ---KEY_DEFINITIONS_START---
 Key Definitions:
 2Ad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/companycontext.tsx
-2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
-2Af5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo.ts
-3Afa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts
+2Ai2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/database.ts
+3Afa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/announcements.ts
+3Afa10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/spaces.ts
+3Afa11: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/users.ts
+3Afa2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/client.ts
+3Afa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/companies.ts
+3Afa5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/index.ts
+3Afa6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/invitations.ts
+3Afa7: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/meetingnotes.ts
+3Afa9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/operations.ts
+3Afb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts
 3Aga1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/setup-dynamo-tables.ts
-3Aga2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/test-aws.ts
-4Agab2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/create.ts
-4Agab3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/get.ts
-4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/by-company.ts
-4Agad4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/remove-from-company.ts
-5Aacaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
-5Aacbb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get/route.ts
+4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/get.ts
+5Aacba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts
 5Aacbc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts
+5Aacbe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing/route.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Ad2, 2Af1, 2Af5, 3Afa1, 3Aga1, 3Aga2, 4Agab2, 4Agab3, 4Agad1, 4Agad4, 5Aacaa1, 5Aacbb1, 5Aacbc1
-last_GRID_edit: Applied suggestion: 4Agad4 -> 4Agad1 (S)
+last_KEY_edit: Assigned keys: 2Ad2, 2Ai2, 3Afa1, 3Afa2, 3Afa3, 3Afa5, 3Afa6, 3Afa7, 3Afa9, 3Afa10, 3Afa11, 3Afb1, 3Aga1, 4Agad1, 5Aacba1, 5Aacbc1, 5Aacbe1
+last_GRID_edit: Applied suggestion: 2Ai2 -> 4Agad1 (s)
 
 ---GRID_START---
-X 2Ad2 2Af1 2Af5 3Afa1 3Aga1 3Aga2 4Agab2 4Agab3 4Agad1 4Agad4 5Aacaa1 5Aacbb1 5Aacbc1
-2Ad2 = oSsSspSsSSpps
-2Af1 = SopSppSsSpsps
-2Af5 = spopSSs3Spps
-3Afa1 = SSpop8s
-3Aga1 = spSpoSSsSSpps
-3Aga2 = ppSpSoS4pps
-4Agab2 = SSspSSoS3sps
-4Agab3 = s3psSSoSSs3
-4Agad1 = SSspS4oSs3
-4Agad4 = SpSpS5opps
-5Aacaa1 = psp4s3poSs
-5Aacbb1 = p7sspSos
-5Aacbc1 = s12o
+X 2Ad2 2Ai2 3Afa1 3Afa2 3Afa3 3Afa5 3Afa6 3Afa7 3Afa9 3Afa10 3Afa11 3Afb1 3Aga1 4Agad1 5Aacba1 5Aacbc1 5Aacbe1
+2Ad2 = oSppsp4ssSsspsp
+2Ai2 = SospspsspssSsspsp
+3Afa1 = psosSsS5pSppsp
+3Afa2 = ppsosSSs4psppsp
+3Afa3 = ssSsosS5pSspsp
+3Afa5 = ppsSsoSs4psppsp
+3Afa6 = psS4oS4pSspsp
+3Afa7 = psSsSsSoS3pSppsp
+3Afa9 = ppSsSsSSoSSpsppsp
+3Afa10 = ssSsSsS3oSpSspsp
+3Afa11 = ssSsSsS4opSspsp
+3Afb1 = SSp9op3sp
+3Aga1 = ssSsSsSSsSSpoSpsp
+4Agad1 = ssppspsppsspSopss
+5Aacba1 = p14osS
+5Aacbc1 = s15os
+5Aacbe1 = p13sSso
 ---GRID_END---
 
 ---mini_tracker_end---

@@ -14,6 +14,7 @@ export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked' | 'r
 // Message types
 export type MessageType = 'text' | 'image' | 'file' | 'transcript';
 
+import { MessageStatus } from '@/types/messaging'; // Added for Message status
 // Define a TimeStamp type that works with both Firebase and DynamoDB
 export type TimeStampType = Timestamp | string;
 
@@ -127,6 +128,8 @@ export interface Message {
   content: string;
   timestamp: TimeStampType;
   type: MessageType;
+  reactions?: { [emoji: string]: string[] }; // Map of emoji to user IDs
+  status?: MessageStatus; // Added for read/delivered status
   attachments?: {
     url: string;
     type: string;

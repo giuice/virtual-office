@@ -39,37 +39,41 @@
 Key Definitions:
 2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
 2Ai3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/messaging.ts
+3Afa4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/conversations.ts
 4Agab2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/create.ts
 4Agab3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/get.ts
 4Agab4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/companies/update.ts
 4Agac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts
-4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/by-company.ts
-4Agad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/create.ts
-4Agad5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts
-5Aacaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
-5Aacbc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts
-5Agada1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
-5Agada2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts
+4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/get.ts
+4Agae1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/by-company.ts
+4Agae2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/create.ts
+4Agae5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/update.ts
+5Aacab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
+5Aacbd1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/status/route.ts
+5Agaea1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
+5Agaea2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/status.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Af1, 2Ai3, 4Agab2, 4Agab3, 4Agab4, 4Agac1, 4Agad1, 4Agad2, 4Agad5, 5Aacaa1, 5Aacbc1, 5Agada1, 5Agada2
-last_GRID_edit: Applied suggestion: 2Ai3 -> 5Aacaa1 (s)
+last_KEY_edit: Assigned keys: 2Af1, 2Ai3, 3Afa4, 4Agab2, 4Agab3, 4Agab4, 4Agac1, 4Agad1, 4Agae1, 4Agae2, 4Agae5, 5Aacab1, 5Aacbd1, 5Agaea1, 5Agaea2
+last_GRID_edit: Applied suggestion: 2Ai3 -> 3Afa4 (s)
 
 ---GRID_START---
-X 2Af1 2Ai3 4Agab2 4Agab3 4Agab4 4Agac1 4Agad1 4Agad2 4Agad5 5Aacaa1 5Aacbc1 5Agada1 5Agada2
-2Af1 = opSssS4ssSS
-2Ai3 = pop7sp3
-4Agab2 = SpoS6ssSS
-4Agab3 = spSoS5ssSS
-4Agab4 = spSSoS4sS3
-4Agac1 = SpS3oS3sS3
-4Agad1 = SpS4oSSssSS
-4Agad2 = SpS5oSsS3
-4Agad5 = SpS6osS3
-5Aacaa1 = s9os3
-5Aacbc1 = spssSSsSSsoSS
-5Agada1 = SpS7sSoS
-5Agada2 = SpS7sSSo
+X 2Af1 2Ai3 3Afa4 4Agab2 4Agab3 4Agab4 4Agac1 4Agad1 4Agae1 4Agae2 4Agae5 5Aacab1 5Aacbd1 5Agaea1 5Agaea2
+2Af1 = oppSs3S3sspSS
+2Ai3 = posp8sp3
+3Afa4 = psosps3pps5
+4Agab2 = SpsoS7sS3
+4Agab3 = sppSoS6sS3
+4Agab4 = spsSSoS5sS3
+4Agac1 = spsS3oS4sS3
+4Agad1 = SpsS4oS3sS3
+4Agae1 = SppS5oSSsS3
+4Agae2 = SppS6oSsS3
+4Agae5 = spsS7osS3
+5Aacab1 = s11os3
+5Aacbd1 = ppsS8soSS
+5Agaea1 = SpsS8sSoS
+5Agaea2 = SpsS8sSSo
 ---GRID_END---
 
 ---mini_tracker_end---

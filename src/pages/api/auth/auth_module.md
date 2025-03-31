@@ -37,21 +37,41 @@
 
 ---KEY_DEFINITIONS_START---
 Key Definitions:
+2Ad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/companycontext.tsx
 2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
 2Af3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/aws-config.ts
+3Afa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/announcements.ts
+3Afa10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/spaces.ts
+3Afa2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/client.ts
+3Afa4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/conversations.ts
+3Afa6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/invitations.ts
+3Afa7: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/meetingnotes.ts
+3Afa8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/messages.ts
+3Afa9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/operations.ts
 4Agaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth/signup.ts
 5Aacba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts
+5Aacbe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing/route.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Af1, 2Af3, 4Agaa1, 5Aacba1
-last_GRID_edit: Applied suggestion: 4Agaa1 -> 2Af3 (s)
+last_KEY_edit: Assigned keys: 2Ad2, 2Af1, 2Af3, 3Afa1, 3Afa2, 3Afa4, 3Afa6, 3Afa7, 3Afa8, 3Afa9, 3Afa10, 4Agaa1, 5Aacba1, 5Aacbe1
+last_GRID_edit: Applied suggestion: 4Agaa1 -> 3Afa10 (s)
 
 ---GRID_START---
-X 2Af1 2Af3 4Agaa1 5Aacba1
-2Af1 = opss
-2Af3 = posp
-4Agaa1 = ssos
-5Aacba1 = spso
+X 2Ad2 2Af1 2Af3 3Afa1 3Afa2 3Afa4 3Afa6 3Afa7 3Afa8 3Afa9 3Afa10 4Agaa1 5Aacba1 5Aacbe1
+2Ad2 = osp3sp5spp
+2Af1 = sop9s3
+2Af3 = ppopsp6spp
+3Afa1 = p3osS6spp
+3Afa2 = ppssosSs5pp
+3Afa4 = sppSsoS5ssp
+3Afa6 = p3S3oS4spp
+3Afa7 = p3SsSSoS3spp
+3Afa8 = p3SsS3oSSssp
+3Afa9 = p3SsS4oSspp
+3Afa10 = p3SsS5ospp
+4Agaa1 = s11oss
+5Aacba1 = psp3sppsppsoS
+5Aacbe1 = psp9sSo
 ---GRID_END---
 
 ---mini_tracker_end---
