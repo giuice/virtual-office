@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
 **Date:** 3/31/2025
-**Last Updated:** 3/31/2025, 8:44 PM (UTC-3:00)
+**Last Updated:** 3/31/2025, 9:05 PM (UTC-3:00)
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -14,21 +14,20 @@
 ```
 ## Current Work Focus:
 
-- **Plan Supabase Database Migration:** Initiating planning to switch the application's backend database from AWS DynamoDB to Supabase due to cost concerns. Previous work on DynamoDB messaging features is paused.
+- **Execute Supabase Migration (Phase 1: Setup & Repositories):** Begin implementing the Supabase migration plan by setting up the Supabase project, applying the schema, and implementing the repository interfaces and Supabase implementations.
 
 ## Next Steps:
 
-1.  **Transition to Strategy Phase:** Update `.clinerules` and load the Strategy Plugin.
-2.  **Identify DynamoDB Usage:** Locate all code interacting with DynamoDB (primarily within `src/lib/dynamo/` and API routes).
-3.  **Define Supabase Schema:** Design the equivalent Supabase (PostgreSQL) schema based on existing DynamoDB tables/data structures (`src/types/database.ts`, `src/types/messaging.ts`).
-4.  **Plan Data Migration (Optional):** Determine if existing data needs migration and plan the process if necessary.
-5.  **Create Supabase Client/Lib:** Plan the creation of a new library (`src/lib/supabase/`) for interacting with Supabase.
-6.  **Create Instruction Files:** Generate detailed instruction files for replacing DynamoDB interactions with Supabase calls in affected modules and API routes.
-7.  **Update HDTA:** Update `system_manifest.md` and other relevant documentation.
+1.  **Transition to Execution Phase:** Update `.clinerules` and load the Execution Plugin.
+2.  **Setup Supabase Project:** Create the project in Supabase, obtain credentials, set environment variables.
+3.  **Apply Schema:** Execute `strategy_tasks/supabase_schema_definition.sql` in the Supabase project.
+4.  **Implement Repository Interfaces:** Create interfaces in `src/repositories/interfaces/` as per `strategy_tasks/repository_interfaces_definition.md`.
+5.  **Implement Supabase Client & Repositories:** Create the client and implementations in `src/lib/supabase/` and `src/repositories/implementations/supabase/` as per `strategy_tasks/supabase_repository_implementation.md`.
+6.  **Begin API Refactoring:** Start refactoring the first set of API routes (e.g., Users) according to the relevant instruction file (`api_refactor_users_repo.md`).
 
 ## Active Decisions and Considerations:
 
-- **Supabase Schema Design:** How to best map DynamoDB's NoSQL structure to Supabase's PostgreSQL structure (tables, relationships, constraints).
-- **Data Migration:** Is migration feasible/necessary? Manual re-creation vs. scripted migration.
-- **Authentication Integration:** How Supabase auth interacts with existing Clerk authentication.
-- **Real-time Features:** How to replace DynamoDB Streams/Socket.IO logic with Supabase Realtime Subscriptions.
+- **Data Migration:** Confirmed decision: No data migration needed; start fresh.
+- **Repository Pattern:** Adopted for data access abstraction.
+- **Real-time:** Plan is to use Supabase Realtime Subscriptions/Presence/Broadcast.
+- **Dependency Injection:** Currently planning manual instantiation of repositories in API routes; consider a more formal DI approach later if complexity increases.
