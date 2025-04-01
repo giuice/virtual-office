@@ -1,7 +1,11 @@
 // src/pages/api/users/create.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createUser } from '@/lib/dynamo';
-import { User } from '@/types/database';
+import { IUserRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { User } from '@/types/database'; // Keep User type import
+
+// Instantiate the repository
+const userRepository: IUserRepository = new SupabaseUserRepository();
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,21 +17,22 @@ export default async function handler(
   }
 
   try {
-    const userData = req.body;
+    const userData: Partial<User> = req.body; // Add type hint
     
     // Validate required fields
     if (!userData.email || !userData.companyId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Create the user
-    const userId = await createUser(userData);
+    // Create the user using the repository
+    // We've validated required fields, so assert the type
+    const createdUser = await userRepository.create(userData as Omit<User, 'id' | 'createdAt' | 'lastActive'>);
     
-    // Return success with the ID
-    return res.status(201).json({ 
-      success: true, 
-      userId, 
-      message: 'User created successfully' 
+    // Return success with the created user object
+    return res.status(201).json({
+      success: true,
+      user: createdUser,
+      message: 'User created successfully'
     });
   } catch (error) {
     console.error('Error creating user:', error);

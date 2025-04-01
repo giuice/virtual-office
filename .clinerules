@@ -1,8 +1,8 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Completed Strategy phase planning for Supabase migration using Repository Pattern. Created all instruction files. Pausing session."
-current_phase: "Strategy"
-next_action: "Update .clinerules to transition to Execution phase and load Execution Plugin."
+last_action: "Completed refactoring of company API routes (create, get, update) using ICompanyRepository. Blocked on cleanup.ts due to missing findByUserId method."
+current_phase: "Execution"
+next_action: "Update ICompanyRepository interface and implementation with findByUserId method, then refactor cleanup.ts OR proceed with next task (api_refactor_spaces_repo.md)."
 next_phase: "Execution"
 
 [CODE_ROOT_DIRECTORIES]
@@ -60,4 +60,10 @@ next_phase: "Execution"
 - **Project Pivot (3/31):** Switched focus from DynamoDB to Supabase due to cost concerns. Paused DynamoDB feature work and initiated planning for Supabase migration.
 - Status check complete (3/31). Transitioned to Strategy phase for Supabase migration planning.
 - **Repository Pattern Pivot (3/31):** Adopted Repository Pattern during Strategy phase for Supabase migration to improve data access abstraction and maintainability. Updated instruction files accordingly.
+- Refactoring API routes requires careful checking of repository interface capabilities. If a required method (like `findByUserId`) is missing, the refactoring for that specific route must be deferred until the interface and implementation are updated.
+- Transitioned to Execution phase (3/31) to begin Supabase migration implementation.
+- Corrected execution path (3/31) to follow Repository Pattern migration plan, starting with interface definitions.
+- Defined all repository interfaces (IUserRepository, ICompanyRepository, etc.) in `src/repositories/interfaces/` (3/31).
+- Implemented all Supabase repository classes (SupabaseUserRepository, etc.) in `src/repositories/implementations/supabase/` (3/31).
+- Refactoring API routes involves replacing direct DB calls with repository method calls, updating imports, adjusting data handling/types, and ensuring error handling remains appropriate. Sometimes type definitions or repository interfaces need adjustments discovered during implementation (e.g., `Space.userIds`, filtering logic).
 ---CLINE_RULES_END---

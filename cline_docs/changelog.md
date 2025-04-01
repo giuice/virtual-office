@@ -1,4 +1,45 @@
+## 2025-03-31
+
+*   **Refactor:** Updated company API routes (`src/pages/api/companies/create.ts`, `src/pages/api/companies/get.ts`, `src/pages/api/companies/update.ts`) to use `ICompanyRepository` and `SupabaseCompanyRepository` implementation.
+*   **Blocked:** Refactoring of `src/pages/api/companies/cleanup.ts` is blocked pending addition of `findByUserId` method to `ICompanyRepository`.
+
+
 # Changelog
+
+## [3/31/2025] - Refactor User API Routes
+- **Description:** Modified all API routes under `src/pages/api/users/` to utilize the `IUserRepository` interface and `SupabaseUserRepository` implementation.
+- **Reason:** Decouple API routes from specific database implementations (Supabase migration) and adhere to the Repository Pattern.
+- **Affected Files:**
+    - `src/pages/api/users/by-company.ts`
+    - `src/pages/api/users/create.ts`
+    - `src/pages/api/users/get-by-firebase-id.ts`
+    - `src/pages/api/users/remove-from-company.ts`
+    - `src/pages/api/users/update.ts`
+    - `src/pages/api/users/[id]/index.ts`
+    - `src/pages/api/users/[id]/status.ts`
+
+
+## 3/31/2025 (9:46 PM)
+- **Supabase Repository Implementation Complete:**
+  - Created concrete Supabase repository classes for all core entities (User, Company, Space, Message, Conversation, Invitation, Announcement, MeetingNote) in `src/repositories/implementations/supabase/`.
+  - Implemented methods defined in the corresponding interfaces using the Supabase client.
+  - Included basic error handling and noted areas needing potential data mapping (camelCase/snake_case) or RPC functions (for atomic updates).
+  - Created barrel file `src/repositories/implementations/supabase/index.ts` to export all implementation classes.
+  - Next step is to refactor API routes to use these repositories.
+
+## 3/31/2025 (9:33 PM)
+- **Repository Interface Definition Complete:**
+  - Defined and created TypeScript interfaces for all core data entities (User, Company, Space, Message, Conversation, Invitation, Announcement, MeetingNote) in `src/repositories/interfaces/`.
+  - Created common types `PaginationOptions` and `PaginatedResult` in `src/types/common.ts`.
+  - Defined and exported `ActionItem` type in `src/types/database.ts`.
+  - Created barrel file `src/repositories/interfaces/index.ts` to export all interfaces.
+  - Next step is to implement these interfaces using Supabase.
+
+## 3/31/2025 (9:18 PM)
+- **Supabase Migration Course Correction:**
+  - Corrected execution path based on user feedback and `supabase_migration_plan.md`.
+  - Aborted direct Supabase library implementation (`src/lib/supabase/users.ts`).
+  - Updated `.clinerules` to point to the correct next step: defining repository interfaces (`strategy_tasks/repository_interfaces_definition.md`).
 
 ## 3/31/2025 (9:05 PM)
 - **Supabase Migration Planning Complete (Strategy Phase):**

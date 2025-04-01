@@ -1,7 +1,11 @@
 // src/pages/api/users/get-by-firebase-id.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getUserByFirebaseId } from '@/lib/dynamo';
+import { IUserRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { User } from '@/types/database'; // Import User type
 
+// Instantiate the repository
+const userRepository: IUserRepository = new SupabaseUserRepository();
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -19,7 +23,8 @@ export default async function handler(
     }
 
     // Get the user
-    const user = await getUserByFirebaseId(firebaseId);
+    // Get the user using the repository
+    const user: User | null = await userRepository.findByFirebaseUid(firebaseId);
     
     if (!user) {
       return res.status(404).json({ 

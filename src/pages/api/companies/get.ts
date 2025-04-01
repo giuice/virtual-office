@@ -1,11 +1,13 @@
 // src/pages/api/companies/get.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getCompany } from '@/lib/dynamo';
+import { ICompanyRepository } from '@/repositories/interfaces';
+import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
   // Only allow GET method
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -19,7 +21,8 @@ export default async function handler(
     }
 
     // Get the company
-    const company = await getCompany(id);
+    // Get the company using the repository
+    const company = await companyRepository.findById(id);
     
     if (!company) {
       return res.status(404).json({ 

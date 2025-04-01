@@ -1,7 +1,11 @@
 // src/pages/api/users/by-company.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getUsersByCompany } from '@/lib/dynamo';
+import { IUserRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { User } from '@/types/database'; // Corrected import path
 
+// Instantiate the repository
+const userRepository: IUserRepository = new SupabaseUserRepository();
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -19,7 +23,8 @@ export default async function handler(
     }
 
     // Get users by company
-    const users = await getUsersByCompany(companyId);
+    // Get users by company using the repository
+    const users: User[] = await userRepository.findByCompany(companyId);
     
     // Return success with users
     return res.status(200).json({ 

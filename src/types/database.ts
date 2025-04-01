@@ -149,6 +149,14 @@ export interface Announcement {
   priority?: 'low' | 'medium' | 'high';
 }
 
+// Action Item for Meeting Notes
+export interface ActionItem {
+  description: string;
+  assignee?: string; // User ID
+  dueDate?: TimeStampType;
+  completed: boolean;
+}
+
 // Meeting Notes Collection
 export interface MeetingNote {
   id: string;
@@ -157,12 +165,7 @@ export interface MeetingNote {
   meetingDate: TimeStampType;
   transcript?: string;
   summary: string;
-  actionItems?: {
-    description: string;
-    assignee?: string; // User ID
-    dueDate?: TimeStampType;
-    completed: boolean;
-  }[];
+  actionItems?: ActionItem[]; // Use the exported ActionItem type
   generatedBy: 'ai' | 'user';
   editedBy?: string; // User ID who last edited
   createdAt: TimeStampType;

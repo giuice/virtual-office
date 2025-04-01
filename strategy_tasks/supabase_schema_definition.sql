@@ -5,16 +5,16 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Optional ENUM Types (Uncomment if choosing to use ENUMs over TEXT)
--- CREATE TYPE user_role AS ENUM ('admin', 'member');
--- CREATE TYPE user_status AS ENUM ('online', 'away', 'busy', 'offline');
--- CREATE TYPE space_type AS ENUM ('workspace', 'conference', 'social', 'breakout', 'private_office', 'open_space', 'lounge', 'lab');
--- CREATE TYPE space_status AS ENUM ('active', 'available', 'maintenance', 'locked', 'reserved', 'in_use');
--- CREATE TYPE message_type AS ENUM ('text', 'image', 'file', 'system', 'announcement');
--- CREATE TYPE message_status AS ENUM ('sending', 'sent', 'delivered', 'read', 'failed');
--- CREATE TYPE conversation_type AS ENUM ('direct', 'group', 'room');
--- CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired');
--- CREATE TYPE note_generator AS ENUM ('ai', 'user');
--- CREATE TYPE announcement_priority AS ENUM ('low', 'medium', 'high');
+CREATE TYPE user_role AS ENUM ('admin', 'member');
+CREATE TYPE user_status AS ENUM ('online', 'away', 'busy', 'offline');
+CREATE TYPE space_type AS ENUM ('workspace', 'conference', 'social', 'breakout', 'private_office', 'open_space', 'lounge', 'lab');
+CREATE TYPE space_status AS ENUM ('active', 'available', 'maintenance', 'locked', 'reserved', 'in_use');
+CREATE TYPE message_type AS ENUM ('text', 'image', 'file', 'system', 'announcement');
+CREATE TYPE message_status AS ENUM ('sending', 'sent', 'delivered', 'read', 'failed');
+CREATE TYPE conversation_type AS ENUM ('direct', 'group', 'room');
+CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired');
+CREATE TYPE note_generator AS ENUM ('ai', 'user');
+CREATE TYPE announcement_priority AS ENUM ('low', 'medium', 'high');
 
 -- Companies Table
 CREATE TABLE companies (
@@ -33,10 +33,10 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
     avatar_url TEXT,
-    status TEXT DEFAULT 'offline' NOT NULL, -- Consider using ENUM type: user_status
+    status user_status DEFAULT 'offline' NOT NULL, -- Use ENUM type
     status_message TEXT,
     preferences JSONB, -- Store theme, notifications, defaultRoom preferences
-    role TEXT DEFAULT 'member' NOT NULL, -- Consider using ENUM type: user_role
+    role user_role DEFAULT 'member' NOT NULL, -- Use ENUM type
     last_active TIMESTAMPTZ DEFAULT now() NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -51,8 +51,8 @@ CREATE TABLE spaces (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    type TEXT NOT NULL, -- Consider using ENUM type: space_type
-    status TEXT NOT NULL, -- Consider using ENUM type: space_status
+    type space_type NOT NULL, -- Use ENUM type
+    status space_status NOT NULL, -- Use ENUM type
     capacity INTEGER DEFAULT 0 NOT NULL,
     features TEXT[], -- Array of feature strings
     position JSONB, -- Store x, y, width, height
@@ -90,7 +90,7 @@ CREATE INDEX idx_space_reservations_times ON space_reservations(start_time, end_
 -- Conversations Table
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    type TEXT NOT NULL, -- Consider using ENUM type: conversation_type
+    type conversation_type NOT NULL, -- Use ENUM type
     participants UUID[], -- Array of User IDs
     last_activity TIMESTAMPTZ DEFAULT now() NOT NULL,
     name TEXT, -- For group/room conversations
@@ -111,8 +111,8 @@ CREATE TABLE messages (
     sender_id UUID REFERENCES users(id) ON DELETE SET NULL, -- User might be deleted
     content TEXT NOT NULL,
     timestamp TIMESTAMPTZ DEFAULT now() NOT NULL,
-    type TEXT NOT NULL, -- Consider using ENUM type: message_type
-    status TEXT NOT NULL, -- Consider using ENUM type: message_status
+    type message_type NOT NULL, -- Use ENUM type
+    status message_status NOT NULL, -- Use ENUM type
     reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL, -- Self-reference for threads
     is_edited BOOLEAN DEFAULT false NOT NULL,
     CONSTRAINT check_content_not_empty CHECK (content <> '')
@@ -161,7 +161,7 @@ CREATE TABLE announcements (
     posted_by UUID REFERENCES users(id) ON DELETE SET NULL,
     timestamp TIMESTAMPTZ DEFAULT now() NOT NULL,
     expiration TIMESTAMPTZ,
-    priority TEXT DEFAULT 'medium', -- Consider using ENUM type: announcement_priority
+    priority announcement_priority DEFAULT 'medium', -- Use ENUM type
     CONSTRAINT check_content_not_empty_announcements CHECK (content <> ''),
     CONSTRAINT check_title_not_empty_announcements CHECK (title <> '')
 );
@@ -177,7 +177,7 @@ CREATE TABLE meeting_notes (
     meeting_date TIMESTAMPTZ NOT NULL,
     transcript TEXT,
     summary TEXT NOT NULL,
-    generated_by TEXT NOT NULL, -- Consider using ENUM type: note_generator
+    generated_by note_generator NOT NULL, -- Use ENUM type
     edited_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
@@ -208,9 +208,9 @@ CREATE TABLE invitations (
     token TEXT PRIMARY KEY, -- Using the token itself as the primary key
     email TEXT NOT NULL,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    role TEXT NOT NULL, -- Consider using ENUM type: user_role
+    role user_role NOT NULL, -- Use ENUM type
     expires_at TIMESTAMPTZ NOT NULL, -- Use TIMESTAMPTZ for consistency
-    status TEXT NOT NULL, -- Consider using ENUM type: invitation_status
+    status invitation_status NOT NULL, -- Use ENUM type
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 -- Indexes for Invitations

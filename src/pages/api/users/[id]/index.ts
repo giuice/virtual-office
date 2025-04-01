@@ -1,7 +1,11 @@
 // src/pages/api/users/[id]/index.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getUserByFirebaseId, updateUser } from '@/lib/dynamo';
+import { IUserRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { User } from '@/types/database'; // Import User type
 
+// Instantiate the repository
+const userRepository: IUserRepository = new SupabaseUserRepository();
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -15,34 +19,40 @@ export default async function handler(
   // GET request - retrieve user
   if (req.method === 'GET') {
     try {
-      const user = await getUserByFirebaseId(id);
+      // Use findById from the repository
+      const user: User | null = await userRepository.findById(id);
       
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ success: false, message: 'User not found' });
       }
       
-      return res.status(200).json({ user });
+      return res.status(200).json({ success: true, user });
     } catch (error) {
       console.error('Error retrieving user:', error);
       return res.status(500).json({ 
-        error: 'Failed to retrieve user',
+        success: false, error: 'Failed to retrieve user',
         message: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   // PUT request - update user
-  else if (req.method === 'PUT') {
+  // DELETE request - delete user
+  else if (req.method === 'DELETE') {
     try {
-      const userData = req.body;
+      const deleted = await userRepository.deleteById(id);
       
-      await updateUser(id, userData);
+      if (!deleted) {
+        // This could mean the user wasn't found or delete failed for other reasons
+        return res.status(404).json({ success: false, message: 'User not found or delete failed' });
+      }
       
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, message: 'User deleted successfully' });
     } catch (error) {
-      console.error('Error updating user:', error);
-      return res.status(500).json({ 
-        error: 'Failed to update user',
+      console.error('Error deleting user:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete user',
         message: error instanceof Error ? error.message : String(error)
       });
     }

@@ -1,7 +1,11 @@
 // src/pages/api/users/update.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateUser } from '@/lib/dynamo';
-import { User } from '@/types/database';
+import { IUserRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { User } from '@/types/database'; // Keep User type import
+
+// Instantiate the repository
+const userRepository: IUserRepository = new SupabaseUserRepository();
 
 export default async function handler(
   req: NextApiRequest,
@@ -20,13 +24,18 @@ export default async function handler(
       return res.status(400).json({ error: 'Missing or invalid id parameter' });
     }
 
-    // Update the user
-    await updateUser(id, userData);
+    // Update the user using the repository
+    const updatedUser = await userRepository.update(id, userData);
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found or update failed' });
+    }
     
-    // Return success
-    return res.status(200).json({ 
-      success: true, 
-      message: 'User updated successfully' 
+    // Return success with the updated user object
+    return res.status(200).json({
+      success: true,
+      user: updatedUser,
+      message: 'User updated successfully'
     });
   } catch (error) {
     console.error('Error updating user:', error);
