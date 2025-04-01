@@ -1,68 +1,59 @@
- // src/app/api/conversations/get/route.ts
+// src/app/api/conversations/get/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Conversation, ConversationType } from '@/types/messaging';
-
-// Access the mock database
-// In a real application, this would be fetched from a database
-// We're using the shared mock conversations from create route
-// @ts-ignore - Accessing external variable from another route file
-import { conversations } from '../create/route';
+import { IConversationRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { PaginationOptions, PaginatedResult } from '@/types/common'; // Import common types
+// import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
 
 export async function GET(request: NextRequest) {
+  // TODO: Implement proper authentication and authorization
+  // const { userId: authenticatedUserId } = getAuth(request); // TODO: Revisit auth
+  // For now, get userId from query params for testing repository logic
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('userId'); // Using query param for now
+  const authenticatedUserId = userId; // Assume query param user is authenticated for this refactor
+
+  if (!authenticatedUserId) {
+    // In real auth, this check would be more robust
+    return NextResponse.json({ error: 'Unauthorized or userId missing' }, { status: 401 });
+  }
+
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(); // Instantiate repository
+
   try {
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const type = searchParams.get('type');
+    // Get query parameters for filtering and pagination
+    const type = searchParams.get('type') as ConversationType | null;
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const cursor = searchParams.get('cursor');
-    
-    // Validate required parameters
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Filter conversations by participant
-    let filteredConversations = conversations.filter(conversation => 
-      conversation.participants.includes(userId) && 
+    const cursor = searchParams.get('cursor') || undefined; // Use undefined if null
+
+    // Prepare pagination options for the repository
+    const paginationOptions: PaginationOptions = { limit, cursor };
+
+    // Fetch paginated conversations for the user from the repository
+    const result: PaginatedResult<Conversation> = await conversationRepository.findByUser(authenticatedUserId, paginationOptions);
+
+    // TODO: Enhance repository's findByUser method to support filtering by type and archived status directly in the query.
+    // Apply filtering after fetching for now.
+    const filteredConversations = result.items.filter(conversation =>
       (includeArchived || !conversation.isArchived) &&
       (!type || conversation.type === type)
     );
-    
-    // Sort conversations by lastActivity
-    filteredConversations.sort((a, b) => 
-      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
-    );
-    
-    // Apply cursor-based pagination
-    let startIndex = 0;
-    if (cursor) {
-      const cursorIndex = filteredConversations.findIndex(conv => conv.id === cursor);
-      if (cursorIndex !== -1) {
-        startIndex = cursorIndex + 1;
-      }
-    }
-    
-    // Get paginated conversations
-    const paginatedConversations = filteredConversations.slice(startIndex, startIndex + limit);
-    
-    // Determine if there are more conversations
-    const hasMore = startIndex + limit < filteredConversations.length;
-    
-    // Get next cursor
-    const nextCursor = hasMore ? paginatedConversations[paginatedConversations.length - 1]?.id : undefined;
-    
+
+    // Note: The repository result already contains pagination info (nextCursor, hasMore).
+    // If post-filtering removes all items on the current page but hasMore was true,
+    // the client might need logic to auto-fetch the next page.
+    // Alternatively, the repository could be enhanced to handle filtering before pagination.
+
     return NextResponse.json({
-      conversations: paginatedConversations,
-      nextCursor,
-      hasMore
+      conversations: filteredConversations,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore // Rely on repository's hasMore calculation
     });
   } catch (error) {
     console.error('Error getting conversations:', error);
+    // Consider more specific error handling based on repository errors
     return NextResponse.json(
       { error: 'Failed to retrieve conversations' },
       { status: 500 }

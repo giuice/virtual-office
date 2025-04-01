@@ -1,6 +1,7 @@
 // src/app/api/messages/status/route.ts
 import { NextResponse } from 'next/server';
-import { updateMessageStatusInDB } from '@/lib/dynamo/messages'; // Corrected import path
+import { IMessageRepository } from '@/repositories/interfaces';
+import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
 import { MessageStatus } from '@/types/messaging';
 // import { getAuth } from '@clerk/nextjs/server'; // Or your auth method // TODO: Revisit auth import/implementation
 
@@ -14,6 +15,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    const messageRepository: IMessageRepository = new SupabaseMessageRepository();
     const { messageId, status, userId } = await request.json();
 
     // Basic validation
@@ -41,15 +43,16 @@ export async function PATCH(request: Request) {
     console.log(`API: Updating status for message ${messageId} to ${status}`); // Removed userId from log as DB function doesn't use it
 
     // Call the actual database update logic
-    await updateMessageStatusInDB(messageId, status);
+    // Call the repository update method
+    await messageRepository.update(messageId, { status: status });
 
     return NextResponse.json({ success: true }, { status: 200 });
 
   } catch (error) {
-    console.error('Error updating message status:', error);
+    console.error('Error updating message status request:', error);
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error updating status' }, { status: 500 });
   }
 }

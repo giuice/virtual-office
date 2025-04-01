@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
-**Date:** 3/31/2025
-**Last Updated:** 3/31/2025, 10:12 PM (UTC-3:00)
+**Date:** 4/1/2025
+**Last Updated:** 4/1/2025, 11:35 AM (UTC-3:00)
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -13,22 +13,23 @@
 - **Maintain Brevity:** Keep this file concise and focused on the *current* state.
 ```
 ## Current Work Focus:
-- **Execute Supabase Migration (Phase 2: API Refactoring):** Refactoring existing API routes to use the new Supabase repository interfaces.
+- **Execute Supabase Migration (Phase 2: API Refactoring & Integration):** Refactoring API routes and integrating frontend calls.
     - User routes: Complete.
-    - Company routes (`create`, `get`, `update`): Complete.
-    - Company route (`cleanup`): Blocked - Requires `ICompanyRepository.findByUserId`.
+    - Company routes (`create`, `get`, `update`, `cleanup`): Complete.
+    - Space routes (`get`, `create`, `update`, `delete`): Complete.
+    - Conversation routes (`archive`, `create`, `get`, `read`): Complete.
+    - Invitation routes (`create`, `accept`): Complete.
+    - Message routes (`create`, `get`, `react`, `status`, `typing` [no DB]): Complete.
 
 ## Next Steps:
 
-1.  **(Blocked Task):** Update `ICompanyRepository` interface and `SupabaseCompanyRepository` implementation to include a `findByUserId` method.
-2.  **(Blocked Task):** Refactor `src/pages/api/companies/cleanup.ts` using the updated repository.
-3.  **Load Space API Refactor Instructions:** Read and begin executing `strategy_tasks/api_refactor_spaces_repo.md`.
-3.  **Refactor Space API Routes:** Proceed with refactoring space routes using `ISpaceRepository` as per `strategy_tasks/api_refactor_spaces_repo.md`.
-4.  **(Prerequisite Check):** Ensure Supabase project is created and schema applied.
+1.  **API Refactoring Complete:** All identified API routes have been refactored to use the Repository pattern.
+2.  **Integrate Frontend Messaging:** Update frontend components (`MessagingContext`, hooks, UI) to correctly use the refactored Supabase-backed API endpoints for messages.
+2.  **(Prerequisite Check):** Ensure Supabase project is created and schema applied.
 
 ## Active Decisions and Considerations:
 
 - **Data Migration:** Confirmed decision: No data migration needed; start fresh.
 - **Repository Pattern:** Adopted for data access abstraction. Interfaces and Supabase implementations complete.
-- **Real-time:** Plan is to use Supabase Realtime Subscriptions/Presence/Broadcast (to be implemented after API refactoring).
+- **Real-time:** Continue using existing Socket.IO implementation (`socket-server.js`, `MessagingContext`). Supabase Realtime integration is on hold.
 - **Dependency Injection:** Currently planning manual instantiation of repositories in API routes; consider a more formal DI approach later if complexity increases.

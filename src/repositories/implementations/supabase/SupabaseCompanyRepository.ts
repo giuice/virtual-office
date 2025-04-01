@@ -79,5 +79,40 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
     return (count ?? 0) > 0;
   }
 
+  async findByUserId(userId: string): Promise<Company | null> {
+    const { data, error } = await supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .contains('admin_ids', [userId]) // Check if admin_ids array contains the userId
+      .maybeSingle(); // Use maybeSingle() as a user might not be an admin of any company
+
+    if (error) {
+      console.error('Error fetching company by user ID:', error);
+      // Don't throw an error if simply not found, but do for other errors
+      if (error.code !== 'PGRST116') { // PGRST116: Row not found (though maybeSingle handles this)
+          throw error;
+      }
+    }
+    // TODO: Map DB response (snake_case) to Company type (camelCase) if needed
+    return data as Company | null;
+  }
+
+  async findAllByUserId(userId: string): Promise<Company[]> {
+    const { data, error } = await supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .contains('admin_ids', [userId]); // Find all companies where admin_ids array contains the userId
+
+    if (error) {
+      console.error('Error fetching companies by user ID:', error);
+      throw error;
+    }
+    // TODO: Map DB response (snake_case) to Company type (camelCase) if needed
+    return (data || []) as Company[];
+
+
+  }
+
+
   // Implement other methods defined in ICompanyRepository if any...
 }

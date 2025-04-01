@@ -1,20 +1,19 @@
 // src/app/api/messages/get/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Message } from '@/types/messaging';
-
-// Mock database
-// In a real application, this would be replaced with a database query
-// For simplicity, we're using the shared mock messages from create route
-let messages: Message[] = [];
+import { IMessageRepository } from '@/repositories/interfaces';
+import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
+import { PaginationOptions, PaginatedResult } from '@/types/common'; // Assuming path
 
 export async function GET(request: NextRequest) {
   try {
+    const messageRepository: IMessageRepository = new SupabaseMessageRepository();
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const cursor = searchParams.get('cursor');
-    const direction = searchParams.get('direction') || 'older';
+    // const direction = searchParams.get('direction') || 'older'; // Repository likely handles sorting
     
     // Validate required parameters
     if (!conversationId) {
@@ -24,42 +23,24 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Filter messages by conversation
-    let filteredMessages = messages.filter(message => 
-      message.conversationId === conversationId
+    // Prepare pagination options
+    const paginationOptions: PaginationOptions = {
+      limit: limit,
+      cursor: cursor || undefined, // Pass cursor if it exists
+    };
+
+    // Fetch messages using repository
+    // TODO: Update IMessageRepository.findByConversation to return PaginatedResult<Message> for proper pagination
+    const messages: Message[] = await messageRepository.findByConversation(
+      conversationId,
+      paginationOptions
     );
-    
-    // Sort messages by timestamp
-    filteredMessages.sort((a, b) => {
-      if (direction === 'older') {
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      } else {
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-      }
-    });
-    
-    // Apply cursor-based pagination
-    let startIndex = 0;
-    if (cursor) {
-      const cursorIndex = filteredMessages.findIndex(msg => msg.id === cursor);
-      if (cursorIndex !== -1) {
-        startIndex = cursorIndex + 1;
-      }
-    }
-    
-    // Get paginated messages
-    const paginatedMessages = filteredMessages.slice(startIndex, startIndex + limit);
-    
-    // Determine if there are more messages
-    const hasMore = startIndex + limit < filteredMessages.length;
-    
-    // Get next cursor
-    const nextCursor = hasMore ? paginatedMessages[paginatedMessages.length - 1]?.id : undefined;
-    
+
+    // Temporary response structure until repository method is updated
     return NextResponse.json({
-      messages: paginatedMessages,
-      nextCursor,
-      hasMore
+      messages: messages,
+      nextCursor: undefined, // Cannot determine next cursor from Message[]
+      hasMore: false,       // Cannot determine hasMore from Message[]
     });
   } catch (error) {
     console.error('Error getting messages:', error);

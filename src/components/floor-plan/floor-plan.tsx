@@ -92,28 +92,109 @@ export function FloorPlan() {
   // to interact with the backend API via context or direct API calls.
   // These functions now expect the global Space type.
 
-  const handleCreateRoom = (newRoomData: Partial<Space>) => { // Expect partial data for creation
-    console.warn("handleCreateRoom needs API integration");
-    // Example API call structure (needs implementation in context/API):
-    // createSpaceInContext({ ...newRoomData, companyId: company?.id, createdBy: currentUserProfile?.id });
-    setIsRoomDialogOpen(false);
+  const handleCreateRoom = async (newRoomData: Partial<Space>) => { // Expect partial data for creation
+    if (!currentUserProfile?.companyId) {
+      console.error("Cannot create room: User company ID not found.");
+      // TODO: Add user feedback (e.g., toast notification)
+      return;
+    }
+
+    const payload = {
+      ...newRoomData,
+      companyId: currentUserProfile.companyId, // Add companyId from context
+    };
+
+    try {
+      const response = await fetch('/api/spaces/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to create space: ${response.statusText}`);
+      }
+
+      const createdSpace: Space = await response.json();
+      console.log('Space created:', createdSpace);
+      // TODO: Update local state (e.g., via CompanyContext) to reflect the new space
+      // This might involve refetching spaces or adding the new one directly.
+      // For now, just closing the dialog.
+
+    } catch (error) {
+      console.error("Error in handleCreateRoom:", error);
+      // TODO: Add user feedback (e.g., toast notification)
+    } finally {
+      setIsRoomDialogOpen(false);
+    }
   };
 
-  const handleUpdateRoom = (updatedRoom: Space) => { // Expect full Space object for update
-    console.warn("handleUpdateRoom needs API integration");
-    // Example API call structure (needs implementation in context/API):
-    // updateSpaceInContext(updatedRoom.id, updatedRoom);
-    setSelectedSpace(null);
-    setIsEditingRoom(false);
+  const handleUpdateRoom = async (updatedRoom: Space) => { // Expect full Space object for update
+    if (!updatedRoom.id) {
+      console.error("Cannot update room: Missing room ID.");
+      // TODO: Add user feedback
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/spaces/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedRoom), // Send the whole updated room object
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to update space: ${response.statusText}`);
+      }
+
+      const resultingSpace: Space = await response.json();
+      console.log('Space updated:', resultingSpace);
+      // TODO: Update local state (e.g., via CompanyContext) to reflect the updated space
+      // This might involve refetching spaces or updating the specific space in the local array.
+
+    } catch (error) {
+      console.error("Error in handleUpdateRoom:", error);
+      // TODO: Add user feedback
+    } finally {
+      setSelectedSpace(null);
+      setIsEditingRoom(false);
+    }
   };
 
-  const handleDeleteRoom = (roomId: string) => {
-    console.warn("handleDeleteRoom needs API integration");
-    // Example API call structure (needs implementation in context/API):
-    // deleteSpaceInContext(roomId);
-    setSelectedSpace(null);
-    if (chatRoom && chatRoom.id === roomId) {
-      setChatRoom(null);
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!roomId) {
+      console.error("Cannot delete room: Missing room ID.");
+      // TODO: Add user feedback
+      return;
+    }
+
+    // Optional: Add a confirmation dialog here before proceeding
+
+    try {
+      const response = await fetch(`/api/spaces/delete?spaceId=${roomId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to delete space: ${response.statusText}`);
+      }
+
+      console.log('Space deleted:', roomId);
+      // TODO: Update local state (e.g., via CompanyContext) to reflect the deleted space
+      // This might involve refetching spaces or removing the space from the local array.
+
+      // Clear selection and chat if the deleted room was selected/active
+      setSelectedSpace(null);
+      if (chatRoom && chatRoom.id === roomId) {
+        setChatRoom(null);
+      }
+
+    } catch (error) {
+      console.error("Error in handleDeleteRoom:", error);
+      // TODO: Add user feedback
     }
   };
 

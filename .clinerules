@@ -1,9 +1,12 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Completed refactoring of company API routes (create, get, update) using ICompanyRepository. Blocked on cleanup.ts due to missing findByUserId method."
+last_action: "Created /api/spaces/delete route using ISpaceRepository and integrated with handleDeleteRoom in floor-plan.tsx."
 current_phase: "Execution"
-next_action: "Update ICompanyRepository interface and implementation with findByUserId method, then refactor cleanup.ts OR proceed with next task (api_refactor_spaces_repo.md)."
+next_action: "Integrate frontend messaging components with refactored message APIs."
 next_phase: "Execution"
+
+[CRITICAL_REMINDER]
+- **CRITICAL:** Components exceeding 300-400 lines significantly hinder AI processing. Aggressively decompose large components into smaller, single-responsibility units using SOLID, DRY, and Separation of Concerns principles. Prioritize this during refactoring and new component creation.
 
 [CODE_ROOT_DIRECTORIES]
 - src
@@ -43,7 +46,6 @@ next_phase: "Execution"
 - Regularly running `analyze-project` after significant code changes keeps the dependency trackers (`module_relationship_tracker.md`, mini-trackers) accurate and prevents potential issues during development.
 - Adding console logs to relevant frontend and backend components is a useful technique for tracing the execution flow during manual testing, especially for multi-step processes like user invitations.
 - Pages within `src/pages` (Pages Router) are not automatically wrapped by providers defined in `src/app/layout.tsx` (App Router). Context-dependent pages in `src/pages` need their own provider wrapping if `src/pages/_app.tsx` is not used.
-- **CRITICAL:** Components exceeding 300-400 lines significantly hinder AI processing. Aggressively decompose large components into smaller, single-responsibility units using SOLID, DRY, and Separation of Concerns principles. Prioritize this during refactoring and new component creation.
 - Identified that `src/lib/messaging-api.ts` is missing several functions needed by the messaging hooks (reactions, status updates, typing indicators, archiving, read status). These need to be implemented along with corresponding backend API routes.
 - Corrected import paths and type definitions in messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) to resolve build errors after fixing floor plan import.
 - Adding placeholder client-side API functions first helps structure the frontend logic before implementing the corresponding backend routes.
@@ -66,4 +68,9 @@ next_phase: "Execution"
 - Defined all repository interfaces (IUserRepository, ICompanyRepository, etc.) in `src/repositories/interfaces/` (3/31).
 - Implemented all Supabase repository classes (SupabaseUserRepository, etc.) in `src/repositories/implementations/supabase/` (3/31).
 - Refactoring API routes involves replacing direct DB calls with repository method calls, updating imports, adjusting data handling/types, and ensuring error handling remains appropriate. Sometimes type definitions or repository interfaces need adjustments discovered during implementation (e.g., `Space.userIds`, filtering logic).
+- When refactoring API routes, carefully check the *specific logic* of the route. A simple repository method (like `findByUserId`) might not be sufficient if the route needs to find *all* related items (requiring `findAllByUserId`).
+- **Type Consistency:** When refactoring API routes to use repositories, ensure the data types used in the route (e.g., for request body parsing, preparing data for the repository) match the types expected by the repository interface methods (e.g., `Message` from `@/types/messaging` vs. `@/types/database`). Mismatches can cause subtle TypeScript errors.
+- Repository method return types must match the expected usage in the API route. If a method like `findByConversation` returns `Message[]` but the route expects `PaginatedResult<Message>`, the route needs temporary adjustments until the repository method is updated.
+- If strict type checking causes persistent issues with object indexing (e.g., `Element implicitly has an 'any' type`), and the underlying type definition cannot be immediately fixed, using a type assertion (`as any`) can be a temporary workaround to proceed, but the type definition should be revisited later.
+- Prioritize refactoring/implementing prerequisite features (e.g., Space/Room management APIs) before attempting end-to-end testing of dependent features (e.g., messaging within rooms).
 ---CLINE_RULES_END---

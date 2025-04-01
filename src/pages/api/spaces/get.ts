@@ -1,6 +1,7 @@
 // src/pages/api/spaces/get.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSpacesByCompany } from '@/lib/dynamo'; // Use the function from dynamo.ts
+import { ISpaceRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase'; // Import implementation
 import { Space } from '@/types/database';
 
 type ResponseData = {
@@ -17,6 +18,8 @@ export default async function handler(
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(); // Instantiate repository
+
   const { companyId } = req.query;
 
   if (!companyId || typeof companyId !== 'string') {
@@ -24,13 +27,14 @@ export default async function handler(
   }
 
   try {
-    // Use the function from dynamo.ts to fetch spaces
-    const spaces = await getSpacesByCompany(companyId);
+    // Use the repository method to fetch spaces
+    const spaces = await spaceRepository.findByCompany(companyId);
 
-    // Ensure users array exists, even if empty (double-check, though api.ts also does this)
+    // Ensure userIds array exists, even if empty
+    // This might be redundant if the repository implementation guarantees it, but safe to keep.
     const spacesWithUsers = spaces.map(space => ({
       ...space,
-      userIds: space.userIds || [] 
+      userIds: space.userIds || []
     }));
 
     res.status(200).json({ spaces: spacesWithUsers });

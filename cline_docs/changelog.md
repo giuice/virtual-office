@@ -1,3 +1,42 @@
+## 2025-04-01
+
+*   **Refactor:** Updated `src/app/api/messages/create/route.ts` to use `IMessageRepository` and `IConversationRepository`, replacing mock data logic. Adjusted type imports to use `@/types/messaging`.
+
+
+*   **Refactor:** Updated `src/app/api/messages/get/route.ts` to use `IMessageRepository`, replacing mock data logic. Added TODO for repository method update to return `PaginatedResult`.
+
+
+*   **Refactor:** Updated `src/app/api/messages/react/route.ts` to use `IMessageRepository`, replacing direct DynamoDB calls. Used `as any` type assertion as a workaround for strict type checking on `message.reactions`.
+
+
+*   **Refactor:** Updated `src/app/api/messages/status/route.ts` to use `IMessageRepository`, replacing direct DynamoDB calls.
+
+
+*   **Feature:** Created Space API route `src/pages/api/spaces/create.ts` using `ISpaceRepository`.
+*   **Refactor:** Updated `handleCreateRoom` in `src/components/floor-plan/floor-plan.tsx` to call the new `/api/spaces/create` endpoint.
+
+
+*   **Feature:** Created Space API route `src/pages/api/spaces/update.ts` using `ISpaceRepository`.
+*   **Refactor:** Updated `handleUpdateRoom` in `src/components/floor-plan/floor-plan.tsx` to call the new `/api/spaces/update` endpoint.
+
+
+*   **Feature:** Created Space API route `src/pages/api/spaces/delete.ts` using `ISpaceRepository`.
+*   **Refactor:** Updated `handleDeleteRoom` in `src/components/floor-plan/floor-plan.tsx` to call the new `/api/spaces/delete` endpoint.
+
+
+*   **Refactor:** Added `findByUserId` and `findAllByUserId` methods to `ICompanyRepository` interface and `SupabaseCompanyRepository` implementation to support company lookup by user association.
+*   **Refactor:** Updated `src/pages/api/companies/cleanup.ts` to use `ICompanyRepository` and `IUserRepository`, replacing direct database calls. Fixed timestamp handling during sorting.
+*   **Status:** Resolved blocker for company cleanup route refactoring.
+
+*   **Refactor:** Updated `src/pages/api/spaces/get.ts` to use `ISpaceRepository` and `SupabaseSpaceRepository` implementation, replacing direct database calls.
+
+*   **Refactor:** Updated conversation API routes (`src/app/api/conversations/archive/route.ts`, `.../create/route.ts`, `.../get/route.ts`, `.../read/route.ts`) to use `IConversationRepository` and `SupabaseConversationRepository` implementation.
+
+*   **Refactor:** Updated invitation API routes (`src/pages/api/invitations/create.ts`, `.../accept.ts`) to use `IInvitationRepository`, `IUserRepository`, and their Supabase implementations.
+
+---
+
+
 ## 2025-03-31
 
 *   **Refactor:** Updated company API routes (`src/pages/api/companies/create.ts`, `src/pages/api/companies/get.ts`, `src/pages/api/companies/update.ts`) to use `ICompanyRepository` and `SupabaseCompanyRepository` implementation.

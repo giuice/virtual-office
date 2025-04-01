@@ -1,6 +1,7 @@
 // src/app/api/conversations/read/route.ts
 import { NextResponse } from 'next/server';
-import { markConversationAsReadInDB } from '@/lib/dynamo/conversations'; // Corrected import path
+import { IConversationRepository } from '@/repositories/interfaces'; // Import interface
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; // Import implementation
 // import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
 
 export async function PATCH(request: Request) {
@@ -12,26 +13,33 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Unauthorized (Placeholder)' }, { status: 401 });
   }
 
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(); // Instantiate repository
+
   try {
-    const { conversationId, userId } = await request.json();
+    // The user marking the conversation as read is the authenticated user.
+    const { conversationId } = await request.json();
+    const userId = authenticatedUserId;
 
     // Basic validation
-    if (!conversationId || !userId) {
-      return NextResponse.json({ error: 'Missing required fields: conversationId, userId' }, { status: 400 });
+    if (!conversationId) {
+      return NextResponse.json({ error: 'Missing required field: conversationId' }, { status: 400 });
     }
 
-    // Authorization check: Ensure the authenticated user matches the userId performing the action
-    if (userId !== authenticatedUserId) {
-        console.warn(`Potential unauthorized read marking: User ${authenticatedUserId} tried to mark read for user ${userId} on conversation ${conversationId}`);
-        return NextResponse.json({ error: 'Forbidden: Cannot mark conversation as read for another user' }, { status: 403 });
-    }
+    // Authorization check (implicit via using authenticatedUserId)
 
     // TODO: Add further authorization: Is the user actually a participant in this conversation?
+    // This check might be handled within the repository method or needs to be added here.
 
     console.log(`API: Marking conversation ${conversationId} as read for user ${userId}`);
 
-    // Call the actual database update logic
-    await markConversationAsReadInDB(conversationId, userId);
+    // Call the repository method to mark as read
+    const success = await conversationRepository.markAsRead(conversationId, userId);
+
+    if (!success) {
+        // Handle cases where the update failed (e.g., conversation not found, user not participant)
+        // The repository method should return false in these cases.
+        return NextResponse.json({ error: 'Failed to mark conversation as read. Conversation not found or user not a participant.' }, { status: 404 }); // Or 403?
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
 
@@ -40,6 +48,7 @@ export async function PATCH(request: Request) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
+    // Consider more specific error handling based on repository errors
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -31,5 +31,22 @@ export interface ICompanyRepository {
    */
   deleteById(id: string): Promise<boolean>;
 
+  /**
+   * Finds a company associated with a specific user ID.
+   * Assumes a user belongs to at most one company in this context.
+   * @param userId The unique ID of the user.
+   * @returns A promise that resolves to the Company object or null if not found.
+   */
+  findByUserId(userId: string): Promise<Company | null>;
+  /**
+   * Finds all companies associated with a specific user ID.
+   * @param userId The unique ID of the user.
+   * @returns A promise that resolves to an array of Company objects.
+   */
+  findAllByUserId(userId: string): Promise<Company[]>;
+
+
+
+
   // Add other methods as needed, e.g., findByName, listAll, etc.
 }
