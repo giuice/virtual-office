@@ -39,47 +39,57 @@
 Key Definitions:
 2Ad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/authcontext.tsx
 2Ad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/contexts/companycontext.tsx
+2Ae4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/hooks/useprotectedroute.ts
 2Af1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/api.ts
+2Af6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/messaging-api.ts
 2Ag1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/accept-invite.tsx
-2Ai2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/database.ts
-3Afa11: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/users.ts
-3Afa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/companies.ts
-3Afa4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/conversations.ts
-3Afa6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/invitations.ts
-3Afa8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/dynamo/messages.ts
+2Aj1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/types/auth.ts
 3Afb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts
-3Aga1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/setup-dynamo-tables.ts
+3Aib2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/interfaces/icompanyrepository.ts
+3Aib4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/interfaces/iinvitationrepository.ts
+3Aib8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/interfaces/iuserrepository.ts
+4Aaab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx
+4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
+4Agaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/auth/signup.ts
 4Agac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts
 4Agac2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/create.ts
-4Agad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/get.ts
-5Aacab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
-5Aacba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/create/route.ts
-5Aacbe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/typing/route.ts
+4Agad2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/spaces/delete.ts
+4Aiaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabaseannouncementrepository.ts
+4Aiaa2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabasecompanyrepository.ts
+4Aiaa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabaseconversationrepository.ts
+4Aiaa5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabasemeetingnoterepository.ts
+4Aiaa8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabaseuserrepository.ts
+5Aacbb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/get/route.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Ad1, 2Ad2, 2Af1, 2Ag1, 2Ai2, 3Afa3, 3Afa4, 3Afa6, 3Afa8, 3Afa11, 3Afb1, 3Aga1, 4Agac1, 4Agac2, 4Agad1, 5Aacab1, 5Aacba1, 5Aacbe1
-last_GRID_edit: Applied suggestion: 2Ai2 -> 4Agad1 (s)
+last_KEY_edit: Assigned keys: 2Ad1, 2Ad2, 2Ae4, 2Af1, 2Af6, 2Ag1, 2Aj1, 3Afb1, 3Aib2, 3Aib4, 3Aib8, 4Aaab1, 4Aaac1, 4Agaa1, 4Agac1, 4Agac2, 4Agad2, 4Aiaa1, 4Aiaa2, 4Aiaa3, 4Aiaa5, 4Aiaa8, 5Aacbb1
+last_GRID_edit: Applied suggestion: 2Aj1 -> 2Ae4 (s)
 
 ---GRID_START---
-X 2Ad1 2Ad2 2Af1 2Ag1 2Ai2 3Afa3 3Afa4 3Afa6 3Afa8 3Afa11 3Afb1 3Aga1 4Agac1 4Agac2 4Agad1 5Aacab1 5Aacba1 5Aacbe1
-2Ad1 = oS3p6Spsp4s
-2Ad2 = SospSssppsSpSssp3
-2Af1 = Ssop9ssSs3
-2Ag1 = Sppop8sp4s
-2Ai2 = pSppos3SsSsspsp3
-3Afa3 = psppsoS4pSs3p3
-3Afa4 = psppsSoS3ps6p
-3Afa6 = p4sSSoSSpSs3p3
-3Afa8 = p4S4oSpsspspsp
-3Afa11 = psppsS4opSs3p3
-3Afb1 = SSppSp5opsp5
-3Aga1 = p4sSsSsSposSSp3
-4Agac1 = sSs10oSSs3
-4Agac2 = psspps3pspSSospps
-4Agad1 = psSps6pSSsosps
-5Aacab1 = ppsp3sp5spsoSS
-5Aacba1 = ppsp3spsp3sppSoS
-5Aacbe1 = spssp8s3SSo
+X 2Ad1 2Ad2 2Ae4 2Af1 2Af6 2Ag1 2Aj1 3Afb1 3Aib2 3Aib4 3Aib8 4Aaab1 4Aaac1 4Agaa1 4Agac1 4Agac2 4Agad2 4Aiaa1 4Aiaa2 4Aiaa3 4Aiaa5 4Aiaa8 5Aacbb1
+2Ad1 = oSsSpS3p3SSpsp8
+2Ad2 = SossppSSspSsps4p4sp
+2Ae4 = ssoppssp4SSppsp7
+2Af1 = SspospspspSpps3Sssppsp
+2Af6 = p3sop9sppspSppS
+2Ag1 = Spspposp4SSpssp7
+2Aj1 = SSsspsoSppSsspspsp4sp
+3Afb1 = SSp4Soppsp3sp8
+3Aib2 = pspsp4oSSp3s4SssSp
+3Aib4 = p8SoSp3Ss4pspp
+3Aib8 = pSpSppSsSSop3Ss3SssSp
+4Aaab1 = SsSppSsp4oSppsp7
+4Aaac1 = SpSppSsp4Sopssp7
+4Agaa1 = pspsp9ossp7
+4Agac1 = ssps6SSpssoSSs6
+4Agac2 = ps3pspps6Sospsppss
+4Agad2 = pspSppsps3p3Ssop6
+4Aiaa1 = p3ssp3s3p3sppoS5
+4Aiaa2 = p3sp4SsSp3sspSoS3p
+4Aiaa3 = p4Sp3spsp3sppSSoS3
+4Aiaa5 = p8s3p3sppS3oss
+4Aiaa8 = pspsppspSpSp3sspS3sop
+5Aacbb1 = p4Sp9sspSpSspo
 ---GRID_END---
 
 ---mini_tracker_end---

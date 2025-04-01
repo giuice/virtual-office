@@ -64,11 +64,11 @@ Key Definitions:
 ---KEY_DEFINITIONS_END---
 
 last_KEY_edit: Assigned keys: 2Aa3, 2Ab3, 3Aab1, 3Aba1, 3Aba2, 3Aba4, 3Aba5, 3Abb4, 3Abb5, 3Abb8, 3Abb10, 3Abb11, 3Abb15, 3Abb16, 3Abe2, 3Abf17, 4Aaaa1, 4Aaab1, 4Aaac1, 4Aabc1, 4Aabd1, 4Aabe1, 5Aabba1, 5Aabba2
-last_GRID_edit: Applied suggestion: 3Abf17 -> 3Abb15 (S)
+last_GRID_edit: Applied suggestion: 2Aa3 -> 4Aabd1 (s)
 
 ---GRID_START---
 X 2Aa3 2Ab3 3Aab1 3Aba1 3Aba2 3Aba4 3Aba5 3Abb4 3Abb5 3Abb8 3Abb10 3Abb11 3Abb15 3Abb16 3Abe2 3Abf17 4Aaaa1 4Aaab1 4Aaac1 4Aabc1 4Aabd1 4Aabe1 5Aabba1 5Aabba2
-2Aa3 = ops18Ssps
+2Aa3 = ops20ps
 2Ab3 = pop12Sp4Spspp
 3Aab1 = spopsp9spSSssSspp
 3Aba1 = sppoSsSsSSs3SpsS3pSs3
@@ -88,7 +88,7 @@ X 2Aa3 2Ab3 3Aab1 3Aba1 3Aba2 3Aba4 3Aba5 3Abb4 3Abb5 3Abb8 3Abb10 3Abb11 3Abb15
 4Aaab1 = spS3pSs5psppSoSpSsSs
 4Aaac1 = spsSSpSs7ppSSopSs3
 4Aabc1 = sSsp4s7Sp4osspp
-4Aabd1 = SpS3sS3s6pS3sosSS
+4Aabd1 = spS3sS3s6pS3sosSS
 4Aabe1 = s21oss
 5Aabba1 = p3sS5ssSssppsSspSsoS
 5Aabba2 = sppsSssSSsS4ps4pSsSo

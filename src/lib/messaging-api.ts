@@ -222,7 +222,7 @@ export const messagingApi = {
       // Assuming DELETE method or a flag in body distinguishes removal.
       // Let's try DELETE first, adjust if backend expects differently.
       const response = await fetch('/api/messages/react', {
-        method: 'DELETE', // Assuming DELETE removes a reaction
+        method: 'POST', // Backend handles add/remove logic via POST based on current state
         headers: {
           'Content-Type': 'application/json',
         },

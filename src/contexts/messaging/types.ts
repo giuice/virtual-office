@@ -6,9 +6,9 @@ import {
   ConversationType,
   MessageType,
   MessageStatus,
-  MessageDraft,
-  MessageAttachment,
-  PaginationOptions
+  // MessageDraft, // Removed - Does not exist in @/types/messaging
+  FileAttachment,
+  // PaginationOptions // Removed - Does not exist in @/types/messaging
 } from '@/types/messaging';
 
 // Define the context type
@@ -32,20 +32,20 @@ export interface MessagingContextType {
   loadMoreMessages: () => Promise<void>;
   sendMessage: (content: string, options?: {
     replyToId?: string;
-    attachments?: MessageAttachment[];
+    attachments?: FileAttachment[];
     type?: MessageType;
   }) => Promise<void>;
   
-  // Message drafts
-  messageDrafts: Record<string, MessageDraft>;
-  updateMessageDraft: (conversationId: string, content: string) => void;
+  // Message drafts (Removed - Type 'MessageDraft' not defined)
+  // messageDrafts: Record<string, MessageDraft>;
+  // updateMessageDraft: (conversationId: string, content: string) => void;
   
   // Typing indicators
   typingUsers: Record<string, string[]>; // conversationId -> userIds
   sendTypingIndicator: (conversationId: string) => void;
   
   // Attachments
-  uploadAttachment: (file: File) => Promise<MessageAttachment>;
+  uploadAttachment: (file: File) => Promise<FileAttachment>;
   
   // Reactions
   addReaction: (messageId: string, emoji: string) => Promise<void>;

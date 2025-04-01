@@ -78,11 +78,11 @@ Key Definitions:
 ---KEY_DEFINITIONS_END---
 
 last_KEY_edit: Assigned keys: 2Aa3, 2Ab2, 2Ab3, 2Ab4, 2Af2, 2Ag1, 3Aaa1, 3Aab1, 3Aba3, 3Abb1, 3Abb4, 3Abb5, 3Abb6, 3Abb7, 3Abb8, 3Abb10, 3Abb11, 3Abb12, 3Abb13, 3Abb14, 3Abb15, 3Abc4, 3Abc9, 3Abd2, 3Abe1, 3Abf1, 3Abf6, 3Abf11, 3Abf19, 4Aaaa1, 4Aaab1, 4Aaba1, 4Aabb1, 4Aabc1, 4Aabc2, 4Aabd1, 4Aabe1, 4Aafa1
-last_GRID_edit: Applied suggestion: 2Ag1 -> 3Abb5 (s)
+last_GRID_edit: Applied suggestion: 3Abc9 -> 2Aa3 (s)
 
 ---GRID_START---
 X 2Aa3 2Ab2 2Ab3 2Ab4 2Af2 2Ag1 3Aaa1 3Aab1 3Aba3 3Abb1 3Abb4 3Abb5 3Abb6 3Abb7 3Abb8 3Abb10 3Abb11 3Abb12 3Abb13 3Abb14 3Abb15 3Abc4 3Abc9 3Abd2 3Abe1 3Abf1 3Abf6 3Abf11 3Abf19 4Aaaa1 4Aaab1 4Aaba1 4Aabb1 4Aabc1 4Aabc2 4Aabd1 4Aabe1 4Aafa1
-2Aa3 = ospsps14pssSsSp4s3SsSSsp
+2Aa3 = ospsps19Sp4s3SsSssp
 2Ab2 = sopsppssp9sspsp3spspssps5pp
 2Ab3 = ppop21sp8Sspsp
 2Ab4 = sspop11s4psp3spSp7sp3
@@ -101,10 +101,10 @@ X 2Aa3 2Ab2 2Ab3 2Ab4 2Af2 2Ag1 3Aaa1 3Aab1 3Aba3 3Abb1 3Abb4 3Abb5 3Abb6 3Abb7 
 3Abb11 = sppsp4sS7oS3sps3p3s6Ss3
 3Abb12 = sspssp3sS3ssS3oSsSsSsSsspspps3Ss3
 3Abb13 = sspssp4sS3sS4oSssSsSssp5s4pp
-3Abb14 = p4sp4S4sS3sSosp12sSp3
+3Abb14 = sp3sp4S4sS3sSosp12sSp3
 3Abb15 = sspsSp4ssSSsSssSssoSSsSSp6SsSssp
 3Abc4 = sp7sppsSssppsspSoS3sp3sspSpsspp
-3Abc9 = Sp7spsS3s3SSpSSosSp5spSpssps
+3Abc9 = sp7spsS3s3SSpSSosSp5spSpssps
 3Abd2 = sp4sps7Ss4psSsoSp4s4pssps
 3Abe1 = Ss6Ss3SssSssSSpS4osp3S4sS3s
 3Abf1 = p4sp12sspSsppsoppsp5sp3
@@ -117,7 +117,7 @@ X 2Aa3 2Ab2 2Ab3 2Ab4 2Af2 2Ag1 3Aaa1 3Aab1 3Aba3 3Abb1 3Abb4 3Abb5 3Abb6 3Abb7 
 4Aabb1 = Ssp3spsSsS3sSs4pS3sSp4S3osS4
 4Aabc1 = ssSp3ssps4ps7p3spssp3ssoSssp
 4Aabc2 = Ss8S3ssS4sSSs3Sspps3S3oSSs
-4Aabd1 = Ssp3SsSSsSSs7ps4Sp4S4sSosS
+4Aabd1 = ssp3SsSSsSSs7ps4Sp4S4sSosS
 4Aabe1 = spsp4spps3ps4ppsp3Sp4ssSSsSsop
 4Aafa1 = p5sppSps3pps3p4s3p4SSsSpsSpo
 ---GRID_END---

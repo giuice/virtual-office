@@ -1,3 +1,14 @@
+## 2025-04-01 (Continued)
+
+*   **Refactor:** Resolved duplicate `MessagingContext` issue. Updated `src/app/layout.tsx` to use the modular provider (`src/contexts/messaging/MessagingContext.tsx`). Removed the outdated provider (`src/contexts/MessagingContext.tsx`).
+*   **Refactor:** Moved messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) from `src/contexts/messaging/` to `src/hooks/` for better project structure and adherence to conventions. Updated import paths in `src/contexts/messaging/MessagingContext.tsx`.
+*   **Refactor:** Cleaned up type imports in `src/contexts/messaging/types.ts` and `src/contexts/messaging/MessagingContext.tsx`. Removed unused `MessageDraft` type and related logic.
+*   **Fix:** Corrected `removeReaction` function in `src/lib/messaging-api.ts` to use `POST` method instead of `DELETE` to align with backend API implementation.
+*   **Integration:** Uncommented API calls within messaging hooks (`useMessages`, `useConversations`, `useSocketEvents`) to integrate frontend logic with the refactored backend API endpoints via `messagingApi`.
+
+---
+
+
 ## 2025-04-01
 
 *   **Refactor:** Updated `src/app/api/messages/create/route.ts` to use `IMessageRepository` and `IConversationRepository`, replacing mock data logic. Adjusted type imports to use `@/types/messaging`.

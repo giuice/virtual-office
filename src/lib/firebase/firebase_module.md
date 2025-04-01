@@ -38,20 +38,22 @@
 ---KEY_DEFINITIONS_START---
 Key Definitions:
 3Afb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/firebase/config.ts
+3Aib8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/interfaces/iuserrepository.ts
 4Agac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/invitations/accept.ts
-5Aacbc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/messages/react/route.ts
-5Agaea1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/pages/api/users/[id]/index.ts
+5Aacaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/archive/route.ts
+5Aacab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/api/conversations/create/route.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 3Afb1, 4Agac1, 5Aacbc1, 5Agaea1
-last_GRID_edit: Applied suggestion: 5Agaea1 -> 4Agac1 (S)
+last_KEY_edit: Assigned keys: 3Afb1, 3Aib8, 4Agac1, 5Aacaa1, 5Aacab1
+last_GRID_edit: Applied suggestion: 3Aib8 -> 4Agac1 (S)
 
 ---GRID_START---
-X 3Afb1 4Agac1 5Aacbc1 5Agaea1
-3Afb1 = os3
-4Agac1 = soSS
-5Aacbc1 = sSoS
-5Agaea1 = sSSo
+X 3Afb1 3Aib8 4Agac1 5Aacaa1 5Aacab1
+3Afb1 = os4
+3Aib8 = soSss
+4Agac1 = sSoSS
+5Aacaa1 = ssSoS
+5Aacab1 = ssSSo
 ---GRID_END---
 
 ---mini_tracker_end---

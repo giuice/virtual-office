@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
-import { MessagingProvider } from '@/contexts/MessagingContext'; // Import MessagingProvider
+import { MessagingProvider } from '@/contexts/messaging/MessagingContext'; // Use the modular provider
 import { ThemeProvider } from '@/providers/theme-provider';
 import { Toaster } from 'sonner';
 import './globals.css';

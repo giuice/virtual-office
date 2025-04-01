@@ -5,13 +5,13 @@ import { createContext, useContext, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   MessageType, 
-  MessageAttachment, 
-  MessageDraft
+  FileAttachment, // Corrected name
+  // MessageDraft // Removed import
 } from '@/types/messaging';
 import { MessagingContextType } from './types';
-import { useConversations } from './useConversations';
-import { useMessages } from './useMessages';
-import { useSocketEvents } from './useSocketEvents';
+import { useConversations } from '@/hooks/useConversations'; // Updated path
+import { useMessages } from '@/hooks/useMessages'; // Updated path
+import { useSocketEvents } from '@/hooks/useSocketEvents'; // Updated path
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
@@ -36,34 +36,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     conversationsManager.updateConversationWithMessage
   );
   
-  // State for message drafts
-  const [messageDrafts, setMessageDrafts] = useState<Record<string, MessageDraft>>({});
-  
-  // Function to update message draft
-  const updateMessageDraft = useCallback((conversationId: string, content: string) => {
-    setMessageDrafts(prev => ({
-      ...prev,
-      [conversationId]: {
-        conversationId,
-        content,
-      },
-    }));
-  }, []);
-  
+  // Removed message draft state and function
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
-    attachments?: MessageAttachment[];
+    attachments?: FileAttachment[]; // Corrected type name
     type?: MessageType;
   }) => {
     if (!activeConversation) return;
     
     // Clear draft
-    updateMessageDraft(activeConversation.id, '');
+    // updateMessageDraft(activeConversation.id, ''); // Removed draft clearing
     
     // Send the message
     await messagesManager.sendMessage(content, options);
-  }, [activeConversation, messagesManager.sendMessage, updateMessageDraft]);
+  }, [activeConversation, messagesManager.sendMessage]); // Removed updateMessageDraft from dependencies
   
   // Create context value by combining all the hooks
   const value: MessagingContextType = {
@@ -93,9 +80,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
     
-    // Message drafts
-    messageDrafts,
-    updateMessageDraft,
+    // Removed message drafts from context value
     
     // Typing indicators (from socketManager)
     typingUsers: {},  // This is managed internally in useSocketEvents
