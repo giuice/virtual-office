@@ -5,13 +5,16 @@ import { Reservation } from '@/types/database';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 function mapToCamelCase(data: any): Reservation {
+  if (!data) return data; // Handle null/undefined input
   return {
     id: data.id,
+    spaceId: data.space_id, // Added mapping
     userId: data.user_id,
     userName: data.user_name,
     startTime: data.start_time,
     endTime: data.end_time,
-    purpose: data.purpose
+    purpose: data.purpose,
+    createdAt: data.created_at // Added mapping
   };
 }
 
@@ -89,13 +92,16 @@ export class SupabaseSpaceReservationRepository implements ISpaceReservationRepo
     };
   }
 
+  // Note: Omit now includes spaceId as it's part of the type but set here
   async create(reservationData: Omit<Reservation, 'id' | 'createdAt'>): Promise<Reservation> {
     const dbData = {
+      space_id: reservationData.spaceId, // Added mapping
       user_id: reservationData.userId,
       user_name: reservationData.userName,
       start_time: reservationData.startTime,
       end_time: reservationData.endTime,
       purpose: reservationData.purpose
+      // created_at is handled by Supabase default value
     };
 
     const { data, error } = await supabase

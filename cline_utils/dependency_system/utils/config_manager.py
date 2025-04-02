@@ -3,6 +3,7 @@ Configuration module for dependency tracking system.
 Handles reading and writing configuration settings.
 """
 
+import glob
 import os
 import json
 from typing import Dict, List, Any, Optional, Union
@@ -112,9 +113,29 @@ DEFAULT_CONFIG = {
         "backups_dir": "cline_docs/backups",
     },
     "excluded_paths": [
-
-    ]
+        "src/node_modules",
+        "src/client/node_modules"
+    ],
+    "allowed_dependency_chars": ['<', '>', 'x', 'd', 's', 'S'],
+    "excluded_file_patterns": [ # <-- ADDED SECTION
+        "*_module.md",
+        "implementation_plan_*.md",
+        "*_task.md" # Future task file pattern (to be confirmed)
+    ]              # <-- END ADDED SECTION
 }
+
+# Define character priorities (Higher number = higher priority) - Centralized definition
+# Conforms to the existing convention in dependency_suggester.py
+CHARACTER_PRIORITIES = {
+    'x': 5,
+    '<': 4, '>': 4,
+    'S': 3,
+    's': 2, 'd': 2,
+    'n': 1, 'p': 1, 'o': 1,
+    '-': 0, # Placeholder_char (Assign lowest numeric priority > 0)
+    ' ': 0  # Empty_char
+}
+DEFAULT_PRIORITY = 0 # Default for unknown characters (lowest priority)
 
 class ConfigManager:
     """
@@ -169,8 +190,8 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("config_data",
-                key_func=lambda self: f"config:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
+        # @cached("config_data",
+        #         key_func=lambda self: f"config:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
         def _get_config(self) -> Dict[str, Any]:
             if self._config is None:
                 self._load_config()
@@ -188,8 +209,8 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("config_path",
-                key_func=lambda self: f"config_path:{normalize_path(get_project_root())}")
+        # @cached("config_path",
+        #         key_func=lambda self: f"config_path:{normalize_path(get_project_root())}")
         def _get_config_path(self) -> str:
             if self._config_path is None:
                 project_root = get_project_root()
@@ -255,8 +276,8 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("excluded_dirs",
-                key_func=lambda self: f"excluded_dirs:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
+        # @cached("excluded_dirs",
+        #         key_func=lambda self: f"excluded_dirs:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
         def _get_excluded_dirs(self) -> List[str]:
             return self.config.get("excluded_dirs", DEFAULT_CONFIG["excluded_dirs"])
 
@@ -271,12 +292,48 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("excluded_extensions",
-                key_func=lambda self: f"excluded_extensions:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
+        # @cached("excluded_extensions",
+        #         key_func=lambda self: f"excluded_extensions:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
         def _get_excluded_extensions(self) -> List[str]:
             return self.config.get("excluded_extensions", DEFAULT_CONFIG["excluded_extensions"])
 
         return _get_excluded_extensions(self)
+
+    def get_excluded_paths(self) -> List[str]:
+        """
+        Get list of excluded paths from configuration.
+        
+        Returns:
+            List of excluded path patterns or absolute paths
+        """
+        from .cache_manager import cached
+
+        # @cached("excluded_paths",
+        #         key_func=lambda self: f"excluded_paths:{os.path.getmtime(self.config_path) if os.path.exists(self.config_path) else 'missing'}")
+        def _get_excluded_paths(self) -> List[str]:
+            # Retrieve excluded_paths from config, defaulting to DEFAULT_CONFIG value
+            excluded_paths_config = self.config.get("excluded_paths", DEFAULT_CONFIG["excluded_paths"])
+            excluded_file_patterns = self.config.get("excluded_file_patterns", DEFAULT_CONFIG.get("excluded_file_patterns", [])) # Get file patterns, default to empty list if not set
+            
+            excluded_paths = []
+            project_root = get_project_root()
+
+            # 1. Explicitly excluded paths
+            excluded_paths.extend([normalize_path(os.path.join(project_root, p)) if not os.path.isabs(p) else normalize_path(p)
+                                     for p in excluded_paths_config])
+
+            # 2. Paths from excluded file patterns
+            for pattern in excluded_file_patterns:
+                # Construct the full pattern relative to the project root
+                full_pattern = normalize_path(os.path.join(project_root, '**', pattern)) # Use '**' for recursion
+                # Use glob with recursive=True to find matching paths
+                matching_paths = glob.glob(full_pattern, recursive=True)
+                excluded_paths.extend([normalize_path(p) for p in matching_paths])
+
+            return excluded_paths
+
+        return _get_excluded_paths(self)
+
 
     def get_threshold(self, threshold_type: str) -> float:
         """
@@ -330,8 +387,8 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("code_roots",
-                key_func=lambda self: f"code_roots:{os.path.getmtime(os.path.join(get_project_root(), '.clinerules')) if os.path.exists(os.path.join(get_project_root(), '.clinerules')) else 'missing'}")
+        # @cached("code_roots",
+        #         key_func=lambda self: f"code_roots:{os.path.getmtime(os.path.join(get_project_root(), '.clinerules')) if os.path.exists(os.path.join(get_project_root(), '.clinerules')) else 'missing'}")
         def _get_code_root_directories(self) -> List[str]:
             clinerules_path = os.path.join(get_project_root(), ".clinerules")
             code_root_dirs = []
@@ -364,8 +421,8 @@ class ConfigManager:
         """
         from .cache_manager import cached
 
-        @cached("doc_dirs",
-                key_func=lambda self: f"doc_dirs:{os.path.getmtime(os.path.join(get_project_root(), '.clinerules')) if os.path.exists(os.path.join(get_project_root(), '.clinerules')) else 'missing'}")
+        # @cached("doc_dirs",
+        #         key_func=lambda self: f"doc_dirs:{os.path.getmtime(os.path.join(get_project_root(), '.clinerules')) if os.path.exists(os.path.join(get_project_root(), '.clinerules')) else 'missing'}")
         def _get_doc_directories(self) -> List[str]:
             clinerules_path = os.path.join(get_project_root(), ".clinerules")
             doc_dirs = []
@@ -388,6 +445,11 @@ class ConfigManager:
             return [normalize_path(d) for d in doc_dirs]
 
         return _get_doc_directories(self)
+
+    def get_allowed_dependency_chars(self) -> List[str]:
+        """Get the allowed dependency characters from configuration."""
+        # Correctly fetch from the config dictionary, falling back to default
+        return self.config.get("allowed_dependency_chars", DEFAULT_CONFIG["allowed_dependency_chars"])
 
     def update_config(self, updates: Dict[str, Any]) -> bool:
         """
@@ -430,3 +492,17 @@ class ConfigManager:
         """
         self._config = DEFAULT_CONFIG.copy()
         return self._save_config()
+
+    def get_char_priority(self, char: str) -> int:
+        """
+        Get the priority tier for a given dependency character.
+        Higher numbers indicate higher priority.
+
+        Args:
+            char: The dependency character.
+
+        Returns:
+            The priority tier (integer).
+        """
+        # Uses the centrally defined dictionary
+        return CHARACTER_PRIORITIES.get(char, DEFAULT_PRIORITY)

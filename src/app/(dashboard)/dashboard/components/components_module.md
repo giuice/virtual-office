@@ -37,81 +37,71 @@
 
 ---KEY_DEFINITIONS_START---
 Key Definitions:
-2Aa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/layout.tsx
 2Ab2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/nav.tsx
-2Ab4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/theme-toggle.tsx
 3Aba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-members.tsx
+3Aba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-settings.tsx
 3Aba4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/message-feed.tsx
 3Aba5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/user-profile.tsx
-3Abb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floorplancanvas.tsx
+3Abb4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floor-plan.tsx
+3Abb5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/index.tsx
+3Abb8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx
+3Abb9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-management.tsx
 3Abb10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-template-selector.tsx
+3Abb11: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-templates.tsx
 3Abb12: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-tooltip.tsx
-3Abb13: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/types.ts
-3Abb14: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/types.tsx
 3Abb15: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-avatar.tsx
 3Abb16: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-hover-card.tsx
-3Abb6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/message-dialog.tsx
-3Abb8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx
-3Abc10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/room-messaging.tsx
-3Abc4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/messagelist.tsx
 3Abc6: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/conversation-list.tsx
 3Abc8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/message-feed.tsx
 3Abc9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/message-item.tsx
-3Abd2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/search/global-search.tsx
+3Abc10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/room-messaging.tsx
 3Abe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell/dashboard-header.tsx
-3Abf17: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/status-avatar.tsx
-3Abf18: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/switch.tsx
-3Abf3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/button.tsx
 3Abf4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/card.tsx
-4Aaaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/create-company/page.tsx
 4Aaab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx
-4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
 4Aaba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/company/page.tsx
-4Aabe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/settings/page.tsx
+4Aabb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/page.tsx
+4Aabc2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan/page.tsx
+4Aabd1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/office/page.tsx
 4Aafa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools/cleanup-companies/page.tsx
+5Aabba: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components
 5Aabba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components/companyoverviewcard.tsx
 5Aabba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components/quicklinksgrid.tsx
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Aa3, 2Ab2, 2Ab4, 3Aba1, 3Aba4, 3Aba5, 3Abb1, 3Abb6, 3Abb8, 3Abb10, 3Abb12, 3Abb13, 3Abb14, 3Abb15, 3Abb16, 3Abc4, 3Abc6, 3Abc8, 3Abc9, 3Abc10, 3Abd2, 3Abe1, 3Abf3, 3Abf4, 3Abf17, 3Abf18, 4Aaaa1, 4Aaab1, 4Aaac1, 4Aaba1, 4Aabe1, 4Aafa1, 5Aabba1, 5Aabba2
-last_GRID_edit: Applied suggestion: 3Abc9 -> 2Aa3 (s)
+last_KEY_edit: Assigned keys: 2Ab2, 3Aba1, 3Aba2, 3Aba4, 3Aba5, 3Abb4, 3Abb5, 3Abb8, 3Abb9, 3Abb10, 3Abb11, 3Abb12, 3Abb15, 3Abb16, 3Abc6, 3Abc8, 3Abc9, 3Abc10, 3Abe1, 3Abf4, 4Aaab1, 4Aaba1, 4Aabb1, 4Aabc2, 4Aabd1, 4Aafa1, 5Aabba, 5Aabba1, 5Aabba2
+last_GRID_edit: Applied suggestions (2025-04-02T12:01:33.797161)
 
 ---GRID_START---
-X 2Aa3 2Ab2 2Ab4 3Aba1 3Aba4 3Aba5 3Abb1 3Abb6 3Abb8 3Abb10 3Abb12 3Abb13 3Abb14 3Abb15 3Abb16 3Abc4 3Abc6 3Abc8 3Abc9 3Abc10 3Abd2 3Abe1 3Abf3 3Abf4 3Abf17 3Abf18 4Aaaa1 4Aaab1 4Aaac1 4Aaba1 4Aabe1 4Aafa1 5Aabba1 5Aabba2
-2Aa3 = os16SsSsSppsps5pps
-2Ab2 = sosp7sspssp4spspspssppsp3s
-2Ab4 = ssop6s3pssp4spssppsp7s
-3Aba1 = spposSsSSs3psSs6SppspS4sSss
-3Aba4 = sppsospssps3SSsS3spSpssp4sspSs
-3Aba5 = sppSsos6pS7sSpsSpS4sSSs
-3Abb1 = sppspsosS3sSsspsspSs4pssp5ss
-3Abb6 = sppSs3oSssppSsS5ssppsps3p4s
-3Abb8 = sppSssSSoS6sSSsS3pssps5pss
-3Abb10 = spsspsSsSoS3sspSSsSssps5psspsS
-3Abb12 = s6SsSSopsSSssS3sSssSsp6sS
-3Abb13 = s7pSSpoSsSssS3sSssSsp6sS
-3Abb14 = sp3spSpSSsSossp9Sp7ss
-3Abb15 = s4SSsSSsSssoS3sSssSssSp3spspsS
-3Abb16 = s3S3ssSsSSsSosS4sSssSs8S
-3Abc4 = sppssSpSspsspSsoS3sSSppsps3p4s
-3Abc6 = sppsSSsS3sspS3oS5pssps4pssS
-3Abc8 = SppsSSsS5psS3oSSsspssps4pssS
-3Abc9 = sppsSSpSssSSpS5oSsSppSppssppsps
-3Abc10 = Ss4S7psSsS3ossps7pssS
-3Abd2 = sppsps3Ss3pssSSs3oSp4s4psps
-3Abe1 = SssS3ssSsSSpS4sSsSopsSpS5ssS
-3Abf3 = ppsp3sp3sspssp7ospsp7s
-3Abf4 = pspps3ps4psspsspspssopSp6sS
-3Abf17 = sppssSps3S5s3SspSppop5spps
-3Abf18 = pssp3spps3ppsp4sppsSpop7s
-4Aaaa1 = sspSpSs4p4s4pssSp4oS3sSss
-4Aaab1 = sppSpSps3p4s7Sp4SoSSsSSs
-4Aaac1 = sppSpSpssp4s8Sp4SSoSsSss
-4Aaba1 = sspSsSppssp4spsspssSp4S3oSsSs
-4Aabe1 = spps3ppssp3ssp6Sppsps3Sopss
-4Aafa1 = p3SpSp8sps6p4S3sposs
-5Aabba1 = p3sSSsps7psspspspsppsSsSssoS
-5Aabba2 = s9S3sSSsSSsSsSsSs8So
+X 2Ab2 3Aba1 3Aba2 3Aba4 3Aba5 3Abb4 3Abb5 3Abb8 3Abb9 3Abb10 3Abb11 3Abb12 3Abb15 3Abb16 3Abc6 3Abc8 3Abc9 3Abc10 3Abe1 3Abf4 4Aaab1 4Aaba1 4Aabb1 4Aabc2 4Aabd1 4Aafa1 5Aabba 5Aabba1 5Aabba2
+2Ab2 = op10s3p3s3pssp5s
+3Aba1 = poSsSsS3s4Ss4SpS6pss
+3Aba2 = pSopS7ppsSSsSSpS6pSS
+3Aba4 = pspospSsp3sS5sSspsSSsppSs
+3Aba5 = pSSsosSs3psS7sS6pSs
+3Abb4 = psSpsoS6sS3pSsp3sSSppSS
+3Abb5 = pS5oS12pssS3ppSS
+3Abb8 = pSSssSSoS8sSSs4Ssppss
+3Abb9 = pSSpsS3oS3sS3pSsp3sSsspSS
+3Abb10 = psSpsS4oSSssSSsSs5SsppsS
+3Abb11 = psSppS5oSssSSpSssppsSsppSS
+3Abb12 = sspssS6oSSsS4sppsSp3sS
+3Abb15 = sspSSsSSs3SoSSsSsSsppsSp3sS
+3Abb16 = sSsS6ssSSoS5s3SSsspsS
+3Abc6 = psS9sSSoS4s4SsspsS
+3Abc8 = psS10sSSoSSs5SSspsS
+3Abc9 = pssSSpSspspS5oSSpsp4spps
+3Abc10 = ssSsS8sS4os5SsspsS
+3Abe1 = sS4sSSs3S4sSsosS5spsS
+3Abf4 = sppssppsps7pssoppsSp3sS
+4Aaab1 = pSSpSpsspsp3s5SpoSSsSSpSs
+4Aaba1 = sSSsSpsspsp3s3psSpSoS3spSs
+4Aabb1 = sS4sSs6SsspsSsSSoSSspSS
+4Aabc2 = pS15pS3sSSoSppSS
+4Aabd1 = pSSsS3s4ppssSpsSpS4oSpSS
+4Aafa1 = pSSpSp3sp4s6pSsspSopss
+5Aabba = p26opp
+5Aabba1 = psS5sSsSs5ps3S5spoS
+5Aabba2 = ssSssSSsS8sS3ssS3spSo
 ---GRID_END---
 
 ---mini_tracker_end---

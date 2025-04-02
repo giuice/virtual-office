@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple, Optional
 
 # Import only from utils
 from cline_utils.dependency_system.utils.cache_manager import cached, invalidate_dependent_entries, clear_all_caches
+from cline_utils.dependency_system.utils.config_manager import ConfigManager
 from .key_manager import validate_key
 
 import logging
@@ -44,7 +45,7 @@ def compress(s: str) -> str:
         return s
     return COMPRESSION_PATTERN.sub(lambda m: m.group(1) + str(len(m.group())), s)
 
-@cached("grid_decompress", key_func=lambda s: f"decompress:{s}")
+#@cached("grid_decompress", key_func=lambda s: f"decompress:{s}")
 def decompress(s: str) -> str:
     """
     Decompress a Run-Length Encoded dependency string with caching.
@@ -169,18 +170,48 @@ def set_char_at(s: str, index: int, new_char: str) -> str:
     return compress(decompressed)
 
 #@cached("grid_validation",
+# Add near top of dependency_grid.py if not already present
+# import logging # Assume logger is already initialized
+from .key_manager import sort_keys # Ensure this import is present
+
+# Ensure logger is initialized in the module
+# logger = logging.getLogger(__name__) # Should already exist
+
+#@cached("grid_validation", # Caching needs careful review if inputs change frequently or if side effects (logging) matter
 #        key_func=lambda grid, keys: f"validate_grid:{hash(str(sorted(grid.items())))}:{':'.join(keys)}")
 def validate_grid(grid: Dict[str, str], keys: List[str]) -> bool:
     """
-    Validate a dependency grid for consistency with keys.
+    Validate a dependency grid for consistency with keys. Ensures keys are sorted
+    using key_manager.sort_keys for diagonal check and provides detailed logging.
     Args:
         grid: Dictionary mapping keys to compressed dependency strings
-        keys: List of keys in the grid
+        keys: List of keys expected in the grid (will be sorted internally)
     Returns:
         True if valid, False otherwise
     """
-    missing_keys = set(keys) - set(grid.keys())
-    if missing_keys:
+    if not isinstance(grid, dict):
+        logger.error("Grid validation failed: 'grid' argument is not a dictionary.")
+        return False
+    if not isinstance(keys, list):
+        logger.error("Grid validation failed: 'keys' argument is not a list.")
+        return False
+
+    try:
+        # Ensure we work with a sorted list internally for index consistency
+        sorted_keys_list = sort_keys(keys)
+    except Exception as e:
+        logger.error(f"Grid validation failed: Error sorting keys - {e}")
+        return False
+
+    num_keys = len(sorted_keys_list)
+
+    # 1. Check if all expected keys are present as rows in the grid
+    expected_keys_set = set(sorted_keys_list)
+    actual_grid_keys_set = set(grid.keys())
+
+    missing_rows = expected_keys_set - actual_grid_keys_set
+    if missing_rows:
+        logger.error(f"Grid validation failed: Missing grid rows for keys: {sorted(list(missing_rows))}")
         return False
 
     expected_length = len(keys)
@@ -190,7 +221,8 @@ def validate_grid(grid: Dict[str, str], keys: List[str]) -> bool:
             return False
         if decompressed[keys.index(key)] != DIAGONAL_CHAR:
             return False
-    #dependencies = [_cache_key_for_grid('validate_grid', grid, keys)]
+
+    logger.debug("Grid validation successful.")
     return True
 
 def add_dependency_to_grid(grid: Dict[str, str], source_key: str, target_key: str,
@@ -223,7 +255,7 @@ def add_dependency_to_grid(grid: Dict[str, str], source_key: str, target_key: st
     new_grid[source_key] = compress(new_row)
 
     # Invalidate cached decompress for the modified row
-    invalidate_dependent_entries('tracker', f"decompress:{new_grid.get(source_key)}")
+    invalidate_dependent_entries('grid_decompress', f"decompress:{new_grid.get(source_key)}")
     # Invalidate cached grid validation.  Use new_grid!
     #invalidate_dependent_entries('tracker', _cache_key_for_grid('validate_grid', new_grid, keys))
     return new_grid
@@ -259,40 +291,67 @@ def remove_dependency_from_grid(grid: Dict[str, str], source_key: str, target_ke
     invalidate_dependent_entries('grid_validation', f"validate_grid:{hash(str(sorted(new_grid.items())))}:{':'.join(keys)}")
     return new_grid
 
-@cached("grid_dependencies",
-        key_func=lambda grid, key, keys, direction="outgoing":
-        f"dependencies:{hash(str(sorted(grid.items())))}:{key}:{direction}")
-def get_dependencies_from_grid(grid: Dict[str, str], key: str, keys: List[str],
-                              direction: str = "outgoing") -> List[str]:
+from collections import defaultdict # <<< ADD IMPORT
+
+# Remove caching for now as the return type and logic are changing significantly
+# @cached("grid_dependencies", ...)
+def get_dependencies_from_grid(grid: Dict[str, str], key: str, keys: List[str]) -> Dict[str, List[str]]:
     """
-    Get dependencies for a specific key in the grid.
+    Get dependencies for a specific key, categorized by relationship type.
 
     Args:
         grid: Dictionary mapping keys to compressed dependency strings
         key: Key to get dependencies for
-        keys: List of keys for index mapping
-        direction: 'outgoing' for dependencies this key has, 'incoming' for keys that depend on this
+        keys: List of keys for index mapping (MUST be in canonical sort order)
 
     Returns:
-        List of dependent keys
+        Dictionary mapping dependency characters ('<', '>', 'x', 'd', 's', 'S', 'p')
+        to lists of related keys.
     """
     if key not in keys:
         raise ValueError(f"Key {key} not in keys list")
 
-    dependencies = []
+    results = defaultdict(set)
     key_idx = keys.index(key)
+    defined_dep_chars = {'<', '>', 'x', 'd', 's', 'S'} # Characters indicating a defined relationship
 
-    if direction == "outgoing":
-        row = decompress(grid.get(key, PLACEHOLDER_CHAR * len(keys)))  # Uses cached decompress
-        for i, char in enumerate(row):
-            if i != key_idx and char not in (EMPTY_CHAR, PLACEHOLDER_CHAR):
-                dependencies.append(keys[i])
-    else:  # incoming
-        for row_key in keys:
-            row = decompress(grid.get(row_key, PLACEHOLDER_CHAR * len(keys)))  # Uses cached decompress
-            if row[key_idx] not in (EMPTY_CHAR, PLACEHOLDER_CHAR, DIAGONAL_CHAR):
-                dependencies.append(row_key)
-    return dependencies
+    for i, other_key in enumerate(keys):
+        if key == other_key:
+            continue # Skip self
+
+        # Determine the relationship character in both directions
+        char_outgoing = EMPTY_CHAR # Default if row missing
+        row_key_compressed = grid.get(key)
+        if row_key_compressed:
+            try:
+                char_outgoing = get_char_at(row_key_compressed, i)
+            except IndexError: pass # Ignore if index out of bounds for this row
+
+        # Categorize based on characters (prioritize defined relationships over placeholders)
+        # Note: Symmetric checks ('x', 'd', 's', 'S') list the other key if *either* direction shows the char.
+        # Directional checks ('>', '<') only consider the specific direction.
+        # Placeholders ('p') are only listed if neither direction has a defined relationship.
+
+        if char_outgoing == 'x':
+            results['x'].add(other_key)
+        elif char_outgoing == 'd':
+             results['d'].add(other_key)
+        elif char_outgoing == 'S':
+             results['S'].add(other_key)
+        elif char_outgoing == 's':
+             results['s'].add(other_key)
+        # Directional check AFTER symmetric checks
+        elif char_outgoing == '>':
+             results['>'].add(other_key)
+        elif char_outgoing == '<':
+             results['<'].add(other_key)             
+        # Placeholder check LAST - only if no defined relationship exists in EITHER direction
+        elif char_outgoing not in defined_dep_chars:
+             if char_outgoing == 'p':
+                 results['p'].add(other_key)
+
+    # Convert sets to lists for the final output
+    return {k: list(v) for k, v in results.items()}
 
 def format_grid_for_display(grid: Dict[str, str], keys: List[str]) -> str:
     """

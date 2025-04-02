@@ -1,7 +1,33 @@
 // src/repositories/implementations/supabase/SupabaseUserRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
-import { User } from '@/types/database';
+import { User, UserRole, UserStatus, TimeStampType } from '@/types/database'; // Import necessary types
+
+// Helper function to map DB snake_case to TS camelCase
+function mapToCamelCase(data: any): User {
+  if (!data) return data;
+  return {
+    id: data.id,
+    companyId: data.company_id,
+    firebase_uid: data.firebase_uid, // Keep snake_case if type uses it, or map if needed
+    email: data.email,
+    displayName: data.display_name,
+    avatarUrl: data.avatar_url,
+    status: data.status as UserStatus,
+    statusMessage: data.status_message,
+    preferences: data.preferences || {}, // Ensure object exists
+    role: data.role as UserRole,
+    lastActive: data.last_active, // Assuming TimeStampType compatibility
+    createdAt: data.created_at   // Assuming TimeStampType compatibility
+  };
+}
+
+// Helper function to map an array
+function mapArrayToCamelCase(dataArray: any[]): User[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapToCamelCase(item));
+}
+
 
 export class SupabaseUserRepository implements IUserRepository {
   private TABLE_NAME = 'users'; // Ensure this matches your Supabase table name
@@ -17,7 +43,8 @@ export class SupabaseUserRepository implements IUserRepository {
       console.error('Error fetching user by ID:', error);
       throw error; // Or handle more gracefully
     }
-    return data as User | null;
+    // Map DB response
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -31,7 +58,8 @@ export class SupabaseUserRepository implements IUserRepository {
       console.error('Error fetching user by email:', error);
       throw error;
     }
-    return data as User | null;
+    // Map DB response
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByFirebaseUid(firebaseUid: string): Promise<User | null> {
@@ -46,7 +74,8 @@ export class SupabaseUserRepository implements IUserRepository {
       console.error('Error fetching user by Firebase UID:', error);
       throw error;
     }
-    return data as User | null;
+    // Map DB response
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByCompany(companyId: string): Promise<User[]> {
@@ -60,14 +89,13 @@ export class SupabaseUserRepository implements IUserRepository {
       console.error('Error fetching users by company:', error);
       throw error;
     }
-    return (data as User[]) || [];
+    // Map DB response array
+    return mapArrayToCamelCase(data || []);
   }
 
-  // Note: The input type matches the interface.
-  // Supabase handles default values (like created_at) if defined in the schema.
-  // Ensure the input `userData` aligns with the table columns (snake_case).
+  // Note: Input type uses camelCase, map to snake_case for DB.
   async create(userData: Omit<User, 'id' | 'createdAt' | 'lastActive'>): Promise<User> {
-     // Map camelCase fields from User type to snake_case for DB if necessary
+     // Map camelCase fields from User type to snake_case for DB
      const dbData = {
         company_id: userData.companyId,
         email: userData.email,
@@ -75,9 +103,10 @@ export class SupabaseUserRepository implements IUserRepository {
         avatar_url: userData.avatarUrl,
         status: userData.status,
         status_message: userData.statusMessage,
-        preferences: userData.preferences,
+        preferences: userData.preferences || {}, // Ensure object exists
         role: userData.role,
-        firebase_uid: userData.firebase_uid, // Ensure this is passed from API
+        firebase_uid: userData.firebase_uid, // Assuming type has firebase_uid
+        // last_active and created_at handled by Supabase defaults
      };
 
     const { data, error } = await supabase
@@ -90,21 +119,21 @@ export class SupabaseUserRepository implements IUserRepository {
       console.error('Error creating user:', error);
       throw error || new Error('Failed to create user or retrieve created data.');
     }
-    // Map snake_case from DB back to camelCase for User type if necessary
-    // For simplicity, assuming direct mapping works or types/schema match casing
-    return data as User;
+    // Map snake_case from DB back to camelCase for User type
+    return mapToCamelCase(data);
   }
 
-  async update(id: string, updates: Partial<User>): Promise<User | null> {
-     // Map camelCase fields from User type to snake_case for DB if necessary
-     // Exclude fields that shouldn't be updated directly (id, createdAt)
-     const { id: _, createdAt: __, companyId, displayName, avatarUrl, statusMessage, lastActive, ...restUpdates } = updates;
-     const dbUpdates: Record<string, any> = { ...restUpdates }; // Start with fields that match casing
+  async update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>): Promise<User | null> {
+     // Map camelCase fields from User type to snake_case for DB
+     // Exclude fields that shouldn't be updated directly (id, createdAt, lastActive)
+     const { companyId, displayName, avatarUrl, statusMessage, firebase_uid, ...restUpdates } = updates; // email, status, preferences, role
+     const dbUpdates: Record<string, any> = { ...restUpdates };
 
      if (companyId !== undefined) dbUpdates.company_id = companyId;
      if (displayName !== undefined) dbUpdates.display_name = displayName;
      if (avatarUrl !== undefined) dbUpdates.avatar_url = avatarUrl;
      if (statusMessage !== undefined) dbUpdates.status_message = statusMessage;
+     if (firebase_uid !== undefined) dbUpdates.firebase_uid = firebase_uid; // Allow updating firebase_uid if needed
      // Update last_active automatically on any update
      dbUpdates.last_active = new Date().toISOString();
 
@@ -122,8 +151,8 @@ export class SupabaseUserRepository implements IUserRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // Map snake_case from DB back to camelCase for User type if necessary
-    return data as User | null; // Returns null if row wasn't found to update
+    // Map snake_case from DB back to camelCase for User type
+    return data ? mapToCamelCase(data) : null; // Returns null if row wasn't found to update
   }
 
   async deleteById(id: string): Promise<boolean> {

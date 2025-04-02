@@ -37,61 +37,35 @@
 
 ---KEY_DEFINITIONS_START---
 Key Definitions:
-2Aa3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/layout.tsx
-2Ab3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell.tsx
-3Aab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/layout.tsx
-3Aba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-members.tsx
 3Aba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-settings.tsx
-3Aba4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/message-feed.tsx
-3Aba5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/user-profile.tsx
-3Abb10: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-template-selector.tsx
-3Abb11: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-templates.tsx
-3Abb15: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-avatar.tsx
-3Abb16: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/user-hover-card.tsx
-3Abb4: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/floor-plan.tsx
-3Abb5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/index.tsx
 3Abb8: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/floor-plan/room-dialog.tsx
+3Abe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell/dashboard-header.tsx
 3Abe2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/shell/dashboard-shell.tsx
-3Abf17: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/ui/status-avatar.tsx
-4Aaaa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/create-company/page.tsx
-4Aaab1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/login/page.tsx
-4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
+4Aaba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/company/page.tsx
+4Aabb1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/page.tsx
 4Aabc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan/layout.tsx
+4Aabc2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/floor-plan/page.tsx
 4Aabd1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/office/page.tsx
+4Aabe: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/settings
 4Aabe1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/settings/page.tsx
-5Aabba1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components/companyoverviewcard.tsx
-5Aabba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(dashboard)/dashboard/components/quicklinksgrid.tsx
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Aa3, 2Ab3, 3Aab1, 3Aba1, 3Aba2, 3Aba4, 3Aba5, 3Abb4, 3Abb5, 3Abb8, 3Abb10, 3Abb11, 3Abb15, 3Abb16, 3Abe2, 3Abf17, 4Aaaa1, 4Aaab1, 4Aaac1, 4Aabc1, 4Aabd1, 4Aabe1, 5Aabba1, 5Aabba2
-last_GRID_edit: Applied suggestion: 2Aa3 -> 4Aabd1 (s)
+last_KEY_edit: Assigned keys: 3Aba2, 3Abb8, 3Abe1, 3Abe2, 4Aaba1, 4Aabb1, 4Aabc1, 4Aabc2, 4Aabd1, 4Aabe, 4Aabe1
+last_GRID_edit: Applied suggestions (2025-04-02T12:01:39.860972)
 
 ---GRID_START---
-X 2Aa3 2Ab3 3Aab1 3Aba1 3Aba2 3Aba4 3Aba5 3Abb4 3Abb5 3Abb8 3Abb10 3Abb11 3Abb15 3Abb16 3Abe2 3Abf17 4Aaaa1 4Aaab1 4Aaac1 4Aabc1 4Aabd1 4Aabe1 5Aabba1 5Aabba2
-2Aa3 = ops20ps
-2Ab3 = pop12Sp4Spspp
-3Aab1 = spopsp9spSSssSspp
-3Aba1 = sppoSsSsSSs3SpsS3pSs3
-3Aba2 = spsSosS6psppS3pSsSS
-3Aba4 = sppssossSs3SSpsp4ssSs
-3Aba5 = sppSSsosSs3SSpS4pSsSs
-3Abb4 = sppsSssoS4sSps5SsSS
-3Abb5 = sppS5oS5ps5SsSS
-3Abb8 = sppSSssSSoS4ps9
-3Abb10 = sppsSssS3oSssps8S
-3Abb11 = sppsSssS4ossps7SS
-3Abb15 = sppspSSsSSssoSpSpps5S
-3Abb16 = sppSsS5ssSosSs7S
-3Abe2 = sSsp10sopsppSsspp
-3Abf17 = sppspsSs5SSpop5sps
-4Aaaa1 = spS3pSs5psspoSSpSs3
-4Aaab1 = spS3pSs5psppSoSpSsSs
-4Aaac1 = spsSSpSs7ppSSopSs3
-4Aabc1 = sSsp4s7Sp4osspp
-4Aabd1 = spS3sS3s6pS3sosSS
-4Aabe1 = s21oss
-5Aabba1 = p3sS5ssSssppsSspSsoS
-5Aabba2 = sppsSssSSsS4ps4pSsSo
+X 3Aba2 3Abb8 3Abe1 3Abe2 4Aaba1 4Aabb1 4Aabc1 4Aabc2 4Aabd1 4Aabe 4Aabe1
+3Aba2 = oSSpSSpSSps
+3Abb8 = SoSppssSsps
+3Abe1 = SSoS3sSSpS
+3Abe2 = ppSosS3sps
+4Aaba1 = SpSsoSpSSpS
+4Aabb1 = SsS3osSSpS
+4Aabc1 = pssSpsoSsps
+4Aabc2 = S7oSpS
+4Aabd1 = SsSsSSsSops
+4Aabe = p9op
+4Aabe1 = ssSsSSsSspo
 ---GRID_END---
 
 ---mini_tracker_end---

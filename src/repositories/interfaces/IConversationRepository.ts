@@ -60,10 +60,13 @@ export interface IConversationRepository {
    * Updates the timestamp of the last message in the conversation.
    * Should typically be called when a new message is added.
    * @param id The unique ID of the conversation.
-   * @param lastMessageTimestamp The ISO timestamp string of the latest message.
+   * Updates the last activity timestamp of the conversation.
+   * Should typically be called when a new message is added or activity occurs.
+   * @param id The unique ID of the conversation.
+   * @param timestamp Optional ISO timestamp string. Defaults to current time if omitted.
    * @returns A promise that resolves to the updated Conversation object or null if not found.
    */
-   updateLastMessageTimestamp(id: string, lastMessageTimestamp: string): Promise<Conversation | null>;
+   updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null>;
 
   /**
    * Increments the unread count for specified participants in a conversation.

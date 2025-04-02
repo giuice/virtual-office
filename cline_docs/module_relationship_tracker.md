@@ -62,21 +62,21 @@ Key Definitions:
 ---KEY_DEFINITIONS_END---
 
 last_KEY_edit: Assigned keys: 1A, 2Aa, 2Ab, 2Ac, 2Ad, 2Ae, 2Af, 2Ag, 2Ah, 2Ai, 2Aj, 3Aaa, 3Aab, 3Aac, 3Aad, 3Aae, 3Aaf, 3Aba, 3Abb, 3Abc, 3Abd, 3Abe, 3Abf, 3Ada, 3Afa, 3Afb, 3Afc, 3Aga, 3Aia, 3Aib, 4Aaaa, 4Aaab, 4Aaac, 4Aaba, 4Aabb, 4Aabc, 4Aabd, 4Aabe, 4Aaca, 4Aacb, 4Aafa, 4Agaa, 4Agab, 4Agac, 4Agad, 4Agae, 4Aiaa, 5Aabba, 5Aacaa, 5Aacab, 5Aacac, 5Aacad, 5Aacba, 5Aacbb, 5Aacbc, 5Aacbd, 5Aacbe, 5Agaea
-last_GRID_edit: Applied suggestion: 2Aj -> 1A (s)
+last_GRID_edit: Applied suggestions (2025-04-02T12:03:12.260313)
 
 ---GRID_START---
 X 1A 2Aa 2Ab 2Ac 2Ad 2Ae 2Af 2Ag 2Ah 2Ai 2Aj 3Aaa 3Aab 3Aac 3Aad 3Aae 3Aaf 3Aba 3Abb 3Abc 3Abd 3Abe 3Abf 3Ada 3Afa 3Afb 3Afc 3Aga 3Aia 3Aib 4Aaaa 4Aaab 4Aaac 4Aaba 4Aabb 4Aabc 4Aabd 4Aabe 4Aaca 4Aacb 4Aafa 4Agaa 4Agab 4Agac 4Agad 4Agae 4Aiaa 5Aabba 5Aacaa 5Aacab 5Aacac 5Aacad 5Aacba 5Aacbb 5Aacbc 5Aacbd 5Aacbe 5Agaea
 1A = op57
-2Aa = sop56
-2Ab = spop55
+2Aa = soSpS4pSSp47
+2Ab = sSopS3spsSp47
 2Ac = xppop54
-2Ad = Sp3op53
-2Ae = sp4op52
-2Af = xp5op51
-2Ag = sp6op50
+2Ad = S3poS3pSSp47
+2Ae = sSSpSoSspSsp47
+2Af = xSSpSSoSpSSp47
+2Ag = sSspSsSopSSp47
 2Ah = sp7op49
-2Ai = sp8op48
-2Aj = sp9op47
+2Ai = sSspS4poSp47
+2Aj = sSSpSsSSpSop47
 3Aaa = sp10op46
 3Aab = sp11op45
 3Aac = sp12op44

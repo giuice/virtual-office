@@ -1,8 +1,30 @@
 // src/repositories/implementations/supabase/SupabaseAnnouncementRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { IAnnouncementRepository } from '@/repositories/interfaces/IAnnouncementRepository';
-import { Announcement } from '@/types/database';
+import { Announcement, TimeStampType } from '@/types/database'; // Import TimeStampType if needed
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+
+// Helper function to map DB snake_case to TS camelCase
+function mapToCamelCase(data: any): Announcement {
+  if (!data) return data;
+  return {
+    id: data.id,
+    companyId: data.company_id,
+    title: data.title,
+    content: data.content,
+    postedBy: data.posted_by,
+    timestamp: data.timestamp, // Assuming TimeStampType compatibility
+    expiration: data.expiration,
+    priority: data.priority
+  };
+}
+
+// Helper function to map an array
+function mapArrayToCamelCase(dataArray: any[]): Announcement[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapToCamelCase(item));
+}
+
 
 export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
   private TABLE_NAME = 'announcements'; // Ensure this matches your Supabase table name
@@ -18,8 +40,8 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
       console.error('Error fetching announcement by ID:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Announcement type (camelCase) if needed
-    return data as Announcement | null;
+    // Map DB response (snake_case) to Announcement type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByCompany(companyId: string, options?: PaginationOptions): Promise<PaginatedResult<Announcement>> {
@@ -40,10 +62,9 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
       throw error;
     }
 
-    const items = (data as Announcement[]) || [];
+    // Map DB response array
+    const items = mapArrayToCamelCase(data || []);
     const nextCursor = items.length === limit ? to + 1 : null;
-
-    // TODO: Map DB response array if needed
 
     return {
       items: items,
@@ -54,13 +75,13 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
   }
 
   async create(announcementData: Omit<Announcement, 'id' | 'timestamp'>): Promise<Announcement> {
-    // TODO: Map Announcement type (camelCase) to DB schema (snake_case) if needed
+    // Map Announcement type (camelCase) to DB schema (snake_case)
     const dbData = {
-        company_id: announcementData.companyId, // Assuming snake_case
+        company_id: announcementData.companyId,
         title: announcementData.title,
         content: announcementData.content,
-        posted_by: announcementData.postedBy, // Assuming snake_case
-        expiration: announcementData.expiration, // Assuming timestamp type
+        posted_by: announcementData.postedBy,
+        expiration: announcementData.expiration,
         priority: announcementData.priority,
         // timestamp handled by Supabase default value
     };
@@ -75,13 +96,14 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
       console.error('Error creating announcement:', error);
       throw error || new Error('Failed to create announcement or retrieve created data.');
     }
-    // TODO: Map DB response back to Announcement type if needed
-    return data as Announcement;
+    // Map DB response back to Announcement type
+    return mapToCamelCase(data);
   }
 
-  async update(id: string, updates: Partial<Omit<Announcement, 'id' | 'timestamp' | 'companyId' | 'userId'>>): Promise<Announcement | null> {
-     // TODO: Map updates if needed (e.g., postedBy to posted_by)
-     const { postedBy, ...restUpdates } = updates;
+  // Note: companyId cannot be updated. postedBy is the correct field to map.
+  async update(id: string, updates: Partial<Omit<Announcement, 'id' | 'timestamp' | 'companyId'>>): Promise<Announcement | null> {
+     // Map updates from camelCase to snake_case
+     const { postedBy, ...restUpdates } = updates; // title, content, expiration, priority
      const dbUpdates: Record<string, any> = { ...restUpdates };
      if (postedBy !== undefined) dbUpdates.posted_by = postedBy;
 
@@ -97,8 +119,8 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // TODO: Map DB response back to Announcement type if needed
-    return data as Announcement | null;
+    // Map DB response back to Announcement type
+    return data ? mapToCamelCase(data) : null;
   }
 
   async deleteById(id: string): Promise<boolean> {

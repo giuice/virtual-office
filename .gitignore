@@ -49,3 +49,5 @@ next-env.d.ts
 
 # dependency tracking
 /cline_docs/backups
+/cline_utils
+cline_utils

@@ -1,8 +1,33 @@
 // src/repositories/implementations/supabase/SupabaseConversationRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
-import { Conversation } from '@/types/messaging';
+import { Conversation, ConversationType } from '@/types/messaging'; // Assuming ConversationType is needed
+import { TimeStampType } from '@/types/database'; // Assuming timestamps match
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+
+// Helper function to map DB snake_case to TS camelCase
+// Note: Adjust based on the actual Conversation type definition in @/types/messaging
+function mapToCamelCase(data: any): Conversation {
+  if (!data) return data;
+  return {
+    id: data.id,
+    type: data.type as ConversationType, // Cast if needed
+    participants: data.participants || [],
+    lastActivity: data.last_activity, // Map last_activity
+    name: data.name,
+    isArchived: data.is_archived, // Map is_archived
+    unreadCount: data.unread_count || {}, // Map unread_count, ensure object
+    roomId: data.room_id // Map room_id
+    // createdAt is in the DB but not in the Conversation type from @/types/messaging
+  };
+}
+
+// Helper function to map an array
+function mapArrayToCamelCase(dataArray: any[]): Conversation[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapToCamelCase(item));
+}
+
 
 export class SupabaseConversationRepository implements IConversationRepository {
   private TABLE_NAME = 'conversations'; // Ensure this matches your Supabase table name
@@ -18,8 +43,8 @@ export class SupabaseConversationRepository implements IConversationRepository {
       console.error('Error fetching conversation by ID:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Conversation type (camelCase) if needed
-    return data as Conversation | null;
+    // Map DB response (snake_case) to Conversation type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByUser(userId: string, options?: PaginationOptions): Promise<PaginatedResult<Conversation>> {
@@ -42,10 +67,9 @@ export class SupabaseConversationRepository implements IConversationRepository {
       throw error;
     }
 
-    const items = (data as Conversation[]) || [];
+    // Map DB response array
+    const items = mapArrayToCamelCase(data || []);
     const nextCursor = items.length === limit ? to + 1 : null; // Calculate next cursor/offset
-
-    // TODO: Map DB response array if needed (snake_case to camelCase)
 
     return {
       items: items,
@@ -55,16 +79,17 @@ export class SupabaseConversationRepository implements IConversationRepository {
     };
   }
 
-  async create(conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'>): Promise<Conversation> {
-     // TODO: Map Conversation type (camelCase) to DB schema (snake_case) if needed
+  // Assuming Conversation type has camelCase properties corresponding to snake_case DB columns
+  async create(conversationData: Omit<Conversation, 'id' | 'createdAt' | 'lastActivity' | 'unreadCount' /* Adjust Omit based on actual type */>): Promise<Conversation> {
+     // Map Conversation type (camelCase) to DB schema (snake_case)
      const dbData = {
         type: conversationData.type,
-        participants: conversationData.participants,
-        name: conversationData.name, // Optional field
-        is_archived: conversationData.isArchived, // Assuming snake_case
-        room_id: conversationData.roomId, // Assuming snake_case
-        // last_activity, created_at, updated_at handled by Supabase defaults/triggers
-        // unread_count initialized by default or trigger
+        participants: conversationData.participants || [],
+        name: conversationData.name,
+        is_archived: conversationData.isArchived || false, // Default if not provided
+        room_id: conversationData.roomId,
+        // last_activity, created_at handled by Supabase defaults/triggers
+        // unread_count initialized by default or trigger (or should be set explicitly if needed)
      };
 
     const { data, error } = await supabase
@@ -77,14 +102,14 @@ export class SupabaseConversationRepository implements IConversationRepository {
       console.error('Error creating conversation:', error);
       throw error || new Error('Failed to create conversation or retrieve created data.');
     }
-     // TODO: Map DB response back to Conversation type if needed
-    return data as Conversation;
+     // Map DB response back to Conversation type
+    return mapToCamelCase(data);
   }
 
+  // Assuming only 'name' is updatable via this general method per interface
   async update(id: string, updates: Partial<Pick<Conversation, 'name'>>): Promise<Conversation | null> {
-    // Only allowing 'name' update for now based on interface correction
-    // TODO: Map updates if needed (e.g., name to name)
-    const dbUpdates = { ...updates };
+    // Map updates from camelCase to snake_case (only 'name' here)
+    const dbUpdates = { ...updates }; // 'name' matches DB column name
 
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
@@ -98,8 +123,8 @@ export class SupabaseConversationRepository implements IConversationRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // TODO: Map DB response back to Conversation type if needed
-    return data as Conversation | null;
+    // Map DB response back to Conversation type
+    return data ? mapToCamelCase(data) : null;
   }
 
   async deleteById(id: string): Promise<boolean> {
@@ -129,8 +154,8 @@ export class SupabaseConversationRepository implements IConversationRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // TODO: Map DB response back to Conversation type if needed
-    return data as Conversation | null;
+    // Map DB response back to Conversation type
+    return data ? mapToCamelCase(data) : null;
   }
 
   async markAsRead(id: string, userId: string): Promise<boolean> {
@@ -158,14 +183,13 @@ export class SupabaseConversationRepository implements IConversationRepository {
     // This is generally not recommended for counters.
   }
 
-  async updateLastMessageTimestamp(id: string, lastMessageTimestamp: string): Promise<Conversation | null> {
-     // Assuming snake_case column 'last_message_timestamp'
-     // Also update 'last_activity' at the same time
+  async updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null> {
+     // Update 'last_activity' timestamp. If no specific timestamp is provided, use current time.
+     const activityTimestamp = timestamp || new Date().toISOString();
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
       .update({
-          last_message_timestamp: lastMessageTimestamp,
-          last_activity: new Date().toISOString() // Update general activity timestamp too
+          last_activity: activityTimestamp
        })
       .eq('id', id)
       .select()
@@ -176,8 +200,8 @@ export class SupabaseConversationRepository implements IConversationRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // TODO: Map DB response back to Conversation type if needed
-    return data as Conversation | null;
+    // Map DB response back to Conversation type
+    return data ? mapToCamelCase(data) : null;
   }
 
   async incrementUnreadCount(id: string, userIdsToIncrement: string[]): Promise<boolean> {

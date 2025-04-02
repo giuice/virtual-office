@@ -1,7 +1,26 @@
 // src/repositories/implementations/supabase/SupabaseCompanyRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { ICompanyRepository } from '@/repositories/interfaces/ICompanyRepository';
-import { Company } from '@/types/database';
+import { Company, TimeStampType } from '@/types/database'; // Import TimeStampType if needed
+
+// Helper function to map DB snake_case to TS camelCase
+function mapToCamelCase(data: any): Company {
+  if (!data) return data;
+  return {
+    id: data.id,
+    name: data.name,
+    adminIds: data.admin_ids || [], // Ensure array exists
+    createdAt: data.created_at, // Assuming TimeStampType compatibility
+    settings: data.settings || {} // Ensure object exists
+  };
+}
+
+// Helper function to map an array
+function mapArrayToCamelCase(dataArray: any[]): Company[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapToCamelCase(item));
+}
+
 
 export class SupabaseCompanyRepository implements ICompanyRepository {
   private TABLE_NAME = 'companies'; // Ensure this matches your Supabase table name
@@ -17,16 +36,16 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
       console.error('Error fetching company by ID:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Company type (camelCase) if needed
-    return data as Company | null;
+    // Map DB response (snake_case) to Company type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
   async create(companyData: Omit<Company, 'id' | 'createdAt'>): Promise<Company> {
-    // TODO: Map Company type (camelCase) to DB schema (snake_case) if needed
+    // Map Company type (camelCase) to DB schema (snake_case)
     const dbData = {
         name: companyData.name,
-        admin_ids: companyData.adminIds, // Assuming snake_case in DB
-        settings: companyData.settings,
+        admin_ids: companyData.adminIds || [], // Ensure array exists
+        settings: companyData.settings || {}, // Ensure object exists
         // created_at is handled by Supabase default value
     };
 
@@ -40,15 +59,16 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
       console.error('Error creating company:', error);
       throw error || new Error('Failed to create company or retrieve created data.');
     }
-    // TODO: Map DB response (snake_case) back to Company type (camelCase) if needed
-    return data as Company;
+    // Map DB response (snake_case) back to Company type (camelCase)
+    return mapToCamelCase(data);
   }
 
   async update(id: string, updates: Partial<Omit<Company, 'id' | 'createdAt'>>): Promise<Company | null> {
-    // TODO: Map Company type (camelCase) to DB schema (snake_case) if needed
-    const { adminIds, ...restUpdates } = updates;
+    // Map Company type (camelCase) to DB schema (snake_case)
+    const { adminIds, settings, ...restUpdates } = updates; // name
     const dbUpdates: Record<string, any> = { ...restUpdates };
     if (adminIds !== undefined) dbUpdates.admin_ids = adminIds;
+    if (settings !== undefined) dbUpdates.settings = settings;
 
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
@@ -62,8 +82,8 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
       if (error.code === 'PGRST116') return null; // Row not found is not an error for update
       throw error;
     }
-    // TODO: Map DB response (snake_case) back to Company type (camelCase) if needed
-    return data as Company | null;
+    // Map DB response (snake_case) back to Company type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
   async deleteById(id: string): Promise<boolean> {
@@ -93,8 +113,8 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
           throw error;
       }
     }
-    // TODO: Map DB response (snake_case) to Company type (camelCase) if needed
-    return data as Company | null;
+    // Map DB response (snake_case) to Company type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findAllByUserId(userId: string): Promise<Company[]> {
@@ -107,10 +127,8 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
       console.error('Error fetching companies by user ID:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Company type (camelCase) if needed
-    return (data || []) as Company[];
-
-
+    // Map DB response (snake_case) to Company type (camelCase)
+    return mapArrayToCamelCase(data || []);
   }
 
 

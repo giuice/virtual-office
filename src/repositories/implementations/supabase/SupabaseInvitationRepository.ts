@@ -1,7 +1,31 @@
 // src/repositories/implementations/supabase/SupabaseInvitationRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { IInvitationRepository } from '@/repositories/interfaces/IInvitationRepository';
-import { Invitation } from '@/types/database';
+import { Invitation, UserRole } from '@/types/database'; // Import UserRole if needed
+
+// Helper function to map DB snake_case to TS camelCase
+// Handles timestamp conversions
+function mapToCamelCase(data: any): Invitation {
+  if (!data) return data;
+  return {
+    token: data.token,
+    email: data.email,
+    companyId: data.company_id,
+    role: data.role as UserRole, // Cast if needed
+    // Convert TIMESTAMPTZ from DB to Unix timestamp (number) for expiresAt
+    expiresAt: data.expires_at ? new Date(data.expires_at).getTime() : 0, // Handle potential null/undefined, provide default
+    status: data.status as 'pending' | 'accepted' | 'expired', // Cast if needed
+    // Convert TIMESTAMPTZ from DB to ISO string for createdAt
+    createdAt: data.created_at ? new Date(data.created_at).toISOString() : '' // Handle potential null/undefined, provide default
+  };
+}
+
+// Helper function to map an array (though likely not needed for this repo)
+// function mapArrayToCamelCase(dataArray: any[]): Invitation[] {
+//   if (!dataArray) return [];
+//   return dataArray.map(item => mapToCamelCase(item));
+// }
+
 
 export class SupabaseInvitationRepository implements IInvitationRepository {
   private TABLE_NAME = 'invitations'; // Ensure this matches your Supabase table name
@@ -17,18 +41,20 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       console.error('Error fetching invitation by token:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Invitation type (camelCase) if needed
-    return data as Invitation | null;
+    // Map DB response (snake_case) to Invitation type (camelCase)
+    return data ? mapToCamelCase(data) : null;
   }
 
+  // Note: Input type expects expiresAt as number (Unix timestamp)
   async create(invitationData: Omit<Invitation, 'createdAt' | 'status'>): Promise<Invitation> {
-    // TODO: Map Invitation type (camelCase) to DB schema (snake_case) if needed
+    // Map Invitation type (camelCase) to DB schema (snake_case)
+    // Convert expiresAt (number) to ISO string for Supabase TIMESTAMPTZ
     const dbData = {
         token: invitationData.token,
         email: invitationData.email,
-        company_id: invitationData.companyId, // Assuming snake_case
+        company_id: invitationData.companyId,
         role: invitationData.role,
-        expires_at: invitationData.expiresAt, // Assuming snake_case and number/timestamp type
+        expires_at: new Date(invitationData.expiresAt).toISOString(), // Convert number to ISO string
         status: 'pending', // Set initial status
         // created_at handled by Supabase default value
     };
@@ -43,8 +69,8 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       console.error('Error creating invitation:', error);
       throw error || new Error('Failed to create invitation or retrieve created data.');
     }
-    // TODO: Map DB response back to Invitation type if needed
-    return data as Invitation;
+    // Map DB response back to Invitation type
+    return mapToCamelCase(data);
   }
 
   async updateStatus(token: string, status: Invitation['status']): Promise<Invitation | null> {
@@ -60,8 +86,8 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       if (error.code === 'PGRST116') return null; // Row not found
       throw error;
     }
-    // TODO: Map DB response back to Invitation type if needed
-    return data as Invitation | null;
+    // Map DB response back to Invitation type
+    return data ? mapToCamelCase(data) : null;
   }
 
   // Optional: Implement deleteByToken if needed

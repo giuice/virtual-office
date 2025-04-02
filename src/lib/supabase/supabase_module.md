@@ -37,19 +37,17 @@
 
 ---KEY_DEFINITIONS_START---
 Key Definitions:
+3Afc: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/supabase
 3Afc1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/supabase/client.ts
-4Aiaa2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/supabasecompanyrepository.ts
-4Aiaa9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/repositories/implementations/supabase/index.ts
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 3Afc1, 4Aiaa2, 4Aiaa9
-last_GRID_edit: Applied suggestion: 4Aiaa9 -> 4Aiaa2 (s)
+last_KEY_edit: Assigned keys: 3Afc, 3Afc1
+last_GRID_edit: Grid structure updated (2025-04-02T12:02:43.062372)
 
 ---GRID_START---
-X 3Afc1 4Aiaa2 4Aiaa9
-3Afc1 = oss
-4Aiaa2 = sos
-4Aiaa9 = sso
+X 3Afc 3Afc1
+3Afc = op
+3Afc1 = po
 ---GRID_END---
 
 ---mini_tracker_end---

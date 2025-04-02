@@ -37,33 +37,21 @@
 
 ---KEY_DEFINITIONS_START---
 Key Definitions:
-2Af3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/lib/aws-config.ts
+3Aad: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/setup-aws
 3Aad1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/setup-aws/page.tsx
-3Aba2: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/company-settings.tsx
-3Aba3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/invite-user-dialog.tsx
-3Aba5: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/dashboard/user-profile.tsx
-3Abc3: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/messageinput.tsx
-3Abc7: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/message-composer.tsx
-3Abc9: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/components/messaging/message-item.tsx
+3Aae1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/test-aws/page.tsx
 4Aaac1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/(auth)/signup/page.tsx
-4Aafa1: f:/cursos2/react/collab-office-app-anthropic/virtual-office/src/app/tools/cleanup-companies/page.tsx
 ---KEY_DEFINITIONS_END---
 
-last_KEY_edit: Assigned keys: 2Af3, 3Aad1, 3Aba2, 3Aba3, 3Aba5, 3Abc3, 3Abc7, 3Abc9, 4Aaac1, 4Aafa1
-last_GRID_edit: Applied suggestion: 2Af3 -> 3Aad1 (s)
+last_KEY_edit: Assigned keys: 3Aad, 3Aad1, 3Aae1, 4Aaac1
+last_GRID_edit: Applied suggestions (2025-04-02T12:02:06.320300)
 
 ---GRID_START---
-X 2Af3 3Aad1 3Aba2 3Aba3 3Aba5 3Abc3 3Abc7 3Abc9 4Aaac1 4Aafa1
-2Af3 = osp8
-3Aad1 = sos8
-3Aba2 = psoSSs3SS
-3Aba3 = psSoSSssSS
-3Aba5 = psSSoSsS3
-3Abc3 = pssSSoSSss
-3Abc7 = ps4SoSsp
-3Abc9 = ps3S3oss
-4Aaac1 = psS3s3oS
-4Aafa1 = psS3spsSo
+X 3Aad 3Aad1 3Aae1 4Aaac1
+3Aad = op3
+3Aad1 = poSs
+3Aae1 = pSop
+4Aaac1 = pspo
 ---GRID_END---
 
 ---mini_tracker_end---

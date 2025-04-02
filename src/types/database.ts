@@ -71,11 +71,13 @@ export interface AccessControl {
 // Reservation for Spaces
 export interface Reservation {
   id: string;
+  spaceId: string; // Added: Link to the space being reserved
   userId: string; // User ID who made the reservation
   userName: string; // User name (denormalized for display)
   startTime: TimeStampType;
   endTime: TimeStampType;
   purpose?: string;
+  createdAt: TimeStampType; // Added: Timestamp of creation
 }
 
 // Space Collection (Replaces the simpler Room type)
