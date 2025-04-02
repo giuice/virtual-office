@@ -77,7 +77,7 @@ export class SupabaseUserRepository implements IUserRepository {
         status_message: userData.statusMessage,
         preferences: userData.preferences,
         role: userData.role,
-        // firebase_uid might be set separately or during auth linking
+        firebase_uid: userData.firebase_uid, // Ensure this is passed from API
      };
 
     const { data, error } = await supabase

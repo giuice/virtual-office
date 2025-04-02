@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { signIn, signInWithGoogle, user } = useAuth();
-  const { company, isLoading: companyLoading } = useCompany();
+  const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
   const { showSuccess, showError } = useNotification();
 
   // Check if the user is authenticated and redirect accordingly
@@ -26,13 +26,18 @@ export default function LoginPage() {
     if (!user || companyLoading) return;
 
     // If user is logged in but doesn't have a company, redirect to company creation
-    if (!company) {
+    if (!company || !currentUserProfile?.companyId) {
+      console.log('Redirecting to create-company...', { 
+        hasCompany: !!company, 
+        hasCompanyId: !!currentUserProfile?.companyId,
+        currentUserProfile
+      });
       router.push('/create-company');
     } else {
       // User has a company, redirect to office
       router.push('/office');
     }
-  }, [user, company, companyLoading, router]);
+  }, [user, company, companyLoading, router, currentUserProfile]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -16,10 +16,7 @@ import {
 } from 'lucide-react';
 import { QuickLinksGrid } from '@/app/(dashboard)/dashboard/components/QuickLinksGrid';
 import { CompanyOverviewCard } from '@/app/(dashboard)/dashboard/components/CompanyOverviewCard';
-import { useMessaging } from '@/contexts/MessagingContext'; // Import useMessaging
-import { useState } from 'react'; // Import useState
-import { Input } from '@/components/ui/input'; // Import Input
-import { MessageType, MessageStatus } from '@/types/messaging'; // Import enums
+
 
 export default function DashboardPage() {
   const { company, currentUserProfile, companyUsers } = useCompany();

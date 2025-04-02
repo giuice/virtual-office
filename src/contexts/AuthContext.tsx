@@ -33,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if user has a profile in the database
         const userProfile = await getUserByFirebaseId(user.uid);
         if (userProfile) {
-          // Update status
-          await updateUserStatus(user.uid, status);
+          // Update status using the Supabase User UUID, not the Firebase UID
+          await updateUserStatus(userProfile.id, status);
         }
       } catch (error) {
         console.error('Error updating user status:', error);
@@ -99,10 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         // Use the server-side API to create a new user
         await createUser({
-          id: user.uid,
+          firebase_uid: user.uid,
           email,
           displayName: displayName || '',
-          companyId: ''
+          status: 'online' as const
         });
 
         if (displayName) {
@@ -133,10 +133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!userProfile) {
           // Use the server-side API to create a new user
           await createUser({
-            id: result.user.uid,
+            firebase_uid: result.user.uid,
             email: result.user.email || '',
             displayName: result.user.displayName || '',
-            companyId: ''
+            status: 'online' as const
           });
         }
       }

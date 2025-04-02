@@ -24,20 +24,18 @@ export default async function handler(
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
-
   try {
     const spaceData: Partial<Space> = req.body;
 
     // Basic validation (expand as needed)
     if (!spaceData.name || !spaceData.type || !spaceData.companyId) {
-       return res.status(400).json({ message: 'Missing required fields: name, type, companyId' });
+      return res.status(400).json({ message: 'Missing required fields: name, type, companyId' });
     }
 
     // Add createdBy field (assuming it's needed and comes from auth)
     const dataToCreate = {
-        ...spaceData,
-        createdBy: authenticatedUserId, // Add creator ID
+      ...spaceData,
+      createdBy: authenticatedUserId, // Add creator ID
     };
 
     // Remove fields potentially added client-side but handled by DB/repo
@@ -45,15 +43,43 @@ export default async function handler(
     delete dataToCreate.createdAt;
     delete dataToCreate.updatedAt;
 
+    // Initialize repository
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
 
-    // Type assertion might be needed if create expects a more specific type
-    const newSpace = await spaceRepository.create(dataToCreate as Omit<Space, 'id' | 'createdAt' | 'updatedAt'>);
-
-    return res.status(201).json(newSpace);
-
-  } catch (error) {
-    console.error('Error creating space:', error);
-    // Add more specific error handling based on potential repository errors
-    return res.status(500).json({ message: 'Internal Server Error creating space' });
+    try {
+      // Type assertion might be needed if create expects a more specific type
+      const newSpace = await spaceRepository.create(dataToCreate as Omit<Space, 'id' | 'createdAt' | 'updatedAt'>);
+      return res.status(201).json(newSpace);
+    } catch (repoError: any) {
+      console.error('Repository error creating space:', repoError);
+      
+      // Check for Supabase-specific errors
+      if (repoError.code === 'PGRST301') {
+        return res.status(403).json({ message: 'Permission denied accessing Supabase' });
+      }
+      
+      if (repoError.message?.includes('authentication')) {
+        return res.status(401).json({ message: 'Supabase authentication error' });
+      }
+      
+      if (repoError.message?.includes('URL') || repoError.message?.includes('Key')) {
+        return res.status(500).json({ 
+          message: 'Supabase configuration error',
+          details: 'The server is missing required configuration. Please check environment variables.'
+        });
+      }
+      
+      // Generic repository error
+      return res.status(500).json({ 
+        message: 'Database error creating space',
+        details: repoError.message || 'Unknown repository error'
+      });
+    }
+  } catch (error: any) {
+    console.error('General error creating space:', error);
+    return res.status(500).json({ 
+      message: 'Internal Server Error creating space',
+      details: error.message || 'Unknown error' 
+    });
   }
 }

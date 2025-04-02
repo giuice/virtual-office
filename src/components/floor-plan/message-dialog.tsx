@@ -15,7 +15,7 @@ import {
 import { MessageSquare } from 'lucide-react'; // Removed Send icon
 // Removed avatar utils and StatusAvatar as they are handled elsewhere
 import { ChatWindow } from '@/components/messaging/ChatWindow'; // Import ChatWindow
-import { useMessaging } from '@/contexts/MessagingContext'; // Import useMessaging
+import { useMessaging } from '@/contexts/messaging/MessagingContext'; // Import useMessaging with correct path
 import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
 import { Message, MessageType, MessageStatus } from '@/types/messaging'; // Import messaging types
 
@@ -33,10 +33,10 @@ const generateDMConversationId = (userId1: string, userId2: string): string => {
 
 export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) {
   const { currentUserProfile } = useCompany();
-  const { messages: allMessages, sendMessage, isConnected } = useMessaging();
+  const { messages: allMessages, sendMessage, loadingMessages } = useMessaging();
   const [directMessages, setDirectMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Add loading state later
+  // No need for local isLoading state, use loadingMessages from context
 
   useEffect(() => {
     if (user && currentUserProfile) {
@@ -55,14 +55,11 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
   if (!user || !currentUserProfile || !conversationId) return null;
 
   const handleSendMessage = (content: string) => {
-    sendMessage({
-      conversationId: conversationId,
-      senderId: currentUserProfile.id,
-      content: content,
-      type: MessageType.TEXT,
-      status: MessageStatus.SENDING,
-      reactions: [],
-      isEdited: false,
+    if (!content.trim()) return;
+    
+    // Use the updated sendMessage API signature
+    sendMessage(content, {
+      type: MessageType.TEXT
     });
   };
 
@@ -76,7 +73,7 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
           conversationId={conversationId} // Pass the generated DM conversation ID
           messages={directMessages}
           onSendMessage={handleSendMessage}
-          isLoading={isLoading}
+          isLoading={loadingMessages}
           // TODO: Pass user.name or other details to ChatWindow header
         />
       </DialogContent>

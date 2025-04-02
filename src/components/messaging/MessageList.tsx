@@ -12,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"; // Import Popover components
-import { useMessaging } from '@/contexts/MessagingContext'; // Import useMessaging
+import { useMessaging } from '@/contexts/messaging/MessagingContext'; // Import useMessaging
 
 interface MessageListProps {
   messages: Message[];

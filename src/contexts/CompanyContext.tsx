@@ -38,6 +38,8 @@ interface CompanyContextType {
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
   removeUserFromCompany: (userId: string) => Promise<void>;
+  // Add loadCompanyData to the interface
+  loadCompanyData: (userId: string) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -57,35 +59,56 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // First, clean up any duplicate companies the user might have
-      try {
-        const { totalRemoved } = await cleanupDuplicateCompanies(userId);
-        if (totalRemoved > 0) {
-          console.log(`Cleaned up ${totalRemoved} duplicate companies for user ${userId}`);
-        }
-      } catch (cleanupError) {
-        console.error('Error cleaning up companies:', cleanupError);
-        // Continue with the rest of the process even if cleanup fails
-      }
+      // Removed the call to cleanupDuplicateCompanies as it was causing errors
+      // and its logic during login is questionable.
 
       // Get user profile
-      const userProfile = await getUserByFirebaseId(userId);
+      let userProfile = await getUserByFirebaseId(userId);
+
+      // If user doesn't exist in Supabase yet, create them now
+      if (!userProfile) {
+        console.log(`User ${userId} not found in Supabase, creating...`);
+        // We need the authenticated user object here to get email/displayName
+        // Assuming 'user' from useAuth() is accessible or passed differently.
+        // For now, let's assume 'user' from useAuth() is available in this scope
+        // Add explicit null check for user to satisfy TypeScript,
+        // although useEffect should prevent this block from running if user is null.
+        if (!user) {
+           console.error("loadCompanyData called for user creation, but user object is null. This indicates a logic error.");
+           throw new Error("Authenticated user data is unexpectedly null during profile creation.");
+        }
+        // Now TypeScript knows 'user' is not null here.
+        // because 'user' is included in the useCallback dependency array below.
+        // The useEffect ensures this code only runs when 'user' is truthy.
+        const createdProfile = await createUser({
+          firebase_uid: userId, // userId is the firebase uid passed to loadCompanyData
+          email: user.email || '',
+          displayName: user.displayName || 'User',
+          status: 'online' as const
+        });
+        // Fetch the newly created profile to ensure we have the Supabase ID etc.
+        userProfile = await getUserByFirebaseId(userId);
+        if (!userProfile) {
+           // This would be a critical error if creation seemed successful but fetch failed
+           throw new Error("Failed to fetch user profile immediately after creation.");
+        }
+        console.log(`User ${userId} created successfully.`);
+      }
+
+      // Set the profile state (either existing or newly created)
       setCurrentUserProfile(userProfile);
 
+      // Now check for company association and load company data if applicable
       if (userProfile?.companyId) {
-        // Get company details
+        console.log(`User ${userId} belongs to company ${userProfile.companyId}, loading company data...`);
         const companyData = await getCompany(userProfile.companyId);
         setCompany(companyData);
-
-        // Get company users
         const users = await getUsersByCompany(userProfile.companyId);
         setCompanyUsers(users);
-
-        // Get company spaces (rooms)
         const fetchedSpaces = await getSpacesByCompany(userProfile.companyId);
-        setSpaces(fetchedSpaces); // Set the spaces state
-
+        setSpaces(fetchedSpaces);
       } else {
+        console.log(`User ${userId} exists but has no company association.`);
         // Reset company-related state if user has no company
         setCompany(null);
         setCompanyUsers([]);
@@ -102,7 +125,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Empty dependency array as it uses userId passed as argument
+  }, [user]); // Add `user` to dependency array
 
   // Effect to trigger loading when auth user changes
   useEffect(() => {
@@ -139,76 +162,79 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         return existingProfile.companyId;
       }
 
-      // Create new company
-      const companyData: Omit<Company, 'id' | 'createdAt'> = {
-        name,
-        adminIds: [user.uid],
-        settings: {
-          allowGuestAccess: false,
-          maxRooms: 10,
-          theme: 'light',
-        },
+      // Define settings if needed (optional)
+      const settings = {
+        allowGuestAccess: false,
+        maxRooms: 10,
+        theme: 'light',
       };
 
-      // Use the API client to create the company
-      const companyId = await createCompany(companyData);
+      console.log('Creating new company:', name);
+      // Call the updated createCompany helper with specific arguments
+      const newCompany = await createCompany(name, user.uid, settings); // Pass name, firebaseUid, settings
+      const companyId = newCompany.id; // Get ID from the returned company object
+      console.log('New company created successfully with ID:', companyId);
 
       // Create or update user profile to link with company
       let userProfile = await getUserByFirebaseId(user.uid);
       
       if (!userProfile) {
         // Create new user profile
-        const userData = {
-          id: user.uid,
-          companyId,
+        console.log('Creating new user profile with company ID:', companyId);
+        // Call createUser directly with the correct arguments
+        await createUser({
+          firebase_uid: user.uid, // Use user.uid from Firebase Auth
           email: user.email || '',
           displayName: user.displayName || 'User',
-          avatarUrl: user.photoURL || undefined,
-          status: 'online' as const,
-          role: 'admin',
-          preferences: {
-            theme: 'light',
-            notifications: true,
-          },
-        };
-        
-        await createUser(userData);
+          status: 'online' as const, // Set initial status
+          companyId // Add companyId directly to the creation payload
+        });
         userProfile = await getUserByFirebaseId(user.uid);
       } else {
-        // Update existing user profile with new company
-        await updateUserStatus(
-          user.uid, 
-          'online', 
-          'Just created a company'
-        );
+        // Update existing user profile with new company ID, role, and status
+        console.log('Updating existing user profile with company ID:', companyId);
         
-        // Update the user's company ID
-        await fetch(`/api/users/update?id=${user.uid}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            companyId,
-            role: 'admin',
-            status: 'online'
-          }),
-        });
-        
-        userProfile = { 
-          ...userProfile, 
-          companyId, 
-          role: 'admin', 
-          status: 'online' 
-        };
+        // Update the user's company ID using the API directly rather than fetch
+        try {
+          await fetch(`/api/users/update?id=${userProfile.id}`, { // Use Supabase UUID here
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              companyId,
+              role: 'admin',
+              status: 'online'
+            }),
+          });
+          
+          // Update the local state immediately without waiting for reload
+          userProfile = { 
+            ...userProfile, 
+            companyId, 
+            role: 'admin', 
+            status: 'online' 
+          };
+          
+          // Update the current user profile state immediately
+          setCurrentUserProfile(userProfile);
+        } catch (updateError) {
+          console.error('Error updating user profile:', updateError);
+          throw new Error('Failed to update user profile with company ID');
+        }
       }
 
       // Get company data
       const companyData2 = await getCompany(companyId);
+      setCompany(companyData2);
       
       // Reload all company data after creation
+      console.log('Reloading company data after creation');
       await loadCompanyData(user.uid);
 
+      // Forcing navigation to dashboard after successful company creation
+      window.location.href = '/dashboard';
+      
       return companyId;
     } catch (err) {
       console.error('Error creating/updating company:', err);
@@ -385,6 +411,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     updateUserProfile,
     updateUserRole,
     removeUserFromCompany,
+    loadCompanyData,
   };
 
   return <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>;

@@ -36,3 +36,28 @@
 - **Real-time:** Continue using existing Socket.IO implementation (`socket-server.js`, hooks). Supabase Realtime integration is on hold.
 - **Dependency Injection:** Currently using manual instantiation of repositories in API routes; consider a more formal DI approach later if complexity increases.
 - **Message Drafts:** Feature temporarily removed due to missing type definition. Revisit later if needed.
+
+## Recent Changes (April 1, 2025)
+
+Created Space Reservation Repository system:
+
+1. Created new repository interface `ISpaceReservationRepository` with methods:
+   - `findById`
+   - `findBySpace` (paginated)
+   - `findByUser` (paginated)  
+   - `create`
+   - `update`
+   - `deleteById`
+   - `isSpaceAvailable` (checks time slot availability)
+
+2. Created Supabase implementation `SupabaseSpaceReservationRepository` that:
+   - Properly maps between snake_case (DB) and camelCase (TypeScript)
+   - Handles pagination for listing methods
+   - Validates space availability before reservations
+   - Includes proper error handling
+
+3. Fixed reservation handling in Space interface by:
+   - Removed `reservations` field from Space type since it's handled by separate table
+   - Reservations are now managed through dedicated repository
+
+This change aligns the codebase with the Supabase schema where reservations are stored in a separate `space_reservations` table with proper indexing and foreign key relationships.

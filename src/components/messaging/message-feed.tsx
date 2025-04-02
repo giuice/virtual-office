@@ -40,8 +40,8 @@ export function MessageFeed({
     activeConversation,
     setActiveConversation,
     getOrCreateRoomConversation,
-    messageDrafts,
-    updateMessageDraft,
+    // messageDrafts,
+    // updateMessageDraft,
     sendTypingIndicator,
     addReaction,
   } = useMessaging();

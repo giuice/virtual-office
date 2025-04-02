@@ -11,9 +11,10 @@ import { Card } from '@/components/ui/card';
 export default function CreateCompanyPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { createNewCompany, isLoading, error, currentUserProfile } = useCompany();
+  const { createNewCompany, isLoading, error, currentUserProfile, loadCompanyData } = useCompany();
   const [companyName, setCompanyName] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Handle authentication redirect
   useEffect(() => {
@@ -24,10 +25,11 @@ export default function CreateCompanyPage() {
   
   // Handle company redirect
   useEffect(() => {
-    if (!isLoading && currentUserProfile?.companyId) {
+    if (!isLoading && !isCreating && currentUserProfile?.companyId) {
+      console.log('Redirecting to dashboard - user already has company:', currentUserProfile);
       router.push('/dashboard');
     }
-  }, [isLoading, currentUserProfile, router]);
+  }, [isLoading, currentUserProfile, router, isCreating]);
 
   // Early return if loading
   if (authLoading || isLoading) {
@@ -35,7 +37,7 @@ export default function CreateCompanyPage() {
   }
 
   // Don't render the form if user is not logged in or already has a company
-  if (!user || currentUserProfile?.companyId) {
+  if (!user || (currentUserProfile?.companyId && !isCreating)) {
     return null;
   }
 
@@ -48,10 +50,22 @@ export default function CreateCompanyPage() {
     }
 
     try {
+      setIsCreating(true);
       setLocalError(null);
       const companyId = await createNewCompany(companyName);
-      router.push('/dashboard'); // Redirect to dashboard after company created
+      console.log('Company created successfully with ID:', companyId);
+      
+      // Force reload company data to ensure state is updated
+      if (user) {
+        await loadCompanyData(user.uid);
+      }
+      
+      // Use window.location for a hard navigation instead of router.push
+      // This ensures a complete page refresh and state reset
+      window.location.href = '/dashboard';
     } catch (err) {
+      setIsCreating(false);
+      console.error('Error creating company:', err);
       setLocalError(err instanceof Error ? err.message : 'Error creating company');
     }
   };
@@ -77,7 +91,7 @@ export default function CreateCompanyPage() {
                 placeholder="Enter your company name"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isCreating}
                 required
               />
             </div>
@@ -91,9 +105,9 @@ export default function CreateCompanyPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || !companyName.trim()}
+              disabled={isLoading || isCreating || !companyName.trim()}
             >
-              {isLoading ? 'Creating...' : 'Create Company'}
+              {isCreating ? 'Creating...' : isLoading ? 'Loading...' : 'Create Company'}
             </Button>
           </div>
         </form>

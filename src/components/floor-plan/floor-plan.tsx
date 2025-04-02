@@ -112,19 +112,27 @@ export function FloorPlan() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to create space: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error("Space creation API error:", errorData);
+        const errorMessage = errorData.message || `Failed to create space: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
       const createdSpace: Space = await response.json();
-      console.log('Space created:', createdSpace);
-      // TODO: Update local state (e.g., via CompanyContext) to reflect the new space
-      // This might involve refetching spaces or adding the new one directly.
-      // For now, just closing the dialog.
-
+      console.log('Space created successfully:', createdSpace);
+      
+      // Manually add the new space to the local state until context refreshes
+      // This provides immediate feedback to the user that the space was created
+      /* TODO: Implement - Add to context if you have a setSpaces method
+      setSpaces(prev => [...prev, createdSpace]);
+      */
+      
+      // TODO: Show success message to user
+      
     } catch (error) {
       console.error("Error in handleCreateRoom:", error);
       // TODO: Add user feedback (e.g., toast notification)
+      // alert(`Failed to create room: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRoomDialogOpen(false);
     }

@@ -40,6 +40,7 @@ export default function CompanyPage() {
   // Redirect to create-company page if user doesn't have a company
   useEffect(() => {
     if (!isLoading && !hasCompany) {
+      console.log('Redirecting from dashboard to create-company...');
       router.push('/create-company');
     }
   }, [hasCompany, isLoading, router]);

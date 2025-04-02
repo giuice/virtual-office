@@ -36,6 +36,7 @@ export interface Company {
 export interface User {
   id: string;
   companyId: string;
+  firebase_uid: string; // Added to link to Firebase Auth
   email: string;
   displayName: string;
   avatarUrl?: string;
@@ -90,7 +91,6 @@ export interface Space {
   userIds: string[]; // User IDs currently in the space
   description?: string;
   accessControl?: AccessControl;
-  reservations?: Reservation[];
   createdBy?: string; // User ID who created the room
   createdAt?: TimeStampType;
   updatedAt?: TimeStampType;

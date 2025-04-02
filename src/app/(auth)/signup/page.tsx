@@ -34,6 +34,7 @@ export default function SignupPage() {
       // Pass display name to signUp method which will update the Firebase profile
       await signUp(email, password, displayName);
       showSuccess({ description: 'Account created successfully!' });
+      console.log('Account created successfully!');
       router.push('/create-company');
     } catch (error) {
       showError({
@@ -49,6 +50,7 @@ export default function SignupPage() {
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully signed up with Google!' });
+      console.log('Successfully signed up with Google!');
       router.push('/create-company');
     } catch (error) {
       showError({

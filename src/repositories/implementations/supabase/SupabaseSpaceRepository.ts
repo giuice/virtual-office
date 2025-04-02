@@ -2,10 +2,38 @@
 import { supabase } from '@/lib/supabase/client';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Space } from '@/types/database';
-import { PaginationOptions, PaginatedResult } from '@/types/common'; // Assuming common types exist
+import { PaginationOptions, PaginatedResult } from '@/types/common';
+
+function mapToCamelCase(data: any): Space {
+  if (!data) return data;
+  
+  return {
+    id: data.id,
+    companyId: data.company_id,
+    name: data.name,
+    type: data.type,
+    status: data.status,
+    capacity: data.capacity,
+    features: data.features,
+    position: data.position,
+    userIds: data.user_ids,
+    description: data.description,
+    accessControl: data.access_control,
+    createdBy: data.created_by,
+    isTemplate: data.is_template,
+    templateName: data.template_name,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  } as Space;
+}
+
+function mapArrayToCamelCase(dataArray: any[]): Space[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapToCamelCase(item));
+}
 
 export class SupabaseSpaceRepository implements ISpaceRepository {
-  private TABLE_NAME = 'spaces'; // Ensure this matches your Supabase table name
+  private TABLE_NAME = 'spaces';
 
   async findById(id: string): Promise<Space | null> {
     const { data, error } = await supabase
@@ -18,28 +46,26 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
       console.error('Error fetching space by ID:', error);
       throw error;
     }
-    // TODO: Map DB response (snake_case) to Space type (camelCase) if needed
-    return data as Space | null;
+    
+    return data ? mapToCamelCase(data) : null;
   }
 
   async findByCompany(companyId: string, options?: PaginationOptions): Promise<Space[]> {
-     // Basic implementation without pagination for now
-     // TODO: Implement proper pagination using options.limit and options.cursor with .range()
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
       .select('*')
-      .eq('company_id', companyId); // Assuming snake_case
+      .eq('company_id', companyId);
 
     if (error) {
       console.error('Error fetching spaces by company:', error);
       throw error;
     }
-    // TODO: Map DB response array if needed
-    return (data as Space[]) || [];
+    
+    return data ? mapArrayToCamelCase(data) : [];
   }
 
   async create(spaceData: Omit<Space, 'id' | 'createdAt' | 'updatedAt'>): Promise<Space> {
-    // TODO: Map Space type (camelCase) to DB schema (snake_case) if needed
+    // Map Space type (camelCase) to DB schema (snake_case)
     const dbData = {
         company_id: spaceData.companyId,
         name: spaceData.name,
@@ -48,15 +74,16 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
         capacity: spaceData.capacity,
         features: spaceData.features,
         position: spaceData.position,
-        user_ids: spaceData.userIds, // Assuming snake_case
+        user_ids: spaceData.userIds,
         description: spaceData.description,
-        access_control: spaceData.accessControl, // Assuming snake_case
-        reservations: spaceData.reservations,
-        created_by: spaceData.createdBy, // Assuming snake_case
-        is_template: spaceData.isTemplate, // Assuming snake_case
-        template_name: spaceData.templateName, // Assuming snake_case
+        access_control: spaceData.accessControl,
+        created_by: spaceData.createdBy,
+        is_template: spaceData.isTemplate,
+        template_name: spaceData.templateName
+        // NOTE: removed reservations as it's handled by space_reservations table
         // created_at and updated_at handled by Supabase default value/triggers
     };
+    
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
       .insert(dbData)
@@ -67,12 +94,12 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
       console.error('Error creating space:', error);
       throw error || new Error('Failed to create space or retrieve created data.');
     }
-    // TODO: Map DB response back to Space type if needed
-    return data as Space;
+    
+    return mapToCamelCase(data);
   }
 
   async update(id: string, updates: Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Space | null> {
-    // TODO: Map Space type (camelCase) to DB schema (snake_case) if needed
+    // Map Space type (camelCase) to DB schema (snake_case)
     const { companyId, userIds, accessControl, createdBy, isTemplate, templateName, ...restUpdates } = updates;
     const dbUpdates: Record<string, any> = { ...restUpdates };
     if (companyId !== undefined) dbUpdates.company_id = companyId;
@@ -81,7 +108,6 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
     if (createdBy !== undefined) dbUpdates.created_by = createdBy;
     if (isTemplate !== undefined) dbUpdates.is_template = isTemplate;
     if (templateName !== undefined) dbUpdates.template_name = templateName;
-    // updated_at should be handled by Supabase trigger ideally
 
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
@@ -95,13 +121,12 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // TODO: Map DB response back to Space type if needed
-    return data as Space | null;
+    
+    return data ? mapToCamelCase(data) : null;
   }
 
   async updateUsers(id: string, userIds: string[]): Promise<Space | null> {
-    // Directly call update with the specific field mapped to snake_case
-    return this.update(id, { userIds: userIds });
+    return this.update(id, { userIds });
   }
 
   async deleteById(id: string): Promise<boolean> {
@@ -116,6 +141,4 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
     }
     return (count ?? 0) > 0;
   }
-
-  // Implement other methods defined in ISpaceRepository if any...
 }

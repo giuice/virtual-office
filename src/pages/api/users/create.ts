@@ -18,10 +18,11 @@ export default async function handler(
 
   try {
     const userData: Partial<User> = req.body; // Add type hint
-    
-    // Validate required fields
-    if (!userData.email || !userData.companyId) {
-      return res.status(400).json({ error: 'Missing required fields' });
+
+    // Validate required fields - firebase_uid is crucial!
+    // companyId is removed as the user might be creating their first company
+    if (!userData.email || !userData.firebase_uid) {
+      return res.status(400).json({ error: 'Missing required fields: email and firebase_uid are required.' });
     }
 
     // Create the user using the repository
