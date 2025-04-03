@@ -18,15 +18,17 @@ interface CreateRoomFormProps {
   formValid: boolean;
   onSave: () => void;
   onCancel: () => void;
+  isLoading?: boolean; // Add isLoading prop
 }
 
-export function CreateRoomForm({ 
-  roomData, 
-  setRoomData, 
-  errors, 
-  formValid, 
-  onSave, 
-  onCancel 
+export function CreateRoomForm({
+  roomData,
+  setRoomData,
+  errors,
+  formValid,
+  onSave,
+  onCancel,
+  isLoading = false // Default to false
 }: CreateRoomFormProps) {
   const [activeTab, setActiveTab] = useState('general');
 
@@ -67,8 +69,8 @@ export function CreateRoomForm({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={onSave} disabled={!formValid}>
-          Create Room
+        <Button onClick={onSave} disabled={!formValid || isLoading}>
+          {isLoading ? "Creating..." : "Create Room"}
         </Button>
       </DialogFooter>
     </div>

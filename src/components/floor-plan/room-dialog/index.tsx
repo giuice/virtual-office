@@ -203,12 +203,12 @@ export function RoomDialog({
               formValid={formValid}
               onSave={handleSaveRoom}
               onCancel={() => onOpenChange(false)}
+              isLoading={createSpace.isPending}
             />
           ) : (
             <ViewRoomTabs
               roomData={roomData}
-              // Pass setRoomData down if tabs need to modify state directly
-              // setRoomData={setRoomData}
+              initialRoomData={room || undefined} // Handle null case by converting to undefined
               isMicActive={isMicActive}
               setIsMicActive={setIsMicActive}
               isScreenSharing={isScreenSharing}
@@ -217,7 +217,6 @@ export function RoomDialog({
               setIsRoomLocked={setIsRoomLocked}
               handleMessageUser={handleMessageUser}
               handleJoinRoom={handleJoinRoom}
-              // Pass the save handler and loading state down
               onSave={handleSaveRoom}
               isSaving={updateSpace.isPending}
             />

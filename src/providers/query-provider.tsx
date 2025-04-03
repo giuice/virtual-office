@@ -1,6 +1,5 @@
-{/* src/providers/query-provider.tsx */}
 'use client'
-
+{/* src/providers/query-provider.tsx */}
 import React, { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'

@@ -14,6 +14,7 @@ import { getRoomTypeLabel } from './utils';
 
 interface ViewRoomTabsProps {
   roomData: Partial<Space>;
+  initialRoomData?: Partial<Space>; // Add initial room data for comparison
   isMicActive: boolean;
   setIsMicActive: React.Dispatch<React.SetStateAction<boolean>>;
   isScreenSharing: boolean;
@@ -22,12 +23,13 @@ interface ViewRoomTabsProps {
   setIsRoomLocked: React.Dispatch<React.SetStateAction<boolean>>;
   handleMessageUser: (user: LocalUser) => void;
   handleJoinRoom: () => void;
-  onSave: () => void; // Added prop for saving changes
-  isSaving: boolean; // Added prop for mutation loading state
+  onSave: () => void;
+  isSaving: boolean;
 }
 
 export function ViewRoomTabs({
   roomData,
+  initialRoomData,
   isMicActive,
   setIsMicActive,
   isScreenSharing,
@@ -36,11 +38,40 @@ export function ViewRoomTabs({
   setIsRoomLocked,
   handleMessageUser,
   handleJoinRoom,
-  onSave, // Accept prop
-  isSaving // Accept prop
+  onSave,
+  isSaving
 }: ViewRoomTabsProps) {
-  // TODO: Determine if any fields have actually changed to enable/disable save button
-  const hasChanges = true; // Placeholder - implement change detection logic
+  // Compare current room data with initial data to detect changes
+  const hasChanges = (() => {
+    if (!initialRoomData) return false;
+    
+    // Fields to compare
+    const fieldsToCompare: (keyof Space)[] = [
+      'name', 'type', 'capacity', 'features', 'description',
+      'accessControl', 'position', 'userIds'
+    ];
+    
+    // Check each field for changes
+    return fieldsToCompare.some(field => {
+      const initial = initialRoomData[field];
+      const current = roomData[field];
+      
+      // Handle arrays (features, userIds)
+      if (Array.isArray(initial) && Array.isArray(current)) {
+        return initial.length !== current.length ||
+          initial.some((item, index) => item !== current[index]);
+      }
+      
+      // Handle objects (position, accessControl)
+      if (typeof initial === 'object' && initial !== null &&
+          typeof current === 'object' && current !== null) {
+        return JSON.stringify(initial) !== JSON.stringify(current);
+      }
+      
+      // Handle primitive values
+      return initial !== current;
+    });
+  })();
 
   return (
     <div className="mt-4">

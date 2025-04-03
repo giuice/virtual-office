@@ -2,14 +2,14 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-// Import global Space type and local types separately
-import { Space, User as GlobalUser } from '@/types/database'; // Use global Space and User
-import { User as LocalUser, SpaceType as LocalSpaceType, RoomTemplate } from './types'; // Keep local types if needed elsewhere
+import { Space, User } from '@/types/database';
+import { RoomTemplate } from './types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button'
-import { RoomDialog } from './room-dialog'
+import { RoomDialog } from './room-dialog/index'
 import { UserHoverCard } from './user-hover-card'
 import { FloorPlanCanvas } from './FloorPlanCanvas'
 import { RoomManagement } from './room-management'
@@ -17,63 +17,28 @@ import { RoomTemplateSelector } from './room-template-selector';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RoomChatIntegration } from './room-chat-integration';
-import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
+import { useCompany } from '@/contexts/CompanyContext';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
+import { useToast } from '@/components/ui/use-toast';
 
-// Sample room templates (Keep for now, might move later)
-const roomTemplates: RoomTemplate[] = [
-  {
-    id: 'template-1',
-    name: 'Standard Meeting Room',
-    type: 'conference',
-    capacity: 8,
-    features: ['video', 'screen-sharing', 'whiteboard'],
-    description: 'Standard meeting room for team discussions and presentations',
-    defaultWidth: 250,
-    defaultHeight: 150,
-    isPublic: true
-  },
-  {
-    id: 'template-2',
-    name: 'Developer Workspace',
-    type: 'workspace',
-    capacity: 4,
-    features: ['screens', 'whiteboard'],
-    description: 'Workspace optimized for development teams',
-    defaultWidth: 300,
-    defaultHeight: 200,
-    isPublic: true
-  },
-  {
-    id: 'template-3',
-    name: 'Break Area',
-    type: 'social',
-    capacity: 6,
-    features: ['coffee', 'snacks'],
-    description: 'Relaxation area for breaks and casual conversations',
-    defaultWidth: 200,
-    defaultHeight: 150,
-    isPublic: true
-  }
-]
+// Import the RoomTemplates component
+import { RoomTemplates } from './room-templates';
 
 export function FloorPlan() {
   // Get data from context
   const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
 
   // State for UI interactions
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null); // Use global Space type
-  const [hoveredUser, setHoveredUser] = useState<LocalUser | null>(null); // Keep LocalUser for hover card if its structure differs
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [hoveredUser, setHoveredUser] = useState<User | null>(null);
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState<boolean>(false);
   const [isRoomManagementOpen, setIsRoomManagementOpen] = useState<boolean>(false);
-  const [templates, setTemplates] = useState<RoomTemplate[]>(roomTemplates)
+  const [userTemplates, setUserTemplates] = useState<RoomTemplate[]>([])
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
-  
-  // State for room messaging
-  const [chatRoom, setChatRoom] = useState<Space | null>(null)
   
   // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {
@@ -88,123 +53,43 @@ export function FloorPlan() {
   // instead of modifying local state directly.
   // For now, these functions will not work correctly as they modify the old local state.
 
-  // TODO: Refactor room management functions (create, update, delete, duplicate)
-  // to interact with the backend API via context or direct API calls.
-  // These functions now expect the global Space type.
+  // Room creation is now handled by the mutation hooks in the RoomDialog component
 
-  const handleCreateRoom = async (newRoomData: Partial<Space>) => { // Expect partial data for creation
-    if (!currentUserProfile?.companyId) {
-      console.error("Cannot create room: User company ID not found.");
-      // TODO: Add user feedback (e.g., toast notification)
-      return;
-    }
+  // Room updates are now handled by the mutation hooks in the RoomDialog component
+const deleteSpaceMutation = useDeleteSpace();
+const { toast } = useToast();
 
-    const payload = {
-      ...newRoomData,
-      companyId: currentUserProfile.companyId, // Add companyId from context
-    };
+const handleDeleteRoom = (roomId: string) => {
+  if (!roomId) {
+    toast({
+      title: "Error",
+      description: "Cannot delete room: Missing room ID.",
+      variant: "destructive"
+    });
+    return;
+  }
 
-    try {
-      const response = await fetch('/api/spaces/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+  deleteSpaceMutation.mutate(roomId, {
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Room deleted successfully"
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-        console.error("Space creation API error:", errorData);
-        const errorMessage = errorData.message || `Failed to create space: ${response.statusText}`;
-        throw new Error(errorMessage);
-      }
-
-      const createdSpace: Space = await response.json();
-      console.log('Space created successfully:', createdSpace);
-      
-      // Manually add the new space to the local state until context refreshes
-      // This provides immediate feedback to the user that the space was created
-      /* TODO: Implement - Add to context if you have a setSpaces method
-      setSpaces(prev => [...prev, createdSpace]);
-      */
-      
-      // TODO: Show success message to user
-      
-    } catch (error) {
-      console.error("Error in handleCreateRoom:", error);
-      // TODO: Add user feedback (e.g., toast notification)
-      // alert(`Failed to create room: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsRoomDialogOpen(false);
-    }
-  };
-
-  const handleUpdateRoom = async (updatedRoom: Space) => { // Expect full Space object for update
-    if (!updatedRoom.id) {
-      console.error("Cannot update room: Missing room ID.");
-      // TODO: Add user feedback
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/spaces/update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedRoom), // Send the whole updated room object
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to update space: ${response.statusText}`);
-      }
-
-      const resultingSpace: Space = await response.json();
-      console.log('Space updated:', resultingSpace);
-      // TODO: Update local state (e.g., via CompanyContext) to reflect the updated space
-      // This might involve refetching spaces or updating the specific space in the local array.
-
-    } catch (error) {
-      console.error("Error in handleUpdateRoom:", error);
-      // TODO: Add user feedback
-    } finally {
-      setSelectedSpace(null);
-      setIsEditingRoom(false);
-    }
-  };
-
-  const handleDeleteRoom = async (roomId: string) => {
-    if (!roomId) {
-      console.error("Cannot delete room: Missing room ID.");
-      // TODO: Add user feedback
-      return;
-    }
-
-    // Optional: Add a confirmation dialog here before proceeding
-
-    try {
-      const response = await fetch(`/api/spaces/delete?spaceId=${roomId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to delete space: ${response.statusText}`);
-      }
-
-      console.log('Space deleted:', roomId);
-      // TODO: Update local state (e.g., via CompanyContext) to reflect the deleted space
-      // This might involve refetching spaces or removing the space from the local array.
-
       // Clear selection and chat if the deleted room was selected/active
       setSelectedSpace(null);
       if (chatRoom && chatRoom.id === roomId) {
         setChatRoom(null);
       }
-
-    } catch (error) {
-      console.error("Error in handleDeleteRoom:", error);
-      // TODO: Add user feedback
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete room",
+        variant: "destructive"
+      });
     }
-  };
+  });
+};
 
   const handleDuplicateRoom = (room: Space) => { // Expect global Space
     console.warn("handleDuplicateRoom needs API integration");
@@ -212,14 +97,13 @@ export function FloorPlan() {
     // duplicateSpaceInContext(room);
   };
 
-  // Handle template selection (Needs API integration)
-  const handleSelectTemplate = (template: RoomTemplate) => {
-    console.warn("handleSelectTemplate needs API integration");
-    // Example API call structure (needs implementation in context/API):
-    // createSpaceFromTemplateInContext(template);
-  };
+  // Template position handling
+  const [templatePosition, setTemplatePosition] = useState<{ x: number; y: number; width?: number; height?: number } | undefined>(undefined);
 
-  // Handle opening chat for a room (Expects global Space)
+  // State for room messaging
+  const [chatRoom, setChatRoom] = useState<Space | null>(null);
+
+  // Handle opening chat for a room
   const handleOpenChat = (room: Space) => {
     setChatRoom(room);
   };
@@ -365,7 +249,6 @@ export function FloorPlan() {
               // Open chat panel on double-click
               handleOpenChat(space);
             }}
-            onSpaceUpdate={handleUpdateRoom} // Pass updated handler
             isEditable={true} // TODO: Make this dependent on user role (admin)
           />)}
         </div>
@@ -382,9 +265,8 @@ export function FloorPlan() {
             setSelectedSpace(null);
           }
         }}
-        onCreate={handleCreateRoom}
-        onUpdate={handleUpdateRoom}
         isCreating={!isEditingRoom}
+        companyId={currentUserProfile?.companyId || ''} // Add required companyId prop
       />
 
       {/* Room Management Dialog - Pass global Space[] */}
@@ -411,12 +293,29 @@ export function FloorPlan() {
       />
       
       {/* Template Selection Dialog */}
-      <RoomTemplateSelector
-        templates={templates}
-        onSelectTemplate={handleSelectTemplate}
-        open={isTemplateDialogOpen}
-        onOpenChange={setIsTemplateDialogOpen}
-      />
+      <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <RoomTemplates
+            onSelectTemplate={(template) => {
+              // Pass template to create room with template position
+              setTemplatePosition(prevPos => ({
+                x: prevPos?.x || 100,
+                y: prevPos?.y || 100,
+                width: template.defaultWidth,
+                height: template.defaultHeight
+              }));
+              setIsTemplateDialogOpen(false);
+            }}
+            onSaveTemplate={(template) => {
+              setUserTemplates(prev => [...prev, template]);
+            }}
+            onDeleteTemplate={(templateId) => {
+              setUserTemplates(prev => prev.filter(t => t.id !== templateId));
+            }}
+            userTemplates={userTemplates}
+          />
+        </DialogContent>
+      </Dialog>
       
       {/* Room Chat Integration */}
       <RoomChatIntegration 

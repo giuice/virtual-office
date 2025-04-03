@@ -6,6 +6,19 @@ import { spaceColors, userStatusColors } from '@/types/ui';
 export type { SpaceType, SpaceStatus, Position, UIUser };
 export { spaceColors, userStatusColors };
 
+// Room template interface
+export interface RoomTemplate {
+  id: string;
+  name: string;
+  type: SpaceType;
+  capacity: number;
+  features: string[];
+  description: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  isPublic: boolean;
+}
+
 // We keep a local Space interface for backward compatibility
 // This will be removed in a future refactoring
 export interface Space {

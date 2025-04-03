@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -15,20 +16,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useCompany } from '@/contexts/CompanyContext'
+import { useCreateSpaceFromTemplate } from '@/hooks/mutations/useSpaceMutations'
 
 interface RoomTemplateSelectorProps {
   templates: RoomTemplate[]
-  onSelectTemplate: (template: RoomTemplate) => void
   open: boolean
   onOpenChange: (open: boolean) => void
+  position?: { x: number; y: number; width?: number; height?: number }
 }
 
 export function RoomTemplateSelector({
   templates,
-  onSelectTemplate,
   open,
-  onOpenChange
+  onOpenChange,
+  position // Optional position for the new room
 }: RoomTemplateSelectorProps) {
+  const { toast } = useToast()
+  const { currentUserProfile } = useCompany()
+  const createFromTemplate = useCreateSpaceFromTemplate()
   // Get room type label
   const getRoomTypeLabel = (type: SpaceType) => {
     switch (type) {
@@ -107,14 +113,51 @@ export function RoomTemplateSelector({
                     </div>
                   </CardContent>
                   <div className="p-2 border-t">
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       onClick={() => {
-                        onSelectTemplate(template);
-                        onOpenChange(false);
+                        if (!currentUserProfile?.companyId) {
+                          toast({
+                            title: "Error",
+                            description: "Company ID not found. Please try again.",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+
+                        const templatePosition = position ? {
+                          ...position,
+                          width: position.width || template.defaultWidth,
+                          height: position.height || template.defaultHeight
+                        } : undefined;
+
+                        createFromTemplate.mutate(
+                          {
+                            template,
+                            companyId: currentUserProfile.companyId,
+                            position: templatePosition
+                          },
+                          {
+                            onSuccess: () => {
+                              toast({
+                                title: "Success",
+                                description: `Room "${template.name}" created successfully.`
+                              });
+                              onOpenChange(false);
+                            },
+                            onError: (error) => {
+                              toast({
+                                title: "Error",
+                                description: error instanceof Error ? error.message : "Failed to create room from template",
+                                variant: "destructive"
+                              });
+                            }
+                          }
+                        );
                       }}
+                      disabled={createFromTemplate.isPending}
                     >
-                      Use Template
+                      {createFromTemplate.isPending ? "Creating..." : "Use Template"}
                     </Button>
                   </div>
                 </Card>
@@ -132,3 +175,4 @@ export function RoomTemplateSelector({
     </Dialog>
   );
 }
+
