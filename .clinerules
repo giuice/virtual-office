@@ -1,8 +1,8 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Completed frontend messaging integration: Resolved duplicate context, refactored hook locations, cleaned types, and uncommented API calls in hooks."
+last_action: "Implemented React Query mutation hooks (useCreateSpace, useUpdateSpace, useDeleteSpace) for spaces."
 current_phase: "Execution"
-next_action: "Test messaging functionality (send/receive, history, reactions, etc.)"
+next_action: "Integrate Mutations: Update components (e.g., RoomDialog) to use mutation hooks for creating/updating spaces."
 next_phase: "Execution"
 
 [CRITICAL_REMINDER]
@@ -81,4 +81,6 @@ next_phase: "Execution"
 - Separating types, utils, and components helps maintain clean separation of concerns
 - Aligning component structure with database schema (like space_reservations table) makes it easier to manage data flow
 - Using TypeScript interfaces to define props makes component relationships explicit and catches errors early
+- When refactoring components to use new data fetching methods (like React Query), ensure local type definitions (like `LocalSpace`) are updated to match the actual data structure returned by the database/adapter to avoid type mismatches.
+- Double-check imports when creating new files (e.g., hooks). Assumed barrel exports might not exist. Verify repository implementations and instantiate them directly if needed. If `apply_diff` fails unexpectedly, reading the file back and using `write_to_file` with the full correct content can be a reliable fallback.
 ---CLINE_RULES_END---

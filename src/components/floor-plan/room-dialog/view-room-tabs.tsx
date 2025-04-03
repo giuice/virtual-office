@@ -22,6 +22,8 @@ interface ViewRoomTabsProps {
   setIsRoomLocked: React.Dispatch<React.SetStateAction<boolean>>;
   handleMessageUser: (user: LocalUser) => void;
   handleJoinRoom: () => void;
+  onSave: () => void; // Added prop for saving changes
+  isSaving: boolean; // Added prop for mutation loading state
 }
 
 export function ViewRoomTabs({
@@ -33,8 +35,13 @@ export function ViewRoomTabs({
   isRoomLocked,
   setIsRoomLocked,
   handleMessageUser,
-  handleJoinRoom
+  handleJoinRoom,
+  onSave, // Accept prop
+  isSaving // Accept prop
 }: ViewRoomTabsProps) {
+  // TODO: Determine if any fields have actually changed to enable/disable save button
+  const hasChanges = true; // Placeholder - implement change detection logic
+
   return (
     <div className="mt-4">
       <Tabs defaultValue="people">
@@ -44,16 +51,16 @@ export function ViewRoomTabs({
           <TabsTrigger value="reservations">Reservations</TabsTrigger>
           <TabsTrigger value="info">Room Info</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="people" className="mt-4">
-          <PeopleTab 
-            userIds={roomData.userIds} 
-            handleMessageUser={handleMessageUser} 
+          <PeopleTab
+            userIds={roomData.userIds}
+            handleMessageUser={handleMessageUser}
           />
         </TabsContent>
-        
+
         <TabsContent value="controls" className="mt-4">
-          <ControlsTab 
+          <ControlsTab
             isMicActive={isMicActive}
             setIsMicActive={setIsMicActive}
             isScreenSharing={isScreenSharing}
@@ -62,29 +69,40 @@ export function ViewRoomTabs({
             setIsRoomLocked={setIsRoomLocked}
           />
         </TabsContent>
-        
+
         <TabsContent value="reservations" className="mt-4">
           <ReservationsTab reservations={roomData.reservations} />
         </TabsContent>
-        
+
         <TabsContent value="info" className="mt-4">
-          <InfoTab 
+          <InfoTab
             type={roomData.type}
             capacity={roomData.capacity}
             features={roomData.features}
             description={roomData.description}
             getRoomTypeLabel={getRoomTypeLabel}
+            // TODO: Pass setRoomData or individual setters if info is editable here
           />
         </TabsContent>
       </Tabs>
-      
-      <DialogFooter className="mt-6">
+
+      <DialogFooter className="mt-6 justify-between"> {/* Use justify-between */}
+        {/* Left side: Info */}
         <div className="text-sm text-muted-foreground">
           <span>{roomData.userIds?.length || 0}/{roomData.capacity || 4} people</span>
         </div>
-        <Button type="submit" onClick={handleJoinRoom}>
-          Join Room
-        </Button>
+        {/* Right side: Buttons */}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleJoinRoom}> {/* Keep Join Room */}
+            Join Room
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={isSaving || !hasChanges} // Disable if saving or no changes
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'} {/* Show loading text */}
+          </Button>
+        </div>
       </DialogFooter>
     </div>
   );

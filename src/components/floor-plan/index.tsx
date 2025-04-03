@@ -1,50 +1,57 @@
 // src/components/floor-plan/index.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react' // Added useMemo
 import { Space as LocalSpace, UIUser, UIUser as User,  spaceColors, userStatusColors } from './types'
 // Import the database Space type and adapter functions
 import { Space as DBSpace, SpaceType } from '@/types/database'
 import { dbSpaceToUISpace } from '@/lib/type-adapters'
+import { useSpaces } from '@/hooks/queries/useSpaces'; // Added useSpaces import
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Monitor, Video, MessageSquare, Coffee, Zap } from 'lucide-react'
 import { RoomTooltip } from './room-tooltip'
-import { RoomDialog } from './room-dialog'
+import { RoomDialog } from './room-dialog/index'
 import { UserHoverCard } from './user-hover-card'
 import { MessageDialog } from './message-dialog'
 import { getAvatarUrl } from '@/lib/avatar-utils'
 import { StatusAvatar } from '@/components/ui/status-avatar'
 
-
 interface FloorPlanProps {
-  spaces: LocalSpace[];
-  companyName: string;
+  companyId: string; // Changed companyName to companyId
   onlineUsers: number;
   activeMeetings: number;
   pendingMessages: number;
 }
 
-export function FloorPlan({ 
-  spaces, 
-  companyName, 
-  onlineUsers, 
-  activeMeetings, 
-  pendingMessages 
+export function FloorPlan({
+  companyId, // Changed companyName to companyId
+  onlineUsers,
+  activeMeetings,
+  pendingMessages
 }: FloorPlanProps) {
+  // Fetch spaces using React Query
+  const { data: dbSpaces, isLoading, isError, error } = useSpaces(companyId);
+
   const [selectedRoom, setSelectedRoom] = useState<LocalSpace | null>(null);
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useState(false);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
-  
+
   // For direct messaging
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
 
-  // Function to handle room creation (required by RoomDialog)
+  // Convert DBSpaces to LocalSpaces using useMemo for optimization
+  const spaces: LocalSpace[] = useMemo(() => {
+    if (!dbSpaces) return [];
+    return dbSpaces.map(dbSpace => dbSpaceToUISpace(dbSpace));
+  }, [dbSpaces]);
+
+  // Function to handle room creation - kept for backward compatibility
   const handleCreateRoom = (newRoomData: Partial<DBSpace>) => {
     console.log('Create room:', newRoomData);
     // This would typically call an API to create the room
-    // For now we'll just log the data
+    // Now handled by useCreateSpace hook in RoomDialog
   };
 
   // Helper function to get color based on room type
@@ -57,51 +64,26 @@ export function FloorPlan({
     return userStatusColors[status] || userStatusColors.default;
   }
 
-  // Function to handle room click
+  // Function to handle room click - Simplified
   const handleRoomClick = (room: LocalSpace) => {
-    // We need to convert our LocalSpace to the database Space type
-    // This would normally be done by fetching the space and its reservations from the API
-    // For now, we'll create a mock conversion
-    
-    const mockSpace: DBSpace = {
-      id: String(room.id), // Convert number ID to string if needed
-      companyId: '1', // Mock company ID
-      name: room.name,
-      type: room.type as SpaceType, // Assuming types are compatible
-      status: 'available', // Default status
-      capacity: room.capacity || 4,
-      features: room.features || [],
-      position: room.position,
-      userIds: room.users.map(user => String(user.id)), // Convert user IDs
-      description: room.description,
-      accessControl: {
-        isPublic: true,
-        // In a real app, we would include room.accessControl properties
-      },
-      // Normally we would fetch these from the space_reservations table
-      // Mock some reservations for demo purposes
-      reservations: [
-        {
-          id: `reservation-${Date.now()}`,
-          userId: 'user-1',
-          userName: 'John Doe',
-          startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-          endTime: new Date(Date.now() + 7200000).toISOString(),  // 2 hours from now
-          purpose: 'Team meeting'
-        }
-      ]
-    };
-    
-    const convertedSpace: LocalSpace = dbSpaceToUISpace(mockSpace);
-    setSelectedRoom(convertedSpace);
+    setSelectedRoom(room);
     setIsRoomDialogOpen(true);
   }
-  
+
   // Function to handle messaging a user
   const handleMessageUser = (e: React.MouseEvent, user: User) => {
     e.stopPropagation(); // Prevent triggering the room click
     setSelectedUser(user);
     setIsMessageDialogOpen(true);
+  }
+
+  // Handle loading and error states
+  if (isLoading) {
+    return <div className="p-4 text-center">Loading floor plan...</div>;
+  }
+
+  if (isError) {
+    return <div className="p-4 text-center text-red-500">Error loading floor plan: {error?.message}</div>;
   }
 
   return (
@@ -119,7 +101,7 @@ export function FloorPlan({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -131,7 +113,7 @@ export function FloorPlan({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -144,7 +126,7 @@ export function FloorPlan({
           </CardContent>
         </Card>
       </div>
-      
+
       {/* Floor Plan */}
       <Card>
         <CardHeader>
@@ -154,10 +136,9 @@ export function FloorPlan({
           </div>
         </CardHeader>
         <CardContent>
-          {/* Changed from bg-gray-50 to bg-secondary for dark mode support */}
           <div className="relative w-full h-[500px] bg-accent rounded-lg overflow-hidden">
             <svg viewBox="0 0 800 600" className="w-full h-full">
-              {/* Grid Pattern - updated stroke color for dark mode */}
+              {/* Grid Pattern */}
               <pattern
                 id="grid"
                 width="40"
@@ -173,13 +154,13 @@ export function FloorPlan({
                 />
               </pattern>
               <rect width="100%" height="100%" fill="url(#grid)" />
-              
+
               {/* Rooms */}
               {spaces.map(space => {
                 const { color, lightColor } = getRoomColor(space.type);
                 return (
                   <RoomTooltip key={space.id} room={space}>
-                    <g 
+                    <g
                       onClick={() => handleRoomClick(space)}
                       className="cursor-pointer transition-transform hover:scale-[1.02]"
                     >
@@ -193,8 +174,8 @@ export function FloorPlan({
                         strokeWidth="2"
                         rx="4"
                       />
-                      
-                      {/* Room Name - updated text fill for dark mode */}
+
+                      {/* Room Name */}
                       <text
                         x={space.position.x + 20}
                         y={space.position.y + 30}
@@ -202,25 +183,24 @@ export function FloorPlan({
                       >
                         {space.name}
                       </text>
-                      
+
                       {/* Users in room */}
                       <g transform={`translate(${space.position.x + 20}, ${space.position.y + 50})`}>
                         {space.users.map((user, i) => (
-                          <g 
-                            key={user.id} 
+                          <g
+                            key={user.id}
                             transform={`translate(${i * 40}, 0)`}
                             onMouseEnter={() => setHoveredUser(user)}
                             onMouseLeave={() => setHoveredUser(null)}
                             className="cursor-pointer group"
                           >
-                            {/* Avatar background with status color */}
+                            {/* Avatar with status color */}
                             <circle
                               cx="15"
                               cy="15"
                               r="16"
                               fill={getUserStatusColor(user.status)}
                             />
-                            
 
                             {/* Clip path for avatar */}
                             <defs>
@@ -228,9 +208,8 @@ export function FloorPlan({
                                 <circle cx="15" cy="15" r="14" />
                               </clipPath>
                             </defs>
-                            
 
-                            {/* User avatar - now using our utility function */}
+                            {/* User avatar */}
                             <image
                               href={getAvatarUrl(user)}
                               x="1"
@@ -239,22 +218,20 @@ export function FloorPlan({
                               width="28"
                               clipPath={`url(#avatar-clip-${user.id})`}
                             />
-                            
 
-                            {/* Status indicator icons (on top of avatar) */}
-                            {user.status === 'presenting' && 
+                            {/* Status indicator icons */}
+                            {user.status === 'presenting' &&
                               <foreignObject x="18" y="-3" width="16" height="16">
                                 <Monitor className="h-4 w-4 text-white bg-blue-500 rounded-full p-0.5" />
                               </foreignObject>
                             }
-                            {user.status === 'away' && user.activity.toLowerCase().includes('break') && 
+                            {user.status === 'away' && user.activity.toLowerCase().includes('break') &&
                               <foreignObject x="18" y="-3" width="16" height="16">
                                 <Coffee className="h-4 w-4 text-white bg-amber-500 rounded-full p-0.5" />
                               </foreignObject>
                             }
-                            
 
-                            {/* Message icon (appears on hover) - updated for dark mode */}
+                            {/* Message icon */}
                             <foreignObject x="18" y="18" width="16" height="16" className="opacity-0 group-hover:opacity-100">
                               <div
                                 className="bg-background dark:bg-card shadow-sm rounded-full p-0.5 cursor-pointer hover:bg-muted transition-colors"
@@ -272,8 +249,8 @@ export function FloorPlan({
               })}
             </svg>
           </div>
-          
-          {/* Room status bar - updated for dark mode */}
+
+          {/* Room status bar */}
           <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground border-t pt-4">
             <div>
               <span>Click on a room to join • </span>
@@ -287,7 +264,7 @@ export function FloorPlan({
         </CardContent>
       </Card>
 
-      {/* User Info Bar - conditionally render when user is hovered */}
+      {/* User Info Bar */}
       {hoveredUser && (
         <Card className="w-full">
           <CardContent className="py-3">
@@ -304,15 +281,16 @@ export function FloorPlan({
           </CardContent>
         </Card>
       )}
-      
+
       {/* Room Dialog */}
-      <RoomDialog 
-        room={selectedRoom as any} 
-        open={isRoomDialogOpen} 
-        onOpenChange={setIsRoomDialogOpen} 
-        onCreate={handleCreateRoom}
+      <RoomDialog
+        room={selectedRoom as any}
+        open={isRoomDialogOpen}
+        onOpenChange={setIsRoomDialogOpen}
+        onCreate={handleCreateRoom} // Kept for backward compatibility
+        companyId={companyId} // Added companyId prop
       />
-      
+
       {/* Message Dialog */}
       <MessageDialog
         user={selectedUser}

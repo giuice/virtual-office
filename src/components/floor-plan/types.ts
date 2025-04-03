@@ -20,21 +20,21 @@ export interface Space {
   description?: string;
   accessControl?: {
     isPublic: boolean;
-    allowedUsers?: number[]; // User IDs that have access
+    allowedUsers?: string[]; // User IDs that have access (Changed to string[])
     allowedRoles?: string[]; // Roles that have access
-    ownerId?: number; // User ID of the owner
+    ownerId?: string; // User ID of the owner (Changed to string)
   };
   reservations?: {
     id: string;
-    userId: number;
+    userId: string; // Changed to string
     userName: string;
-    startTime: Date;
-    endTime: Date;
-    purpose: string;
+    startTime: string | Date; // Changed to string | Date
+    endTime: string | Date;   // Changed to string | Date
+    purpose?: string; // Changed to optional
   }[];
-  createdBy?: number; // User ID who created the room
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdBy?: string; // User ID who created the room (Changed to string)
+  createdAt?: string | Date; // Changed to string | Date
+  updatedAt?: string | Date; // Changed to string | Date
   isTemplate?: boolean;
   templateName?: string;
 }

@@ -7,9 +7,10 @@ export interface RoomDialogProps {
   room: Space | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (newRoomData: Partial<Space>) => void;
-  onUpdate?: (updatedRoom: Space) => void;
+  onCreate?: (newRoomData: Partial<Space>) => void; // Made optional
+  onUpdate?: (updatedRoom: Space) => void; // Already optional
   isCreating?: boolean;
+  companyId: string; // Added for React Query mutations
 }
 
 export interface RoomTabsProps {

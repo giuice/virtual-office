@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { MessagingProvider } from '@/contexts/messaging/MessagingContext'; // Use the modular provider
 import { ThemeProvider } from '@/providers/theme-provider';
+import { QueryProvider } from '@/providers/query-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -20,6 +21,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+            <QueryProvider>
           <AuthProvider>
             <CompanyProvider>
               <MessagingProvider> {/* Wrap with MessagingProvider */}
@@ -28,6 +30,7 @@ export default function RootLayout({
               </MessagingProvider>
             </CompanyProvider>
           </AuthProvider>
+            </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

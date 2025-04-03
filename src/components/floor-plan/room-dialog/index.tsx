@@ -10,15 +10,24 @@ import { RoomDialogProps } from './types';
 import { RoomHeader } from './room-header';
 import { CreateRoomForm } from './create-room-form';
 import { ViewRoomTabs } from './view-room-tabs';
+import { useCreateSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations'; // Import useUpdateSpace
+import { useNotification } from '@/hooks/useNotification';
 
-export function RoomDialog({ 
-  room, 
-  open, 
-  onOpenChange, 
-  onCreate, 
-  onUpdate,
-  isCreating = false 
-}: RoomDialogProps) {
+// Define the type for the creation payload based on the hook
+type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>;
+// Define the type for the update payload based on the hook
+type SpaceUpdateData = Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>>;
+
+
+export function RoomDialog({
+  room,
+  open,
+  onOpenChange,
+  // onCreate, // Removed onCreate prop
+  // onUpdate, // Removed onUpdate prop - handled by mutation hook now
+  isCreating = false,
+  companyId // Added companyId prop
+}: RoomDialogProps & { companyId: string }) { // Remove onUpdate from props if no longer needed externally
   // Room state - Use global Space type
   const [roomData, setRoomData] = useState<Partial<Space>>({
     id: '',
@@ -33,19 +42,23 @@ export function RoomDialog({
     accessControl: { isPublic: true },
     reservations: []
   });
-  
+
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formValid, setFormValid] = useState(false);
-  
+
   // UI state
   const [isMicActive, setIsMicActive] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isRoomLocked, setIsRoomLocked] = useState(false);
-  
+
   // For direct messaging
   const [messageUser, setMessageUser] = useState<LocalUser | null>(null);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+
+  const { showSuccess, showError } = useNotification();
+  const createSpace = useCreateSpace();
+  const updateSpace = useUpdateSpace(); // Call the update hook
 
   // Initialize form with room data if editing
   useEffect(() => {
@@ -60,7 +73,6 @@ export function RoomDialog({
     } else {
       // Reset form for new room
       setRoomData({
-        id: `room-${Date.now()}`, // Generate ID client-side for now, API might override
         name: '',
         type: 'workspace',
         status: 'available',
@@ -75,25 +87,25 @@ export function RoomDialog({
       setIsRoomLocked(false);
     }
   }, [room, isCreating]);
-  
+
   // Validate form
   useEffect(() => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!roomData.name?.trim()) {
       newErrors.name = 'Room name is required';
     } else if (roomData.name.length > 30) {
       newErrors.name = 'Room name must be 30 characters or less';
     }
-    
+
     if (roomData.capacity && (roomData.capacity < 1 || roomData.capacity > 50)) {
       newErrors.capacity = 'Capacity must be between 1 and 50';
     }
-    
+
     if (roomData.description && roomData.description.length > 200) {
       newErrors.description = 'Description must be 200 characters or less';
     }
-    
+
     setErrors(newErrors);
     setFormValid(Object.keys(newErrors).length === 0);
   }, [roomData]);
@@ -103,51 +115,80 @@ export function RoomDialog({
     setMessageUser(user);
     setIsMessageDialogOpen(true);
   };
-  
+
   // Join room function (mock implementation)
   const handleJoinRoom = () => {
     console.log(`Joining room: ${roomData.id}`);
     // Here you would implement actual room joining logic with Socket.io
     onOpenChange(false);
   };
-  
-  // Save room function - Prepare data for API
+
+  // Save room function - Use mutation hooks
   const handleSaveRoom = () => {
-    if (!formValid) return;
+    // Disable if invalid or either mutation is loading
+    if (!formValid || createSpace.isPending || updateSpace.isPending) return;
 
     // Update room status based on lock state
     const finalStatus = isRoomLocked ? 'locked' : (roomData.status || 'available');
 
-    // Construct the data object based on the global Space type
-    const roomPayload: Partial<Space> = {
-      name: roomData.name || 'Untitled Room',
-      type: roomData.type || 'workspace',
-      status: finalStatus,
-      capacity: roomData.capacity || 4,
-      features: roomData.features || [],
-      position: roomData.position || { x: 100, y: 100, width: 200, height: 150 },
-      userIds: roomData.userIds || [],
-      description: roomData.description,
-      accessControl: roomData.accessControl || { isPublic: true },
-      reservations: roomData.reservations || [],
-    };
-
     if (isCreating) {
-      // Pass partial data for creation
-      onCreate(roomPayload);
-    } else if (onUpdate && roomData.id) {
-      // Pass full object (including ID) for update
-      onUpdate({ ...roomPayload, id: roomData.id } as Space);
+      // Construct the data object for creation
+      const createPayload: SpaceCreateData = {
+        companyId: companyId,
+        name: roomData.name || 'Untitled Room',
+        type: roomData.type || 'workspace',
+        status: finalStatus,
+        capacity: roomData.capacity || 4,
+        features: roomData.features || [],
+        position: roomData.position || { x: 100, y: 100, width: 200, height: 150 },
+        userIds: roomData.userIds || [],
+        description: roomData.description,
+        accessControl: roomData.accessControl || { isPublic: true },
+        isTemplate: roomData.isTemplate || false,
+        templateName: roomData.templateName,
+      };
+      createSpace.mutate(createPayload, {
+        onSuccess: () => {
+          showSuccess({ description: "Room created successfully." });
+          onOpenChange(false);
+        },
+        onError: (error) => {
+          showError({ title: "Error", description: `Failed to create room: ${error.message}` });
+        },
+      });
+    } else if (roomData.id) { // Check if we have an ID for update
+      // Construct the data object for update
+      const updatePayload: SpaceUpdateData = {
+        // Only include fields that have changed or are relevant for update
+        name: roomData.name,
+        type: roomData.type,
+        status: finalStatus,
+        capacity: roomData.capacity,
+        features: roomData.features,
+        position: roomData.position,
+        userIds: roomData.userIds, // Assuming userIds might be updated here, otherwise handle separately
+        description: roomData.description,
+        accessControl: roomData.accessControl,
+        isTemplate: roomData.isTemplate,
+        templateName: roomData.templateName,
+      };
+      updateSpace.mutate({ id: roomData.id, updates: updatePayload }, {
+        onSuccess: () => {
+          showSuccess({ description: "Room updated successfully." });
+          onOpenChange(false);
+        },
+        onError: (error) => {
+          showError({ title: "Error", description: `Failed to update room: ${error.message}` });
+        },
+      });
     }
-
-    onOpenChange(false);
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <RoomHeader 
+          <RoomHeader
             name={roomData.name}
             type={roomData.type}
             features={roomData.features}
@@ -166,6 +207,8 @@ export function RoomDialog({
           ) : (
             <ViewRoomTabs
               roomData={roomData}
+              // Pass setRoomData down if tabs need to modify state directly
+              // setRoomData={setRoomData}
               isMicActive={isMicActive}
               setIsMicActive={setIsMicActive}
               isScreenSharing={isScreenSharing}
@@ -174,11 +217,14 @@ export function RoomDialog({
               setIsRoomLocked={setIsRoomLocked}
               handleMessageUser={handleMessageUser}
               handleJoinRoom={handleJoinRoom}
+              // Pass the save handler and loading state down
+              onSave={handleSaveRoom}
+              isSaving={updateSpace.isPending}
             />
           )}
         </DialogContent>
       </Dialog>
-      
+
       {/* Message Dialog */}
       <MessageDialog
         user={messageUser}
