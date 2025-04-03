@@ -76,4 +76,9 @@ next_phase: "Execution"
 - Placing hooks (`useX`) in `src/hooks` is standard convention and avoids confusion compared to placing them within `src/contexts`.
 - Duplicate files (like `MessagingContext.tsx`) can cause significant issues; verify imports (`layout.tsx`, components) to ensure the correct version is used before deleting duplicates.
 - Ensure type definitions are consistent across files (`src/types/` vs `src/contexts/x/types.ts`) and remove unused/undefined type imports.
+- Breaking down large React components into smaller, focused components improves maintainability and makes the code easier to understand and test
+- Using a directory structure for related components helps organize code and makes relationships clearer
+- Separating types, utils, and components helps maintain clean separation of concerns
+- Aligning component structure with database schema (like space_reservations table) makes it easier to manage data flow
+- Using TypeScript interfaces to define props makes component relationships explicit and catches errors early
 ---CLINE_RULES_END---

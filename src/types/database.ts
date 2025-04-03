@@ -4,15 +4,24 @@ import { Timestamp } from 'firebase/firestore';
 // User role types
 export type UserRole = 'admin' | 'member';
 
-// User status types (Keep existing UserStatus, floor plan uses a different set)
+// User status types
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
 
-// Floor Plan / Space related types
+// UI-specific user status (different from database status)
+export type UIUserStatus = 'active' | 'away' | 'presenting' | 'viewing';
+
+// Space types
 export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout' | 'private_office' | 'open_space' | 'lounge' | 'lab';
 export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked' | 'reserved' | 'in_use';
 
 // Message types
-export type MessageType = 'text' | 'image' | 'file' | 'transcript';
+export type MessageType = 'text' | 'image' | 'file' | 'transcript' | 'system' | 'announcement';
+// Conversation types
+export type ConversationType = 'direct' | 'group' | 'room';
+// Announcement priority
+export type AnnouncementPriority = 'low' | 'medium' | 'high';
+// Note generator type
+export type NoteGenerator = 'ai' | 'user';
 
 import { MessageStatus } from '@/types/messaging'; // Added for Message status
 // Define a TimeStamp type that works with both Firebase and DynamoDB
@@ -71,13 +80,11 @@ export interface AccessControl {
 // Reservation for Spaces
 export interface Reservation {
   id: string;
-  spaceId: string; // Added: Link to the space being reserved
   userId: string; // User ID who made the reservation
   userName: string; // User name (denormalized for display)
-  startTime: TimeStampType;
-  endTime: TimeStampType;
+  startTime: string | Date;
+  endTime: string | Date;
   purpose?: string;
-  createdAt: TimeStampType; // Added: Timestamp of creation
 }
 
 // Space Collection (Replaces the simpler Room type)
@@ -92,12 +99,15 @@ export interface Space {
   position: Position;
   userIds: string[]; // User IDs currently in the space
   description?: string;
-  accessControl?: AccessControl;
+  accessControl: AccessControl;
   createdBy?: string; // User ID who created the room
-  createdAt?: TimeStampType;
-  updatedAt?: TimeStampType;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   isTemplate?: boolean; // If this space is a template itself
   templateName?: string; // Name of the template used, if any
+  // This property won't be stored directly in the spaces table
+  // but will be populated when fetching a space with its reservations
+  reservations?: Reservation[];
 }
 
 // Room Collection (DEPRECATED - Use Space instead)

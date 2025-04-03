@@ -2,7 +2,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Space, User, spaceColors, userStatusColors } from './types'
+import { Space as LocalSpace, UIUser, UIUser as User,  spaceColors, userStatusColors } from './types'
+// Import the database Space type and adapter functions
+import { Space as DBSpace, SpaceType } from '@/types/database'
+import { dbSpaceToUISpace } from '@/lib/type-adapters'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Monitor, Video, MessageSquare, Coffee, Zap } from 'lucide-react'
@@ -13,8 +16,9 @@ import { MessageDialog } from './message-dialog'
 import { getAvatarUrl } from '@/lib/avatar-utils'
 import { StatusAvatar } from '@/components/ui/status-avatar'
 
+
 interface FloorPlanProps {
-  spaces: Space[];
+  spaces: LocalSpace[];
   companyName: string;
   onlineUsers: number;
   activeMeetings: number;
@@ -28,7 +32,7 @@ export function FloorPlan({
   activeMeetings, 
   pendingMessages 
 }: FloorPlanProps) {
-  const [selectedRoom, setSelectedRoom] = useState<Space | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<LocalSpace | null>(null);
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useState(false);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
   
@@ -36,8 +40,15 @@ export function FloorPlan({
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
 
+  // Function to handle room creation (required by RoomDialog)
+  const handleCreateRoom = (newRoomData: Partial<DBSpace>) => {
+    console.log('Create room:', newRoomData);
+    // This would typically call an API to create the room
+    // For now we'll just log the data
+  };
+
   // Helper function to get color based on room type
-  const getRoomColor = (type: Space['type']) => {
+  const getRoomColor = (type: LocalSpace['type']) => {
     return spaceColors[type] || spaceColors.default;
   }
 
@@ -47,8 +58,42 @@ export function FloorPlan({
   }
 
   // Function to handle room click
-  const handleRoomClick = (room: Space) => {
-    setSelectedRoom(room);
+  const handleRoomClick = (room: LocalSpace) => {
+    // We need to convert our LocalSpace to the database Space type
+    // This would normally be done by fetching the space and its reservations from the API
+    // For now, we'll create a mock conversion
+    
+    const mockSpace: DBSpace = {
+      id: String(room.id), // Convert number ID to string if needed
+      companyId: '1', // Mock company ID
+      name: room.name,
+      type: room.type as SpaceType, // Assuming types are compatible
+      status: 'available', // Default status
+      capacity: room.capacity || 4,
+      features: room.features || [],
+      position: room.position,
+      userIds: room.users.map(user => String(user.id)), // Convert user IDs
+      description: room.description,
+      accessControl: {
+        isPublic: true,
+        // In a real app, we would include room.accessControl properties
+      },
+      // Normally we would fetch these from the space_reservations table
+      // Mock some reservations for demo purposes
+      reservations: [
+        {
+          id: `reservation-${Date.now()}`,
+          userId: 'user-1',
+          userName: 'John Doe',
+          startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+          endTime: new Date(Date.now() + 7200000).toISOString(),  // 2 hours from now
+          purpose: 'Team meeting'
+        }
+      ]
+    };
+    
+    const convertedSpace: LocalSpace = dbSpaceToUISpace(mockSpace);
+    setSelectedRoom(convertedSpace);
     setIsRoomDialogOpen(true);
   }
   
@@ -176,6 +221,7 @@ export function FloorPlan({
                               fill={getUserStatusColor(user.status)}
                             />
                             
+
                             {/* Clip path for avatar */}
                             <defs>
                               <clipPath id={`avatar-clip-${user.id}`}>
@@ -183,6 +229,7 @@ export function FloorPlan({
                               </clipPath>
                             </defs>
                             
+
                             {/* User avatar - now using our utility function */}
                             <image
                               href={getAvatarUrl(user)}
@@ -193,6 +240,7 @@ export function FloorPlan({
                               clipPath={`url(#avatar-clip-${user.id})`}
                             />
                             
+
                             {/* Status indicator icons (on top of avatar) */}
                             {user.status === 'presenting' && 
                               <foreignObject x="18" y="-3" width="16" height="16">
@@ -205,6 +253,7 @@ export function FloorPlan({
                               </foreignObject>
                             }
                             
+
                             {/* Message icon (appears on hover) - updated for dark mode */}
                             <foreignObject x="18" y="18" width="16" height="16" className="opacity-0 group-hover:opacity-100">
                               <div
@@ -258,9 +307,10 @@ export function FloorPlan({
       
       {/* Room Dialog */}
       <RoomDialog 
-        room={selectedRoom} 
+        room={selectedRoom as any} 
         open={isRoomDialogOpen} 
         onOpenChange={setIsRoomDialogOpen} 
+        onCreate={handleCreateRoom}
       />
       
       {/* Message Dialog */}
