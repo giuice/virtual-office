@@ -56,6 +56,7 @@ export function useConversations() {
         participants: [user.uid], // Start with just the current user
         name: roomName,
         roomId,
+        userId: user.uid, // Add the user ID as a separate property
       });
       
       // Add to conversations list
@@ -100,6 +101,7 @@ export function useConversations() {
       const newConversation = await messagingApi.createConversation({ 
          type: ConversationType.DIRECT,
          participants: [user.uid, otherUserId],
+         userId: user.uid, // Add the user ID as a separate property
          // Name might be handled differently for direct messages
       });
       

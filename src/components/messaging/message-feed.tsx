@@ -110,17 +110,17 @@ export function MessageFeed({
   };
   
   // Get current draft for the active conversation
-  const getCurrentDraft = () => {
-    if (!activeConversation) return '';
-    return messageDrafts[activeConversation.id]?.content || '';
-  };
+  // const getCurrentDraft = () => {
+  //   if (!activeConversation) return '';
+  //   return messageDrafts[activeConversation.id]?.content || '';
+  // };
   
-  // Handle draft update
-  const handleDraftUpdate = (content: string) => {
-    if (activeConversation) {
-      updateMessageDraft(activeConversation.id, content);
-    }
-  };
+  // // Handle draft update
+  // const handleDraftUpdate = (content: string) => {
+  //   if (activeConversation) {
+  //     updateMessageDraft(activeConversation.id, content);
+  //   }
+  // };
   
   // Render loading state
   if (isLoading || loadingMessages) {
@@ -229,8 +229,8 @@ export function MessageFeed({
           onTyping={handleTyping}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
-          initialValue={getCurrentDraft()}
-          onValueChange={handleDraftUpdate}
+          initialValue={ ""/*getCurrentDraft()*/}
+          onValueChange={()=>{}/*handleDraftUpdate*/}
         />
       </CardFooter>
     </Card>

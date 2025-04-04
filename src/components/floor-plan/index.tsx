@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useMemo } from 'react' // Added useMemo
-import { Space as LocalSpace, UIUser, UIUser as User,  spaceColors, userStatusColors } from './types'
+import { Space as LocalSpace, UIUser as User,  spaceColors, userStatusColors } from './types'
 // Import the database Space type and adapter functions
 import { Space as DBSpace, SpaceType } from '@/types/database'
 import { dbSpaceToUISpace } from '@/lib/type-adapters'
@@ -10,7 +10,8 @@ import { useSpaces } from '@/hooks/queries/useSpaces'; // Added useSpaces import
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Monitor, Video, MessageSquare, Coffee, Zap } from 'lucide-react'
-import { RoomTooltip } from './room-tooltip'
+//import { RoomTooltip } from './room-tooltip'
+import { FloorTooltip } from './floor-tooltip'
 import { RoomDialog } from './room-dialog/index'
 import { UserHoverCard } from './user-hover-card'
 import { MessageDialog } from './message-dialog'
@@ -159,7 +160,7 @@ export function FloorPlan({
               {spaces.map(space => {
                 const { color, lightColor } = getRoomColor(space.type);
                 return (
-                  <RoomTooltip key={space.id} room={space}>
+                  <FloorTooltip content={{ type: 'space', data: space }} key={space.id}>
                     <g
                       onClick={() => handleRoomClick(space)}
                       className="cursor-pointer transition-transform hover:scale-[1.02]"
@@ -244,7 +245,7 @@ export function FloorPlan({
                         ))}
                       </g>
                     </g>
-                  </RoomTooltip>
+                  </FloorTooltip>
                 );
               })}
             </svg>

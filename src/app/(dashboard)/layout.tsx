@@ -3,6 +3,7 @@
 
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { SearchProvider } from '@/contexts/SearchContext';
+import { SpaceRealtimeProvider } from '@/components/providers/space-realtime-provider';
 
 export default function DashboardLayout({
   children,
@@ -29,9 +30,11 @@ export default function DashboardLayout({
 
   return (
     <SearchProvider>
-      <div className="min-h-screen bg-background">
-        {children}
-      </div>
+      <SpaceRealtimeProvider>
+        <div className="min-h-screen bg-background">
+          {children}
+        </div>
+      </SpaceRealtimeProvider>
     </SearchProvider>
   );
 }

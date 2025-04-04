@@ -11,7 +11,7 @@
 ## ENTERING/EXITING THIS PHASE
 
 **Enter if**:
-- `.memorybankrules` shows `CURRENT: Strategy`
+- `memorybankrules.md` shows `CURRENT: Strategy`
 - Transitioning from Setup/Maintenance
 
 **Exit when**:
@@ -33,7 +33,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 ## CONTEXT LOADING
 
 1. Read core files:
-   - `.memorybankrules`
+   - `memorybankrules.md`
    - `memory-bank/projectbrief.md`
    - `memory-bank/productContext.md`
    - `memory-bank/activeContext.md`
@@ -253,7 +253,7 @@ In addition to core MUP checklist, also verify:
 [ ] Dependencies are clearly specified
 [ ] Task priorities are documented
 [ ] Complex tasks are decomposed if needed
-[ ] `.memorybankrules` updated with NEXT: Execution
+[ ] `memorybankrules.md` updated with NEXT: Execution
 [/TRANSITION_CHECKLIST]
 
 ## REQUIRED RESPONSE FORMAT

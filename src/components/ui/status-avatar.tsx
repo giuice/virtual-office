@@ -1,7 +1,7 @@
 // src/components/ui/status-avatar.tsx
 'use client';
 
-import { User } from '@/components/floor-plan/types';
+import { UIUser as User } from '@/components/floor-plan/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
 

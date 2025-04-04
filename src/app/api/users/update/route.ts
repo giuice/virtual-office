@@ -23,10 +23,31 @@ export async function PATCH(
     // Ensure lastActive is excluded if present, as the repository handles it.
     const { lastActive, ...userData }: Partial<User> = await request.json();
 
-    // Update the user using the repository
+    // Check if the ID is a Firebase UID (not a UUID format)
+    const isFirebaseUid = !id.includes('-') && id.length < 36;
+    
+    let userId = id;
+    
+    // If this is a Firebase UID, we need to find the corresponding user's database ID
+    if (isFirebaseUid) {
+      console.log(`Received Firebase UID: ${id}, finding corresponding user database ID`);
+      const user = await userRepository.findByFirebaseUid(id);
+      
+      if (!user) {
+        return NextResponse.json({ 
+          success: false, 
+          message: `User with Firebase UID ${id} not found` 
+        }, { status: 404 });
+      }
+      
+      userId = user.id; // Use the database UUID instead of Firebase UID
+      console.log(`Found user with database ID: ${userId}`);
+    }
+
+    // Update the user using the repository with the correct UUID
     // The repository's update method handles mapping camelCase to snake_case
     // and automatically sets last_active.
-    const updatedUser = await userRepository.update(id, userData);
+    const updatedUser = await userRepository.update(userId, userData);
 
     if (!updatedUser) {
       return NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 });

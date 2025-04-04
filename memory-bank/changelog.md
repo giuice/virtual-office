@@ -4,6 +4,18 @@ This file tracks significant changes to the project, organized by date with the 
 
 ## April 4, 2025
 
+### Invitation System Fix
+- **Feature**: Fixed critical error in the invitation system
+- **Components Updated**:
+  - Updated `api/invitations/accept/route.ts` to use the user's database ID (UUID) instead of Firebase UID
+  - Updated `api/users/update/route.ts` to detect and handle both Firebase UIDs and database UUIDs
+  - Improved error handling in the join page UI
+- **Benefits**:
+  - Resolved "invalid input syntax for type uuid" errors
+  - Improved system reliability
+  - Better error handling and user feedback
+  - Proper handling of ID format differences between Firebase and database
+
 ### React Query Integration for Spaces
 - **Feature**: Integrated React Query mutation hooks into components
 - **Components Updated**:

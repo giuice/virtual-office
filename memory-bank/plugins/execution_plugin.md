@@ -10,7 +10,7 @@
 ## ENTERING/EXITING THIS PHASE
 
 **Enter if**:
-- `.memorybankrules` shows `CURRENT: Execution`
+- `memorybankrules.md` shows `CURRENT: Execution`
 - Transitioning from Strategy
 
 **Exit when**:
@@ -31,7 +31,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 ## CONTEXT LOADING
 
 1. Read core files:
-   - `.memorybankrules`
+   - `memorybankrules.md`
    - `memory-bank/projectbrief.md`
    - `memory-bank/productContext.md`
    - `memory-bank/activeContext.md`
@@ -82,7 +82,7 @@ For each step in the instruction file:
 
 5. **Apply MUP**
    - Complete all MUP checklist items
-   - Update `.memorybankrules` with progress
+   - Update `memorybankrules.md` with progress
 
 ## ERROR HANDLING PROTOCOL
 
@@ -133,7 +133,7 @@ In addition to core MUP checklist, also verify:
 [ ] All expected outputs are generated
 [ ] Results and observations are documented
 [ ] Instruction file is updated with step status
-[ ] `.memorybankrules` updated with NEXT: Strategy
+[ ] `memorybankrules.md` updated with NEXT: Strategy
 [/TRANSITION_CHECKLIST]
 
 ## REQUIRED RESPONSE FORMAT

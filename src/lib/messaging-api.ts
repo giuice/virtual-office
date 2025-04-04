@@ -80,7 +80,7 @@ export const messagingApi = {
   /**
    * Create a new conversation
    */
-  async createConversation(conversation: Partial<Conversation>): Promise<Conversation> {
+  async createConversation(conversation: Partial<Conversation> & { userId?: string }): Promise<Conversation> {
     try {
       const response = await fetch('/api/conversations/create', {
         method: 'POST',

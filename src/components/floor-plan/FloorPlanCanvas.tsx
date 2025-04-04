@@ -10,6 +10,9 @@ import { RoomTooltip } from './room-tooltip';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
+import { KonvaUserAvatar } from './konva-user-avatar'; // Import the new KonvaUserAvatar component
+import { UserTooltip } from './user-tooltip';
+import { FloorTooltip } from './floor-tooltip';
 
 export type FloorPlanCanvasProps = {
   spaces: Space[]; // Expects global Space[]
@@ -35,6 +38,10 @@ export const FloorPlanCanvas = ({
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { companyUsers } = useCompany(); // Get companyUsers from context
+  
+  // Add state for user tooltip
+  const [hoveredUser, setHoveredUser] = useState<GlobalUser | null>(null);
+  const [userTooltipPosition, setUserTooltipPosition] = useState({ x: 0, y: 0 });
 
   // Grid settings
   const gridSize = 20; // Size of grid cells in pixels
@@ -376,32 +383,57 @@ export const FloorPlanCanvas = ({
                       fill="hsl(var(--muted-foreground))"
                     />
 
-                    {/* User Indicators - Add check for space.userIds */}
+                    {/* User Indicators - Replace circles with KonvaUserAvatar */}
                     {Array.isArray(space.userIds) && space.userIds.map((userId, index) => {
                       const user = companyUsers.find(u => u.id === userId);
                       if (!user) return null; // Skip if user data not found yet
 
-                      // Simple layout: place circles in a row near the bottom
-                      const userIndicatorRadius = 5;
-                      const padding = 5;
-                      const indicatorX = space.position.x + padding + userIndicatorRadius + index * (userIndicatorRadius * 2 + padding);
-                      const indicatorY = space.position.y + space.position.height - padding - userIndicatorRadius - 30; // Position above user count text
+                      // Layout: place avatars in a row near the bottom
+                      const avatarSize = 16; // Increase size from 12 to 16
+                      const padding = 8;
+                      const maxAvatarsPerRow = Math.floor((space.position.width - padding * 2) / (avatarSize * 2 + padding));
+                      
+                      // Calculate row and column for grid layout
+                      const row = Math.floor(index / maxAvatarsPerRow);
+                      const col = index % maxAvatarsPerRow;
+                      
+                      const avatarX = space.position.x + padding + avatarSize + col * (avatarSize * 2 + padding);
+                      const avatarY = space.position.y + space.position.height - padding - avatarSize - 30 - (row * (avatarSize * 2 + 4));
 
-                      // Ensure indicators stay within bounds (simple check)
-                      if (indicatorX + userIndicatorRadius > space.position.x + space.position.width - padding) {
+                      // Ensure avatars stay within bounds
+                      if (avatarX + avatarSize > space.position.x + space.position.width - padding) {
                         return null; // Don't render if it overflows horizontally
                       }
 
                       return (
-                        <Circle
+                        <KonvaUserAvatar
                           key={userId}
-                          x={indicatorX}
-                          y={indicatorY}
-                          radius={userIndicatorRadius}
-                          fill={user.status === 'online' ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))'} // Example: Green for online, gray otherwise
-                          stroke="white"
-                          strokeWidth={1}
-                          // TODO: Add tooltip or hover effect to show user name
+                          user={user}
+                          x={avatarX}
+                          y={avatarY}
+                          size={avatarSize}
+                          onClick={(user) => {
+                            // Handle click on user avatar if needed
+                            console.log('User clicked:', user.displayName);
+                          }}
+                          onMouseEnter={(e, user) => {
+                            // Show tooltip with user info
+                            setHoveredUser(user);
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const pointerPosition = stage.getPointerPosition();
+                              if (pointerPosition) {
+                                setUserTooltipPosition({
+                                  x: pointerPosition.x,
+                                  y: pointerPosition.y
+                                });
+                              }
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            // Hide tooltip
+                            setHoveredUser(null);
+                          }}
                         />
                       );
                     })}
@@ -473,6 +505,12 @@ export const FloorPlanCanvas = ({
           </Stage>
         </TransformComponent>
       </TransformWrapper>
+      
+      {/* User tooltip */}
+      {hoveredUser && <FloorTooltip 
+        content={{ type: 'user', data: hoveredUser }} 
+        position={userTooltipPosition}
+      />}
     </div>
   );
 };

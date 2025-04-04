@@ -10,8 +10,8 @@
 ## ENTERING/EXITING THIS PHASE
 
 **Enter if**:
-- `.memorybankrules` shows `CURRENT: Setup/Maintenance`
-- `.memorybankrules` is missing (initial setup)
+- `memorybankrules.md` shows `CURRENT: Setup/Maintenance`
+- `memorybankrules.md` is missing (initial setup)
 
 **Exit when**:
 - All core files exist and are initialized
@@ -31,7 +31,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 ## CORE FILE INITIALIZATION
 
 **Required files**:
-- `.memorybankrules`: Phase management
+- `memorybankrules.md`: Phase management
 - `memory-bank/projectbrief.md`: Project goals
 - `memory-bank/productContext.md`: Product context
 - `memory-bank/activeContext.md`: Current state
@@ -43,7 +43,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 **Creation procedure**:
 1. Check if each file exists
 2. For missing files, create with basic templates[memory-bank/templates]:
-   - For `.memorybankrules`:
+   - For `memorybankrules.md`:
      ```
      [PHASE_MARKER]
      CURRENT: Setup/Maintenance
@@ -73,7 +73,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
    - `build`, `dist` (outputs)
    - `docs` (documentation)
 
-4. Update `.memorybankrules`:
+4. Update `memorybankrules.md`:
    ```
    [CODE_ROOT_DIRECTORIES]
    - src
@@ -118,10 +118,10 @@ In addition to core MUP checklist, also verify:
 
 [TRANSITION_CHECKLIST]
 [ ] All required files exist
-[ ] Code roots identified and added to `.memorybankrules`
+[ ] Code roots identified and added to `memorybankrules.md`
 [ ] `dependency_tracker.md` populated with dependencies
 [ ] `doc_tracker.md` created and populated
-[ ] `.memorybankrules` updated with NEXT: Strategy
+[ ] `memorybankrules.md` updated with NEXT: Strategy
 [/TRANSITION_CHECKLIST]
 
 ## REQUIRED RESPONSE FORMAT

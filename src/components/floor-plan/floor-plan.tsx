@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
+import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -41,6 +42,7 @@ export function FloorPlan() {
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
+  const [chatRoom, setChatRoom] = useState<Space | null>(null);
   
   // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {
@@ -103,18 +105,8 @@ const handleDeleteRoom = (roomId: string) => {
   // Template position handling
   const [templatePosition, setTemplatePosition] = useState<{ x: number; y: number; width?: number; height?: number } | undefined>(undefined);
 
-  // State for room messaging
-  const [chatRoom, setChatRoom] = useState<Space | null>(null);
-
-  // Handle opening chat for a room
-  const handleOpenChat = (room: Space) => {
-    setChatRoom(room);
-  };
-  
-  // Handle closing chat
-  const handleCloseChat = () => {
-    setChatRoom(null);
-  };
+  // Use the last space hook to persist space selection
+  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserProfile, spaces);
 
   // Handle entering a space (new function)
   const handleEnterSpace = (space: Space) => {
@@ -144,6 +136,9 @@ const handleDeleteRoom = (roomId: string) => {
               title: "Entered Space",
               description: `You have entered ${space.name}`
             });
+            
+            // Save the space ID for persistence across sessions
+            saveLastSpace(space.id);
           },
           onError: (error) => {
             toast({
@@ -153,6 +148,9 @@ const handleDeleteRoom = (roomId: string) => {
             });
           }
         });
+      } else {
+        // User is already in this space, just save the ID
+        saveLastSpace(space.id);
       }
     }
     
@@ -162,6 +160,67 @@ const handleDeleteRoom = (roomId: string) => {
     // Open chat for this space
     handleOpenChat(space);
   };
+  
+  // Handle leaving a space
+  const handleLeaveSpace = (space: Space) => {
+    if (!space || !space.id || !currentUserProfile) {
+      return;
+    }
+    
+    // Remove the user from the space's userIds
+    const updatedUserIds = (space.userIds || []).filter(id => id !== currentUserProfile.id);
+    
+    updateSpaceMutation.mutate({
+      id: space.id,
+      updates: { userIds: updatedUserIds }
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Left Space",
+          description: `You have left ${space.name}`
+        });
+        
+        // Clear the saved space if it's the one we're leaving
+        if (lastSpaceId === space.id) {
+          clearLastSpace();
+        }
+        
+        // If this was the selected space, deselect it
+        if (selectedSpace?.id === space.id) {
+          setSelectedSpace(null);
+          setChatRoom(null);
+        }
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: `Failed to leave space: ${error.message}`,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  // Handle opening chat for a room
+  const handleOpenChat = (room: Space) => {
+    setChatRoom(room);
+  };
+  
+  // Handle closing chat
+  const handleCloseChat = () => {
+    setChatRoom(null);
+  };
+
+  useEffect(() => {
+    // If there's a last space ID, try to select it
+    if (lastSpaceId) {
+      const space = spaces.find(space => space.id === lastSpaceId);
+      if (space) {
+        setSelectedSpace(space);
+        handleEnterSpace(space);
+      }
+    }
+  }, [lastSpaceId, spaces]);
 
   return (
     <div className="space-y-4 relative">

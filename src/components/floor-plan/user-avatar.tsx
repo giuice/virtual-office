@@ -1,5 +1,5 @@
 // components/floor-plan/user-avatar.tsx
-import { User } from './types'
+import { UIUser as User } from './types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {

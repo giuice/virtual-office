@@ -1,5 +1,30 @@
 # Changelog
 
+## 2025-04-04: Real-time Space Updates and Avatar Implementation
+- Implemented `useSpaceRealtime` hook for automatic React Query cache invalidation
+- Integrated Supabase Realtime with React Query for spaces
+- Created SpaceRealtimeProvider component for dashboard layout
+- Added user avatars to the floor plan
+- Implemented space persistence across sessions with `useLastSpace` hook
+
+### Added
+- Real-time subscription for spaces with Supabase Realtime
+- Automatic cache invalidation for spaces based on real-time events
+- SpaceRealtimeProvider component for dashboard layout
+- User avatars to the floor plan
+- Space persistence across sessions
+
+### Changed
+- Updated floor plan to include user avatars
+- Implemented space persistence across sessions
+
+### Technical Details
+- Used Supabase channel API for real-time subscriptions
+- Implemented event-specific cache invalidation strategies
+- Integrated with React Query's cache management system
+- Created `KonvaUserAvatar` component for rendering user avatars in Konva canvas
+- Implemented user tooltips for displaying user information on hover
+
 ## 2025-04-03: Major Tech Stack Update
 - Migrated from Firebase/DynamoDB to Supabase for data persistence
 - Implemented Repository Pattern for data access abstraction
@@ -34,6 +59,8 @@
 - Space (Room) Management
 - User Profiles and Status
 - Company Invitation System
+- Avatar Implementation in Floor Plan
+- Space Persistence Across Sessions
 
 ### In Progress
 - Meeting Notes System
