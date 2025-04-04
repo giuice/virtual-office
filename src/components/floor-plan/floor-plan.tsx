@@ -19,8 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RoomChatIntegration } from './room-chat-integration';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
+import { useDeleteSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -28,6 +29,7 @@ import { RoomTemplates } from './room-templates';
 export function FloorPlan() {
   // Get data from context
   const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
+  const router = useRouter(); // Add router for navigation
 
   // State for UI interactions
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
@@ -57,6 +59,7 @@ export function FloorPlan() {
 
   // Room updates are now handled by the mutation hooks in the RoomDialog component
 const deleteSpaceMutation = useDeleteSpace();
+const updateSpaceMutation = useUpdateSpace();
 const { toast } = useToast();
 
 const handleDeleteRoom = (roomId: string) => {
@@ -111,6 +114,53 @@ const handleDeleteRoom = (roomId: string) => {
   // Handle closing chat
   const handleCloseChat = () => {
     setChatRoom(null);
+  };
+
+  // Handle entering a space (new function)
+  const handleEnterSpace = (space: Space) => {
+    if (!space || !space.id) {
+      toast({
+        title: "Error",
+        description: "Cannot enter space: Invalid space data.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Update the user's position to be in this space
+    if (currentUserProfile && currentUserProfile.id) {
+      // Add the current user to the space's userIds if not already there
+      const updatedUserIds = space.userIds || [];
+      if (!updatedUserIds.includes(currentUserProfile.id)) {
+        updatedUserIds.push(currentUserProfile.id);
+        
+        // Update the space with the new userIds using the mutation hook
+        updateSpaceMutation.mutate({ 
+          id: space.id, 
+          updates: { userIds: updatedUserIds } 
+        }, {
+          onSuccess: () => {
+            toast({
+              title: "Entered Space",
+              description: `You have entered ${space.name}`
+            });
+          },
+          onError: (error) => {
+            toast({
+              title: "Error",
+              description: `Failed to enter space: ${error.message}`,
+              variant: "destructive"
+            });
+          }
+        });
+      }
+    }
+    
+    // Set the selected space
+    setSelectedSpace(space);
+    
+    // Open chat for this space
+    handleOpenChat(space);
   };
 
   return (
@@ -242,15 +292,15 @@ const handleDeleteRoom = (roomId: string) => {
               spaces={filteredSpaces} // Pass global Space[]
               onSpaceSelect={(space: Space) => { // Ensure type is global Space
                 setSelectedSpace(space);
-              // We don't automatically open the edit dialog, 
-              // so users can select a room for other actions like chat
-            }}
-            onSpaceDoubleClick={(space) => {
-              // Open chat panel on double-click
-              handleOpenChat(space);
-            }}
-            isEditable={true} // TODO: Make this dependent on user role (admin)
-          />)}
+                // Enter the space when clicked
+                handleEnterSpace(space);
+              }}
+              onSpaceDoubleClick={(space) => {
+                // Open chat panel on double-click
+                handleOpenChat(space);
+              }}
+              isEditable={true} // TODO: Make this dependent on user role (admin)
+            />)}
         </div>
       </Card>
 

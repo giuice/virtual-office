@@ -1,4 +1,4 @@
-// src/pages/api/spaces/create.ts
+// src/app/api/spaces/create.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';

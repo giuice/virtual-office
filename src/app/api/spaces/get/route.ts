@@ -1,0 +1,32 @@
+import { NextResponse } from 'next/server';
+import { ISpaceRepository } from '@/repositories/interfaces';
+import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
+import { Space } from '@/types/database';
+
+export async function GET(request: Request) {
+  // Get companyId from URL params
+  const { searchParams } = new URL(request.url);
+  const companyId = searchParams.get('companyId');
+
+  if (!companyId) {
+    return NextResponse.json({ message: 'Company ID is required' }, { status: 400 });
+  }
+
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+
+  try {
+    // Use the repository method to fetch spaces
+    const spaces = await spaceRepository.findByCompany(companyId);
+
+    // Ensure userIds array exists, even if empty
+    const spacesWithUsers = spaces.map(space => ({
+      ...space,
+      userIds: space.userIds || []
+    }));
+
+    return NextResponse.json({ spaces: spacesWithUsers });
+  } catch (error: any) {
+    console.error('Error fetching spaces:', error);
+    return NextResponse.json({ message: error.message || 'Failed to fetch spaces' }, { status: 500 });
+  }
+}

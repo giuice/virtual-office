@@ -1,249 +1,272 @@
-
 # Product Requirements Document (PRD) for Virtual Office App
 
 ## App Overview
-The virtual office app is a digital workspace designed to enhance collaboration for remote and hybrid teams by simulating a physical office environment. It provides an interactive, user-friendly platform for seamless connection, communication, and collaboration. Key features include a top-down virtual office layout with configurable team rooms, user avatars with status indicators, and a navigation bar for quick access to a global blackboard and user profiles. The design remains minimalist, leveraging light colors and flat design elements for a modern, approachable interface.
+The virtual office app is a digital workspace designed to enhance collaboration for remote and hybrid teams by simulating a physical office environment. It provides an interactive, user-friendly platform for seamless connection, communication, and collaboration. Key features include an interactive virtual office layout with configurable spaces (rooms), user avatars with status indicators, real-time messaging, meeting tools, and administrative controls. The design leverages TailwindCSS and Shadcn/UI for a modern, approachable interface.
 
 **Target Audience:** Remote workers, hybrid teams, and organizations seeking efficient digital collaboration tools.
 
 ---
 
 ## Database & Data Storage
-The database is now a priority to support real-time features, user management, and AI capabilities. It ensures data persistence, security, and company-based access control.
+The database is crucial for supporting real-time features, user management, space configuration, messaging, and AI capabilities. It ensures data persistence, security, and company-based access control using Supabase.
 
 ### Database Implementation
-- **Current Implementation: AWS DynamoDB**
-  - A NoSQL database service that provides fast and predictable performance with seamless scalability
-  - Integrated with AWS SDK for secure server-side operations
-  - Global Secondary Indexes for efficient queries across partition keys
+- **Current Implementation: Supabase (PostgreSQL)**
+  - A Backend-as-a-Service platform providing a PostgreSQL database, authentication, real-time subscriptions, and storage.
+  - Integrated via the `@supabase/supabase-js` client library.
+  - Leverages Repository Pattern for data access abstraction.
 
-### Table Structure
+### Table Structure (Supabase Schema)
 - **Tables:**
-  - **`virtual-office-companies`**: Stores organization data (`id`, `name`, `adminIds`, `createdAt`, `settings`).
-  - **`virtual-office-users`**: Manages user profiles (`id`, `companyId`, `email`, `displayName`, `avatarUrl`, `status`, `preferences`, `role`, `lastActive`).
-  - **`virtual-office-rooms`**: Tracks team rooms (`id`, `companyId`, `name`, `isLocked`, `occupants`, `position`, `createdBy`, `createdAt`).
-  - **`virtual-office-messages`**: Stores chat and transcripts (`id`, `roomId` or `recipientId`, `senderId`, `content`, `timestamp`, `type`).
-  - **`virtual-office-announcements`**: Holds global blackboard posts (`id`, `companyId`, `title`, `content`, `postedBy`, `timestamp`, `expiration`).
-  - **`virtual-office-meeting-notes`**: Archives AI-generated notes (`id`, `roomId`, `meetingDate`, `transcript`, `summary`, `actionItems`, `generatedBy`, `editedBy`).
+  - **`companies`**: Stores organization data (`id`, `name`, `admin_ids`, `created_at`, `settings`).
+  - **`users`**: Manages user profiles (`id`, `firebase_uid` (legacy/optional), `company_id`, `email`, `display_name`, `avatar_url`, `status`, `preferences`, `role`, `last_active`).
+  - **`spaces`**: Tracks virtual spaces/rooms (`id`, `company_id`, `name`, `type`, `status`, `capacity`, `features`, `position`, `user_ids`, `description`, `access_control`, `created_by`, `is_template`).
+  - **`space_reservations`**: Manages booking of spaces (`id`, `space_id`, `user_id`, `start_time`, `end_time`, `purpose`).
+  - **`conversations`**: Represents chat threads (`id`, `type`, `participants`, `last_activity`, `name`, `is_archived`, `unread_count`, `room_id`).
+  - **`messages`**: Stores chat messages (`id`, `conversation_id`, `sender_id`, `content`, `timestamp`, `type`, `status`, `reply_to_id`, `is_edited`).
+  - **`message_attachments`**: Stores message file attachments (`id`, `message_id`, `name`, `type`, `size`, `url`).
+  - **`message_reactions`**: Tracks reactions to messages (`id`, `message_id`, `user_id`, `emoji`).
+  - **`announcements`**: Holds company-wide posts (`id`, `company_id`, `title`, `content`, `posted_by`, `timestamp`, `expiration`, `priority`).
+  - **`meeting_notes`**: Archives meeting details (`id`, `room_id`, `title`, `meeting_date`, `transcript`, `summary`, `generated_by`, `edited_by`).
+  - **`meeting_note_action_items`**: Tracks tasks from meetings (`id`, `note_id`, `description`, `assignee_id`, `due_date`, `completed`).
+  - **`invitations`**: Manages user invitations to companies (`token`, `email`, `company_id`, `role`, `expires_at`, `status`).
 
 ### Security and Access Control
-- Server-side only DynamoDB operations for security
-- Firebase Authentication integration for user authentication
-- Company-based data isolation through partition filtering
-
-### Global Secondary Indexes
-- **CompanyIndex**: Efficient queries for resources by company ID
-- **RoomIndex**: Efficient queries for messages and notes by room ID
+- **Supabase Authentication** for user login and session management.
+- **Supabase Row Level Security (RLS)** policies for fine-grained data access control.
+- **Repository Pattern** enforces data access rules within the application logic.
+- API routes protected via middleware and session checks.
 
 ---
 
 ## Core Features
 
-### Existing Features (MVP)
+### Implemented Features
 - **User Authentication and Security**
-  - Login via Email/Password or OAuth (Firebase Authentication already implemented).
-  - Data encryption and secure session management in place.
+  - Login via Email/Password (Supabase Auth).
+  - Secure session management.
+  - Role-based access (Admin/Member).
+- **Company Management**
+  - Company creation and settings.
+  - User invitation system.
+  - Member management.
 - **Virtual Office Layout & Navigation**
-  - Top-down interactive floor plan with clickable team rooms.
-  - Navigation bar with search and profile access.
-- **Team Rooms & Real-Time Communication**
-  - Avatars with mic toggle, screen sharing, and calling features.
-  - Admin controls to lock/unlock rooms.
+  - Interactive floor plan using Konva.
+  - Draggable spaces, zoom/pan.
+  - Real-time user presence indicators on the floor plan.
+- **Space (Room) Management**
+  - Creation, editing, deletion of spaces.
+  - Space templates.
+  - Space reservation system.
+- **Real-Time Communication**
+  - Text-based chat within spaces and direct messages.
+  - Message threads and replies.
+  - Message reactions.
+  - File attachments.
+  - Real-time updates via Supabase Realtime / Socket.IO.
 - **User Profiles**
-  - Basic avatar customization and status indicators.
+  - Profile display with avatar, name, status.
+  - Status indicators (online, away, etc.).
 
-### Planned Enhancements: AI-Powered Communication & Collaboration
-These features leverage the database for storing and retrieving AI-generated content.
+### In Progress / Planned Features
+- **Meeting Notes System:** (In Progress) AI-generated notes, summaries, action items.
+- **Announcement System:** (In Progress) Company-wide announcements with priority.
+- **Enhanced Communication Tools:** (Planned) Video conferencing, screen sharing, virtual whiteboard.
+- **Administrative Dashboard:** (Planned) Usage analytics, user monitoring, system health.
 
-#### Near-Term AI Features
-1. **Real-Time Translation & Transcription:** Live speech-to-text and translation saved in `messages`.
-2. **AI-Based Meeting Notes:** Auto-capture and store notes in `meetingNotes`.
-3. **AI-Generated Summaries & Recaps:** Summarize transcripts, saved in `meetingNotes`.
-4. **Task Suggestions and Reminders:** Detect tasks from `messages` and store in `meetingNotes`.
-5. **Intelligent Presence & Schedule Alerts:** Monitor `users.status` for alerts.
-6. **Personal AI Assistant for Users:** Query `messages` and `meetingNotes`.
-7. **AI-Powered Search and Memory:** Search across `messages`, `meetingNotes`, and `announcements`.
+### AI-Powered Features (Planned/Near-Term)
 
-#### Future AI Enhancements
-1. **Participant Sentiment Analysis:** Analyze `messages` and `meetingNotes`.
-2. **AI Receptionist / Assistant in Rooms:** Manage `rooms` entry.
-3. **Dynamic Room Adjustments:** Suggest changes based on `rooms` data.
-4. **AI Coaching and Feedback:** Provide feedback using `messages` and `meetingNotes`.
+1. **Real-Time Translation & Transcription**
+   - Live speech-to-text and translation saved in `messages` table.
+   - Integration with meeting notes and chat messages.
+
+2. **AI-Based Meeting Notes**
+   - Auto-capture and store notes in `meeting_notes` table.
+   - Generate structured summaries and action items.
+
+3. **AI-Generated Summaries & Recaps**
+   - Summarize transcripts and discussions.
+   - Store in `meeting_notes.summary` field.
+
+4. **Task Suggestions and Reminders**
+   - Detect tasks from messages and meetings.
+   - Store in `meeting_note_action_items` table.
+   - Integrate with user calendars.
+
+5. **Intelligent Presence & Schedule Alerts**
+   - Monitor `users.status` and activity patterns.
+   - Provide smart availability predictions.
+
+6. **Personal AI Assistant for Users**
+   - Context-aware assistance using data from:
+     - `messages` (conversation history)
+     - `meeting_notes` (meeting content)
+     - `announcements` (company updates)
+
+7. **AI-Powered Search and Memory**
+   - Semantic search across:
+     - `messages.content`
+     - `meeting_notes.transcript/summary`
+     - `announcements.content`
+
+### Future AI Enhancements (Long-Term)
+
+1. **Participant Sentiment Analysis**
+   - Analyze `messages` and `meeting_notes` for emotional tone.
+   - Provide insights on team dynamics.
+
+2. **AI Receptionist / Assistant in Rooms**
+   - Virtual assistant for space management.
+   - Integrates with `spaces` and `users` tables.
+
+3. **Dynamic Room Adjustments**
+   - Suggest space configurations based on usage patterns.
+   - Leverages `space_reservations` and `spaces` data.
+
+4. **AI Coaching and Feedback**
+   - Provide participation feedback using:
+     - `messages` (communication patterns)
+     - `meeting_notes` (engagement metrics)
 
 ---
 
 # Planning
 
-## Step 1: Define Epics
-The epics are restructured to prioritize database setup and reflect dependencies on data storage, while incorporating existing progress.
+## Step 1: Define Epics (Revised for Supabase & Current Progress)
 
-### Epic 1: Database Setup and Company Management
-- **Focus:** Initialize Firestore, define schemas, and implement company-based access.
+### Epic 1: Core Infrastructure & Supabase Migration (Completed)
+- **Focus:** Set up Next.js, Tailwind, Supabase; migrate data model; implement Repository Pattern.
+- **Status:** Done.
+
+### Epic 2: Authentication & Company Management (Completed)
+- **Focus:** Integrate Supabase Auth, implement company creation, invitations, member management.
+- **Status:** Done.
+
+### Epic 3: Interactive Floor Plan & Space Management (Completed)
+- **Focus:** Build interactive canvas, implement space CRUD, reservations, real-time occupancy.
+- **Status:** Done.
+
+### Epic 4: Real-Time Messaging System (Completed)
+- **Focus:** Implement chat, threads, reactions, attachments using Supabase Realtime / Socket.IO.
+- **Status:** Done.
+
+### Epic 5: Meeting Notes System (In Progress)
+- **Focus:** Develop meeting note creation, editing, AI summaries, action items.
 - **User Stories:**
-  - As a company admin, I want to create and manage my organization’s workspace so my team can collaborate effectively.
-  - As a user, I want my data tied to my company for privacy and organization.
+  - As a user, I want meeting notes automatically generated and summarized.
+  - As a participant, I want action items tracked from meetings.
 - **Sample Tasks:**
-  - Initialize Firestore and define collections (`companies`, `users`, `rooms`, etc.).
-  - Implement security rules for company-based access.
-  - Set up composite indexes for efficient querying.
-  - Develop company creation and user invitation flow.
-  - Test data isolation between companies.
+  - Build UI for notes display and editing.
+  - Integrate transcription service (placeholder).
+  - Implement action item tracking linked to users.
+  - Develop AI summary generation (placeholder/future).
 
-### Epic 2: User Authentication and Security
-- **Focus:** Enhance existing login/logout with database integration for `companies` and `users`.
+### Epic 6: Announcement System (In Progress)
+- **Focus:** Implement company-wide announcements with priority levels.
 - **User Stories:**
-  - As a user, I want to log in securely and join my company’s workspace.
-  - As an admin, I want to manage user roles within my company.
+  - As an admin, I want to post important updates to the entire company.
+  - As a user, I want to see relevant announcements.
 - **Sample Tasks:**
-  - Integrate existing authentication with `companies` and `users` collections.
-  - Develop role-based access control (admin vs. member).
-  - Enhance session management with database persistence.
-  - Test authentication flows across companies.
+  - Create UI for posting and viewing announcements.
+  - Implement backend logic for storing and retrieving announcements via repository.
+  - Add priority levels and filtering.
 
-### Epic 3: Virtual Office Layout and Navigation
-- **Focus:** Enhance existing layout with data from `rooms` and `users`.
+### Epic 7: AI-Powered Communication Enhancements (Planned)
+- **Focus:** Implement AI features for enhanced collaboration.
 - **User Stories:**
-  - As a user, I want to see my company’s office layout and navigate easily.
+  - As a user, I want real-time meeting transcriptions and translations.
+  - As a team, we want AI-generated meeting summaries and action items.
+  - As a participant, I want an AI assistant to help find information.
 - **Sample Tasks:**
-  - Update floor plan to fetch rooms from `rooms` collection based on `companyId`.
-  - Implement real-time updates for room status and occupancy.
-  - Enhance search functionality for rooms and users tied to `companyId`.
-  - Test navigation bar integration with database.
+  - Research/select AI services for transcription/summarization.
+  - Integrate AI services with messaging and meeting systems.
+  - Develop AI assistant interface.
+  - Implement semantic search across messages and notes.
 
-### Epic 4: Team Rooms and Real-Time Communication
-- **Focus:** Expand collaboration features using `rooms` and `messages`.
+### Epic 8: Enhanced Communication Tools (Planned)
+- **Focus:** Integrate video conferencing, screen sharing, whiteboard.
 - **User Stories:**
-  - As a team member, I want real-time communication within my company’s rooms.
-  - As an admin, I want to control room access.
+  - As a team, we want seamless video calls and screen sharing within spaces.
+  - As collaborators, we want a virtual whiteboard for brainstorming.
 - **Sample Tasks:**
-  - Enhance room UI with user presence data from `users`.
-  - Integrate Socket.io with `rooms` and `messages` for real-time sync.
-  - Store and retrieve messages in `messages` collection.
-  - Test audio/video integration (WebRTC) with database-backed rooms.
+  - Research/select WebRTC or third-party video solution.
+  - Integrate video/audio streams into space components.
+  - Implement screen sharing functionality.
+  - Develop or integrate a virtual whiteboard component.
 
-### Epic 5: Global Blackboard
-- **Focus:** Add announcements stored in `announcements`.
+### Epic 9: Administrative Dashboard & Analytics (Planned)
+- **Focus:** Provide admins with tools for monitoring and managing the platform.
 - **User Stories:**
-  - As an admin, I want to post company-wide updates.
-  - As a user, I want to see announcements from my company.
+  - As an admin, I want to see usage statistics and user activity.
+  - As an admin, I want tools to manage users and spaces effectively.
 - **Sample Tasks:**
-  - Develop announcements UI.
-  - Implement announcement creation for admins, storing in `announcements`.
-  - Fetch and display announcements based on `companyId`.
-  - Enable real-time updates for new announcements.
-
-### Epic 6: User Profiles
-- **Focus:** Enhance profiles with data stored in `users`.
-- **User Stories:**
-  - As a user, I want to customize my profile within my company’s workspace.
-- **Sample Tasks:**
-  - Update avatar display and status indicators with `users` collection.
-  - Develop profile customization, saving to `users` preferences.
-  - Create user settings page tied to `users`.
-  - Test profile updates across sessions.
-
-### Epic 7: AI-Powered Communication Enhancements (Near-Term AI Features)
-- **Focus:** Integrate AI tools to enhance collaboration, leveraging the database.
-- **User Stories & Sample Tasks:**
-  - **User Story 7.1 (Real-Time Translation & Transcription):**
-    - *As a user, I want live speech-to-text and translation.*
-    - Tasks: Research speech-to-text/translation APIs; integrate with WebRTC; store in `messages`.
-  - **User Story 7.2 (AI-Based Meeting Notes):**
-    - *As a user, I want automatic meeting notes.*
-    - Tasks: Capture audio; transcribe with NLP; store in `meetingNotes`.
-  - **User Story 7.3 (AI-Generated Summaries & Recaps):**
-    - *As a user, I want meeting summaries.*
-    - Tasks: Generate summaries from transcripts; save in `meetingNotes`.
-  - **User Story 7.4 (Task Suggestions and Reminders):**
-    - *As a user, I want task suggestions from discussions.*
-    - Tasks: Detect tasks in `messages`; integrate with calendar APIs.
-  - **User Story 7.5 (Intelligent Presence & Schedule Alerts):**
-    - *As a user, I want alerts when colleagues are available.*
-    - Tasks: Monitor `users.status`; implement notifications.
-  - **User Story 7.6 (Personal AI Assistant for Users):**
-    - *As a user, I want an AI assistant to retrieve information.*
-    - Tasks: Build chatbot; query `messages` and `meetingNotes`.
-  - **User Story 7.7 (AI-Powered Search and Memory):**
-    - *As a user, I want to search past interactions.*
-    - Tasks: Index `messages`, `meetingNotes`; integrate AI search.
-
-### Epic 8: Future AI Enhancements (Advanced AI Features)
-- **Focus:** Advanced AI analytics and assistance.
-- **User Stories & Sample Tasks:**
-  - **User Story 8.1 (Participant Sentiment Analysis):**
-    - *As an admin, I want to gauge meeting sentiment.*
-    - Tasks: Evaluate sentiment tools; analyze `messages` and `meetingNotes`.
-  - **User Story 8.2 (AI Receptionist / Assistant in Rooms):**
-    - *As a visitor, I want an AI receptionist.*
-    - Tasks: Design AI interface; integrate with `rooms`.
-  - **User Story 8.3 (Dynamic Room Adjustments):**
-    - *As an admin, I want AI to suggest room changes.*
-    - Tasks: Analyze `rooms` data; prototype UI suggestions.
-  - **User Story 8.4 (AI Coaching and Feedback):**
-    - *As a user, I want feedback on participation.*
-    - Tasks: Research analysis models; build feedback module.
+  - Design dashboard UI.
+  - Implement data aggregation for analytics (user counts, space usage, message volume).
+  - Build user management interface.
+  - Add system health monitoring.
 
 ---
 
-## Step 2: Detailed Planning & Sprint Setup
+## Step 2: Detailed Planning & Sprint Setup (Revised)
 
-### Environment Setup (Pre-Sprint)
-- **Task 0.1:** Initialize Next.js project with TypeScript (done).
-- **Task 0.2:** Install Tailwind CSS and Shadcn UI (done).
-- **Task 0.3:** Set up ESLint, Prettier, and Git repository (done).
-- **Task 0.4:** Configure Firebase (Authentication + Firestore partially done; expand for full schema).
+### Environment Setup (Completed)
+- **Task 0.1:** Initialize Next.js project with TypeScript.
+- **Task 0.2:** Install Tailwind CSS and Shadcn UI.
+- **Task 0.3:** Set up ESLint, Prettier, and Git repository.
+- **Task 0.4:** Configure Supabase client and environment variables.
+- **Task 0.5:** Implement Repository Pattern structure.
 
-### Sprint 1: Database and Core MVP Enhancements (Weeks 1-2)
-**Focus:** Epics 1, 2, 3, and 6
-- **Epic 1:** Database schema, security rules, company management.
-- **Epic 2:** Integrate existing authentication with database.
-- **Epic 3:** Update virtual office layout with database.
-- **Epic 6:** Enhance user profiles with database storage.
+### Recent Sprints (Completed)
+- **Sprints 1-X:** Focused on Supabase migration, core feature implementation (Auth, Company, Floor Plan, Spaces, Messaging).
+
+### Current/Upcoming Sprints (Example Focus)
+
+#### Sprint Y: Meeting Notes & Announcements (Current Focus)
+- **Focus:** Epics 5 & 6
 - **Sample Tasks:**
-  - Define Firestore schema and security rules.
-  - Implement company creation and user invitation flow.
-  - Update authentication to store user data in `users`.
-  - Fetch rooms from `rooms` for floor plan.
-  - Save profile customizations to `users`.
-  - Test data persistence and company isolation.
+  - Complete Meeting Notes UI and basic functionality.
+  - Implement Announcement creation and display.
+  - Add action item tracking.
+  - Implement announcement priority.
+  - Refine related repository methods and API routes.
 
-### Sprint 2: Real-Time Features and Initial AI (Weeks 3-4)
-**Focus:** Epics 4 and 7 (partial)
-- **Epic 4:** Enhance team rooms with database-backed real-time communication.
-- **Epic 7:** Add Real-Time Translation & Transcription, AI-Based Meeting Notes.
+#### Sprint Y+1: AI Features Foundation
+- **Focus:** Epic 7 (Initial AI Implementation)
 - **Sample Tasks:**
-  - Integrate Socket.io with `rooms` and `messages`.
-  - Enhance mic toggle and screen sharing with message storage.
-  - Integrate speech-to-text API; save transcripts in `messages`.
-  - Generate and store meeting notes in `meetingNotes`.
-  - Test real-time sync and AI outputs.
+  - Research and select AI services for transcription/summarization.
+  - Implement basic AI meeting note generation.
+  - Add AI-powered search prototype.
+  - Develop initial AI assistant interface.
 
-### Sprint 3: Expand AI and Polish (Weeks 5-6)
-**Focus:** Epics 5 and 7 (remaining)
-- **Epic 5:** Implement global blackboard with announcements.
-- **Epic 7:** Add Task Suggestions, Presence Alerts, AI Assistant, Search.
+#### Sprint Y+2: Communication Tools Integration
+- **Focus:** Epic 8 (Video/Screen Share)
 - **Sample Tasks:**
-  - Build blackboard UI; store announcements in `announcements`.
-  - Detect tasks from `messages`; integrate reminders.
-  - Monitor `users.status` for alerts.
-  - Develop AI assistant and search tied to database.
-  - Conduct user testing and refinements.
+  - Integrate selected video conferencing solution.
+  - Add screen sharing capabilities to spaces.
+  - Test real-time audio/video performance.
+  - Update UI to accommodate new communication controls.
 
-### Future Sprints: Advanced AI Features (Post-MVP)
-**Focus:** Epic 8
-- Plan for advanced AI features after MVP stabilization based on user feedback.
+#### Sprint Y+3: Admin Dashboard & Advanced AI
+- **Focus:** Epics 9 & 7 (Advanced)
+- **Sample Tasks:**
+  - Design initial dashboard layout.
+  - Implement basic usage data collection.
+  - Enhance AI features with sentiment analysis.
+  - Add advanced search capabilities.
 
 ---
 
-## Non-Functional Requirements (Throughout Development)
-- **Performance:** Page load < 2s, real-time latency < 100ms.
-- **Security:** HTTPS, Firebase security rules, data encryption.
-- **Accessibility:** WCAG 2.1 Level AA.
-- **Scalability:** Support 100 to 1,000+ concurrent users.
+## Non-Functional Requirements (Ongoing)
+- **Performance:** Optimize queries, leverage caching (React Query), minimize bundle size.
+- **Security:** Enforce Supabase RLS, validate inputs, protect API routes.
+- **Accessibility:** Adhere to WCAG 2.1 Level AA guidelines.
+- **Scalability:** Design database schema and queries for growth; monitor Supabase usage.
+- **Maintainability:** Follow coding standards, use Repository Pattern, write clear code, add tests.
 
 ---
 
 ## Final Notes
-- **Budget & Timeline:** Leverage free/low-cost tools (Firebase, Socket.io) for MVP; scale as needed.
-- **User Onboarding:** Add tutorials for company setup and AI features.
-- **Testing & Feedback:** Conduct regular testing to ensure usability and performance.
+- **Technology Choices:** Leverage Supabase features (Auth, DB, Realtime) effectively. Utilize Next.js App Router and Server Components where appropriate.
+- **AI Integration:** Carefully evaluate AI services for cost, quality, and privacy considerations.
+- **User Experience:** Prioritize intuitive UI/UX, especially for AI features and interactive elements.
+- **Testing:** Implement comprehensive testing for AI features to ensure accuracy and reliability.

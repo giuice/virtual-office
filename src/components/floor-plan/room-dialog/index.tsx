@@ -12,6 +12,7 @@ import { CreateRoomForm } from './create-room-form';
 import { ViewRoomTabs } from './view-room-tabs';
 import { useCreateSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations'; // Import useUpdateSpace
 import { useNotification } from '@/hooks/useNotification';
+import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
 
 // Define the type for the creation payload based on the hook
 type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>;
@@ -59,6 +60,7 @@ export function RoomDialog({
   const { showSuccess, showError } = useNotification();
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(); // Call the update hook
+  const { loadCompanyData, currentUserProfile } = useCompany(); // Get loadCompanyData from CompanyContext
 
   // Initialize form with room data if editing
   useEffect(() => {
@@ -118,9 +120,9 @@ export function RoomDialog({
 
   // Join room function (mock implementation)
   const handleJoinRoom = () => {
-    console.log(`Joining room: ${roomData.id}`);
-    // Here you would implement actual room joining logic with Socket.io
-    onOpenChange(false);
+    console.log('Joining room:', roomData.name);
+    // TODO: Implement actual room joining logic
+    showSuccess({ description: `Joined ${roomData.name}` });
   };
 
   // Save room function - Use mutation hooks
@@ -150,6 +152,10 @@ export function RoomDialog({
       createSpace.mutate(createPayload, {
         onSuccess: () => {
           showSuccess({ description: "Room created successfully." });
+          // Refresh company data to update spaces in context
+          if (currentUserProfile?.id) {
+            loadCompanyData(currentUserProfile.id);
+          }
           onOpenChange(false);
         },
         onError: (error) => {
@@ -175,6 +181,10 @@ export function RoomDialog({
       updateSpace.mutate({ id: roomData.id, updates: updatePayload }, {
         onSuccess: () => {
           showSuccess({ description: "Room updated successfully." });
+          // Refresh company data to update spaces in context
+          if (currentUserProfile?.id) {
+            loadCompanyData(currentUserProfile.id);
+          }
           onOpenChange(false);
         },
         onError: (error) => {

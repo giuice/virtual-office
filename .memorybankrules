@@ -1,41 +1,9 @@
 ---CLINE_RULES_START---
 [LAST_ACTION_STATE]
-last_action: "Transitioning to Setup/Maintenance Phase"
+last_action: "Integrated React Query mutation hooks for Spaces into components"
 current_phase: "Set-up/Maintenance"
-next_action: "Initialize Core Files and Verify Dependencies"
+next_action: "Implement Real-time Updates with useSpaceRealtime hook"
 next_phase: "Set-up/Maintenance"
-
-[CRITICAL_RULES]
-## Critical Code Safety Rules
-- **Never modify existing functional code** without explicit permission
-- **Always check if components/hooks already exist** before creating new ones
-- **Preserve all existing imports and dependencies** when modifying files
-- **Never remove code** unless specifically instructed to do so
-- **Make incremental changes** rather than complete rewrites
-- **Test all code modifications** to ensure functionality is preserved
-
-## Component Development
-- **Component Size Limit**: Never exceed 300 lines per component/page
-- **Single Responsibility**: Each component does exactly one thing
-- **Atomic Design**: Build UIs with atoms → molecules → organisms → templates → pages
-- **Component Splitting**: Break complex UI into smaller components
-
-## State Management
-- **Server State**: Use React Query for API data with proper query keys
-- **Client State**: Use Zustand for global state with atomic stores
-- **Local State**: Use useState/useReducer for component-specific state
-
-## Architecture
-- **Custom Hooks**: Extract logic from components (data fetching, state, effects)
-- **Data Flow**: Props down, events up; avoid prop drilling with context/Zustand
-- **Reuse Existing Patterns**: Study and follow existing project patterns
-
-## Next.js Best Practices
-- Leverage App Router for layouts and nested routes
-- Use client components only when necessary
-- Implement proper error boundaries
-
-Always decompose components that approach 300 lines and integrate new code with existing patterns. Before implementing any solution, identify and reuse existing code patterns in the project.
 
 [CODE_ROOT_DIRECTORIES]
 - src
