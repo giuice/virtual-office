@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageType, MessageStatus, ConversationType } from '@/types/messaging';
+import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment } from '@/types/messaging';
 
 /**
  * API client for messaging system
@@ -334,6 +334,100 @@ export const messagingApi = {
       // No specific data expected on success
     } catch (error) {
       console.error('Error marking conversation as read:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Upload a file attachment for a message
+   * @param file The file to upload
+   * @param messageId Optional message ID to associate with the upload (can be assigned later)
+   * @param conversationId Conversation ID for organizing uploads
+   * @returns Promise resolving to the uploaded file attachment details
+   */
+  async uploadMessageAttachment(
+    file: File,
+    conversationId: string,
+    messageId?: string
+  ): Promise<FileAttachment> {
+    try {
+      // Create a FormData object to handle file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('conversationId', conversationId);
+      if (messageId) {
+        formData.append('messageId', messageId);
+      }
+
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        // No Content-Type header here - browser sets it with boundary for FormData
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload file attachment');
+      }
+
+      const data = await response.json();
+      return data.attachment;
+    } catch (error) {
+      console.error('Error uploading file attachment:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a file attachment
+   * @param attachmentId ID of the attachment to delete
+   * @returns Promise resolving to success status
+   */
+  async deleteMessageAttachment(attachmentId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/messages/attachment/${attachmentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete file attachment');
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error deleting file attachment:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all attachments for a specific message
+   * @param messageId ID of the message to get attachments for
+   * @returns Promise resolving to an array of file attachments
+   */
+  async getMessageAttachments(messageId: string): Promise<FileAttachment[]> {
+    try {
+      const response = await fetch(`/api/messages/attachments?messageId=${messageId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get message attachments');
+      }
+
+      const data = await response.json();
+      return data.attachments;
+    } catch (error) {
+      console.error('Error getting message attachments:', error);
       throw error;
     }
   }

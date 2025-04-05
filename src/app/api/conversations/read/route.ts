@@ -1,54 +1,65 @@
 // src/app/api/conversations/read/route.ts
 import { NextResponse } from 'next/server';
-import { IConversationRepository } from '@/repositories/interfaces'; // Import interface
-import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; // Import implementation
-// import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { validateUserSession } from '@/lib/auth/session';
+import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 
 export async function PATCH(request: Request) {
-  // TODO: Implement proper authentication and authorization
-  // const { userId: authenticatedUserId } = getAuth(request); // TODO: Revisit auth
-  const authenticatedUserId = 'placeholder-auth-user-id'; // Placeholder for now
-
-  if (!authenticatedUserId) {
-    return NextResponse.json({ error: 'Unauthorized (Placeholder)' }, { status: 401 });
-  }
-
-  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(); // Instantiate repository
-
   try {
-    // The user marking the conversation as read is the authenticated user.
+    // Validate user session to handle Firebase UID vs Database UUID mismatch
+    const { userId, userDbId, error: sessionError } = await validateUserSession();
+    
+    if (sessionError || !userId || !userDbId) {
+      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
+    }
+    
     const { conversationId } = await request.json();
-    const userId = authenticatedUserId;
-
+    
     // Basic validation
     if (!conversationId) {
       return NextResponse.json({ error: 'Missing required field: conversationId' }, { status: 400 });
     }
-
-    // Authorization check (implicit via using authenticatedUserId)
-
-    // TODO: Add further authorization: Is the user actually a participant in this conversation?
-    // This check might be handled within the repository method or needs to be added here.
-
-    console.log(`API: Marking conversation ${conversationId} as read for user ${userId}`);
-
-    // Call the repository method to mark as read
-    const success = await conversationRepository.markAsRead(conversationId, userId);
-
-    if (!success) {
-        // Handle cases where the update failed (e.g., conversation not found, user not participant)
-        // The repository method should return false in these cases.
-        return NextResponse.json({ error: 'Failed to mark conversation as read. Conversation not found or user not a participant.' }, { status: 404 }); // Or 403?
+    
+    // Get repositories
+    const { conversationRepository } = await getSupabaseRepositories();
+    
+    // Check if the conversation exists and if the user is a participant
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('participants')
+      .eq('id', conversationId)
+      .single();
+      
+    if (convError || !conversation) {
+      console.error('Error fetching conversation:', convError);
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
-
+    
+    // Verify user is a participant in the conversation
+    // participants field likely contains Firebase UIDs, so compare with userId (not userDbId)
+    if (!conversation.participants.includes(userId)) {
+      return NextResponse.json({ error: 'Not authorized to modify this conversation' }, { status: 403 });
+    }
+    
+    console.log(`API: Marking conversation ${conversationId} as read for user ${userId} (DB ID: ${userDbId})`);
+    
+    // Call the repository method to mark as read
+    // Use userDbId (Database UUID) for database operations where required by repository
+    const success = await conversationRepository.markAsRead(conversationId, userDbId);
+    
+    if (!success) {
+      return NextResponse.json({ error: 'Failed to mark conversation as read' }, { status: 500 });
+    }
+    
     return NextResponse.json({ success: true }, { status: 200 });
-
+    
   } catch (error) {
     console.error('Error marking conversation as read:', error);
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
-    // Consider more specific error handling based on repository errors
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

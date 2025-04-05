@@ -1,50 +1,77 @@
 // src/app/api/messages/status/route.ts
 import { NextResponse } from 'next/server';
-import { IMessageRepository } from '@/repositories/interfaces';
-import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { validateUserSession } from '@/lib/auth/session';
+import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { MessageStatus } from '@/types/messaging';
-// import { getAuth } from '@clerk/nextjs/server'; // Or your auth method // TODO: Revisit auth import/implementation
 
 export async function PATCH(request: Request) {
-  // TODO: Implement proper authentication and authorization
-  // const { userId: authenticatedUserId } = getAuth(request); // TODO: Revisit auth
-  const authenticatedUserId = 'placeholder-auth-user-id'; // Placeholder for now
-
-  if (!authenticatedUserId) { // Keep basic check for placeholder
-    return NextResponse.json({ error: 'Unauthorized (Placeholder)' }, { status: 401 });
-  }
-
   try {
-    const messageRepository: IMessageRepository = new SupabaseMessageRepository();
-    const { messageId, status, userId } = await request.json();
+    // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
+    const { userId, userDbId, error: sessionError } = await validateUserSession();
+
+    if (sessionError || !userId || !userDbId) {
+      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
+    }
+
+    const { messageRepository } = await getSupabaseRepositories();
+    const { messageId, status } = await request.json();
 
     // Basic validation
-    if (!messageId || !status || !userId) {
-      return NextResponse.json({ error: 'Missing required fields: messageId, status, userId' }, { status: 400 });
+    if (!messageId || !status) {
+      return NextResponse.json({ error: 'Missing required fields: messageId, status' }, { status: 400 });
     }
 
     // Validate status enum
     if (!Object.values(MessageStatus).includes(status)) {
-        return NextResponse.json({ error: 'Invalid message status provided' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid message status provided' }, { status: 400 });
     }
 
-    // TODO: Add authorization check: Does the authenticated user have permission to update this message status?
-    // This might involve checking if the user is a participant in the conversation associated with the message.
-    // For read status, usually only the recipient can mark it as read for themselves.
-    // For delivered status, it might be system-driven or based on recipient actions.
-    if (userId !== authenticatedUserId) {
-        console.warn(`Potential unauthorized status update attempt: User ${authenticatedUserId} tried to update status for user ${userId} on message ${messageId}`);
-        // Depending on rules, might allow system messages or specific roles to update status for others.
-        // For now, restrict to user updating their own status (e.g., marking as read).
-        // return NextResponse.json({ error: 'Forbidden: Cannot update status for another user' }, { status: 403 });
+    // Get the message to check permissions
+    const message = await messageRepository.findById(messageId);
+    
+    if (!message) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
     }
 
+    // Authorization checks - different for different status types
+    // For DELIVERED and READ, the receiver should be updating their status
+    // For SENT, typically system or sender updates
+    // For FAILED, typically system updates
+    
+    // For receiver actions (DELIVERED, READ), user must be a participant in the conversation
+    // For system/sender actions, user must be the sender
+    if (status === MessageStatus.DELIVERED || status === MessageStatus.READ) {
+      // Check if user is a participant in the conversation
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('participants')
+        .eq('id', message.conversationId)
+        .single();
+        
+      if (error || !data) {
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      }
+      
+      // Check if the user is a participant in the conversation
+      // participants field likely contains Firebase UIDs, so compare with userId (not userDbId)
+      if (!data.participants.includes(userId)) {
+        return NextResponse.json({ error: 'Unauthorized: Not a participant in this conversation' }, { status: 403 });
+      }
+    } else if (status === MessageStatus.SENT || status === MessageStatus.FAILED) {
+      // For system/sender updates, check if user is the sender
+      // sender_id in database likely uses Database UUID, so compare with userDbId
+      if (message.senderId !== userDbId) {
+        return NextResponse.json({ error: 'Unauthorized: Cannot update status for messages you did not send' }, { status: 403 });
+      }
+    }
 
-    console.log(`API: Updating status for message ${messageId} to ${status}`); // Removed userId from log as DB function doesn't use it
+    console.log(`API: Updating status for message ${messageId} to ${status}`);
 
-    // Call the actual database update logic
     // Call the repository update method
-    await messageRepository.update(messageId, { status: status });
+    await messageRepository.update(messageId, { status });
 
     return NextResponse.json({ success: true }, { status: 200 });
 

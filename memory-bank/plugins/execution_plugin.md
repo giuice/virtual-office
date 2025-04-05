@@ -39,9 +39,10 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
    - `memory-bank/changelog.md`
    - `memory-bank/progress.md`
    - `docs/doc_tracker.md`
-   
-2. Load instruction file for current task
-3. Load all dependency files listed in the instruction file
+
+2. Load implementation plan on `memory-bank/implementation_plans` 
+3. Load the next task instruction file
+4. Load all dependency files listed in the task instruction file
 
 ## STEP EXECUTION PROCESS
 

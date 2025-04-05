@@ -32,17 +32,33 @@ export async function createUser(userData: {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json(); // Keep this line
-      throw new Error(errorData.error || 'Failed to create user'); // Throw error
-    }
-
-    const result = await response.json();
-    if (!result.success || !result.user) {
+    // Handle both success and conflict (user already exists) responses
+    if (response.ok || response.status === 409) {
+      const result = await response.json();
+      
+      // If the API returned a user object, use it
+      if (result.user) {
+        return result.user;
+      }
+      
+      // If there was a conflict (user already exists), try to get the user by Firebase ID
+      if (response.status === 409) {
+        console.log('User already exists, fetching by Firebase ID');
+        const existingUser = await getUserByFirebaseId(userData.firebase_uid);
+        if (existingUser) {
+          return existingUser;
+        }
+        // If we couldn't get the user by Firebase ID, try by email
+        // This is a fallback and might not be needed in most cases
+        throw new Error('User exists but could not be retrieved');
+      }
+      
       throw new Error(result.message || 'API reported failure in creating user');
     }
-    return result.user; // Return the created user object
-    // Erroneous lines removed here
+
+    // Handle other error responses
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to create user');
   } catch (error) {
     console.error('API error creating user:', error);
     throw error;
@@ -231,6 +247,77 @@ function tryGetCachedUser(firebaseUserId: string): User | null {
     console.warn('Failed to retrieve cached user data:', e);
   }
   return null;
+}
+
+/**
+ * Get user by database ID via the server-side API
+ */
+export async function getUserById(userId: string, retries = 3): Promise<User | null> {
+  console.log(`Fetching user profile for Database ID: ${userId}`);
+
+  // Check if userId is valid
+  if (!userId) {
+    console.error('Invalid User ID: empty or undefined');
+    return null;
+  }
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      // Add timeout to fetch request using AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      console.log(`Attempting to fetch user by ID (attempt ${attempt + 1}/${retries + 1})`);
+
+      // Use a more reliable URL construction
+      const url = new URL('/api/users/get', window.location.origin);
+      url.searchParams.append('id', userId);
+
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+        // Add cache control to prevent caching issues
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      }).finally(() => clearTimeout(timeoutId));
+
+      // Log complete response status and headers for debugging
+      console.log(`API Response Status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log(`User not found for ID: ${userId}`);
+          return null;
+        }
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.user) {
+        console.log(`API returned success=false or missing user data for ID: ${userId}`);
+        return null;
+      }
+
+      console.log(`Successfully fetched user for ID: ${userId}`);
+      return data.user;
+    } catch (error) {
+      console.error(`Error fetching user by ID (attempt ${attempt + 1}/${retries + 1}):`, error);
+      
+      // If this is the last retry, return null
+      if (attempt === retries) {
+        console.error(`All ${retries + 1} attempts to fetch user failed.`);
+        return null;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000);
+      console.log(`Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+
+  return null; // This should never be reached due to the return in the last retry
 }
 
 /**

@@ -1,0 +1,86 @@
+# T3_ReactQueryMigration Instructions
+
+## Objective
+Refactor the messaging hooks to use React Query for data fetching and mutations, following the pattern established with spaces, to improve state management, caching, and error handling.
+
+## Context
+The project has adopted React Query for server state management, as seen in the implementation for spaces. However, the messaging hooks (useMessages, useConversations, useSocketEvents) still use traditional useState and useEffect patterns. This task aims to align the messaging system with the project's server state management approach.
+
+[Implementation Plan: IP1_MessagingConversationsFixes]
+
+## Dependencies
+- src/hooks/useMessages.ts
+- src/hooks/useConversations.ts
+- src/hooks/useSocketEvents.ts
+- src/lib/messaging-api.ts
+- src/contexts/messaging/types.ts
+- src/hooks/queries/ (directory for query hooks)
+- src/hooks/mutations/ (directory for mutation hooks)
+
+## Steps
+1. **Study Existing React Query Implementation**
+   - Review the implementation of React Query for spaces
+   - Understand the pattern for query hooks and mutation hooks
+   - Note the approach for error handling and loading states
+
+2. **Create Query Hooks for Messages**
+   - Create useMessagesQuery hook in src/hooks/queries/
+   - Implement proper query keys and caching strategy
+   - Handle pagination with React Query's built-in support
+   - Ensure proper error handling and loading states
+
+3. **Create Query Hooks for Conversations**
+   - Create useConversationsQuery hook in src/hooks/queries/
+   - Implement proper query keys and caching strategy
+   - Handle filtering (archived, conversation type) with query parameters
+   - Ensure proper error handling and loading states
+
+4. **Create Mutation Hooks for Messages**
+   - Create useSendMessage mutation hook
+   - Create useAddReaction and useRemoveReaction mutation hooks
+   - Create useUpdateMessageStatus mutation hook
+   - Implement optimistic updates where appropriate
+
+5. **Create Mutation Hooks for Conversations**
+   - Create useCreateConversation mutation hook
+   - Create useArchiveConversation and useUnarchiveConversation mutation hooks
+   - Create useMarkConversationAsRead mutation hook
+   - Implement optimistic updates where appropriate
+
+6. **Refactor useMessages Hook**
+   - Replace useState/useEffect with React Query hooks
+   - Maintain the same public API for backward compatibility
+   - Ensure proper error handling and loading states
+   - Implement optimistic updates for better user experience
+
+7. **Refactor useConversations Hook**
+   - Replace useState/useEffect with React Query hooks
+   - Maintain the same public API for backward compatibility
+   - Ensure proper error handling and loading states
+   - Implement optimistic updates for better user experience
+
+8. **Refactor useSocketEvents Hook**
+   - Integrate with React Query's cache invalidation
+   - Ensure proper handling of real-time updates
+   - Maintain compatibility with Socket.IO or Supabase Realtime
+
+9. **Update Components Using These Hooks**
+   - Identify components using the messaging hooks
+   - Update them to handle the new loading and error states
+   - Ensure proper UI feedback during operations
+
+## Expected Output
+- New query hooks for messages and conversations
+- New mutation hooks for messaging operations
+- Refactored useMessages, useConversations, and useSocketEvents hooks
+- Updated components using these hooks
+- Improved error handling and loading states
+- Better caching and state management
+
+## Notes
+- Follow the existing React Query patterns in the project
+- Keep component size under 300 lines as per project guidelines
+- Maintain backward compatibility where possible
+- Use atomic stores for UI state (Zustand) if needed
+- Consider breaking complex hooks into smaller, focused hooks
+- Ensure proper TypeScript typing throughout

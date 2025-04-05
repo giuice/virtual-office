@@ -1,0 +1,75 @@
+# T4_RealtimeMessaging Instructions
+
+## Objective
+Implement Supabase Realtime for messaging to replace or augment Socket.IO, ensuring real-time updates for messages, reactions, typing indicators, and read status across the application.
+
+## Context
+The project has transitioned from DynamoDB to Supabase and has implemented Supabase Realtime for spaces. However, the messaging system still relies on Socket.IO for real-time updates. This task aims to align the messaging system with the project's real-time update approach using Supabase Realtime.
+
+[Implementation Plan: IP1_MessagingConversationsFixes]
+
+## Dependencies
+- src/hooks/useSocketEvents.ts
+- src/contexts/messaging/types.ts
+- src/hooks/queries/ (React Query hooks)
+- src/lib/supabase/client.ts
+- src/hooks/useMessagesRealtime.ts (to be created)
+- src/hooks/useConversationsRealtime.ts (to be created)
+
+## Steps
+1. **Study Existing Supabase Realtime Implementation**
+   - Review the implementation of Supabase Realtime for spaces
+   - Understand the pattern for real-time hooks
+   - Note the approach for cache invalidation with React Query
+
+2. **Create Realtime Hook for Messages**
+   - Create useMessagesRealtime hook
+   - Subscribe to message table changes in Supabase
+   - Implement handlers for INSERT, UPDATE, and DELETE events
+   - Integrate with React Query's cache invalidation
+
+3. **Create Realtime Hook for Conversations**
+   - Create useConversationsRealtime hook
+   - Subscribe to conversation table changes in Supabase
+   - Implement handlers for INSERT, UPDATE, and DELETE events
+   - Integrate with React Query's cache invalidation
+
+4. **Implement Typing Indicator with Supabase**
+   - Create a dedicated table or use Supabase Presence for typing indicators
+   - Implement real-time subscription for typing events
+   - Ensure proper UI feedback for typing indicators
+
+5. **Implement Read Status Updates with Supabase**
+   - Update the read status tracking to use Supabase Realtime
+   - Ensure real-time updates when messages are read
+   - Update UI components to reflect read status changes
+
+6. **Integrate with Socket.IO (if needed)**
+   - Determine if Socket.IO is still needed for any functionality
+   - Create a transition plan if complete replacement is not feasible
+   - Ensure both systems can work together during transition
+
+7. **Update UI Components**
+   - Identify components that need real-time updates
+   - Integrate them with the new real-time hooks
+   - Ensure proper UI feedback for real-time events
+
+8. **Test Real-time Functionality**
+   - Test with multiple users/browsers
+   - Verify real-time updates for messages, reactions, typing, and read status
+   - Ensure proper error handling and recovery
+
+## Expected Output
+- New real-time hooks for messages and conversations
+- Integration with React Query for cache invalidation
+- Real-time updates for typing indicators and read status
+- Updated UI components reflecting real-time changes
+- Transition plan from Socket.IO (if needed)
+
+## Notes
+- Follow the existing Supabase Realtime patterns in the project
+- Consider performance implications of real-time subscriptions
+- Implement throttling or debouncing for frequent events (like typing)
+- Ensure proper error handling and recovery
+- Document the approach for future reference
+- Consider security implications of real-time updates

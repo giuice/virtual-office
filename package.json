@@ -2,11 +2,19 @@
   "name": "virtual-office",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run --exclude \"**/__tests__/api/playwright/**\"",
+    "test:watch": "vitest --exclude \"**/__tests__/api/playwright/**\"",
+    "test:ui": "vitest --ui --exclude \"**/__tests__/api/playwright/**\"",
+    "test:api": "playwright test",
+    "test:api:debug": "playwright test --debug",
+    "test:api:ui": "playwright test --ui",
+    "test:all": "node run-tests.js"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
@@ -25,6 +33,7 @@
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@shadcn/ui": "^0.0.4",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.49.4",
     "@tailwindcss/postcss": "^4.0.17",
     "@tanstack/react-query": "^5.71.5",
@@ -54,17 +63,25 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.42.1",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/socket.io-client": "^3.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/browser": "^1.3.0",
+    "@vitest/ui": "^1.3.0",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
+    "happy-dom": "^12.10.3",
+    "jsdom": "^24.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "shadcn-ui": "^0.9.5",
     "tailwindcss": "^4.0.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^1.3.0"
   }
 }

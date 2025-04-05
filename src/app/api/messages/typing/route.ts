@@ -1,38 +1,74 @@
 // src/app/api/messages/typing/route.ts
 import { NextResponse } from 'next/server';
-// import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { validateUserSession } from '@/lib/auth/session';
+import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 
 export async function POST(request: Request) {
-  // TODO: Implement proper authentication and authorization
-  // const { userId: authenticatedUserId } = getAuth(request); // TODO: Revisit auth
-  const authenticatedUserId = 'placeholder-auth-user-id'; // Placeholder for now
-
-  if (!authenticatedUserId) {
-    return NextResponse.json({ error: 'Unauthorized (Placeholder)' }, { status: 401 });
-  }
-
   try {
-    const { conversationId, userId, isTyping } = await request.json();
-
+    // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
+    const { userId, error: sessionError } = await validateUserSession();
+    
+    if (sessionError || !userId) {
+      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
+    }
+    
+    const { conversationId, isTyping } = await request.json();
+    
     // Basic validation
-    if (!conversationId || !userId || typeof isTyping !== 'boolean') {
-      return NextResponse.json({ error: 'Missing required fields: conversationId, userId, isTyping (boolean)' }, { status: 400 });
+    if (!conversationId || typeof isTyping !== 'boolean') {
+      return NextResponse.json({ error: 'Missing required fields: conversationId, isTyping (boolean)' }, { status: 400 });
     }
-
-    // Authorization check: Ensure the authenticated user matches the userId sending the indicator
-    if (userId !== authenticatedUserId) {
-        console.warn(`Potential unauthorized typing indicator: User ${authenticatedUserId} tried to send indicator for user ${userId} in conversation ${conversationId}`);
-        return NextResponse.json({ error: 'Forbidden: Cannot send typing indicator for another user' }, { status: 403 });
+    
+    // Create Supabase client with context
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    // Check if user has access to the conversation
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('participants')
+      .eq('id', conversationId)
+      .single();
+      
+    if (convError || !conversation) {
+      console.error('Error fetching conversation:', convError);
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
-
+    
+    // Verify user is a participant in the conversation
+    // participants field likely contains Firebase UIDs, so compare with userId
+    if (!conversation.participants.includes(userId)) {
+      return NextResponse.json({ error: 'Not authorized to send typing indicators in this conversation' }, { status: 403 });
+    }
+    
     console.log(`API: User ${userId} is ${isTyping ? 'typing' : 'stopped typing'} in conversation ${conversationId}`);
-
-    // TODO: Implement logic - likely broadcasting this via WebSockets
-    // This HTTP endpoint might just be a trigger or might not be used if sockets handle it directly.
-    // For example, broadcast to other participants in conversationId.
-
+    
+    // Send real-time typing indicator via Supabase Realtime
+    // This approach broadcasts the typing status to all participants in the conversation
+    const { error: broadcastError } = await supabase
+      .from('typing_indicators')
+      .upsert(
+        {
+          conversation_id: conversationId,
+          user_id: userId,
+          is_typing: isTyping,
+          timestamp: new Date().toISOString()
+        },
+        { onConflict: 'conversation_id,user_id' } // Assuming there's a composite key
+      );
+      
+    if (broadcastError) {
+      console.error('Error broadcasting typing indicator:', broadcastError);
+      // Continue even if broadcast fails - don't block the response
+    }
+    
+    // If using Socket.IO alongside Supabase, you might want to also emit a socket event
+    // This would require importing a socket server instance
+    // socketServer.emit('typing_indicator', { conversationId, userId, isTyping });
+    
     return NextResponse.json({ success: true }, { status: 200 });
-
+    
   } catch (error) {
     console.error('Error processing typing indicator:', error);
     if (error instanceof SyntaxError) {

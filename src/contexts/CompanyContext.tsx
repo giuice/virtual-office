@@ -11,6 +11,7 @@ import { Company, User, UserRole, Space } from '@/types/database'; // Added Spac
 // Using API client instead of direct DynamoDB access
 import {
   getUserByFirebaseId,
+  getUserById,
   createUser,
   updateUserStatus,
   updateUserRole as apiUpdateUserRole,
@@ -62,8 +63,21 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       // Removed the call to cleanupDuplicateCompanies as it was causing errors
       // and its logic during login is questionable.
 
-      // Get user profile
-      let userProfile = await getUserByFirebaseId(userId);
+      // Check if userId is a valid Firebase UID or a UUID
+      // Firebase UIDs typically don't have hyphens, while UUIDs do
+      const isUUID = userId.includes('-') && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      
+      // If it's a UUID, we need to find the user by database ID instead of Firebase UID
+      let userProfile;
+      if (isUUID) {
+        console.log(`User ID ${userId} appears to be a UUID, not a Firebase UID. Trying to find user by ID...`);
+        // This would require a new API endpoint to get user by ID
+        // For now, we'll try to get the user by Firebase UID and handle the error
+        userProfile = await getUserById(userId);
+      } else {
+        // Get user profile by Firebase UID
+        userProfile = await getUserByFirebaseId(userId);
+      }
 
       // If user doesn't exist in Supabase yet, create them now
       if (!userProfile) {
@@ -77,24 +91,34 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
            console.error("loadCompanyData called for user creation, but user object is null. This indicates a logic error.");
            throw new Error("Authenticated user data is unexpectedly null during profile creation.");
         }
-        // Now TypeScript knows 'user' is not null here.
-        // because 'user' is included in the useCallback dependency array below.
-        // The useEffect ensures this code only runs when 'user' is truthy.
-        const createdProfile = await createUser({
-          firebase_uid: userId, // userId is the firebase uid passed to loadCompanyData
-          email: user.email || '',
-          displayName: user.displayName || 'User',
-          status: 'online' as const
-        });
-        // Fetch the newly created profile to ensure we have the Supabase ID etc.
-        userProfile = await getUserByFirebaseId(userId);
-        if (!userProfile) {
-           // This would be a critical error if creation seemed successful but fetch failed
-           throw new Error("Failed to fetch user profile immediately after creation.");
+        
+        try {
+          // Now TypeScript knows 'user' is not null here.
+          // because 'user' is included in the useCallback dependency array below.
+          // The useEffect ensures this code only runs when 'user' is truthy.
+          const createdProfile = await createUser({
+            firebase_uid: userId, // Always use the userId as firebase_uid
+            email: user.email || '',
+            displayName: user.displayName || 'User',
+            status: 'online' as const
+          });
+          // Fetch the newly created profile to ensure we have the Supabase ID etc.
+          userProfile = createdProfile;
+        } catch (err) {
+          console.error("Error creating user profile:", err);
+          // If creation failed, try to get the user one more time
+          // This handles the case where the user already exists but we got an error
+          if (isUUID) {
+            userProfile = await getUserById(userId);
+          } else {
+            userProfile = await getUserByFirebaseId(userId);
+          }
+          if (!userProfile) {
+            throw new Error("Failed to create or retrieve user profile");
+          }
         }
-        console.log(`User ${userId} created successfully.`);
       }
-
+      
       // Set the profile state (either existing or newly created)
       setCurrentUserProfile(userProfile);
 
