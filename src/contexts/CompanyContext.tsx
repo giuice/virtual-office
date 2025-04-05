@@ -131,6 +131,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setCompanyUsers(users);
         const fetchedSpaces = await getSpacesByCompany(userProfile.companyId);
         setSpaces(fetchedSpaces);
+        console.log(`[CompanyContext] Loaded ${fetchedSpaces.length} spaces for company ${userProfile.companyId}:`, JSON.stringify(fetchedSpaces, null, 2));
       } else {
         console.log(`User ${userId} exists but has no company association.`);
         // Reset company-related state if user has no company

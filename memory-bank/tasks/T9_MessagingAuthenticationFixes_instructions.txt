@@ -1,0 +1,59 @@
+# T9_MessagingAuthenticationFixes Instructions
+
+## Objective
+Fix authentication and session handling issues in messaging API routes to resolve 401 errors and "No active session" errors when sending messages and typing indicators.
+
+## Context
+Users are encountering authentication errors when trying to send messages or typing indicators. The error messages include "401 Unauthorized" and "No active session" errors from the messaging API. These issues are preventing basic messaging functionality.
+
+[Implementation Plan: IP1_MessagingConversationsFixes]
+
+## Dependencies
+- src/lib/messaging-api.ts
+- src/app/api/messages/create/route.ts
+- src/app/api/messages/typing/route.ts
+- src/lib/auth/session.ts (for validateUserSession)
+- src/hooks/useMessages.ts
+- src/contexts/MessagingContext.tsx
+
+## Steps
+1. **Fix Session Validation in API Routes**
+   - Examine the session validation logic in all messaging API routes
+   - Update the POST handler in /api/messages/create/route.ts to use validateUserSession
+   - Ensure consistent error handling for authentication failures
+   - Add better error logging to identify the exact source of authentication failures
+
+2. **Update Authentication Handling in Messaging API**
+   - Review messaging-api.ts to ensure proper session handling
+   - Add error handling specifically for authentication failures
+   - Fix sendMessage and sendTypingIndicator functions to handle auth errors correctly
+   - Add retry logic or session refresh where appropriate
+
+3. **Implement Consistent Session Management**
+   - Ensure the validateUserSession helper is used consistently across all routes
+   - Handle the Firebase UID vs Database UUID conversion correctly
+   - Add appropriate headers to API requests if needed for auth
+   - Fix any issues with cookie or token handling
+
+4. **Add Debugging Information**
+   - Add temporary verbose logging in API routes for session data
+   - Log user IDs, session status, and authentication attempts
+   - Create a debug endpoint to check current session status if needed
+
+5. **Fix Error Handling in Frontend Components**
+   - Update MessagingContext and useMessages hook to better handle auth errors
+   - Add appropriate user feedback for auth failures
+   - Implement session recovery logic where feasible
+
+## Expected Output
+- No more 401 Unauthorized errors when sending messages
+- No more "No active session" errors for typing indicators
+- Proper authentication for all messaging API routes
+- Consistent session handling across messaging operations
+- Clear error messages in case of authentication issues
+
+## Notes
+- Focus on fixing the authentication flow rather than changing the messaging logic
+- Prioritize getting basic message sending working before addressing more advanced features
+- Use console logging liberally to diagnose session state
+- Ensure proper handling of Firebase UIDs vs Database UUIDs in all authentication checks

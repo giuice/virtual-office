@@ -10,8 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog/index'
-import { UserHoverCard } from './user-hover-card'
-import { FloorPlanCanvas } from './FloorPlanCanvas'
+import { FloorPlanCanvas } from './FloorPlanCanvas' // replaced with DomFloorPlan
 import { RoomManagement } from './room-management'
 import { RoomTemplateSelector } from './room-template-selector';
 import { Input } from '@/components/ui/input';
@@ -23,9 +22,12 @@ import { useDeleteSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutati
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
 import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
+import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
+import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
+import { DomFloorPlan } from './dom-floor-plan';
 
 export function FloorPlan() {
   // Get data from context
@@ -43,6 +45,8 @@ export function FloorPlan() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
   const [chatRoom, setChatRoom] = useState<Space | null>(null);
+  const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
+  const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   
   // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {
@@ -51,6 +55,25 @@ export function FloorPlan() {
                          (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
+
+  // Log spaces for debugging
+  useEffect(() => {
+    debugLogger.log('FloorPlan', `Loaded ${spaces.length} spaces`, spaces);
+    // Check for unusual space data
+    if (spaces.length > 0) {
+      const spacesWithInvalidPosition = spaces.filter(
+        space => !space.position || 
+          typeof space.position.x !== 'number' || 
+          typeof space.position.y !== 'number' ||
+          typeof space.position.width !== 'number' ||
+          typeof space.position.height !== 'number'
+      );
+      
+      if (spacesWithInvalidPosition.length > 0) {
+        debugLogger.warn('FloorPlan', 'Found spaces with invalid position data:', spacesWithInvalidPosition);
+      }
+    }
+  }, [spaces]);
   
   // TODO: Refactor room management functions (create, update, delete, duplicate)
   // to interact with the backend API via context or direct API calls,
@@ -119,48 +142,65 @@ const handleDeleteRoom = (roomId: string) => {
       return;
     }
 
-    // Update the user's position to be in this space
-    if (currentUserProfile && currentUserProfile.id) {
-      // Add the current user to the space's userIds if not already there
-      const updatedUserIds = space.userIds || [];
-      if (!updatedUserIds.includes(currentUserProfile.id)) {
-        updatedUserIds.push(currentUserProfile.id);
-        
-        // Update the space with the new userIds using the mutation hook
-        updateSpaceMutation.mutate({ 
-          id: space.id, 
-          updates: { userIds: updatedUserIds } 
-        }, {
-          onSuccess: () => {
-            toast({
-              title: "Entered Space",
-              description: `You have entered ${space.name}`
-            });
-            
-            // Save the space ID for persistence across sessions
-            saveLastSpace(space.id);
-          },
-          onError: (error) => {
-            toast({
-              title: "Error",
-              description: `Failed to enter space: ${error.message}`,
-              variant: "destructive"
-            });
-          }
-        });
-      } else {
-        // User is already in this space, just save the ID
-        saveLastSpace(space.id);
-      }
-    }
+    // Save this space as the last selected space for the user
+    saveLastSpace(space.id);
     
-    // Set the selected space
+    // Highlight the selected space
+    setHighlightedSpaceId(space.id);
+    
+    // Just select the space without automatically adding the user to it
     setSelectedSpace(space);
     
-    // Open chat for this space
-    handleOpenChat(space);
+    console.log(`User viewing space: ${space.name} (${space.id})`);
+    
+    // NOTE: We've removed the automatic user assignment to spaces
+    // Users should now be explicitly added to spaces through a dedicated UI action
   };
-  
+
+  // Add a new explicit function for users to join a space
+  const handleJoinSpace = (space: Space) => {
+    if (!space || !space.id || !currentUserProfile?.id) {
+      toast({
+        title: "Error",
+        description: "Cannot join space: Missing data.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Only add the user if they're not already in the space
+    const updatedUserIds = [...(space.userIds || [])];
+    if (!updatedUserIds.includes(currentUserProfile.id)) {
+      updatedUserIds.push(currentUserProfile.id);
+      
+      // Update the space with the new userIds using the mutation hook
+      updateSpaceMutation.mutate({ 
+        id: space.id,
+        updates: { userIds: updatedUserIds }
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Success",
+            description: `You joined ${space.name}`
+          });
+          setSelectedSpace(prev => prev?.id === space.id ? 
+            {...prev, userIds: updatedUserIds} : prev);
+        },
+        onError: (error: Error) => {
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to join space",
+            variant: "destructive"
+          });
+        }
+      });
+    } else {
+      toast({
+        description: `You are already in ${space.name}`
+      });
+    }
+  };
+
   // Handle leaving a space
   const handleLeaveSpace = (space: Space) => {
     if (!space || !space.id || !currentUserProfile) {
@@ -223,7 +263,27 @@ const handleDeleteRoom = (roomId: string) => {
   }, [lastSpaceId, spaces]);
 
   return (
-    <div className="space-y-4 relative">
+    <div className="space-y-4 w-full">
+      {/* Add debug button and panel */}
+      <div className="flex justify-end mb-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setShowDebugPanel(!showDebugPanel)}
+          className="text-xs"
+        >
+          {showDebugPanel ? 'Hide' : 'Show'} Debug Panel
+        </Button>
+      </div>
+      
+      {showDebugPanel && (
+        <SpaceDebugPanel 
+          spaces={spaces} 
+          onHighlightSpace={(space) => setHighlightedSpaceId(space.id)}
+          onHidePanel={() => setShowDebugPanel(false)}
+        />
+      )}
+
       {/* Status Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -347,10 +407,26 @@ const handleDeleteRoom = (roomId: string) => {
           {isCompanyLoading ? (
             <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
           ) : (
-            <FloorPlanCanvas
+            // <FloorPlanCanvas 
+            //   spaces={filteredSpaces} // Pass global Space[]
+            //   onSpaceSelect={(space: Space) => { // Ensure type is global Space
+            //     setSelectedSpace(space);
+            //     // Enter the space when clicked
+            //     handleEnterSpace(space);
+            //   }}
+            //   onSpaceDoubleClick={(space) => {
+            //     // Open chat panel on double-click
+            //     handleOpenChat(space);
+            //   }}
+            //   isEditable={true} // TODO: Make this dependent on user role (admin)
+            //   highlightedSpaceId={highlightedSpaceId} // Pass highlighted space ID
+            // />
+
+            <DomFloorPlan 
               spaces={filteredSpaces} // Pass global Space[]
               onSpaceSelect={(space: Space) => { // Ensure type is global Space
                 setSelectedSpace(space);
+                setHighlightedSpaceId(space.id);
                 // Enter the space when clicked
                 handleEnterSpace(space);
               }}
@@ -359,7 +435,9 @@ const handleDeleteRoom = (roomId: string) => {
                 handleOpenChat(space);
               }}
               isEditable={true} // TODO: Make this dependent on user role (admin)
-            />)}
+              highlightedSpaceId={highlightedSpaceId} // Pass highlighted space ID
+            />
+            )}
         </div>
       </Card>
 

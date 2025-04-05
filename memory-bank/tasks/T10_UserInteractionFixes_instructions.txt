@@ -1,0 +1,60 @@
+# T10_UserInteractionFixes Instructions
+
+## Objective
+Fix user-to-user messaging and interaction in the floor plan to enable proper communication between users.
+
+## Context
+Users are unable to send messages to other users when clicking on them in the floor plan. This is a core functionality of the virtual office that needs to be fixed urgently.
+
+[Implementation Plan: IP1_MessagingConversationsFixes]
+
+## Dependencies
+- src/components/floor-plan/FloorPlan.tsx
+- src/components/messaging/MessageDialog.tsx
+- src/components/messaging/MessageInput.tsx
+- src/hooks/useConversations.ts
+- src/hooks/useMessages.ts
+- src/lib/messaging-api.ts
+- src/contexts/MessagingContext.tsx
+
+## Steps
+1. **Fix User Click Interactions**
+   - Examine how user clicks on the floor plan are handled
+   - Ensure clicking on another user opens the correct messaging dialog
+   - Debug event propagation and click handlers in floor plan components
+   - Fix any issues with user identification or conversation routing
+
+2. **Fix Conversation Initialization**
+   - Debug conversation creation when sending message to a user
+   - Ensure conversations are properly created if they don't exist
+   - Fix any issues with participant identification
+   - Address any UUID vs UID format issues in conversation participant handling
+
+3. **Update Messaging Dialog Components**
+   - Ensure proper opening/closing of messaging dialogs on user interaction
+   - Fix display of recipient information in messaging UI
+   - Update component state handling for message threads
+   - Verify message routing based on selected recipient
+
+4. **Fix Real-time Message Delivery**
+   - Ensure messages are properly delivered in real-time
+   - Fix any issues with subscription to message events
+   - Ensure message notifications appear correctly
+   - Debug Socket.IO or Supabase Realtime connection for messaging
+
+5. **Add User Presence Indicators**
+   - Add clear visual indicators for online users
+   - Update user status in real-time across sessions
+   - Ensure user avatars reflect current online status
+
+## Expected Output
+- Ability to click on other users and send messages to them
+- Proper conversation initialization for new user interactions
+- Messaging dialogs that correctly show the intended recipient
+- Real-time message delivery between users
+
+## Notes
+- Focus on the core interaction path of clicking a user and sending a message
+- Prioritize fixing the immediate user-to-user communication flow
+- Consider adding temporary UI elements to make interaction points more obvious
+- Be mindful of the Firebase UID vs Database UUID mismatch when handling participants
