@@ -1,6 +1,6 @@
 # Project Progress
 
-## Current Status (As of April 4, 2025)
+## Current Status (As of April 5, 2025)
 
 ### Completed Features
 1. **Core Infrastructure**
@@ -27,6 +27,7 @@
    - ✅ Zoom and pan capabilities
    - ✅ Space interaction
    - ✅ Grid snapping
+   - ⚠️ **Note:** Konva implementation to be replaced by DOM-based approach (IP2).
 
 5. **Space Management**
    - ✅ Space creation and editing
@@ -70,27 +71,39 @@
 
 ### Upcoming Tasks (Priority Order)
 
-1. **Meeting Notes System Completion**
-   - Implement action items tracking
-   - Add AI summary generation
-   - Integrate meeting transcripts
+1.  **DOM Floor Plan Implementation (IP2)**
+    *   T11_DB_AddUserLocation: Add `current_space_id` to `users` table.
+    *   T12_API_UpdateUserLocation: Create API route for location updates.
+    *   T19_Realtime_Backend: Verify/implement backend presence broadcasting.
+    *   T13_Hook_UserPresence: Implement presence hook.
+    *   T14_Component_PresenceContext: Create presence context.
+    *   T17_Component_UserAvatarPresence: Create avatar component.
+    *   T16_Component_SpaceElement: Create space component.
+    *   T15_Component_DomFloorPlan: Refactor main floor plan component.
+    *   T18_Integration_SpaceChat: Integrate space entry with chat opening.
+    *   T20_Cleanup_Konva: Remove old Konva code/dependencies.
 
-2. **Announcement System Enhancement**
-   - Add priority levels
-   - Implement targeted announcements
-   - Add expiration handling
+2.  **Meeting Notes System Completion**
+    *   Implement action items tracking
+    *   Add AI summary generation
+    *   Integrate meeting transcripts
 
-3. **Communication Tools Development**
-   - Research and select video conferencing solution
-   - Implement screen sharing
-   - Develop virtual whiteboard
-   - Add collaborative document editing
+3.  **Announcement System Enhancement**
+    *   Add priority levels
+    *   Implement targeted announcements
+    *   Add expiration handling
 
-4. **Administrative Features**
-   - Design analytics dashboard
-   - Implement usage tracking
-   - Add space utilization metrics
-   - Create system health monitoring
+4.  **Communication Tools Development**
+    *   Research and select video conferencing solution
+    *   Implement screen sharing
+    *   Develop virtual whiteboard
+    *   Add collaborative document editing
+
+5.  **Administrative Features**
+    *   Design analytics dashboard
+    *   Implement usage tracking
+    *   Add space utilization metrics
+    *   Create system health monitoring
 
 ### Technical Debt & Improvements
 
@@ -120,12 +133,13 @@
 - Implemented Repository Pattern
 - Enhanced real-time capabilities
 - Improved state management with React Query
+- Planned DOM Floor Plan implementation (IP2) and created tasks T11-T20.
 
 ## Next Sprint Goals
-1. Complete Meeting Notes System
-2. Enhance Announcement System
-3. Begin Video Conferencing Integration
-4. Start Administrative Dashboard Development
+1. **Implement DOM Floor Plan (IP2 - Tasks T11-T20)**
+2. Complete Meeting Notes System
+3. Enhance Announcement System
+4. Begin Video Conferencing Integration
 
 ## Long-term Roadmap
 1. Mobile Application Development

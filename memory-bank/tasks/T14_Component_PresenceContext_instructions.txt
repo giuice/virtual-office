@@ -1,0 +1,121 @@
+# T14_Component_PresenceContext Instructions
+
+## Objective
+Create a React Context (`PresenceContext`) and Provider (`PresenceProvider`) to manage and distribute the user presence data and update function obtained from the `useUserPresence` hook (T13).
+
+## Context
+This context provides a clean way to access presence information (list of users with their locations/status) and the function to update the current user's location throughout the component tree, primarily for the `DomFloorPlan` and potentially other components that might need presence data. It avoids prop drilling.
+
+## Dependencies
+- React (`createContext`, `useContext`, `PropsWithChildren`)
+- `src/hooks/useUserPresence.ts` (T13)
+- `src/types/database.ts` (User type or a specific UserPresence type)
+- Return type definition from `useUserPresence` hook.
+
+## Steps
+
+1.  **Define Context Type:**
+    *   Determine the shape of the data the context will hold. This should match the return value of `useUserPresence`.
+    *   Example Type:
+        ```typescript
+        import { User } from '@/types/database'; // Adjust path
+
+        // Define a more specific type if needed, based on what useUserPresence fetches
+        type UserPresenceData = Pick<User, 'id' | 'display_name' | 'avatar_url' | 'status' | 'current_space_id'>;
+
+        interface PresenceContextType {
+          usersPresence: UserPresenceData[] | undefined;
+          isLoadingPresence: boolean;
+          presenceError: Error | null;
+          updateMyLocation: (spaceId: string | null) => void; // Or the specific type from useMutation
+          isUpdatingLocation: boolean;
+        }
+        ```
+
+2.  **Create Context:**
+    *   Create the context file: `src/contexts/PresenceContext.tsx`.
+    *   Import React and the context type definition.
+    *   Create the context with a default value (usually `null` or an object with default states, requiring checks in consumers).
+        ```typescript
+        import React, { createContext, useContext, PropsWithChildren } from 'react';
+        // ... import PresenceContextType and UserPresenceData ...
+        import { useUserPresence } from '@/hooks/useUserPresence'; // Adjust path
+
+        const PresenceContext = createContext<PresenceContextType | null>(null);
+        ```
+
+3.  **Create Provider Component:**
+    *   In the same file (`src/contexts/PresenceContext.tsx`), create the `PresenceProvider` component.
+    *   It should accept `children` as props.
+    *   Inside the provider, call the `useUserPresence` hook to get the data and functions.
+    *   Pass the values obtained from the hook into the `PresenceContext.Provider`.
+        ```typescript
+        export const PresenceProvider = ({ children }: PropsWithChildren) => {
+          const presence = useUserPresence(); // Gets all return values from the hook
+
+          // Ensure the context value matches PresenceContextType
+          const contextValue: PresenceContextType = {
+            usersPresence: presence.usersPresence, // Adjust names based on hook return
+            isLoadingPresence: presence.isLoading, // Adjust names
+            presenceError: presence.error, // Adjust names
+            updateMyLocation: presence.updateMyLocation, // Adjust names
+            isUpdatingLocation: presence.isUpdatingLocation, // Adjust names
+          };
+
+          return (
+            <PresenceContext.Provider value={contextValue}>
+              {children}
+            </PresenceContext.Provider>
+          );
+        };
+        ```
+
+4.  **Create Consumer Hook:**
+    *   In the same file, create a custom hook `usePresence` for easy consumption of the context.
+    *   This hook should use `useContext(PresenceContext)`.
+    *   It should include a check to ensure the context is not null (i.e., the hook is used within a `PresenceProvider`).
+        ```typescript
+        export const usePresence = (): PresenceContextType => {
+          const context = useContext(PresenceContext);
+          if (!context) {
+            throw new Error('usePresence must be used within a PresenceProvider');
+          }
+          return context;
+        };
+        ```
+
+5.  **Integrate Provider:**
+    *   Wrap the relevant part of your application tree with `PresenceProvider`. This is typically done in a layout component (`src/app/layout.tsx` or a specific layout for the authenticated part of the app) or potentially closer to where the floor plan is rendered, depending on how widely presence data is needed. Ensure it's *inside* providers for Supabase client, React Query, and Company/Auth context.
+    *   Example (`src/app/layout.tsx` or similar):
+        ```typescript
+        // ... other providers
+        import { PresenceProvider } from '@/contexts/PresenceContext'; // Adjust path
+
+        // ...
+        <CompanyProvider> {/* Assuming CompanyProvider provides companyId */}
+          <PresenceProvider>
+             {/* Rest of the app */}
+             {children}
+          </PresenceProvider>
+        </CompanyProvider>
+        // ...
+        ```
+
+6.  **Verification:**
+    *   Temporarily use the `usePresence` hook in a component rendered within the provider scope.
+    *   Log the values (`usersPresence`, `isLoadingPresence`, etc.) to the console to verify they are being passed correctly.
+    *   Ensure the `updateMyLocation` function is available.
+    *   Verify the error is thrown if `usePresence` is used outside the provider.
+
+## Expected Output
+- `src/contexts/PresenceContext.tsx` file containing:
+    - `PresenceContextType` interface/type.
+    - `PresenceContext` object.
+    - `PresenceProvider` component.
+    - `usePresence` consumer hook.
+- `PresenceProvider` integrated into the application's component tree (e.g., in `layout.tsx`).
+
+## Notes
+- Ensure the type definition `PresenceContextType` accurately reflects all the values returned by `useUserPresence` that need to be shared.
+- Place the `PresenceProvider` appropriately in the component tree, ensuring it has access to necessary parent contexts (like Auth/Company context for user/company IDs and Supabase client).
+- The `usePresence` hook provides a convenient and type-safe way for components to access the presence data.

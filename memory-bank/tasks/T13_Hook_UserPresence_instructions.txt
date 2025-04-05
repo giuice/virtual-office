@@ -1,0 +1,108 @@
+# T13_Hook_UserPresence Instructions
+
+## Objective
+Create a custom React hook (`useUserPresence`) responsible for fetching user presence data (location, status) for the current company, subscribing to real-time updates, and providing a function to update the current user's location.
+
+## Context
+This hook centralizes the logic for managing user presence on the frontend. It will be consumed by the `PresenceContext` (T14) and ultimately used by the `DomFloorPlan` (T15) to display users in their correct spaces and reflect status changes. It leverages React Query for data fetching/caching and Supabase Realtime for live updates.
+
+## Dependencies
+- React (`useState`, `useEffect`, `useCallback`)
+- `@tanstack/react-query` (`useQuery`, `useMutation`, `useQueryClient`)
+- `@supabase/supabase-js` (Supabase client instance, likely from a context)
+- `src/types/database.ts` (User type)
+- `src/repositories/interfaces/IUserRepository.ts` (Potentially needed for initial fetch type, though API call might be preferred)
+- Client-side API utility/function to call `PUT /api/users/location` (Needs to be created or located)
+- `CompanyContext` or similar hook/context to get the current `companyId` and `userId`.
+- **Existing Code:** Check `src/hooks` and `src/contexts` for any existing hooks related to fetching users or handling Supabase subscriptions that can be reused or refactored.
+
+## Steps
+
+1.  **Define Hook Structure:**
+    *   Create the hook file: `src/hooks/useUserPresence.ts`.
+    *   Define the function signature: `export function useUserPresence() { ... }`.
+    *   Import necessary dependencies.
+    *   Get `companyId` and current `userId` from context (`useCompany`, `useAuth` or similar). Handle cases where these might not be available yet.
+
+2.  **Fetch Initial Presence Data:**
+    *   Use `useQuery` from React Query to fetch the initial presence state for all users in the current company.
+    *   **Query Key:** Define a stable query key, e.g., `['presence', companyId]`.
+    *   **Query Function:**
+        *   This function should ideally call a dedicated API endpoint (e.g., `GET /api/users/presence?companyId={companyId}`) that fetches users with essential presence fields (`id`, `display_name`, `avatar_url`, `status`, `current_space_id`). **Alternatively**, if no such endpoint exists, it *could* use the `UserRepository` client-side, but an API endpoint is generally preferred for server-side data fetching. **Check for existing API routes or user fetching hooks first.**
+        *   Ensure the fetch only runs if `companyId` is available.
+    *   **Return Type:** The query function should return an array of users with presence data (e.g., `Partial<User>[]` or a specific `UserPresence` type).
+
+3.  **Implement Real-Time Subscription:**
+    *   Use `useEffect` to set up and tear down the Supabase Realtime subscription.
+    *   Get the Supabase client instance (from context).
+    *   Subscribe to changes on the `users` table for the specific `companyId`. Filter for relevant events (`INSERT`, `UPDATE`). Listen for changes to `current_space_id` and `status`.
+        ```typescript
+        useEffect(() => {
+          if (!supabase || !companyId) return;
+
+          const channel = supabase
+            .channel(`realtime-presence-${companyId}`)
+            .on<User>(
+              'postgres_changes',
+              {
+                event: '*', // Listen to INSERT, UPDATE, DELETE
+                schema: 'public',
+                table: 'users',
+                filter: `company_id=eq.${companyId}`,
+              },
+              (payload) => {
+                console.log('Presence change received:', payload);
+                // Update React Query cache based on payload (new, old, eventType)
+                queryClient.invalidateQueries({ queryKey: ['presence', companyId] }); // Simple invalidation
+                // Or, for more granular updates:
+                // queryClient.setQueryData(['presence', companyId], (oldData) => { ... update logic ... });
+              }
+            )
+            .subscribe((status, err) => {
+              if (status === 'SUBSCRIBED') {
+                console.log('Subscribed to presence channel');
+              }
+              if (status === 'CHANNEL_ERROR') {
+                console.error('Presence channel error:', err);
+              }
+            });
+
+          return () => {
+            supabase.removeChannel(channel);
+          };
+        }, [supabase, companyId, queryClient]);
+        ```
+    *   **Cache Update:** Inside the subscription callback, update the React Query cache (`queryClient.setQueryData` or `queryClient.invalidateQueries`) based on the `payload` (event type, new data, old data) to reflect the changes in the UI without a full refetch. Invalidation is simpler but less performant. `setQueryData` provides a better UX.
+
+4.  **Implement Location Update Function:**
+    *   Use `useMutation` from React Query to handle updating the current user's location.
+    *   **Mutation Function:** This function will accept `spaceId: string | null` as input. It needs to call the `PUT /api/users/location` endpoint. Create/use a client-side API helper function for this (e.g., `updateUserLocationAPI(spaceId)`).
+    *   **Optimistic Updates (Recommended):**
+        *   Implement `onMutate` to optimistically update the user's location in the React Query cache (`['presence', companyId]`).
+        *   Implement `onError` to roll back the optimistic update if the mutation fails.
+        *   Implement `onSettled` (or `onSuccess`) to invalidate the query to ensure consistency with the server state eventually.
+    *   **Provide Function:** Expose the `mutate` function (e.g., renamed to `updateMyLocation`) from the hook.
+
+5.  **Return Values:**
+    *   Return the presence data from `useQuery` (e.g., `usersPresence: data`).
+    *   Return loading and error states from `useQuery`.
+    *   Return the location update function from `useMutation` (e.g., `updateMyLocation: updateLocationMutation.mutate`).
+    *   Return mutation status if needed (e.g., `isUpdatingLocation: updateLocationMutation.isPending`).
+
+6.  **Verification:**
+    *   Test the hook by integrating it into a temporary component or the `PresenceContext`.
+    *   Verify initial data fetching.
+    *   Verify real-time updates by manually changing user `status` or `current_space_id` in the Supabase database and observing UI changes.
+    *   Verify the `updateMyLocation` function correctly calls the API and updates the UI (optimistically and after refetch/invalidation).
+    *   Check browser console for subscription status and errors.
+
+## Expected Output
+- A functional React hook `useUserPresence` in `src/hooks/useUserPresence.ts`.
+- The hook fetches user presence data for the company, updates in real-time via Supabase subscriptions, and provides a function to update the current user's location via an API call.
+
+## Notes
+- **API Helper:** Ensure a client-side function exists to call `PUT /api/users/location`. If not, create one (e.g., in `src/lib/api/users.ts`).
+- **Performance:** For very large companies, fetching all users might be inefficient. Consider pagination or fetching only users currently associated with *any* space if performance becomes an issue. The current approach assumes a moderate number of users per company.
+- **Error Handling:** Implement robust error handling for fetching, subscriptions, and mutations.
+- **Cache Strategy:** Carefully design the React Query cache update logic in the subscription callback for optimal performance and UX. Simple invalidation is easiest but can cause UI flashes. Manual updates with `setQueryData` are smoother.
+- **Refactoring:** Double-check if existing hooks like `useUsers` or parts of `MessagingContext` (if it handles any presence) can be leveraged or refactored to avoid duplication.

@@ -3,17 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Group, Circle, Line } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { Vector2d } from 'konva/lib/types';
-import Konva from 'konva';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Space, User as GlobalUser, UIUserStatus } from '@/types/database'; // Use global Space type and User
-import { spaceColors } from './types'; // Keep local colors for now
-import { RoomTooltip } from './room-tooltip';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
 import { KonvaUserAvatar } from './konva-user-avatar'; // Import the KonvaUserAvatar component
-import { UserTooltip } from './user-tooltip';
 import { FloorTooltip } from './floor-tooltip';
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 

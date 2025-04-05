@@ -1,0 +1,86 @@
+# T11_DB_AddUserLocation Instructions
+
+## Objective
+Add a `current_space_id` column to the `users` table in the Supabase database to track the user's current location within the virtual office floor plan. Update the relevant repository interface and implementation.
+
+## Context
+This change is fundamental for the new DOM-based floor plan interaction model. It allows the application to know which space (if any) a user is currently occupying, enabling real-time presence updates on the floor plan.
+
+## Dependencies
+- Supabase project access (for applying migration)
+- `src/types/database.ts`
+- `src/repositories/interfaces/IUserRepository.ts`
+- `src/repositories/implementations/supabase/SupabaseUserRepository.ts`
+
+## Steps
+
+1.  **Define Migration:**
+    *   Create a new SQL migration file (e.g., in a `supabase/migrations` directory if following standard Supabase CLI workflow, or prepare the SQL statement).
+    *   The SQL statement should add a `current_space_id` column to the `public.users` table.
+    *   This column should be of type `uuid`, nullable, and have a foreign key constraint referencing `public.spaces(id)`. Consider adding `ON DELETE SET NULL` to handle cases where a space is deleted while users are in it.
+    *   Example SQL:
+        ```sql
+        ALTER TABLE public.users
+        ADD COLUMN current_space_id UUID NULL;
+
+        ALTER TABLE public.users
+        ADD CONSTRAINT users_current_space_id_fkey
+        FOREIGN KEY (current_space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
+
+        -- Optional: Add an index for potential performance benefits if querying users by space
+        -- CREATE INDEX idx_users_current_space_id ON public.users(current_space_id);
+        ```
+
+2.  **Apply Migration:**
+    *   Apply the migration to your Supabase database using the Supabase CLI (`supabase db push` if using local development and migrations folder) or by running the SQL directly in the Supabase SQL Editor.
+
+3.  **Update Database Types:**
+    *   Modify the `User` type definition in `src/types/database.ts` to include the optional `current_space_id: string | null;` field.
+
+4.  **Update Repository Interface:**
+    *   Open `src/repositories/interfaces/IUserRepository.ts`.
+    *   Add a new method signature for updating the user's location:
+        ```typescript
+        updateLocation(userId: string, spaceId: string | null): Promise<User | null>;
+        ```
+    *   **Check Existing:** Review other methods (like `findById`, `findAll`, `findByCompanyId`) to see if they need to optionally return or utilize the `current_space_id`. For now, assume fetching methods don't *need* to change unless specifically required later, but the `updateLocation` is essential.
+
+5.  **Update Supabase Repository Implementation:**
+    *   Open `src/repositories/implementations/supabase/SupabaseUserRepository.ts`.
+    *   Implement the `updateLocation` method:
+        *   Use the Supabase client (`this.supabase`) to update the `users` table.
+        *   Set the `current_space_id` column for the given `userId`.
+        *   Handle potential errors (e.g., user not found).
+        *   Return the updated user object or null on failure.
+        *   Example Implementation:
+          ```typescript
+          async updateLocation(userId: string, spaceId: string | null): Promise<User | null> {
+            const { data, error } = await this.supabase
+              .from('users')
+              .update({ current_space_id: spaceId, last_active: new Date().toISOString() }) // Also update last_active
+              .eq('id', userId)
+              .select()
+              .single();
+
+            if (error) {
+              console.error('Error updating user location:', error);
+              return null;
+            }
+            return data;
+          }
+          ```
+
+6.  **Verification:**
+    *   Manually check the `users` table structure in Supabase Studio to confirm the column and constraint exist.
+    *   (Optional) Add a unit test for the `updateLocation` repository method if testing infrastructure is in place.
+
+## Expected Output
+- Updated `users` table schema in Supabase.
+- Modified `src/types/database.ts`.
+- Modified `src/repositories/interfaces/IUserRepository.ts`.
+- Modified `src/repositories/implementations/supabase/SupabaseUserRepository.ts` with the new method.
+
+## Notes
+- Ensure you have the necessary permissions to alter the Supabase table.
+- Coordinate with team members if applying database changes to a shared environment.
+- Consider the implications of `ON DELETE SET NULL` vs. other foreign key actions based on desired application behavior when spaces are deleted. `SET NULL` is generally safest here.

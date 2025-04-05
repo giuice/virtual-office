@@ -1,0 +1,103 @@
+# T17_Component_UserAvatarPresence Instructions
+
+## Objective
+Create a React component (`UserAvatarPresence`) that displays a user's avatar using Shadcn UI's `Avatar` component and includes a visual indicator for their current presence status (e.g., online, away, busy).
+
+## Context
+This component provides the visual representation of a user on the floor plan, typically rendered within a `SpaceElement` (T16). It combines the user's profile picture with their real-time status.
+
+## Dependencies
+- React
+- Shadcn UI components: `Avatar`, `AvatarImage`, `AvatarFallback`
+- `src/types/database.ts` (User type or `UserPresenceData` type from T14)
+- Tailwind CSS for status indicator styling.
+- Utility function to get initials from name (for fallback).
+
+## Steps
+
+1.  **Create Component File:**
+    *   Create the file: `src/components/floor-plan/UserAvatarPresence.tsx`.
+
+2.  **Define Props:**
+    *   Define the props interface. It should receive:
+        *   `user`: The user data object (e.g., `UserPresenceData`).
+        *   `onClick`: (Optional) A callback function `(userId: string) => void` to handle clicks on the avatar (e.g., for opening a profile or DM).
+        ```typescript
+        import { UserPresenceData } from '@/contexts/PresenceContext'; // Adjust path
+        import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Adjust path
+        import { cn } from "@/lib/utils"; // Adjust path
+
+        interface UserAvatarPresenceProps {
+          user: UserPresenceData;
+          onClick?: (userId: string) => void;
+        }
+        ```
+
+3.  **Implement Rendering Logic:**
+    *   Render the Shadcn `Avatar` component.
+    *   Inside `Avatar`, use `AvatarImage` with `src={user.avatar_url}` and `alt={user.display_name}`.
+    *   Use `AvatarFallback` to display the user's initials if the image fails to load. Create or use a utility function `getInitials(name)` for this.
+    *   **Status Indicator:**
+        *   Render a small `span` or `div` element positioned absolutely relative to the `Avatar` container (e.g., bottom-right corner).
+        *   Use Tailwind CSS to style the indicator: make it circular (`rounded-full`), give it a size (e.g., `w-2 h-2` or `w-3 h-3`), and set its `background-color` based on the `user.status` value ('online', 'away', 'busy', 'offline', etc.). Add a small border (e.g., `border-2 border-background`) to make it stand out against the avatar.
+        *   Use `cn` utility for conditional classes based on status.
+
+4.  **Implement Click Handler (Optional):**
+    *   If the `onClick` prop is provided, add an `onClick` handler to the main `Avatar` container.
+    *   Call `onClick(user.id)` when the avatar is clicked.
+    *   Add `cursor: pointer` styling if clickable.
+
+5.  **Example Implementation:**
+    ```typescript
+    // Assume getInitials function exists
+    const getInitials = (name: string = '') => name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+
+    const UserAvatarPresence = ({ user, onClick }: UserAvatarPresenceProps) => {
+      const statusColor = {
+        online: 'bg-green-500',
+        away: 'bg-yellow-500',
+        busy: 'bg-red-500',
+        offline: 'bg-gray-400',
+      }[user.status || 'offline'] || 'bg-gray-400'; // Default to offline
+
+      const handleClick = () => {
+        if (onClick) {
+          onClick(user.id);
+        }
+      };
+
+      return (
+        <div className="relative inline-block" onClick={handleClick} role={onClick ? "button" : undefined} aria-label={onClick ? `User ${user.display_name}` : undefined}>
+          <Avatar className={cn("h-8 w-8", onClick && "cursor-pointer")}> {/* Adjust size as needed */}
+            <AvatarImage src={user.avatar_url || undefined} alt={user.display_name || 'User Avatar'} />
+            <AvatarFallback>{getInitials(user.display_name)}</AvatarFallback>
+          </Avatar>
+          <span
+            className={cn(
+              "absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border-2 border-background ring-1 ring-background", // Adjust size/border
+              statusColor
+            )}
+            title={`Status: ${user.status || 'offline'}`} // Tooltip for status
+          />
+        </div>
+      );
+    };
+    ```
+
+6.  **Verification:**
+    *   Integrate this component into `SpaceElement` (T16).
+    *   Verify that avatars render correctly with images or fallbacks.
+    *   Verify the status indicator appears in the correct position and color based on user status data.
+    *   Verify the `onClick` handler works if implemented (use `console.log` initially).
+    *   Check styling and alignment within the `SpaceElement`.
+
+## Expected Output
+- A functional React component `UserAvatarPresence` in `src/components/floor-plan/UserAvatarPresence.tsx`.
+- The component displays a user's avatar with a status indicator and optionally handles clicks.
+
+## Notes
+- **Status Mapping:** Ensure the `statusColor` mapping covers all possible `user.status` values defined in your application/database. Provide a sensible default.
+- **Styling:** Adjust avatar size (`h-8 w-8`), status indicator size (`h-2.5 w-2.5`), and positioning to fit the design.
+- **Initials Function:** Ensure the `getInitials` utility function is available and correctly handles various name formats (or lack thereof).
+- **Interaction:** Decide what action the optional `onClick` should trigger (e.g., open profile popover, start DM). This logic will likely reside in the parent component (`DomFloorPlan` or `SpaceElement`).
+- **Accessibility:** Added basic `title` for the status indicator. Consider adding more ARIA attributes if needed, especially for the click interaction.

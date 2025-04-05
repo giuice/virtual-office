@@ -1,0 +1,92 @@
+# T16_Component_SpaceElement Instructions
+
+## Objective
+Create a React component (`SpaceElement`) responsible for rendering a single space (room) on the DOM-based floor plan, displaying users within it, and handling the click interaction to "enter" the space.
+
+## Context
+This component represents a single room or area on the floor plan. It receives space data and the list of users currently inside it from its parent (`DomFloorPlan`). It uses the `updateMyLocation` function (passed down or from context) to trigger the user's location change upon clicking the space.
+
+## Dependencies
+- React
+- `src/types/database.ts` (Space, User types or UserPresenceData type from T14)
+- `src/components/floor-plan/UserAvatarPresence.tsx` (T17 - Will be created)
+- Tailwind CSS / Shadcn UI (e.g., `Card` component for the space background)
+- `usePresence` hook (from T14, if `updateMyLocation` is not passed as a prop)
+- `useMessaging` hook (from `MessagingContext`, for opening chat - T18)
+
+## Steps
+
+1.  **Create Component File:**
+    *   Create the file: `src/components/floor-plan/SpaceElement.tsx`.
+
+2.  **Define Props:**
+    *   Define the props interface for the component. It should receive:
+        *   `space`: The `Space` object data.
+        *   `usersInSpace`: An array of users currently in this space (e.g., `UserPresenceData[]`).
+        *   `onEnterSpace`: A callback function `(spaceId: string) => void` that will be called when the space is clicked. This function will likely call `updateMyLocation` and potentially open the chat (handled in T18).
+        ```typescript
+        import { Space } from '@/types/database'; // Adjust path
+        import { UserPresenceData } from '@/contexts/PresenceContext'; // Adjust path if defined there
+
+        interface SpaceElementProps {
+          space: Space;
+          usersInSpace: UserPresenceData[];
+          onEnterSpace: (spaceId: string) => void;
+        }
+        ```
+
+3.  **Implement Rendering Logic:**
+    *   The component should render a main container `div` representing the space.
+    *   **Styling:** Style the `div` using Tailwind CSS based on `space` properties (e.g., dimensions, background color/image, border). Consider using a Shadcn `Card` component as the base for consistent styling. Apply `position: absolute` or other positioning styles based on `space.position` data if implementing precise layout (coordinate with T15). Add `cursor: pointer` and hover effects to indicate interactivity.
+    *   **Display Space Name:** Render the `space.name` inside the `div`.
+    *   **Render Users:** Map over the `usersInSpace` prop. For each `user`, render the `UserAvatarPresence` component (T17), passing the `user` data as a prop. Arrange the avatars within the space (e.g., using flexbox or grid).
+    *   **Handle Empty State:** Display something visually distinct if `usersInSpace` is empty (optional).
+
+4.  **Implement Click Handler:**
+    *   Add an `onClick` handler to the main container `div`.
+    *   When clicked, the handler should call the `onEnterSpace` prop, passing the `space.id`.
+        ```typescript
+        const SpaceElement = ({ space, usersInSpace, onEnterSpace }: SpaceElementProps) => {
+          const handleClick = () => {
+            onEnterSpace(space.id);
+          };
+
+          return (
+            <div
+              className="space-element bg-card border rounded p-2 absolute cursor-pointer hover:bg-muted/50" // Example styling
+              style={{ top: `${space.position?.y ?? 0}px`, left: `${space.position?.x ?? 0}px`, width: `${space.position?.width ?? 100}px`, height: `${space.position?.height ?? 100}px` }} // Example positioning
+              onClick={handleClick}
+              aria-label={`Enter space ${space.name}`}
+              role="button"
+            >
+              <h3 className="font-semibold text-sm mb-1 truncate">{space.name}</h3>
+              <div className="flex flex-wrap gap-1"> {/* Container for avatars */}
+                {usersInSpace.map((user) => (
+                  <UserAvatarPresence key={user.id} user={user} />
+                ))}
+                {usersInSpace.length === 0 && (
+                   <span className="text-xs text-muted-foreground">Empty</span>
+                )}
+              </div>
+            </div>
+          );
+        };
+        ```
+
+5.  **Verification:**
+    *   Integrate this component into `DomFloorPlan` (T15).
+    *   Verify that spaces render correctly with their names and styles.
+    *   Verify that the correct user avatars appear within each space.
+    *   Verify that clicking the space element triggers the `onEnterSpace` callback (use `console.log` initially in the parent component's handler).
+    *   Check responsiveness and layout, especially how user avatars are arranged within the space.
+
+## Expected Output
+- A functional React component `SpaceElement` in `src/components/floor-plan/SpaceElement.tsx`.
+- The component renders a single space, displays users within it using `UserAvatarPresence`, and triggers a callback function when clicked.
+
+## Notes
+- **Positioning:** The example uses absolute positioning based on `space.position`. Adjust this based on the chosen layout strategy in `DomFloorPlan` (T15). Ensure the `Space` type includes `position: { x: number, y: number, width: number, height: number }` or similar if using this method.
+- **Styling:** Refine the Tailwind CSS classes to match the desired visual appearance. Consider different styles based on `space.type` (e.g., meeting room vs. social area).
+- **Accessibility:** Added basic `aria-label` and `role="button"`. Enhance accessibility as needed.
+- **Interaction Feedback:** Add visual feedback on hover/click (e.g., changing background color, scale transform).
+- **Dependencies:** This component relies on `UserAvatarPresence` (T17) being created. Use a placeholder if developing `SpaceElement` first.

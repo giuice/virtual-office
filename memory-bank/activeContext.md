@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
 **Date:** 4/2/2025
-**Last Updated:** 4/5/2025, 11:06 AM (UTC-3:00) // Updated timestamp
+**Last Updated:** 4/5/2025, 3:45 PM (UTC-3:00) // Updated timestamp
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -13,28 +13,15 @@
 - **Maintain Brevity:** Keep this file concise and focused on the *current* state.
 ```
 ## Current Work Focus:
-- **Phase**: Execution
-- **Focus Area**: Implementing fixes for floor plan visualization and messaging system
-- **Current Tasks**: 
-  - T8_FloorPlanVisibilityFixes - Fix space visualization and loading issues
-  - T9_MessagingAuthenticationFixes - Fix authentication and session issues in messaging
-  - T10_UserInteractionFixes - Fix user-to-user interaction for messaging
+- **Phase**: Strategy
+- **Focus Area**: Planning DOM Floor Plan Implementation (IP2)
+- **Current Tasks**: N/A (Strategy Phase)
 
 ## Next Steps:
-1. Complete T8_FloorPlanVisibilityFixes
-   - Fix black space rendering and visibility issues
-   - Ensure all created spaces appear on the floor plan
-   - Fix user avatar display across different sessions
-2. Complete T9_MessagingAuthenticationFixes
-   - Fix 401 Unauthorized errors for sending messages
-   - Fix "No active session" errors for typing indicators
-3. Complete T10_UserInteractionFixes
-   - Enable clicking on users to send messages
-   - Fix conversation initialization between users
-4. Proceed with remaining tasks after critical fixes
-   - T2_RepositoryEnhancement - Ensure repositories fully implement interfaces
-   - T3_ReactQueryMigration - Refactor messaging hooks to use React Query
-   - T4_RealtimeMessaging - Implement Supabase Realtime for messaging
+1.  **Finalize Strategy:** Review and confirm Implementation Plan IP2 and associated tasks T11-T20. (Completed)
+2.  **Update Memory Bank:** Update `activeContext.md` and `progress.md` with IP2 details. (In Progress)
+3.  **Transition to Execution:** User to switch mode to ACT.
+4.  **Begin Implementation:** Start executing tasks for IP2, beginning with T11_DB_AddUserLocation.
 
 ## Active Decisions and Considerations:
 - **Testing Strategy:** Developed an alternative testing approach for Next.js App Router API routes due to challenges with direct unit testing. Focus on testing core logic separately from route handlers.
@@ -45,7 +32,8 @@
 - **UI State Management:** Plan to use **Zustand** for managing client-side UI state (e.g., selected items, filters) once React Query is integrated.
 - **Repository Pattern:** Adopted for data access abstraction. Interfaces and Supabase implementations complete. API routes refactored. React Query hooks will use repositories.
 - **Real-time:** Implemented Supabase Realtime with React Query for automatic cache invalidation. Existing Socket.IO implementation (`socket-server.js`, hooks) remains for messaging until fully migrated/replaced.
-- **Floor Plan Visualization Priority:** Prioritizing floor plan visibility fixes over other tasks as users are experiencing black spaces and missing elements.
+- **Floor Plan Technology:** Decided to replace Konva canvas implementation with standard DOM elements (HTML/CSS/Shadcn) for better integration, accessibility, and potentially simpler maintenance (IP2).
+- **Floor Plan Visualization Priority:** Previous fixes (T8) addressed immediate Konva issues. Now focusing on the strategic replacement with DOM (IP2).
 
 ## Recent Changes Summary (See changelog.md for details)
 - **Apr 5:** Restructured implementation plan to prioritize critical floor plan and messaging fixes. Added tasks T8, T9, and T10 to address immediate usability issues.
@@ -56,19 +44,22 @@
 - **Apr 4:** Integrated React Query mutation hooks into components. Updated `FloorPlan` component to use `useUpdateSpace` hook for the `handleEnterSpace` function, replacing the TODO comment with proper implementation.
 - **Apr 2:** Implemented React Query mutation hooks (`useCreateSpace`, `useUpdateSpace`, `useDeleteSpace`) for spaces. Set up React Query, implemented space query hooks, refactored FloorPlan component. Fixed LocalSpace type definitions. Refactored RoomDialog component into smaller units.
 
-## Latest Action (2025-04-05 ~15:15 UTC-3)
+## Latest Action (2025-04-05 ~15:45 UTC-3)
 
-**Goal:** Resolve incorrect user assignments in spaces (e.g., users appearing in 'Cozinha' when `userIds` should be empty).
+**Goal:** Plan the implementation of the DOM-based floor plan (replacing Konva).
 
-**Investigation & Actions:**
-- Verified API initially returned incorrect `userIds`.
-- Investigated `SupabaseSpaceRepository` and identified/fixed data mapping issues for `userIds` (Steps 287-289).
-- Examined `useSpaces`, `useSpaceMutations`, and `CompanyContext` data flow.
-- Added logging to `CompanyContext` to verify the `spaces` state after fetching.
+**Phase:** Strategy
+
+**Actions:**
+- Transitioned to Strategy phase.
+- Reviewed project brief and user request for DOM floor plan.
+- Outlined core concepts, architecture, and high-level tasks (T11-T20).
+- Created detailed instruction files for tasks T11 through T20.
+- Created Implementation Plan document `IP2_DomFloorPlanImplementation.md`.
+- Updating `activeContext.md` (this action).
 
 **Outcome:**
-- Confirmed via `console.log` in `CompanyContext` that the correct data (`userIds: []` for 'Cozinha') is now being fetched from the API and stored in the client-side context state.
-- The UI now correctly reflects user assignments based on the fixed data flow.
-- The root cause was traced back to the data mapping logic in `SupabaseSpaceRepository`.
+- Detailed plan and task instructions for DOM floor plan implementation are ready.
+- Implementation Plan document created.
 
-**Status:** User assignment issue appears resolved.
+**Status:** Ready to update `progress.md` and then transition to Execution phase upon user confirmation.

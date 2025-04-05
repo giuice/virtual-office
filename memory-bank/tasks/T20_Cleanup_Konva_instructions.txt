@@ -1,0 +1,55 @@
+# T20_Cleanup_Konva Instructions
+
+## Objective
+Remove all remaining Konva-related code, components, and dependencies from the project after the new DOM-based floor plan implementation (T11-T19) is verified and stable.
+
+## Context
+This is the final cleanup step to fully remove the old canvas-based implementation. It ensures the codebase is clean, reduces bundle size, and prevents confusion by eliminating unused code and dependencies. **This task should only be performed AFTER tasks T11 through T19 are completed and thoroughly tested.**
+
+## Dependencies
+- Successful completion and verification of tasks T11-T19.
+- Project codebase.
+- `package.json` file.
+- Search capabilities (IDE search or `grep`/`rg`).
+
+## Steps
+
+1.  **Final Verification:**
+    *   Thoroughly test all floor plan functionality implemented in T15-T18 (rendering spaces, user presence, entering spaces, chat integration).
+    *   Ensure no part of the application still relies on Konva components or logic.
+
+2.  **Identify Konva Components/Code:**
+    *   **Delete Old Component File:** Delete the old Konva canvas component file, likely `src/components/floor-plan/FloorPlanCanvas.tsx` (confirm exact filename).
+    *   **Search for Imports:** Perform a project-wide search for imports from `'react-konva'` and `'konva'`.
+    *   **Search for Usage:** Search for usage of Konva component names (e.g., `<Stage`, `<Layer`, `<Rect`, `<Group`, `<Image`, `<Text`) and Konva API calls (e.g., `Konva.Node`, `getStage()`).
+    *   **Review Related Files:** Check files that previously imported or interacted with `FloorPlanCanvas.tsx` or other Konva elements to ensure all related logic has been removed or refactored (e.g., parent components, context files if they held Konva state).
+
+3.  **Remove Identified Code:**
+    *   Delete any remaining import statements for `react-konva` or `konva`.
+    *   Remove any leftover Konva components from JSX.
+    *   Delete any state variables, `useEffect` hooks, or utility functions that were solely used for the Konva implementation (identified in T15, Step 1).
+
+4.  **Uninstall Dependencies:**
+    *   Open `package.json`.
+    *   Verify that `react-konva` and `konva` are listed in `dependencies` or `devDependencies`.
+    *   Run the appropriate command to remove them:
+        *   `npm uninstall react-konva konva`
+        *   `yarn remove react-konva konva`
+        *   `pnpm remove react-konva konva`
+    *   Check `package.json` and the lock file (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) to confirm the dependencies have been removed.
+
+5.  **Final Check & Testing:**
+    *   Run the application (`npm run dev` or similar).
+    *   Perform another round of testing on the floor plan features to ensure nothing was broken during the cleanup.
+    *   Check the browser console for any new errors.
+    *   Consider running linters/type checkers (`npm run lint`, `npm run typecheck`) to catch potential issues.
+
+## Expected Output
+- All Konva-related code removed from the project.
+- `react-konva` and `konva` dependencies uninstalled.
+- A cleaner codebase focused solely on the DOM-based floor plan implementation.
+
+## Notes
+- **Timing is Crucial:** Do not perform this cleanup until the new implementation is fully functional and stable. Premature removal can break the application during the refactoring process.
+- **Search Thoroughly:** Be meticulous when searching for remaining Konva code. It might exist in unexpected places if not carefully managed during refactoring.
+- **Version Control:** Ensure all changes are committed to version control before starting the cleanup, and commit the cleanup as a separate step.
