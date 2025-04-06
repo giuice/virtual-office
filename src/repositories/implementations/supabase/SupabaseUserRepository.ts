@@ -18,7 +18,8 @@ function mapToCamelCase(data: any): User {
     preferences: data.preferences || {}, // Ensure object exists
     role: data.role as UserRole,
     lastActive: data.last_active, // Assuming TimeStampType compatibility
-    createdAt: data.created_at   // Assuming TimeStampType compatibility
+    createdAt: data.created_at,   // Assuming TimeStampType compatibility
+    current_space_id: data.current_space_id // Added for user location tracking
   };
 }
 
@@ -174,4 +175,23 @@ export class SupabaseUserRepository implements IUserRepository {
       return this.update(userId, { companyId: companyId === null ? undefined : companyId });
   }
 
+  async updateLocation(userId: string, spaceId: string | null): Promise<User | null> {
+    const { data, error } = await supabase
+      .from(this.TABLE_NAME)
+      .update({
+        current_space_id: spaceId,
+        last_active: new Date().toISOString() // Update last_active when location changes
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user location:', error);
+      if (error.code === 'PGRST116') return null; // Row not found
+      throw error;
+    }
+
+    return data ? mapToCamelCase(data) : null;
+  }
 }

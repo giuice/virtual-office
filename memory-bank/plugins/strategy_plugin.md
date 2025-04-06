@@ -23,9 +23,10 @@
 **Exit action**:
 ```
 [PHASE_MARKER]
-CURRENT: Strategy
-NEXT: Execution
+CURRENT_PHASE: Strategy
+NEXT_PHASE: Execution
 LAST_ACTION: Completed Strategy Phase - Plans and Tasks Created
+NEXT_ACTION: Trasition to 'EXECUTION' phase
 REQUIRED_BEFORE_TRANSITION: User Action Required
 [/PHASE_MARKER]
 ```
@@ -274,4 +275,5 @@ All responses after an action MUST end with:
 [X] 11. Tasks are linked to their implementation plans: [Yes/No + details]
 [X] 12. Task priorities are documented: [Yes/No + details]
 [X] 13. Progress.md updated with new implementation plans and tasks: [Yes/No + details]
+[X] 14. `memorybankrules.md` updated with NEXT_ACTION action
 [/MUP_VERIFICATION]

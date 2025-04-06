@@ -24,6 +24,7 @@
 CURRENT: Setup/Maintenance
 NEXT: Strategy
 LAST_ACTION: Completed Setup/Maintenance Phase
+NEXT_ACTION: Transition to Strategy Phase
 REQUIRED_BEFORE_TRANSITION: User Action Required
 [/PHASE_MARKER]
 ```
@@ -46,9 +47,10 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
    - For `memorybankrules.md`:
      ```
      [PHASE_MARKER]
-     CURRENT: Setup/Maintenance
-     NEXT: Setup/Maintenance
+     CURRENT_PHASE: Setup/Maintenance
+     NEXT_PHASE: Setup/Maintenance
      LAST_ACTION: System Initialized
+     NEXT_ACTION: Create/Update Core files
      REQUIRED_BEFORE_TRANSITION: Core Files Creation
      [/PHASE_MARKER]
      
@@ -138,4 +140,5 @@ All responses after an action MUST end with:
 [X] 7. Dependency trackers formatted: [Yes/No/NA + details]
 [X] 8. Progress updated: [Yes/No/NA + details]
 [X] 9. Core files initialized: [Yes/No/NA + details]
+[X] 10. `memorybankrules.md` updated with NEXT_ACTION action
 [/MUP_VERIFICATION]

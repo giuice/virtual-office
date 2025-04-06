@@ -2,6 +2,43 @@
 import '@testing-library/react';
 import { vi, expect } from 'vitest';
 
+// Mock Supabase client for realtime testing
+vi.mock('@supabase/supabase-js', () => {
+  return {
+    createClient: vi.fn().mockReturnValue({
+      channel: vi.fn().mockReturnValue({
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn().mockReturnThis(),
+        unsubscribe: vi.fn().mockResolvedValue(undefined),
+      }),
+      getChannels: vi.fn().mockReturnValue([]),
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: { id: 'test-user-id' }
+            }
+          },
+          error: null
+        })
+      },
+      from: vi.fn().mockReturnValue({
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: 'test-user-id',
+            current_space_id: 'test-space-id',
+            company_id: 'test-company-id'
+          },
+          error: null
+        })
+      })
+    })
+  };
+});
+
 // Mock FormData
 class MockFormData {
   private data: Record<string, any> = {};

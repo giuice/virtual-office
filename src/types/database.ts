@@ -59,6 +59,7 @@ export interface User {
   role: UserRole;
   lastActive: TimeStampType;
   createdAt: TimeStampType;
+  current_space_id?: string | null; // Reference to Space.id, nullable
 }
 
 // Position type for floor plan elements

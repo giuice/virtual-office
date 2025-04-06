@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
-**Date:** 4/2/2025
-**Last Updated:** 4/5/2025, 3:45 PM (UTC-3:00) // Updated timestamp
+**Date:** 4/5/2025
+**Last Updated:** 4/5/2025, 4:01 PM (UTC-3:00)
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -12,18 +12,19 @@
 - **Do NOT include:** Detailed task breakdowns, historical changes, long-term plans.
 - **Maintain Brevity:** Keep this file concise and focused on the *current* state.
 ```
+
 ## Current Work Focus:
-- **Phase**: Strategy
-- **Focus Area**: Planning DOM Floor Plan Implementation (IP2)
-- **Current Tasks**: N/A (Strategy Phase)
+- **Phase**: Execution
+- **Focus Area**: Implementing DOM Floor Plan (IP2) - Phase 1: Backend & Data Layer
+- **Current Tasks**: T11_DB_AddUserLocation - Adding current_space_id to users table
 
 ## Next Steps:
-1.  **Finalize Strategy:** Review and confirm Implementation Plan IP2 and associated tasks T11-T20. (Completed)
-2.  **Update Memory Bank:** Update `activeContext.md` and `progress.md` with IP2 details. (In Progress)
-3.  **Transition to Execution:** User to switch mode to ACT.
-4.  **Begin Implementation:** Start executing tasks for IP2, beginning with T11_DB_AddUserLocation.
+1. Apply SQL migration to Supabase database
+2. Test new updateLocation repository method
+3. Proceed with T12_API_UpdateUserLocation once current task is verified
 
 ## Active Decisions and Considerations:
+- **SQL Migration Strategy:** Created migration with ON DELETE SET NULL for the current_space_id foreign key constraint, ensuring safe space deletion handling
 - **Testing Strategy:** Developed an alternative testing approach for Next.js App Router API routes due to challenges with direct unit testing. Focus on testing core logic separately from route handlers.
 - **Messaging System Architecture:** Need to evaluate current messaging architecture and identify improvements for reliability and performance.
 - **Real-time Updates for Messages:** Consider how to best implement real-time updates for messages using Supabase Realtime and React Query.
@@ -36,30 +37,24 @@
 - **Floor Plan Visualization Priority:** Previous fixes (T8) addressed immediate Konva issues. Now focusing on the strategic replacement with DOM (IP2).
 
 ## Recent Changes Summary (See changelog.md for details)
-- **Apr 5:** Restructured implementation plan to prioritize critical floor plan and messaging fixes. Added tasks T8, T9, and T10 to address immediate usability issues.
-- **Apr 4:** Completed implementation of messaging API features (file attachments, message status, typing indicators, conversation archive/read status) and corresponding API routes with proper handling of Firebase UID vs Database UUID mismatch.
-- **Apr 4:** Transitioned to Execution phase to implement fixes for messaging and conversations system.
-- **Apr 4:** Fixed critical error in the invitation system where Firebase UIDs were being used directly in database operations expecting UUIDs. Implemented ID format detection and conversion in API routes.
-- **Apr 4:** Implemented user avatars in the floor plan with tooltips showing user information. Implemented space persistence across sessions with the `useLastSpace` hook to ensure users remain in their selected space even after logging out and back in.
-- **Apr 4:** Integrated React Query mutation hooks into components. Updated `FloorPlan` component to use `useUpdateSpace` hook for the `handleEnterSpace` function, replacing the TODO comment with proper implementation.
-- **Apr 2:** Implemented React Query mutation hooks (`useCreateSpace`, `useUpdateSpace`, `useDeleteSpace`) for spaces. Set up React Query, implemented space query hooks, refactored FloorPlan component. Fixed LocalSpace type definitions. Refactored RoomDialog component into smaller units.
+- **Apr 5:** Added current_space_id column to users table with foreign key constraint and index
+- **Apr 5:** Updated User type and repository implementations to support user location tracking
+- **Apr 5:** Restructured implementation plan to prioritize critical floor plan and messaging fixes
 
-## Latest Action (2025-04-05 ~15:45 UTC-3)
+## Latest Action (2025-04-05 ~16:01 UTC-3)
 
-**Goal:** Plan the implementation of the DOM-based floor plan (replacing Konva).
+**Goal:** Implement T11_DB_AddUserLocation by adding current_space_id to users table.
 
-**Phase:** Strategy
+**Phase:** Execution
 
 **Actions:**
-- Transitioned to Strategy phase.
-- Reviewed project brief and user request for DOM floor plan.
-- Outlined core concepts, architecture, and high-level tasks (T11-T20).
-- Created detailed instruction files for tasks T11 through T20.
-- Created Implementation Plan document `IP2_DomFloorPlanImplementation.md`.
-- Updating `activeContext.md` (this action).
+- Created SQL migration for adding current_space_id column
+- Updated User type in database.ts
+- Added updateLocation method to IUserRepository
+- Implemented updateLocation in SupabaseUserRepository
 
 **Outcome:**
-- Detailed plan and task instructions for DOM floor plan implementation are ready.
-- Implementation Plan document created.
+- All code changes for T11 are complete
+- Ready to apply SQL migration to Supabase
 
-**Status:** Ready to update `progress.md` and then transition to Execution phase upon user confirmation.
+**Status:** Awaiting SQL migration execution and verification

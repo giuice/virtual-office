@@ -11,4 +11,5 @@ export interface IUserRepository {
   deleteById(id: string): Promise<boolean>; // Returns true if successful
   // Add other methods as needed, e.g., search, count, etc.
   updateCompanyAssociation(userId: string, companyId: string | null): Promise<User | null>;
+  updateLocation(userId: string, spaceId: string | null): Promise<User | null>;
 }

@@ -12,9 +12,10 @@
 
 ## PHASE MANAGEMENT SYSTEM
 [PHASE_MARKER]
-CURRENT: [current phase name]
-NEXT: [next phase name]
+CURRENT_PHASE: [current phase name]
+NEXT_PHASE: [next phase name]
 LAST_ACTION: [description of last completed action]
+NEXT_ACTION: [description of next planned action]
 REQUIRED_BEFORE_TRANSITION: [conditions that must be met]
 [/PHASE_MARKER]
 
