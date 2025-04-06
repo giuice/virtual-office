@@ -12,4 +12,6 @@ export interface IUserRepository {
   // Add other methods as needed, e.g., search, count, etc.
   updateCompanyAssociation(userId: string, companyId: string | null): Promise<User | null>;
   updateLocation(userId: string, spaceId: string | null): Promise<User | null>;
+
+  findAll(): Promise<User[]>;
 }

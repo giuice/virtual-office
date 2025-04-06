@@ -12,3 +12,9 @@
 - Enabled realtime for users table in Supabase
 - Added test suite for realtime presence updates
 - Added mocks for Supabase realtime functionality in test setup
+
+### April 6, 2025
+- Completed T13_Hook_UserPresence
+- Implemented repository-backed, real-time presence hook
+- Grouped users by space for efficient rendering
+- Ready for PresenceContext integration (T14)

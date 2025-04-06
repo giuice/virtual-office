@@ -194,4 +194,17 @@ export class SupabaseUserRepository implements IUserRepository {
 
     return data ? mapToCamelCase(data) : null;
   }
+
+  async findAll(): Promise<User[]> {
+    const { data, error } = await supabase
+      .from(this.TABLE_NAME)
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching all users:', error);
+      throw error;
+    }
+
+    return mapArrayToCamelCase(data || []);
+  }
 }

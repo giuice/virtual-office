@@ -1,8 +1,9 @@
 [PHASE_MARKER]
 CURRENT: Execution
 NEXT: Strategy
-LAST_ACTION: Completed T19_Realtime_Backend - Implemented RLS policies and realtime configuration for user presence
-REQUIRED_BEFORE_TRANSITION: Begin IP2 Phase 2 with T13_Hook_UserPresence
+LAST_ACTION: Completed T13_Hook_UserPresence - repository-backed, real-time, grouped by space
+NEXT_ACTION: Proceed with T14_PresenceContext implementation
+REQUIRED_BEFORE_TRANSITION: Complete all tasks on `memory-bank/implementation_plans/IP2_DomFloorPlanImplementation.md` 
 [/PHASE_MARKER]
 
 [CODE_ROOT_DIRECTORIES]

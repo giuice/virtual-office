@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
-**Date:** 4/5/2025
-**Last Updated:** 4/5/2025, 4:01 PM (UTC-3:00)
+**Date:** 4/6/2025
+**Last Updated:** 4/6/2025, 12:21 PM (UTC-3:00)
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -14,47 +14,31 @@
 ```
 
 ## Current Work Focus:
-- **Phase**: Execution
-- **Focus Area**: Implementing DOM Floor Plan (IP2) - Phase 1: Backend & Data Layer
-- **Current Tasks**: T11_DB_AddUserLocation - Adding current_space_id to users table
+- **Phase:** Execution
+- **Focus Area:** Implementing DOM Floor Plan (IP2) - Phase 2: Frontend Presence
+- **Current Tasks:** T13_Hook_UserPresence - Real-time presence hook (✅ Completed)
 
 ## Next Steps:
-1. Apply SQL migration to Supabase database
-2. Test new updateLocation repository method
-3. Proceed with T12_API_UpdateUserLocation once current task is verified
+1. Begin T14_PresenceContext: Create context/provider using the presence hook
+2. Integrate PresenceContext into floor plan components
+3. Develop UserAvatarPresence and SpaceElement components
 
 ## Active Decisions and Considerations:
-- **SQL Migration Strategy:** Created migration with ON DELETE SET NULL for the current_space_id foreign key constraint, ensuring safe space deletion handling
-- **Testing Strategy:** Developed an alternative testing approach for Next.js App Router API routes due to challenges with direct unit testing. Focus on testing core logic separately from route handlers.
-- **Messaging System Architecture:** Need to evaluate current messaging architecture and identify improvements for reliability and performance.
-- **Real-time Updates for Messages:** Consider how to best implement real-time updates for messages using Supabase Realtime and React Query.
-- **Firebase UID vs Database UUID:** Implemented a solution to handle the mismatch between Firebase UIDs and database UUIDs by detecting ID format and converting as needed.
-- **Server State Management:** Adopted **React Query** for fetching, caching, and synchronizing server state, replacing the need for custom context providers (like the planned `SpaceContext`).
-- **UI State Management:** Plan to use **Zustand** for managing client-side UI state (e.g., selected items, filters) once React Query is integrated.
-- **Repository Pattern:** Adopted for data access abstraction. Interfaces and Supabase implementations complete. API routes refactored. React Query hooks will use repositories.
-- **Real-time:** Implemented Supabase Realtime with React Query for automatic cache invalidation. Existing Socket.IO implementation (`socket-server.js`, hooks) remains for messaging until fully migrated/replaced.
-- **Floor Plan Technology:** Decided to replace Konva canvas implementation with standard DOM elements (HTML/CSS/Shadcn) for better integration, accessibility, and potentially simpler maintenance (IP2).
-- **Floor Plan Visualization Priority:** Previous fixes (T8) addressed immediate Konva issues. Now focusing on the strategic replacement with DOM (IP2).
+- **Repository Pattern:** All data access via repositories and API routes
+- **Supabase Realtime:** Used for live updates, combined with React Query cache
+- **State Management:** React Query for server state, Zustand planned for UI state
+- **Floor Plan:** DOM-based, replacing Konva
+- **Presence Data:** Grouped by space for efficient rendering
+- **Messaging Integration:** To be connected after presence components
 
-## Recent Changes Summary (See changelog.md for details)
-- **Apr 5:** Added current_space_id column to users table with foreign key constraint and index
-- **Apr 5:** Updated User type and repository implementations to support user location tracking
-- **Apr 5:** Restructured implementation plan to prioritize critical floor plan and messaging fixes
+## Recent Changes Summary
+- **Apr 6:** Completed T13_Hook_UserPresence with grouping by space, repository-backed
+- **Apr 5:** Added current_space_id to users table, updated repositories
+- **Apr 5:** Created API endpoints for user location and listing
 
-## Latest Action (2025-04-05 ~16:01 UTC-3)
+## Latest Action (2025-04-06)
+- Completed T13_Hook_UserPresence: repository-backed, real-time presence hook with grouping by space
 
-**Goal:** Implement T11_DB_AddUserLocation by adding current_space_id to users table.
-
-**Phase:** Execution
-
-**Actions:**
-- Created SQL migration for adding current_space_id column
-- Updated User type in database.ts
-- Added updateLocation method to IUserRepository
-- Implemented updateLocation in SupabaseUserRepository
-
-**Outcome:**
-- All code changes for T11 are complete
-- Ready to apply SQL migration to Supabase
-
-**Status:** Awaiting SQL migration execution and verification
+## Status
+- Presence hook complete and tested
+- Ready to proceed with PresenceContext implementation (T14)
