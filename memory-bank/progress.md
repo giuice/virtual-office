@@ -1,6 +1,6 @@
 # Project Progress
 
-## Current Status (As of April 5, 2025)
+## Current Status (As of April 8, 2025)
 
 ### Completed Features
 1. **Core Infrastructure**
@@ -77,9 +77,9 @@
     *   T19_Realtime_Backend: Verify/implement backend presence broadcasting.
     *   T13_Hook_UserPresence: Implement presence hook.
     *   T14_Component_PresenceContext: Create presence context.
+    *   ~~T16_Component_SpaceElement: Create space component.~~ **(Completed 4/8/2025)**
     *   T17_Component_UserAvatarPresence: Create avatar component.
-    *   T16_Component_SpaceElement: Create space component.
-    *   T15_Component_DomFloorPlan: Refactor main floor plan component.
+    *   ~~T15_Component_DomFloorPlan: Refactor main floor plan component.~~ **(Completed 4/6/2025)**
     *   T18_Integration_SpaceChat: Integrate space entry with chat opening.
     *   T20_Cleanup_Konva: Remove old Konva code/dependencies.
 

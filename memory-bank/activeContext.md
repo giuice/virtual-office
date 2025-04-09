@@ -1,7 +1,7 @@
 # Active Context
 ```guidance
 **Date:** 4/6/2025
-**Last Updated:** 4/6/2025, 12:21 PM (UTC-3:00)
+**Last Updated:** 4/6/2025, 2:52 PM (UTC-3:00)
 
 **Purpose:** This file provides a concise overview of the current work focus, immediate next steps, and active decisions for the project.
 
@@ -15,30 +15,31 @@
 
 ## Current Work Focus:
 - **Phase:** Execution
-- **Focus Area:** Implementing DOM Floor Plan (IP2) - Phase 2: Frontend Presence
-- **Current Tasks:** T13_Hook_UserPresence - Real-time presence hook (✅ Completed)
+- **Focus Area:** DOM Floor Plan (IP2) - Frontend Presence
+- **Current Tasks:** T17_Component_UserAvatarPresence (✅ Completed), preparing T18_Integration_SpaceChat
 
 ## Next Steps:
-1. Begin T14_PresenceContext: Create context/provider using the presence hook
-2. Integrate PresenceContext into floor plan components
-3. Develop UserAvatarPresence and SpaceElement components
+1. Integrate space clicks with chat system (T18)
+2. Clean up Konva remnants (T20)
 
 ## Active Decisions and Considerations:
 - **Repository Pattern:** All data access via repositories and API routes
 - **Supabase Realtime:** Used for live updates, combined with React Query cache
 - **State Management:** React Query for server state, Zustand planned for UI state
-- **Floor Plan:** DOM-based, replacing Konva
-- **Presence Data:** Grouped by space for efficient rendering
+- **Floor Plan:** DOM-based, replacing Konva (done)
+- **Presence Data:** Grouped by space for efficient rendering (done)
 - **Messaging Integration:** To be connected after presence components
 
 ## Recent Changes Summary
-- **Apr 6:** Completed T13_Hook_UserPresence with grouping by space, repository-backed
-- **Apr 5:** Added current_space_id to users table, updated repositories
-- **Apr 5:** Created API endpoints for user location and listing
+- **Apr 8:** Completed T17_Component_UserAvatarPresence - avatar with status indicator
+- **Apr 8:** Completed T16_Component_SpaceElement
+- **Apr 6:** Completed T15_Component_DomFloorPlan
+- **Apr 6:** Completed T14_PresenceContext
+- **Apr 6:** Completed T13_Hook_UserPresence
 
-## Latest Action (2025-04-06)
-- Completed T13_Hook_UserPresence: repository-backed, real-time presence hook with grouping by space
+## Latest Action (2025-04-08)
+- Completed T17_Component_UserAvatarPresence
 
 ## Status
-- Presence hook complete and tested
-- Ready to proceed with PresenceContext implementation (T14)
+- UserAvatarPresence component created and integrated
+- Ready to proceed with chat integration

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Space, User } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -23,14 +24,15 @@ interface DomFloorPlanProps {
 
 export function DomFloorPlan(props: DomFloorPlanProps) {
   const spaces = props.spaces || [];
-  const { companyUsers, currentUserProfile } = useCompany();
+  const { currentUserProfile } = useCompany();
+  const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
   const [hoveredSpaceId, setHoveredSpaceId] = useState<string | null>(null);
   
   // Log space and user data for debugging
   useEffect(() => {
     console.log('--- DOM Floor Plan Debug Info ---');
     console.log('Total spaces:', spaces.length);
-    console.log('Total users:', companyUsers.length);
+    console.log('Total users:', users?.length ?? 0);
     
     // Clearly log all spaces and their assigned users for debugging
     spaces.forEach(space => {
@@ -39,7 +41,7 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
       console.log(`Space "${space.name}" (${space.id}) has ${userIdsArray.length} assigned users:`, 
         userIdsArray.length > 0 ? userIdsArray : 'NONE');
     });
-  }, [spaces, companyUsers]);
+  }, [spaces, users]);
   
   // Get space color based on type
   const getSpaceColorClass = (type: Space['type']): string => {
@@ -97,13 +99,7 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
             spaceUserIds.length > 0 ? spaceUserIds : 'NO USERS');
           
           // Only match users by exact ID match
-          const spaceUsers = companyUsers.filter(user => {
-            const isInSpace = spaceUserIds.includes(user.id);
-            if (isInSpace) {
-              console.log(`✓ User ${user.displayName} (${user.id}) belongs in space "${space.name}"`);
-            }
-            return isInSpace;
-          });
+          const spaceUsers = usersInSpaces.get(space.id) || [];
           
           const isHighlighted = props.highlightedSpaceId === space.id;
           const isHovered = hoveredSpaceId === space.id;
@@ -124,7 +120,14 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
                 minHeight: "140px",
                 position: "relative",
               }}
-              onClick={() => props.onSpaceSelect?.(space)}
+              onClick={async () => {
+                try {
+                  await updateLocation(space.id);
+                  props.onSpaceSelect?.(space);
+                } catch (error) {
+                  console.error('Failed to update location:', error);
+                }
+              }}
               onDoubleClick={() => props.onSpaceDoubleClick?.(space)}
               onMouseEnter={() => setHoveredSpaceId(space.id)}
               onMouseLeave={() => setHoveredSpaceId(null)}

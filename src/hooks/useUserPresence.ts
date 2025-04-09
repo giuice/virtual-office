@@ -1,26 +1,23 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
-import { User } from '@/types/database'; // adjust import if needed
+import { UserPresenceData } from '@/types/database';
 
-// Query key for presence data
 const PRESENCE_QUERY_KEY = ['user-presence'];
 
 export function useUserPresence() {
   const queryClient = useQueryClient();
 
-  // Fetch initial presence data
-  const { data: users, isLoading, error } = useQuery<User[]>({
+  const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
     queryKey: PRESENCE_QUERY_KEY,
     queryFn: async () => {
       const res = await fetch('/api/users/list');
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch users');
-      return json.users as User[];
+      return json.users as UserPresenceData[];
     },
   });
 
-  // Subscribe to Supabase Realtime changes on users table
   useEffect(() => {
     const channel = supabase
       .channel('user-presence-channel')
@@ -28,9 +25,9 @@ export function useUserPresence() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users' },
         (payload) => {
-          queryClient.setQueryData<User[]>(PRESENCE_QUERY_KEY, (old) => {
+          queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
             if (!old) return old;
-            const newUser = payload.new as User;
+            const newUser = payload.new as UserPresenceData;
             if (payload.eventType === 'INSERT') {
               return [...old, newUser];
             }
@@ -38,7 +35,7 @@ export function useUserPresence() {
               return old.map((u) => (u.id === newUser.id ? newUser : u));
             }
             if (payload.eventType === 'DELETE') {
-              return old.filter((u) => u.id !== (payload.old as User).id);
+              return old.filter((u) => u.id !== (payload.old as UserPresenceData).id);
             }
             return old;
           });
@@ -51,7 +48,6 @@ export function useUserPresence() {
     };
   }, [queryClient]);
 
-  // Mutation to update current user's location
   const { mutateAsync: updateLocation } = useMutation({
     mutationFn: async (spaceId: string | null) => {
       await fetch('/api/users/location', {
@@ -66,8 +62,8 @@ export function useUserPresence() {
   });
 
   const usersInSpaces = useMemo(() => {
-    const map = new Map<string | null, User[]>();
-    (users ?? []).forEach(user => {
+    const map = new Map<string | null, UserPresenceData[]>();
+    (users ?? []).forEach((user) => {
       const key = user.current_space_id ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(user);

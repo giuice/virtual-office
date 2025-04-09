@@ -32,7 +32,7 @@ This is the core UI task for replacing the Konva canvas with a DOM-based impleme
     *   Destructure the necessary values: `usersPresence`, `isLoadingPresence`, `updateMyLocation`, `isUpdatingLocation`.
 
 3.  **Refactor Rendering Logic:**
-    *   Remove the Konva `<Stage>` and related components from the JSX.
+    *   Remove the Konva `<Stage>` and related components from the TSX.
     *   Create a main container `div` for the floor plan. This `div` might need `overflow: auto` or specific styling to handle zooming/panning if implemented.
     *   Fetch spaces using the existing hook (`useSpaces`).
     *   Map over the fetched `spaces` data. For each `space`:

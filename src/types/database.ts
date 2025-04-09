@@ -62,6 +62,14 @@ export interface User {
   current_space_id?: string | null; // Reference to Space.id, nullable
 }
 
+export interface UserPresenceData {
+  id: string;
+  display_name: string;
+  avatar_url?: string;
+  status?: 'online' | 'away' | 'busy' | 'offline';
+  current_space_id?: string | null;
+}
+
 // Position type for floor plan elements
 export interface Position {
   x: number;
