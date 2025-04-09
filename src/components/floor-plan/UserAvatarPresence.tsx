@@ -35,11 +35,11 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
       className="relative inline-block"
       onClick={handleClick}
       role={onClick ? 'button' : undefined}
-      aria-label={onClick ? `User ${user.display_name}` : undefined}
+      aria-label={onClick ? `User ${user.displayName}` : undefined}
     >
       <Avatar className={cn('h-8 w-8', onClick && 'cursor-pointer')}>
-        <AvatarImage src={user.avatar_url || undefined} alt={user.display_name || 'User Avatar'} />
-        <AvatarFallback>{getInitials(user.display_name)}</AvatarFallback>
+        <AvatarImage src={user.avatarUrl || undefined} alt={user.displayName || 'User Avatar'} />
+        <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
       </Avatar>
       <span
         className={cn(

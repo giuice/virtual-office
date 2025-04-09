@@ -64,8 +64,8 @@ export interface User {
 
 export interface UserPresenceData {
   id: string;
-  display_name: string;
-  avatar_url?: string;
+  displayName: string;
+  avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
   current_space_id?: string | null;
 }

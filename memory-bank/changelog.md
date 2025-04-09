@@ -41,3 +41,13 @@
 - Completed T17_Component_UserAvatarPresence
 - Created React component for user avatar with status indicator
 - Prepared for integration with space chat system
+
+### April 9, 2025
+- Completed T18 Step 2: Wired chat open callback into DOM floor plan
+- Clicking a space now triggers chat panel opening logic
+- Files affected: dom-floor-plan.tsx, SpaceElement.tsx, T18 task instructions
+
+### April 9, 2025
+- Completed T18 Steps 3 & 4: Verified chat integration
+- Space clicks correctly open chat panel for selected space
+- Files affected: dom-floor-plan.tsx, T18 task instructions

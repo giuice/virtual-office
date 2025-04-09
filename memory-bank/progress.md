@@ -1,6 +1,6 @@
 # Project Progress
 
-## Current Status (As of April 8, 2025)
+## Current Status (As of April 9, 2025)
 
 ### Completed Features
 1. **Core Infrastructure**
@@ -80,7 +80,7 @@
     *   ~~T16_Component_SpaceElement: Create space component.~~ **(Completed 4/8/2025)**
     *   T17_Component_UserAvatarPresence: Create avatar component.
     *   ~~T15_Component_DomFloorPlan: Refactor main floor plan component.~~ **(Completed 4/6/2025)**
-    *   T18_Integration_SpaceChat: Integrate space entry with chat opening.
+    *   ~~T18_Integration_SpaceChat: Integrate space entry with chat opening.~~ **(Completed 4/9/2025)**
     *   T20_Cleanup_Konva: Remove old Konva code/dependencies.
 
 2.  **Meeting Notes System Completion**

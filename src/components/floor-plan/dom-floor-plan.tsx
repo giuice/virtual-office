@@ -20,6 +20,7 @@ interface DomFloorPlanProps {
   onSpaceDoubleClick?: (space: Space) => void;
   highlightedSpaceId?: string | null;
   isEditable?: boolean;
+  onOpenChat?: (space: Space) => void; // added optional chat callback
 }
 
 export function DomFloorPlan(props: DomFloorPlanProps) {
@@ -124,6 +125,7 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
                 try {
                   await updateLocation(space.id);
                   props.onSpaceSelect?.(space);
+                  props.onOpenChat?.(space); // trigger chat open
                 } catch (error) {
                   console.error('Failed to update location:', error);
                 }
@@ -176,7 +178,7 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
                           <span 
                             className={cn(
                               "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background",
-                              getUserStatusClass(user.status)
+                              getUserStatusClass(user.status || 'offline')
                             )} 
                           />
                         </div>

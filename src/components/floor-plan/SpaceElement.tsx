@@ -7,11 +7,15 @@ interface SpaceElementProps {
   space: Space;
   usersInSpace: UserPresenceData[];
   onEnterSpace: (spaceId: string) => void;
+  onOpenChat?: (space: Space) => void; // added optional chat callback
 }
 
-const SpaceElement: React.FC<SpaceElementProps> = ({ space, usersInSpace, onEnterSpace }) => {
+const SpaceElement: React.FC<SpaceElementProps> = ({ space, usersInSpace, onEnterSpace, onOpenChat }) => {
   const handleClick = () => {
     onEnterSpace(space.id);
+    if (onOpenChat) {
+      onOpenChat(space);
+    }
   };
 
   return (
