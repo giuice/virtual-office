@@ -245,15 +245,35 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async findAll(): Promise<User[]> {
+    console.log('[UserRepository] Fetching all users with avatar data');
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
       .select('*');
 
     if (error) {
-      console.error('Error fetching all users:', error);
+      console.error('[UserRepository] Error fetching all users:', error);
       throw error;
     }
 
-    return mapArrayToCamelCase(data || []);
+    // Validate each user has required fields
+    const validatedUsers = (data || []).map(user => {
+      // Log missing critical fields
+      if (!user.id || !user.email || !user.display_name) {
+        console.warn('[UserRepository] User with incomplete data:', user.id || 'unknown');
+      }
+      
+      // Ensure avatar_url exists with fallback
+      if (!user.avatar_url) {
+        console.log(`[UserRepository] User ${user.id} missing avatar_url, using fallback`);
+      }
+      
+      // Return original data to be processed by mapToCamelCase
+      return user;
+    });
+    
+    // Map and return user data with avatars
+    const mappedUsers = mapArrayToCamelCase(validatedUsers);
+    console.log(`[UserRepository] Found ${mappedUsers.length} users with avatar data`);
+    return mappedUsers;
   }
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react'; // Added useEffect
-import { User } from './types';
+import { UIUser as User } from './types';
 // Removed Avatar imports as they are handled within ChatWindow/MessageList
 import { Button } from '@/components/ui/button';
 // Removed ScrollArea and Textarea as ChatWindow handles them

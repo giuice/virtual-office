@@ -1,20 +1,18 @@
 import React from 'react';
 import { UserPresenceData } from '@/types/database';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarWithFallback } from '@/components/ui/avatar-with-fallback';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface UserAvatarPresenceProps {
   user: UserPresenceData;
   onClick?: (userId: string) => void;
 }
-
-const getInitials = (name: string = '') =>
-  name
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 
 const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }) => {
   const statusColor = {
@@ -31,24 +29,45 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
   };
 
   return (
-    <div
-      className="relative inline-block"
-      onClick={handleClick}
-      role={onClick ? 'button' : undefined}
-      aria-label={onClick ? `User ${user.displayName}` : undefined}
-    >
-      <Avatar className={cn('h-8 w-8', onClick && 'cursor-pointer')}>
-        <AvatarImage src={user.avatarUrl || undefined} alt={user.displayName || 'User Avatar'} />
-        <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-      </Avatar>
-      <span
-        className={cn(
-          'absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border-2 border-background ring-1 ring-background',
-          statusColor
-        )}
-        title={`Status: ${user.status || 'offline'}`}
-      />
-    </div>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="relative inline-block"
+            onClick={handleClick}
+            role={onClick ? 'button' : undefined}
+            aria-label={onClick ? `User ${user.displayName}` : undefined}
+          >
+            <AvatarWithFallback
+              src={user.avatarUrl}
+              alt={user.displayName || 'User'}
+              size="md"
+              onLoad={() => {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[UserAvatarPresence] Avatar loaded for ${user.displayName}`);
+                }
+              }}
+              onError={() => {
+                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}`);
+              }}
+            />
+            <span
+              className={cn(
+                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background',
+                statusColor
+              )}
+            />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="font-medium">{user.displayName}</p>
+          <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
+          {process.env.NODE_ENV === 'development' && (
+            <p className="text-[10px] text-muted-foreground mt-1">ID: {user.id}</p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
