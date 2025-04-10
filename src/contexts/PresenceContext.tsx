@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useUserPresence } from '@/hooks/useUserPresence';
+import { useCompany } from '@/contexts/CompanyContext';
 import type { UserPresenceData } from '@/types/database';
 
 interface PresenceContextType {
@@ -14,13 +15,23 @@ interface PresenceContextType {
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
 
 export const PresenceProvider = ({ children }: { children: ReactNode }) => {
+  // Get current user ID from CompanyContext
+  const { currentUserProfile } = useCompany();
+  const currentUserId = currentUserProfile?.id;
+
+  // Pass the current user ID to useUserPresence
   const {
     users,
     usersInSpaces,
     isLoading,
     error,
     updateLocation,
-  } = useUserPresence();
+  } = useUserPresence(currentUserId);
+
+  // Log for debugging purposes
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set'}`);
+  }
 
   return (
     <PresenceContext.Provider

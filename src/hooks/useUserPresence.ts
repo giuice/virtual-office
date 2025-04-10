@@ -8,6 +8,10 @@ import { UserPresenceData } from '@/types/database';
 const PRESENCE_QUERY_KEY = ['user-presence'];
 
 export function useUserPresence(currentUserId?: string) {
+  // Log initialization with current user ID
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[useUserPresence] Initialize with userId: ${currentUserId || 'undefined'}`);
+  }
   const queryClient = useQueryClient();
 
   const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
@@ -60,12 +64,34 @@ export function useUserPresence(currentUserId?: string) {
   }, [users, currentUserId]);
 
   const safeUpdateLocation = async (spaceId: string | null) => {
-    if (!currentUserId) return;
-    if (currentUser && currentUser.current_space_id === spaceId) {
+    if (!currentUserId) {
+      console.error('[Presence] Cannot update location: currentUserId is missing');
+      return;
+    }
+    
+    // Clear any previous request that might be pending
+    debouncedUpdateLocation.cancel();
+    
+    // If user is already in this space, log and skip unless it's null (leaving all spaces)
+    if (currentUser && currentUser.current_space_id === spaceId && spaceId !== null) {
       console.log('[Presence] User already in this space, skipping update');
       return;
     }
-    debouncedUpdateLocation(spaceId);
+    
+    // Log the attempted change
+    console.log(`[Presence] Requesting location change: ${currentUser?.current_space_id || 'null'} -> ${spaceId || 'null'}`);
+    
+    // Update immediately (apply debounce internally)
+    await debouncedUpdateLocation(spaceId);
+    
+    // Manually update local state to show immediate feedback
+    // This will be overwritten when the real-time update comes in
+    if (currentUser) {
+      queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
+        if (!old) return old;
+        return old.map(u => u.id === currentUserId ? {...u, current_space_id: spaceId} : u);
+      });
+    }
   };
 
   const debouncedUpdateLocation = useMemo(() =>
@@ -85,23 +111,49 @@ export function useUserPresence(currentUserId?: string) {
           // Log error details if the API call fails
           const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
           console.error(`[Presence] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
-          // TODO: Consider adding user notification or retry logic here
+          
+          // Revert the optimistic update if the server call failed
+          queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
+            if (!old) return old;
+            
+            // Find current user and check what their original space was
+            const user = old.find(u => u.id === currentUserId);
+            console.log(`[Presence] Reverting failed update for user ${currentUserId}`);
+            return old;
+          });
+          
+          throw new Error(`Failed to update location: ${errorData.message || response.statusText}`);
         } else {
-           if (process.env.NODE_ENV === 'development') {
-             console.log(`[Presence] Successfully requested location update to space ${spaceId} for user ${currentUserId}`);
-           }
-           // Invalidate query on success? Maybe not needed due to realtime updates.
-           // queryClient.invalidateQueries({ queryKey: PRESENCE_QUERY_KEY }); 
+          const responseData = await response.json();
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[Presence] Successfully updated location to space ${spaceId} for user ${currentUserId}`, responseData);
+          }
+          // No need to manually update the query data here - the realtime subscription will handle it
+          return responseData;
         }
       } catch (error) {
         console.error(`[Presence] Network error updating location to space ${spaceId}:`, error);
-        // TODO: Consider adding user notification or retry logic here
+        throw error; // Re-throw so the caller can handle it
       }
-    }, 300, { leading: true, trailing: false }) // Changed trailing to false to avoid potential double calls if component unmounts/remounts quickly
-  , [currentUserId, queryClient]); // Added queryClient dependency
+    }, 250, { leading: true, trailing: false }) // Reduced debounce time and avoid trailing calls
+  , [currentUserId, queryClient]);
 
   const updateLocation = async (spaceId: string | null) => {
-    debouncedUpdateLocation(spaceId);
+    if (!currentUserId) {
+      console.error("[Presence] Cannot update location: currentUserId is missing in updateLocation call.");
+      
+      // For debugging: log some helpful context
+      console.warn("[Presence] Debug info: Make sure PresenceProvider has access to the current user ID");
+      console.warn("[Presence] Current state:", { 
+        currentUserId,
+        usersCount: users?.length || 0,
+        currentUser: currentUser ? { id: currentUser.id, name: currentUser.displayName } : null
+      });
+      
+      return Promise.reject(new Error("Cannot update location: currentUserId is missing"));
+    }
+    
+    return debouncedUpdateLocation(spaceId);
   };
 
   const usersInSpaces = useMemo(() => {

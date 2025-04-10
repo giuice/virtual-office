@@ -37,15 +37,22 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
       console.log('Total spaces:', spaces.length);
       console.log('Total users:', users?.length ?? 0);
       
-      // Clearly log all spaces and their assigned users for debugging
+      // Log presence data by space
+      usersInSpaces.forEach((usersInSpace, spaceId) => {
+        const spaceName = spaces.find(s => s.id === spaceId)?.name || 'Unknown';
+        console.log(`Space "${spaceName}" (${spaceId}) has ${usersInSpace.length} users via presence system:`,
+          usersInSpace.map(u => u.displayName).join(', '));
+      });
+      
+      // For reference, also log legacy userIds arrays (being phased out)
       spaces.forEach(space => {
         // Check if userIds is actually an array (important!)
         const userIdsArray = Array.isArray(space.userIds) ? space.userIds : [];
-        console.log(`Space "${space.name}" (${space.id}) has ${userIdsArray.length} assigned users:`, 
+        console.log(`Space "${space.name}" (${space.id}) legacy userIds array has ${userIdsArray.length} entries:`, 
           userIdsArray.length > 0 ? userIdsArray : 'NONE');
       });
     }
-  }, [spaces, users]);
+  }, [spaces, users, usersInSpaces]);
   
   // Get space color based on type
   const getSpaceColorClass = (type: Space['type']): string => {
@@ -75,8 +82,37 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
 
   // Check if current user is in space
   const isUserInSpace = (space: Space) => {
-    if (!currentUserProfile?.id || !space.userIds) return false;
-    return space.userIds.includes(currentUserProfile.id);
+    if (!currentUserProfile?.id) return false;
+    
+    // Primary method: Check if user's current_space_id matches this space
+    const currentUser = users?.find(u => u.id === currentUserProfile.id);
+    
+    // For debugging, log details about this check
+    if (process.env.NODE_ENV === 'development' && currentUserProfile) {
+      // Only log when active user is in focus to reduce noise
+      if (hoveredSpaceId === space.id || lastRequestedSpaceId === space.id) {
+        console.log(`[FloorPlan] User ${currentUserProfile.displayName} space check:`,
+          {
+            spaceId: space.id,
+            spaceName: space.name,
+            userCurrentSpaceId: currentUser?.current_space_id,
+            match: currentUser?.current_space_id === space.id,
+            inLegacyArray: space.userIds && Array.isArray(space.userIds) ? 
+              space.userIds.includes(currentUserProfile.id) : false
+          });
+      }
+    }
+    
+    if (currentUser?.current_space_id === space.id) {
+      return true;
+    }
+    
+    // Fallback method: Check legacy space.userIds (being phased out)
+    if (space.userIds && Array.isArray(space.userIds)) {
+      return space.userIds.includes(currentUserProfile.id);
+    }
+    
+    return false;
   };
 
   return (
@@ -128,6 +164,11 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
               onClick={async () => {
                 try {
                   const currentUserId = currentUserProfile?.id;
+                  if (!currentUserId) {
+                    console.error('[FloorPlan] Cannot update location: currentUserProfile.id is missing');
+                    return;
+                  }
+                  
                   const currentUser = users?.find(u => u.id === currentUserId);
                   const currentSpaceId = currentUser?.current_space_id;
 
@@ -145,8 +186,15 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
                        console.log(`Updating location: ${currentSpaceId} -> ${space.id}`);
                      }
                     setLastRequestedSpaceId(space.id); // Set flag before async call
-                    await updateLocation(space.id);
-                    // Consider resetting lastRequestedSpaceId on success/failure if needed
+                    try {
+                      await updateLocation(space.id);
+                      // Reset lastRequestedSpaceId after successful update
+                      setTimeout(() => setLastRequestedSpaceId(null), 1000); // Clear after 1s to prevent rapid clicks
+                    } catch (updateError) {
+                      console.error('Error updating location:', updateError);
+                      // Reset immediately on error
+                      setLastRequestedSpaceId(null);
+                    }
                   } else {
                      if (process.env.NODE_ENV === 'development') {
                        console.log(`User already in space ${space.id}, skipping update`);
