@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Space, User } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarWithFallback } from '@/components/ui/avatar-with-fallback';
 import { Badge } from '@/components/ui/badge';
 import { 
   Tooltip,
@@ -193,20 +193,26 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
                     <Tooltip key={user.id}>
                       <TooltipTrigger asChild>
                         <div className="relative">
-                          <Avatar className="h-8 w-8 border border-border">
-                            {user.avatarUrl ? (
-                              <AvatarImage src={user.avatarUrl} alt={user.displayName || 'User'} />
-                            ) : (
-                              <AvatarFallback className="text-xs">
-                                {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : 'U'}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
+                          <AvatarWithFallback
+                            src={user.avatarUrl}
+                            alt={user.displayName || 'User'}
+                            size="md"
+                            onLoad={() => {
+                              // Successfully loaded avatar
+                              if (process.env.NODE_ENV === 'development') {
+                                console.log(`[FloorPlan] Avatar loaded for ${user.displayName}`);
+                              }
+                            }}
+                            onError={() => {
+                              // Failed to load avatar
+                              console.warn(`[FloorPlan] Failed to load avatar for ${user.displayName}`);
+                            }}
+                          />
                           
                           {/* Status indicator */}
                           <span 
                             className={cn(
-                              "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background",
+                              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background",
                               getUserStatusClass(user.status || 'offline')
                             )} 
                           />

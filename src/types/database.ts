@@ -68,6 +68,10 @@ export interface UserPresenceData {
   avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
   current_space_id?: string | null;
+  // Added flag to track avatar loading state
+  avatarLoading?: boolean;
+  // Added flag to track avatar error state
+  avatarError?: boolean;
 }
 
 // Position type for floor plan elements

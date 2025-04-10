@@ -13,10 +13,45 @@ export function useUserPresence(currentUserId?: string) {
   const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
     queryKey: PRESENCE_QUERY_KEY,
     queryFn: async () => {
+      console.log('[Presence] Fetching user presence data with avatar info');
       const res = await fetch('/api/users/list');
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error(`[Presence] API error (${res.status}):`, errorText);
+        throw new Error(`Failed to fetch users: ${res.status} ${errorText}`);
+      }
+      
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to fetch users');
-      return json.users as UserPresenceData[];
+      
+      // Process and validate user data with avatar information
+      return (json.users || []).map((user: any) => {
+        // Validate required fields
+        if (!user.id) {
+          console.error('[Presence] User missing ID - skipping');
+          return null; // Will be filtered out below
+        }
+
+        // Ensure avatar and other fields are properly formatted
+        const processedUser: UserPresenceData = {
+          id: user.id,
+          displayName: user.displayName || 'Unknown User',
+          avatarUrl: user.avatarUrl || '',
+          status: user.status || 'offline',
+          current_space_id: user.current_space_id || null,
+          avatarLoading: false,
+          avatarError: false
+        };
+        
+        // Log avatar data for debugging
+        if (process.env.NODE_ENV === 'development') {
+          if (!user.avatarUrl) {
+            console.log(`[Presence] User ${user.displayName} (${user.id}) has no avatar URL`);
+          }
+        }
+        
+        return processedUser;
+      }).filter(Boolean) as UserPresenceData[]; // Remove any null entries from validation
     },
   });
 
