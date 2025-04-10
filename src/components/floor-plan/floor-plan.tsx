@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog/index'
-import { FloorPlanCanvas } from './FloorPlanCanvas' // replaced with DomFloorPlan
 import { RoomManagement } from './room-management'
 import { RoomTemplateSelector } from './room-template-selector';
 import { Input } from '@/components/ui/input';
@@ -27,7 +26,7 @@ import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import { DomFloorPlan } from './dom-floor-plan';
+import DomFloorPlan  from './dom-floor-plan';
 
 export function FloorPlan() {
   // Get data from context

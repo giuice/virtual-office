@@ -5,6 +5,7 @@ import { MessagingProvider } from '@/contexts/messaging/MessagingContext'; // Us
 import { ThemeProvider } from '@/providers/theme-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { Toaster } from 'sonner';
+import { PresenceProvider } from '@/contexts/PresenceContext';
 import './globals.css';
 
 export default function RootLayout({
@@ -21,16 +22,18 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-            <QueryProvider>
-          <AuthProvider>
-            <CompanyProvider>
-              <MessagingProvider> {/* Wrap with MessagingProvider */}
-                {children}
-                <Toaster richColors closeButton position="top-right" />
-              </MessagingProvider>
-            </CompanyProvider>
-          </AuthProvider>
-            </QueryProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <CompanyProvider>
+                <PresenceProvider>
+                  <MessagingProvider> {/* Wrap with MessagingProvider */}
+                    {children}
+                    <Toaster richColors closeButton position="top-right" />
+                  </MessagingProvider>
+                </PresenceProvider>
+              </CompanyProvider>
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

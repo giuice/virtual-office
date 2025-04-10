@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { debugLogger } from '@/utils/debug-logger';
+
 
 interface DomFloorPlanProps {
   spaces: Space[];
@@ -23,12 +23,13 @@ interface DomFloorPlanProps {
   onOpenChat?: (space: Space) => void; // added optional chat callback
 }
 
-export function DomFloorPlan(props: DomFloorPlanProps) {
+export default function DomFloorPlan(props: DomFloorPlanProps) {
   const spaces = props.spaces || [];
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
   const [hoveredSpaceId, setHoveredSpaceId] = useState<string | null>(null);
-  
+  const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
+
   // Log space and user data for debugging
   useEffect(() => {
     console.log('--- DOM Floor Plan Debug Info ---');
@@ -123,9 +124,25 @@ export function DomFloorPlan(props: DomFloorPlanProps) {
               }}
               onClick={async () => {
                 try {
-                  await updateLocation(space.id);
+                  const currentUserId = currentUserProfile?.id;
+                  const currentUser = users?.find(u => u.id === currentUserId);
+                  const currentSpaceId = currentUser?.current_space_id;
+
+                  if (space.id === lastRequestedSpaceId) {
+                    console.log('[FloorPlan] Already requested this space, skipping');
+                    return;
+                  }
+
+                  if (currentSpaceId !== space.id) {
+                    console.log(`Updating location: ${currentSpaceId} -> ${space.id}`);
+                    setLastRequestedSpaceId(space.id);
+                    await updateLocation(space.id);
+                  } else {
+                    console.log(`User already in space ${space.id}, skipping update`);
+                  }
+
                   props.onSpaceSelect?.(space);
-                  props.onOpenChat?.(space); // trigger chat open
+                  props.onOpenChat?.(space);
                 } catch (error) {
                   console.error('Failed to update location:', error);
                 }

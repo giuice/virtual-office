@@ -56,6 +56,7 @@ export async function PUT(request: Request) {
     delete updateData.updatedAt;
     delete updateData.createdBy;
     delete updateData.companyId;
+    delete updateData.userIds; // REMOVE userIds from update payload
 
     const updatedSpace = await spaceRepository.update(spaceId, updateData);
 

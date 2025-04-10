@@ -1,3 +1,4 @@
+'use client';
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useUserPresence } from '@/hooks/useUserPresence';
 import type { UserPresenceData } from '@/types/database';

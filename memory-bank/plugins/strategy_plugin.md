@@ -139,25 +139,8 @@ Before proceeding, verify:
 - Every subtask is referenced by its parent task
 - `memory-bank/progress.md` shows correct hierarchy and priorities
 
-## VIII. MANDATORY UPDATE PROTOCOL (MUP)
-After EVERY significant action:
-
-1. Update `memorybankrules.md`:
-   ```
-   <PHASE_MARKER>
-   CURRENT_PHASE: Strategy
-   NEXT_PHASE: [next phase]
-   LAST_ACTION: [what you just did]
-   NEXT_ACTION: [what should be done next]
-   </PHASE_MARKER>
-   ```
-
-2. Update `memory-bank/activeContext.md` with:
-   - Action completed
-   - Current state
-   - Next steps
-
-3. Update `memory-bank/changelog.md` for significant changes
+## VIII. **ADDITIONAL PHASE MUP** (APM)
+1. Veryfy Implentations and Tasks relationships are correcty on `memory-bank/progress.md`
 
 ## IX. TRANSITION CHECKLIST
 Before transitioning to Execution phase, verify:

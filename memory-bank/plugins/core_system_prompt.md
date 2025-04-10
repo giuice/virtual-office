@@ -68,9 +68,11 @@ Tracker files:
 - Documentation dependencies: `memory-bank/docs/doc_tracker.md`
 
 ## V. MANDATORY UPDATE PROTOCOL (MUP) - REQUIRED FILE MODIFICATIONS
+❗ **CRITICAL RULE**: After EVERY state-changing action, you MUST determine which MUP to follow based on the current phase:
 
-❗ **CRITICAL RULE**: After EVERY state-changing action, you MUST IMMEDIATELY EDIT these FILES and aditional MUP `current_phase`:
+**CHOOSE ONLY ONE OF THESE OPTIONS**:
 
+**IF** CURRENT_PHASE is "Set-up/Maintenance" **THEN USE THIS MUP**:
 1. **EDIT FILE - DO NOT JUST REPORT**: Use the write_file, edit_file, or create_file tools to update `memorybankrules.md` with:
    ```
    <PHASE_MARKER>
@@ -81,22 +83,27 @@ Tracker files:
    REQUIRED_BEFORE_TRANSITION: [conditions that must be met]
    </PHASE_MARKER>
    ```
-
 2. **EDIT FILE - DO NOT JUST REPORT**: Use the write_file, edit_file, or create_file tools to update `memory-bank/activeContext.md` with:
    - What action was just completed
    - Current state of the project
    - Next steps or tasks
-
 3. **EDIT FILE - DO NOT JUST REPORT**: Update `memory-bank/changelog.md` for significant changes with:
    - Date and time
    - Description of change
    - Reason for change
    - Files affected
-4. **EDIT FILE - DO NOT JUST REPORT** Use the file tools to update plugin-specific MUP additions for the `current_phase`.
 
-5. After completing steps 1-4, you MUST verify the files were updated by reading them back and confirming changes.
+**IF** CURRENT_PHASE is "Strategy" **THEN**:
+- **IGNORE** the basic MUP above
+- **FOLLOW ONLY** the section marked **ADDITIONAL PHASE MUP** (APM) in `strategy_plugin.md`
 
-❌ **NEVER PROCEED** to the next task or response until you have ACTUALLY MODIFIED the files listed above using file editing tools.
+**IF** CURRENT_PHASE is "Execution" **THEN**:
+- **IGNORE** the basic MUP above
+- **FOLLOW ONLY** the section marked **ADDITIONAL PHASE MUP** (APM) in `execution_plugin.md`
+
+After completing the appropriate MUP, you MUST verify all files were updated by reading them back and confirming changes.
+
+❌ **NEVER PROCEED** to the next task or response until you have ACTUALLY MODIFIED the required files using file editing tools.
 
 ## VI. Mandatory Periodic Documentation Updates
 
@@ -155,8 +162,9 @@ I have made the following file modifications:
 1. EDITED `memorybankrules.md`: [Quote the exact text you added to the file]
 2. EDITED `memory-bank/activeContext.md`: [Quote the exact text you added to the file]
 3. EDITED `memory-bank/changelog.md`: [Quote the exact text you added to the file or "No significant changes to record"]
-4. VERIFICATION: I have confirmed all files were properly updated by reading them back.
-5. NEXT ACTION: [Describe exactly what will be done next]
+4. EDITED Extra `current_phase` MUP protocol : [Quote the exact text you added to the file or "No significant changes to record"]
+5. VERIFICATION: I have confirmed all files were properly updated by reading them back.
+6. NEXT ACTION: [Describe exactly what will be done next]
 </MUP_COMPLETED_ACTIONS>
 
 __Adhere to the "Don't Repeat Yourself" (DRY) and Separation of Concerns principles.__

@@ -128,7 +128,7 @@ At the **end of every task or subtask**, you **MUST**:
 - **Do NOT** start a new task, subtask, or phase transition **until** you have actually modified all required files
 ❗ **This is critical to prevent project state gaps.**
 
-## ERROR HANDLING PROTOCOL
+## V. ERROR HANDLING PROTOCOL
 
 When encountering errors:
 1. Document the error condition
@@ -156,7 +156,7 @@ When encountering errors:
 
 4. Use write_file or edit_file to update all relevant files with error information and resolution
 
-## SUBTASK HANDLING
+## VI. SUBTASK HANDLING
 
 When a step requires subtask execution:
 1. Load subtask instruction file
@@ -164,7 +164,7 @@ When a step requires subtask execution:
 3. Use edit_file to mark the parent task step as completed
 4. Return to the parent task execution
 
-## EXECUTION MUP - REQUIRED FILE MODIFICATIONS
+## VII. **ADDITIONAL PHASE MUP** (APM)
 
 After EVERY step execution, you MUST:
 
@@ -209,7 +209,7 @@ After EVERY step execution, you MUST:
 
 6. After making all file modifications, verify they were applied correctly by reading files back.
 
-## CHECKPOINTS BEFORE TRANSITION
+## VIII.CHECKPOINTS BEFORE TRANSITION
 
 Before transitioning to Strategy phase, use read_file to verify:
 <TRANSITION_CHECKLIST>
@@ -220,7 +220,7 @@ Before transitioning to Strategy phase, use read_file to verify:
 [ ] Used write_file or edit_file to update `memorybankrules.md` with NEXT_PHASE: Strategy
 </TRANSITION_CHECKLIST>
 
-## REQUIRED RESPONSE FORMAT
+## IX. REQUIRED RESPONSE FORMAT
 
 All responses after completing an action MUST end with verification of actual file modifications:
 
