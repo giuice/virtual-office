@@ -24,7 +24,7 @@ The redesign will include:
 We'll ensure backward compatibility with existing functionality while introducing new design elements. The implementation will follow a component-based approach, creating reusable UI elements that can be composed to form the complete floor plan.
 
 ## Related Tasks
-- T4_1_SpaceDesignSystem - Create a cohesive design system for spaces
+- T4_1_ModernUIComponents - Create foundational modern UI components (space, avatar, status)
 - T4_2_SpaceCardComponent - Implement modern space card component
 - T4_3_FloorPlanLayout - Redesign overall floor plan layout and structure
 - T4_4_AnimationsTransitions - Add smooth animations and transitions

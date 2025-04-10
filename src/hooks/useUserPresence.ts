@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { debounce } from 'lodash';
 import { supabase } from '@/lib/supabase/client';
 import { UserPresenceData } from '@/types/database';
 
 const PRESENCE_QUERY_KEY = ['user-presence'];
+type ConnectionStatus = 'idle' | 'subscribing' | 'subscribed' | 'error' | 'timed_out' | 'closed';
 
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
@@ -13,6 +14,7 @@ export function useUserPresence(currentUserId?: string) {
     console.log(`[useUserPresence] Initialize with userId: ${currentUserId || 'undefined'}`);
   }
   const queryClient = useQueryClient();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
 
   const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
     queryKey: PRESENCE_QUERY_KEY,
@@ -198,18 +200,35 @@ export function useUserPresence(currentUserId?: string) {
           });
         }
       )
-      .subscribe((status, err) => { // Add callback for subscription status/errors
+      .subscribe((status, err) => {
         if (err) {
           console.error('[Presence] Supabase subscription error:', err);
-          // TODO: Handle subscription error (e.g., notify user, attempt reconnect)
+          setConnectionStatus('error');
+          // TODO: Consider more robust error handling (e.g., notify user)
         } else {
           if (process.env.NODE_ENV === 'development') {
             console.log(`[Presence] Supabase subscription status: ${status}`);
           }
-          // Optional: Handle specific statuses like 'SUBSCRIBED', 'CHANNEL_ERROR', 'TIMED_OUT'
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-             // Attempt to resubscribe or notify user
-             console.warn(`[Presence] Subscription issue: ${status}. Consider reconnection logic.`);
+          switch (status) {
+            case 'SUBSCRIBED':
+              setConnectionStatus('subscribed');
+              break;
+            case 'TIMED_OUT':
+              setConnectionStatus('timed_out');
+              console.warn(`[Presence] Subscription timed out. Supabase client may attempt reconnection.`);
+              break;
+            case 'CHANNEL_ERROR':
+              setConnectionStatus('error');
+              console.error(`[Presence] Channel error occurred.`);
+              break;
+            case 'CLOSED':
+              // This status might be triggered during intentional unsubscription.
+              // We set the status explicitly in the cleanup function.
+              // setConnectionStatus('closed');
+              break;
+            default:
+              // Handle any other statuses if necessary
+              break;
           }
         }
       });
@@ -217,12 +236,14 @@ export function useUserPresence(currentUserId?: string) {
     // Log initial subscription attempt
     if (process.env.NODE_ENV === 'development') {
       console.log('[Presence] Attempting to subscribe to Supabase presence channel.');
+      setConnectionStatus('subscribing'); // Set status before subscribing
     }
 
     return () => {
       if (process.env.NODE_ENV === 'development') {
         console.log('[Presence] Unsubscribing from Supabase presence channel.');
       }
+      setConnectionStatus('closed'); // Set status on cleanup
       supabase.removeChannel(channel).catch(error => {
          console.error('[Presence] Error removing Supabase channel:', error);
       });
@@ -235,5 +256,6 @@ export function useUserPresence(currentUserId?: string) {
     isLoading,
     error,
     updateLocation: safeUpdateLocation,
+    connectionStatus,
   };
 }
