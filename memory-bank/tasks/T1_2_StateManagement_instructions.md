@@ -25,29 +25,25 @@ This indicates the space update endpoint is not properly handling the response w
 - src/repositories/implementations/supabase/SupabaseSpaceRepository.ts (Space data access)
 
 ## Steps
-1. Fix Space Update API:
-   - Review space update API route
-   - Add proper error handling for PGRST116 error
-   - Return appropriate HTTP status and error messages
-   - Log detailed error information for debugging
+1. ✅ Fix Space Update API:
+   - Reviewed space update API route (`/api/spaces/update/route.ts`)
+   - Reviewed repository (`SupabaseSpaceRepository.ts`) - already handled PGRST116
+   - Modified `useSpaceMutations.ts` to handle 404 status specifically
+   - Identified the actual source of the 404/500 loop in `useLastSpace.ts` calling `/api/users/location` which called `SupabaseUserRepository.updateLocation`.
+   - Added detailed error handling to `SupabaseUserRepository.updateLocation` to pinpoint RPC and subsequent errors.
+   - Removed redundant logic selecting/updating `spaces.userIds` from `SupabaseUserRepository.updateLocation`.
 
-2. Optimize Debug Logging:
-   - Move debug logs behind DEBUG flag
-   - Create structured logging function
-   - Reduce log frequency
-   - Add meaningful context to logs
+2. ✅ Optimize Debug Logging:
+   - Wrapped verbose logs in `dom-floor-plan.tsx` with `process.env.NODE_ENV === 'development'` checks
 
-3. Fix State Management:
-   - Review space state updates in useUserPresence
-   - Add proper error handling for failed updates
-   - Implement retry mechanism for failed updates
-   - Add state validation before updates
+3. ✅ Fix State Management:
+   - Reviewed state updates in `useUserPresence.ts`
+   - Added error handling to `debouncedUpdateLocation` fetch call in `useUserPresence.ts`
+   - Refactored `useLastSpace.ts` to call `/api/users/location` instead of `/api/spaces/update`.
 
-4. Optimize Supabase Subscriptions:
-   - Review subscription cleanup
-   - Implement proper subscription management
-   - Add subscription error handling
-   - Add reconnection logic
+4. ✅ Optimize Supabase Subscriptions:
+   - Reviewed subscription cleanup in `useUserPresence.ts` (already present)
+   - Added status and error logging callback to `.subscribe()` in `useUserPresence.ts`
 
 ## Expected Output
 - Space updates should work without 404 errors

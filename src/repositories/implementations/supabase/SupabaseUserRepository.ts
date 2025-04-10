@@ -178,64 +178,55 @@ export class SupabaseUserRepository implements IUserRepository {
   async updateLocation(userId: string, spaceId: string | null): Promise<User | null> {
     console.log(`[updateLocation] Start for user ${userId} to space ${spaceId}`);
 
-    // Atomically remove userId from all rooms
-    const { error: removeError } = await supabase
-      .rpc('remove_user_from_all_spaces', { user_id_param: userId });
-
-    if (removeError) {
-      console.error('[updateLocation] Error removing user from all spaces:', removeError);
-      throw removeError;
-    } else {
-      console.log(`[updateLocation] Successfully removed user ${userId} from all spaces`);
+    // 1. Call RPC 'remove_user_from_all_spaces'
+    try {
+        const { error: removeError } = await supabase
+          .rpc('remove_user_from_all_spaces', { user_id_param: userId });
+        if (removeError) {
+          console.error('[updateLocation] Error from RPC remove_user_from_all_spaces:', removeError);
+          // Throw a new error with a more specific message for better debugging in the API route
+          throw new Error(`RPC remove_user_from_all_spaces failed: ${removeError.message}`); 
+        } else {
+          console.log(`[updateLocation] Successfully called RPC remove_user_from_all_spaces for user ${userId}`);
+        }
+    } catch (rpcCatchError) {
+        console.error('[updateLocation] Exception during RPC call:', rpcCatchError);
+        throw rpcCatchError; // Re-throw exception to be caught by the API route
     }
+    // Steps 2 & 3 (fetching space and updating its userIds) are removed as they are redundant
+    // after migrating to users.current_space_id for presence tracking.
 
-    // Add user to new room if applicable
-    if (spaceId) {
-      const { data: targetSpace, error: targetSpaceError } = await supabase
-        .from('spaces')
-        .select('userIds')
-        .eq('id', spaceId)
-        .single();
+    // 4. Update user's current_space_id
+    try {
+        console.log(`[updateLocation] Updating user ${userId} current_space_id to ${spaceId}`);
+        const { data, error } = await supabase
+          .from(this.TABLE_NAME)
+          .update({
+            current_space_id: spaceId,
+            last_active: new Date().toISOString(),
+          })
+          .eq('id', userId)
+          .select()
+          .single();
 
-      if (targetSpaceError) {
-        console.error('[updateLocation] Error fetching target space:', targetSpaceError);
-        throw targetSpaceError;
-      }
+        if (error) {
+          // Handle user not found specifically
+          if (error.code === 'PGRST116') {
+              console.warn(`[updateLocation] User ${userId} not found when updating current_space_id. Returning null.`);
+              return null; // User not found, valid case for returning null
+          } else {
+              // For other user update errors, log and throw
+              console.error('[updateLocation] Error updating user current_space_id:', error);
+              throw new Error(`Updating user current_space_id failed: ${error.message}`); 
+          }
+        }
 
-      const existingUserIds = Array.isArray(targetSpace.userIds) ? targetSpace.userIds : [];
-      const alreadyInRoom = existingUserIds.includes(userId);
-
-      if (!alreadyInRoom) {
-        const updatedUserIds = [...existingUserIds, userId];
-        await supabase
-          .from('spaces')
-          .update({ userIds: updatedUserIds })
-          .eq('id', spaceId);
-        console.log(`[updateLocation] Added user ${userId} to space ${spaceId}`);
-      } else {
-        console.log(`[updateLocation] User ${userId} already in space ${spaceId}, skipping add`);
-      }
+        console.log(`[updateLocation] Successfully updated user ${userId} current_space_id to ${spaceId}`);
+        return data ? mapToCamelCase(data) : null; // Should have data if no error
+    } catch (userUpdateCatchError) {
+         console.error('[updateLocation] Exception during user current_space_id update:', userUpdateCatchError);
+         throw userUpdateCatchError; // Re-throw exception
     }
-
-    // Update user's current_space_id
-    const { data, error } = await supabase
-      .from(this.TABLE_NAME)
-      .update({
-        current_space_id: spaceId,
-        last_active: new Date().toISOString(),
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[updateLocation] Error updating user location:', error);
-      if (error.code === 'PGRST116') return null;
-      throw error;
-    }
-
-    console.log(`[updateLocation] Completed for user ${userId} to space ${spaceId}`);
-    return data ? mapToCamelCase(data) : null;
   }
 
   async updateCurrentSpace(userId: string, spaceId: string | null): Promise<User | null> {

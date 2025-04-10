@@ -35,13 +35,35 @@ export function useUserPresence(currentUserId?: string) {
 
   const debouncedUpdateLocation = useMemo(() =>
     debounce(async (spaceId: string | null) => {
-      await fetch('/api/users/location', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUserId, spaceId }),
-      });
-    }, 300, { leading: true, trailing: true })
-  , [currentUserId]);
+      if (!currentUserId) {
+        console.error("[Presence] Cannot update location: currentUserId is missing.");
+        return;
+      }
+      try {
+        const response = await fetch('/api/users/location', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUserId, spaceId }),
+        });
+
+        if (!response.ok) {
+          // Log error details if the API call fails
+          const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+          console.error(`[Presence] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
+          // TODO: Consider adding user notification or retry logic here
+        } else {
+           if (process.env.NODE_ENV === 'development') {
+             console.log(`[Presence] Successfully requested location update to space ${spaceId} for user ${currentUserId}`);
+           }
+           // Invalidate query on success? Maybe not needed due to realtime updates.
+           // queryClient.invalidateQueries({ queryKey: PRESENCE_QUERY_KEY }); 
+        }
+      } catch (error) {
+        console.error(`[Presence] Network error updating location to space ${spaceId}:`, error);
+        // TODO: Consider adding user notification or retry logic here
+      }
+    }, 300, { leading: true, trailing: false }) // Changed trailing to false to avoid potential double calls if component unmounts/remounts quickly
+  , [currentUserId, queryClient]); // Added queryClient dependency
 
   const updateLocation = async (spaceId: string | null) => {
     debouncedUpdateLocation(spaceId);
@@ -89,10 +111,34 @@ export function useUserPresence(currentUserId?: string) {
           });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => { // Add callback for subscription status/errors
+        if (err) {
+          console.error('[Presence] Supabase subscription error:', err);
+          // TODO: Handle subscription error (e.g., notify user, attempt reconnect)
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[Presence] Supabase subscription status: ${status}`);
+          }
+          // Optional: Handle specific statuses like 'SUBSCRIBED', 'CHANNEL_ERROR', 'TIMED_OUT'
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+             // Attempt to resubscribe or notify user
+             console.warn(`[Presence] Subscription issue: ${status}. Consider reconnection logic.`);
+          }
+        }
+      });
+
+    // Log initial subscription attempt
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Presence] Attempting to subscribe to Supabase presence channel.');
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Presence] Unsubscribing from Supabase presence channel.');
+      }
+      supabase.removeChannel(channel).catch(error => {
+         console.error('[Presence] Error removing Supabase channel:', error);
+      });
     };
   }, [queryClient]);
 

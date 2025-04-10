@@ -38,7 +38,15 @@ const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateDa
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || 'Failed to update space');
+    // Handle 404 specifically - space not found
+    if (response.status === 404) {
+      console.warn(`Space with ID ${id} not found for update.`);
+      // Depending on desired behavior, you might return null or re-throw a specific error
+      // For now, let's throw a more specific error to differentiate
+      throw new Error(`Space with ID ${id} not found`); 
+    }
+    // Throw for other non-ok statuses
+    throw new Error(error.message || `Failed to update space (status: ${response.status})`);
   }
 
   return response.json();

@@ -81,3 +81,24 @@
   - memory-bank/tasks/T1_4_RealtimeIntegration_instructions.md
   - memory-bank/progress.md
   - memory-bank/activeContext.md
+
+### April 9, 2025 (Evening)
+- Completed T1_2_StateManagement:
+  - Fixed 404/500 errors during space entry/update by correcting API/repository logic.
+  - Refactored `useLastSpace` hook to use correct API endpoint (`/api/users/location`).
+  - Removed redundant logic attempting to access removed `spaces.userIds` column in `SupabaseUserRepository.updateLocation`.
+  - Added specific error handling for 404s in `useSpaceMutations`.
+  - Added detailed error handling/logging in `SupabaseUserRepository.updateLocation`.
+  - Optimized debug logging in `dom-floor-plan.tsx`.
+  - Added error handling to `debouncedUpdateLocation` in `useUserPresence.ts`.
+  - Added status/error logging to Supabase subscription in `useUserPresence.ts`.
+- Files affected:
+  - src/hooks/mutations/useSpaceMutations.ts
+  - src/components/floor-plan/dom-floor-plan.tsx
+  - src/hooks/useUserPresence.ts
+  - src/hooks/useLastSpace.ts
+  - src/repositories/implementations/supabase/SupabaseUserRepository.ts
+  - memory-bank/tasks/T1_2_StateManagement_instructions.md
+  - memory-bank/progress.md
+  - memory-bank/activeContext.md
+  - memorybankrules.md
