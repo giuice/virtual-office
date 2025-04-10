@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChatWindow } from './ChatWindow';
-import { useMessaging } from '@/contexts/MessagingContext'; // Assuming context is updated
+import { useMessaging } from '@/contexts/messaging/MessagingContext'; // Assuming context is updated
 import { Message, MessageType, MessageStatus } from '@/types/messaging';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Button } from '@/components/ui/button';

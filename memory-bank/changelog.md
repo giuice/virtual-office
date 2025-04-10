@@ -38,10 +38,16 @@
 - **Apr 10, 2025:** Attempted T1_3_SpaceInteraction Step 4: Failed due to apply_diff content mismatch.
 - **Apr 10, 2025:** Resolved T1_3_SpaceInteraction: User confirmed functionality is working; marked as complete without changes.
 - **Apr 10, 2025:** Updated task instruction file, memorybankrules.md, and activeContext.md.
+- **Apr 10, 2025:** Completed Step 1 of T1_4_RealtimeIntegration: Removed Socket.io code. Files affected: `socket-server.js` (deleted), `package.json`, `package-lock.json`, `src/hooks/useSocketEvents.ts`.
+- **Apr 10, 2025:** Completed Step 2 of T1_4_RealtimeIntegration: Verified Supabase Realtime configuration in `src/lib/supabase/client.ts` and `src/hooks/useUserPresence.ts`.
+- **Apr 10, 2025:** Completed Step 3 of T1_4_RealtimeIntegration: Updated `src/hooks/useUserPresence.ts` to track and expose Supabase connection status.
+- **Apr 10, 2025:** Completed Task T1_4_RealtimeIntegration: Finished Socket.io cleanup and Supabase realtime verification/update. UI monitoring deferred.
+- **Apr 10, 2025:** Strategy Phase: Corrected task naming inconsistency for T4_1. Merged instructions into `T4_1_SpaceDesignSystem_instructions.md` and deleted `T4_1_ModernUIComponents_instructions.md`. Updated `IP4_ModernFloorPlanUI.md`.
 
 ## Pending Changes
-- Implement T1_4_RealtimeIntegration.
-- Finalize modern floor plan UI components.
+- Implement T4_1_SpaceDesignSystem.
+- Implement UI for T1_4 connection status monitoring (Deferred).
+- Finalize modern floor plan UI components (T4_2 onwards).
 
 ## Notes
 - All changes follow the Critical Code Safety Rules.
