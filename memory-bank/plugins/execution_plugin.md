@@ -1,48 +1,67 @@
-# EXECUTION PLUGIN v3
+# EXECUTION PLUGIN v4
 
-> ⚠️ **CRITICAL:** ALWAYS use `read_file`, `write_file` or `edit_file` for EVERY action. TEST all changes by asking the user to confirm functionality. Do NOT proceed until verification is complete.
+> ⚠️ **CRITICAL:** ALWAYS use file tools to check if files exist BEFORE reading. ALWAYS perform the Mandatory Update Protocol (MUP) after EVERY step. NEVER proceed without updating all required files.
 
 ## EXECUTION WORKFLOW
-1. READ `memorybankrules.md` → 
-2. READ implementation plan & task → 
-3. VERIFY file state → 
+1. CHECK files → 
+2. READ context → 
+3. VERIFY state → 
 4. EXECUTE step → 
-5. TEST changes (with user) → 
-6. UPDATE all trackers → 
+5. TEST changes → 
+6. PERFORM MUP → 
 7. GET confirmation
 
 ## INITIALIZATION SEQUENCE
-**ALWAYS READ IN THIS ORDER:**
-1. First: `read_file memorybankrules.md` - Determines current task
-2. Second: Read implementation plan: 
+
+**STEP 1: Read Rules File**
+```
+read_file memorybankrules.md
+read_file memory-bank/activeContext.md
+read_file memory-bank/progress.md
+```
+
+**STEP 2: Find Implementation Plan**
+1. Check NEXT_ACTION in memorybankrules.md or in rule files to identify current/next task (e.g., T1_4_RealtimeIntegration)
+2. Extract implementation number (e.g., 1 from T1_4)
+3. Check if implementation plan exists:
    ```
-   read_file memory-bank/implementation_plans/IP{implementation_number}_{PlanName}.md
+   list_directory memory-bank/implementation_plans
    ```
-3. Third: Read current task: 
+4. Look for any file that starts with "IP{number}_"
+5. If found, read the file:
+   ```
+   read_file memory-bank/implementation_plans/IP{number}_{PlanName}.md
+   ```
+6. If not found, check progress.md then ASK USER:
+   ```
+   I cannot find the implementation plan for task T{number}. Can you help me locate it or should I create a new one?
+   ```
+
+**STEP 3: Find Task Instructions**
+1. Check if task file exists:
+   ```
+   list_directory memory-bank/tasks
+   ```
+2. Look for file matching T{implementation_number}_{task_number}_{TaskName}
+3. Read the task file:
    ```
    read_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
    ```
-4. Fourth: Read context files:
-   ```
-   read_file memory-bank/activeContext.md
-   read_file memory-bank/progress.md
-   ```
+4. If not found, ASK USER for guidance
+
 
 ## TASK EXECUTION PROCESS
 
-**BEFORE EACH STEP:**
-- Read the file(s) you'll be modifying
-- Verify current state matches your expectations
-- Document what you intend to change
-
 **FOR EACH STEP:**
-1. Execute the step exactly as written in the task instructions
-2. Test results - ASK USER to verify changes work correctly:
+1. Read the file(s) you'll be modifying
+2. Verify current state matches expectations
+3. Execute the step from task instructions
+4. Test changes with user:
    ```
-   Please test these changes to confirm they work as expected. 
+   Please test these changes to confirm they work as expected.
    Do they function correctly?
    ```
-3. Update task status in instruction file:
+5. Update task status:
    ```
    edit_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
    ```
@@ -52,11 +71,18 @@
    1. ✅ [Completed step]
    2. ⬜ [Next step]
    ```
-4. Update `memorybankrules.md` with current status:
+6. **PERFORM MUP** (see section below)
+7. Get user confirmation before proceeding
+
+## MANDATORY UPDATE PROTOCOL (MUP)
+
+After EVERY step completion, you MUST:
+
+1. Update `memorybankrules.md`:
    ```
    edit_file memorybankrules.md
    ```
-   Update:
+   Replace phase marker with:
    ```
    <PHASE_MARKER>
    CURRENT_PHASE: Execution
@@ -66,30 +92,60 @@
    REQUIRED_BEFORE_TRANSITION: None
    </PHASE_MARKER>
    ```
-5. Update `memory-bank/activeContext.md` with step completion details
-6. Update `memory-bank/progress.md` with correct percentage:
+
+2. Update `memory-bank/activeContext.md`:
+   ```
+   edit_file memory-bank/activeContext.md
+   ```
+   Add dated entry:
+   ```
+   ## [YYYY-MM-DD]
+   - Completed step [number] of task T{implementation_number}_{task_number}_{TaskName}
+   - [Specific details about what changed]
+   - Next: [Next step description]
+   ```
+
+3. Update `memory-bank/progress.md`:
+   ```
+   edit_file memory-bank/progress.md
+   ```
+   Update with exact format:
    ```
    ## Implementation Plans
-   - IP{implementation_number}_{PlanName}: X% (status)
+   - IP{implementation_number}_{PlanName}: [X]% ([status])
    
    ## Task Tracking
-   - T{implementation_number}_{task_number}_{TaskName}: Y% (status) [IP{implementation_number}_{PlanName}]
-     - [Any subtasks listed here]
+   - T{implementation_number}_{task_number}_{TaskName}: [Y]% ([status]) [IP{implementation_number}_{PlanName}]
+     - [Any subtasks listed here with percentages]
    
    ### Task Priorities
    1. T{implementation_number}_{task_number}_{TaskName} (priority) - rationale [IP{implementation_number}]
+   2. [Other tasks with priorities]
+   ```
+
+4. If task is complete, update `memory-bank/changelog.md`:
+   ```
+   edit_file memory-bank/changelog.md
+   ```
+   Add:
+   ```
+   ## Recent Changes
+   - **[YYYY-MM-DD]:** Completed T{implementation_number}_{task_number}_{TaskName}.
+   ```
+
+5. Verify all updates by reading back files:
+   ```
+   read_file memorybankrules.md
+   read_file memory-bank/activeContext.md
+   read_file memory-bank/progress.md
    ```
 
 ## TASK COMPLETION
+
 When all steps in a task are complete:
-1. Update progress to 100%
+1. Update task percentage to 100%
 2. Update parent implementation plan status
-3. Update `changelog.md` for significant implementations:
-   ```
-   ## Recent Changes
-   - **DATE:** Completed T{implementation_number}_{task_number}_{TaskName}.
-   ```
-4. Change `memorybankrules.md` to indicate completion:
+3. Update `memorybankrules.md` to indicate completion:
    ```
    <PHASE_MARKER>
    CURRENT_PHASE: Execution
@@ -100,19 +156,21 @@ When all steps in a task are complete:
    </PHASE_MARKER>
    ```
 
-## SUBTASK HANDLING
-For subtasks (format: T{implementation_number}_{task_number}_{subtask_number}_{SubtaskName}):
-1. Complete all subtask steps first
-2. Update parent task when all subtasks complete
-3. Maintain proper hierarchy in progress.md
-
 ## ERROR HANDLING
+
 If errors occur:
 1. Stop immediately
-2. Document the error with context
-3. Ask user for guidance before proceeding
+2. Document the error:
+   ```
+   ERROR ENCOUNTERED:
+   Command: [exact command that failed]
+   Error: [exact error message]
+   Context: [what you were trying to do]
+   ```
+3. Suggest solutions and ask for guidance
 
 ## EVIDENCE REQUIRED
+
 After each step:
 ```
 STEP COMPLETION:
@@ -120,7 +178,7 @@ STEP COMPLETION:
 2. Files modified:
    - [file1]: [specific changes made]
    - [file2]: [specific changes made]
-3. TEST: [Ask user to verify changes work as expected]
+3. MUP COMPLETED: All required files updated
 4. CURRENT STATUS: [X/Y] steps complete
 
 USER VERIFICATION REQUIRED:
