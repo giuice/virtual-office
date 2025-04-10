@@ -2,16 +2,16 @@
 
 > ⚠️ **MANDATORY:**
 > You **MUST** perform the full **Mandatory Update Protocol (MUP)** **immediately after completing every task or subtask**.
-> You **MUST ACTUALLY EDIT FILES** using the write_file, edit_file, or create_directory tools.
+> You **MUST ACTUALLY EDIT FILES** using your `write file` tool, `edit file` tool, or `create directory tools.
 > **Never** proceed to the next task, subtask, or phase transition **without** actually editing files.
 > **DO NOT just check boxes - you must use the file editing tools to make changes.**
 
-╔═════════════════════════════════════════════════════════════╗
-║                        EXECUTION                             ║
-║                                                             ║
-║  Verify  -->  Execute  -->  Document  -->  Update  -->  Next ║
-║  State       Step         Results       Trackers      Step   ║
-╚═════════════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════════════════╗
+║                        EXECUTION                                                ║
+║                                                                                 ║
+║  Verify  -->  Execute  -->  Document  -->  Update  Test/User Tests -->  Next    ║
+║  State       Step         Results       Trackers                        Step    ║
+╚═════════════════════════════════════════════════════════════════════════════════╝
 
 ## I. ENTERING/EXITING THIS PHASE
 
@@ -26,7 +26,7 @@
 - Results are documented
 
 **Exit action**:
-You MUST use write_file or edit_file to update memorybankrules.md with:
+You MUST use write_file or edit file tool to update memorybankrules.md with:
 ```
 <PHASE_MARKER>
 CURRENT_PHASE: Execution
@@ -49,13 +49,13 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 2. Identify and load the implementation plan:
    - First determine current task from `memorybankrules.md` LAST_ACTION or NEXT_ACTION fields
    - Extract implementation plan reference (IP#) from task name (e.g., T1_2_Login → IP1)
-   - Use read_file to load the specific implementation plan:
-     `read_file memory-bank/implementation_plans/IP{ip_number}_{name}.md`
+   - Use read file tool to load the specific implementation plan:
+     `read file tool memory-bank/implementation_plans/IP{ip_number}_{name}.md`
    - If plan reference isn't clear from task name, check `progress.md` for task-to-plan mapping
 
 3. Load the specific task instruction file:
-   - Use read_file to load the current task: 
-     `read_file memory-bank/tasks/T{task_id}_instructions.md`
+   - Use read file tool to load the current task: 
+     `read file tool memory-bank/tasks/T{task_id}_instructions.md`
 
 4. Load all dependency files listed in the task instruction file
 
@@ -64,7 +64,7 @@ REQUIRED_BEFORE_TRANSITION: User Action Required
 For each step in the instruction file:
 
 1. **EXECUTE Pre-Action Verification Protocol (PAVP)** (CRITICAL): 
-   1. Before file modifications (replace_in_file, write_to_file, etc.):
+   1. Before file modifications (replace_in_file tool, write_to_file tool, etc.):
 ❗ **PROCEED ONLY IF STATES MATCH**
 
 2. **Execute Step**
@@ -82,7 +82,7 @@ For each step in the instruction file:
    ```
 
 4. **Update Step Status**
-   - Use edit_file to mark step as completed in the instruction file:
+   - Use edit file tool to mark step as completed in the instruction file:
      ```
      ## Steps
      1. ✅ [Step description]
@@ -110,7 +110,7 @@ For each step in the instruction file:
 
 At the **end of every task or subtask**, you **MUST**:
 
-- Use write_file or edit_file to update all relevant files:
+- Use write_file or edit file tool to update all relevant files:
   1. `memorybankrules.md` - Update with phase marker showing last and next actions
   2. `memory-bank/activeContext.md` - Update with current state and next steps
   3. `memory-bank/progress.md` 
@@ -154,21 +154,23 @@ When encountering errors:
    </RESOLUTION>
    ```
 
-4. Use write_file or edit_file to update all relevant files with error information and resolution
+4. Use write_file or edit file tool to update all relevant files with error information and resolution
 
 ## VI. SUBTASK HANDLING
 
 When a step requires subtask execution:
 1. Load subtask instruction file
 2. Execute all steps in the subtask
-3. Use edit_file to mark the parent task step as completed
+3. Use edit file tool to mark the parent task step as completed
 4. Return to the parent task execution
+
+## ❗ BEFORE MUP PROTOCOL TEST IF POSSIBLE OR HELP USER TEST THE STEP
 
 ## VII. **ADDITIONAL PHASE MUP** (APM)
 
 After EVERY step execution, you MUST:
 
-1. Use write_file or edit_file to update `memorybankrules.md` with:
+1. Use write_file or edit file tool to update `memorybankrules.md` with:
    ```
    <PHASE_MARKER>
    CURRENT_PHASE: Execution
@@ -179,12 +181,12 @@ After EVERY step execution, you MUST:
    </PHASE_MARKER>
    ```
 
-2. Use write_file or edit_file to update `memory-bank/activeContext.md` with:
+2. Use write_file or edit file tool to update `memory-bank/activeContext.md` with:
    - Details of the step just completed
    - Current state of execution
    - Next steps to be taken
 
-3. Use write_file or edit_file to update `memory-bank/changelog.md` with:
+3. Use write_file or edit file tool to update `memory-bank/changelog.md` with:
    ```
    ## [YYYY-MM-DD]
    - Completed: [step description]
@@ -192,7 +194,7 @@ After EVERY step execution, you MUST:
    - Outcome: [result of the step]
    - Files affected: [list of files modified]
    ```
-4. Use write_file or edit_file to update `memory-bank/progress.md` 
+4. Use write_file or edit file tool to update `memory-bank/progress.md` 
      1. ## Implementation Plans
          - IP1_UserDashboard: {0}% ({status})
      2. ## Task Tracking
@@ -200,7 +202,7 @@ After EVERY step execution, you MUST:
      3. ### Task Priorities
          1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
          2. T2_1_ProfileSettings (High) - Security requirement [IP2] 
-5. Use edit_file to update the task instruction file with step status:
+5. Use edit file tool to update the task instruction file with step status:
    ```
    ## Steps
    1. ✅ [Completed step]
@@ -211,13 +213,13 @@ After EVERY step execution, you MUST:
 
 ## VIII.CHECKPOINTS BEFORE TRANSITION
 
-Before transitioning to Strategy phase, use read_file to verify:
+Before transitioning to Strategy phase, use read file tool to verify:
 <TRANSITION_CHECKLIST>
 [ ] All steps in the instruction file are executed
 [ ] All expected outputs are generated
 [ ] Results and observations are documented
-[ ] Used edit_file to update instruction file with step status
-[ ] Used write_file or edit_file to update `memorybankrules.md` with NEXT_PHASE: Strategy
+[ ] Used edit file tool to update instruction file with step status
+[ ] Used write_file or edit file tool to update `memorybankrules.md` with NEXT_PHASE: Strategy
 </TRANSITION_CHECKLIST>
 
 ## IX. REQUIRED RESPONSE FORMAT
@@ -227,15 +229,15 @@ All responses after completing an action MUST end with verification of actual fi
 <MUP_COMPLETED_ACTIONS>
 I have made the following file modifications:
 
-1. EDITED `memorybankrules.md`: [Quote the exact text you added to the file]
+1. EDITED `memorybankrules.md`: [YYES/NO]
 
-2. EDITED `memory-bank/activeContext.md`: [Quote the exact text you added to the file]
+2. EDITED `memory-bank/activeContext.md`: [YES/NO]
 
-3. EDITED `memory-bank/changelog.md`: [Quote the exact text you added to the file]
+3. EDITED `memory-bank/changelog.md`: [YES/NO]
 
-4. EDITED `memory-bank/progress.md`: [shows correct hierarchy and priorities - YES/NO]
+4. EDITED `memory-bank/progress.md`: [YES/NO]
 
-5. EDITED `[task instruction file]`: [Quote the exact text you modified in the file]
+5. EDITED `[task instruction file]`: [YES/NO]
 
 6. EDITED ADDITIONAL FILES:
    - [filename]: [Quote the relevant text you added/edited]

@@ -1,7 +1,7 @@
 # SETUP/MAINTENANCE PLUGIN
 
 > ⚠️ **MANDATORY:**
-> You **MUST ACTUALLY EDIT FILES** using the write_file, edit_file, or create_directory tools.
+> You **MUST ACTUALLY EDIT FILES** using your available write_file, edit_file, or create_directory tools.
 > **DO NOT just check boxes - you must use the file editing tools to make changes.**
 > **Never** proceed to the next step or phase transition **without** actually editing files.
 

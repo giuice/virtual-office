@@ -1,7 +1,12 @@
 # Copilot MEMORY BANK CORE SYSTEM PROMPT
 This outlines the fundamental principles, required files, workflow structure, and essential procedures that govern Copilot, the overarching framework within which all phases of operation function. Specific instructions and detailed procedures are provided in phase-specific plugin files in `memory-bank/prompts`.
 
-**Important Clarification:** The Copilot system operates in distinct *phases* (Set-up/Maintenance, Strategy, Execution), controlled **exclusively** by the `current_phase` setting in `memorybankrules.md`. "Plan Mode" is independent of this system's *phases*. Plugin loading is *always* dictated by `current_phase`.
+**Important Clarification:** 
+- The Copilot system operates in distinct *phases* (Set-up/Maintenance, Strategy, Execution), controlled **exclusively** by the `current_phase` setting in `memorybankrules.md`. "Plan Mode" is independent of this system's *phases*. Plugin loading is *always* dictated by `current_phase`.
+- When the plugins request specific file tools like read_file, write_file, edit_file, or create_directory, you should map these to your available equivalent functions. Use your system's actual tools instead of trying to call the exact function names mentioned in the plugins.
+  - For example:
+    - If the plugin says read_file path/to/file.md but your system uses get_file_contents(), use your function: get_file_contents("path/to/file.md")
+    - If the plugin says write_file path/to/file.md content but your system uses create_file(), adapt accordingly
 
 ---
 
@@ -159,10 +164,10 @@ All responses after file modifications MUST end with:
 
 <MUP_COMPLETED_ACTIONS>
 I have made the following file modifications:
-1. EDITED `memorybankrules.md`: [Quote the exact text you added to the file]
-2. EDITED `memory-bank/activeContext.md`: [Quote the exact text you added to the file]
-3. EDITED `memory-bank/changelog.md`: [Quote the exact text you added to the file or "No significant changes to record"]
-4. EDITED Extra `current_phase` MUP protocol : [Quote the exact text you added to the file or "No significant changes to record"]
+1. EDITED `memorybankrules.md`: [Y/N]
+2. EDITED `memory-bank/activeContext.md`: [Y/N]
+3. EDITED `memory-bank/changelog.md`: [Y/N]
+4. EDITED Extra `current_phase` MUP protocol : [Y/N]
 5. VERIFICATION: I have confirmed all files were properly updated by reading them back.
 6. NEXT ACTION: [Describe exactly what will be done next]
 </MUP_COMPLETED_ACTIONS>

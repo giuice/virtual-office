@@ -82,51 +82,62 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
 
   const handleEnterSpace = async (spaceId: string) => {
     try {
-      const currentUserId = currentUserProfile?.id;
-      if (!currentUserId) {
-        console.error('[FloorPlan] Cannot update location: currentUserProfile.id is missing');
-        return;
+      if (!currentUserProfile?.id) {
+        throw new Error('[FloorPlan] Cannot update location: user ID missing');
       }
-      
-      const currentUser = users?.find(u => u.id === currentUserId);
-      const currentSpaceId = currentUser?.current_space_id;
-
-      // Avoid duplicate requests if already processing
-      if (spaceId === lastRequestedSpaceId) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[FloorPlan] Already requested this space, skipping');
-        }
-        return;
+  
+      const selectedSpace = spaces.find(s => s.id === spaceId);
+      if (!selectedSpace) {
+        throw new Error('[FloorPlan] Space not found');
       }
-
-      // Only update if the user is not already in the target space
-      if (currentSpaceId !== spaceId) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Updating location: ${currentSpaceId} -> ${spaceId}`);
+  
+      // Add space validation checks
+      if (selectedSpace) {
+        if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
+          throw new Error('[FloorPlan] Space is at capacity');
         }
-        setLastRequestedSpaceId(spaceId); // Set flag before async call
-        try {
-          await updateLocation(spaceId);
-          // Reset lastRequestedSpaceId after successful update
-          setTimeout(() => setLastRequestedSpaceId(null), 1000); // Clear after 1s to prevent rapid clicks
-        } catch (updateError) {
-          console.error('Error updating location:', updateError);
-          // Reset immediately on error
-          setLastRequestedSpaceId(null);
+  
+        if (selectedSpace.status !== 'available') {
+          throw new Error('[FloorPlan] Space is not available');
         }
       } else {
+        throw new Error('[FloorPlan] Selected space not found');
+      }
+  
+      const currentUser = users?.find(u => u.id === currentUserProfile.id);
+      if (currentUser && currentUser.current_space_id === spaceId) {
         if (process.env.NODE_ENV === 'development') {
-          console.log(`User already in space ${spaceId}, skipping update`);
+          console.log(`User already in space ${spaceId}`);
+        }
+        return;
+      }
+  
+      setLastRequestedSpaceId(spaceId);  // Set loading state
+      try {
+        await updateLocation(spaceId);
+        setLastRequestedSpaceId(null);  // Reset after success
+      } catch (error) {
+        console.error('Error updating location:', error);
+        setLastRequestedSpaceId(null);
+        if (error instanceof Error) {
+          throw error;
+        } else {
+          throw new Error('Unknown error during location update');
         }
       }
-
-      const selectedSpace = spaces.find(s => s.id === spaceId);
+  
       if (selectedSpace) {
         props.onSpaceSelect?.(selectedSpace);
         props.onOpenChat?.(selectedSpace);
       }
     } catch (error) {
-      console.error('Failed to update location:', error);
+      if (error instanceof Error) {
+        console.error('Space transition failed:', error.message);
+        // Add user-facing error handling, e.g., set an error state
+      } else {
+        console.error('Space transition failed: Unknown error');
+      }
+      // Handle error (e.g., display message to user)
     }
   };
 
