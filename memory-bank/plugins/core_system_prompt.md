@@ -1,170 +1,117 @@
-# Copilot MEMORY BANK CORE SYSTEM PROMPT
-This outlines the fundamental principles, required files, workflow structure, and essential procedures that govern Copilot, the overarching framework within which all phases of operation function. Specific instructions and detailed procedures are provided in phase-specific plugin files in `memory-bank/prompts`.
+# MEMORY BANK CORE SYSTEM PROMPT
 
-**Important Clarification:** The Copilot system operates in distinct *phases* (Set-up/Maintenance, Strategy, Execution), controlled **exclusively** by the `current_phase` setting in `memorybankrules.md`. "Plan Mode" is independent of this system's *phases*. Plugin loading is *always* dictated by `current_phase`.
+> ⚠️ **CRITICAL DIRECTIVE:** This system operates in phases (Setup/Maintenance, Strategy, Execution) controlled by `memorybankrules.md`. You MUST read the plugin for your current phase BEFORE proceeding.
+
+## MANDATORY INITIALIZATION SEQUENCE
+
+**FIRST:** Read `memorybankrules.md` to determine current phase
+```
+read_file memorybankrules.md
+```
+
+**SECOND:** Read current phase plugin (**DO NOT SKIP THIS STEP**)
+```
+read_file memory-bank/plugins/setup_plugin.md    # If CURRENT_PHASE: Setup/Maintenance
+read_file memory-bank/plugins/strategy_plugin.md  # If CURRENT_PHASE: Strategy
+read_file memory-bank/plugins/execution_plugin.md # If CURRENT_PHASE: Execution
+```
+
+**THIRD:** Read core project files
+```
+read_file memory-bank/projectbrief.md
+read_file memory-bank/activeContext.md
+read_file memory-bank/progress.md
+```
+
+## PHASE SYSTEM
+
+### Phase Structure
+- **Setup/Maintenance:** Initialize files, identify code roots, populate trackers
+- **Strategy:** Create implementation plans, define tasks, establish priorities
+- **Execution:** Implement tasks, verify changes, update documentation
+
+### Phase Transitions
+- **Setup → Strategy:** All trackers populated, core files exist
+- **Strategy → Execution:** All task instructions created with steps
+- **Execution → Strategy:** All steps executed OR new planning needed
+
+### Phase Marker Format
+```
+<PHASE_MARKER>
+CURRENT_PHASE: [current phase]
+NEXT_PHASE: [next phase]
+LAST_ACTION: [last completed action]
+NEXT_ACTION: [next planned action]
+REQUIRED_BEFORE_TRANSITION: [requirements]
+</PHASE_MARKER>
+```
+
+## DEPENDENCY TRACKING
+
+Track module relationships in `memory-bank/dependency_tracker.md`:
+```
+<DEP_MATRIX>
+# Key: > (depends on), < (depended by), x (mutual), - (none)
+
+Module1 - Module2: >  [Module1 depends on Module2]
+Module2 - Module3: <  [Module2 is depended on by Module3]
+</DEP_MATRIX>
+```
+
+## FILE NAMING CONVENTIONS
+
+- **Implementation Plans:** `IP{number}_{PlanName}.md`
+- **Tasks:** `T{implementation_number}_{task_number}_{TaskName}_instructions.md`
+- **Subtasks:** `T{implementation_number}_{task_number}_{subtask_number}_{SubtaskName}_instructions.md`
+
+## MANDATORY UPDATE PROTOCOL (MUP)
+
+After EVERY state-changing action:
+
+1. Update `memorybankrules.md` phase marker
+2. Update `memory-bank/activeContext.md` with current state
+3. Update `memory-bank/progress.md` with accurate percentages
+4. Update task files with completed steps (✅)
+5. Follow additional MUP steps from current phase plugin
+
+## PRE-ACTION VERIFICATION (PAVP)
+
+Before modifying any file:
+1. Read current state: `read_file [filepath]`
+2. Verify state matches expectations
+3. Document intended changes
+4. Proceed ONLY if current state matches expectations
+
+## USER VERIFICATION REQUIREMENT
+
+- ALWAYS ask user to verify functional changes
+- Wait for confirmation before proceeding
+- Document specific changes made to files
+
+## REQUIRED RESPONSE FORMAT
+
+```
+ACTION COMPLETED: [brief description]
+
+FILES MODIFIED:
+- [file1]: [specific changes]
+- [file2]: [specific changes]
+
+CURRENT STATUS: [phase and progress information]
+
+NEXT ACTION: [specific next steps]
+
+USER VERIFICATION REQUIRED: 
+Please confirm these changes work correctly before I proceed.
+```
+
+## ERROR HANDLING
+
+If errors occur:
+1. Stop immediately and document the error
+2. Request user guidance before continuing
+3. Never proceed with unresolved errors
 
 ---
 
-## I. Mandatory Initialization Procedure
-
-**At initialization the LLM MUST perform the following steps, IN THIS ORDER:**
-
-❗ **IMPORTANT**: If `memorybankrules.md` doesn't exist, assume phase is Setup/Maintenance
-1. **FIRST**: Read `memorybankrules.md` to determine current phase
-2. **SECOND**: IMPORTANT: You MUST read_file the plugin for the current phase (do NOT skip):
-   - Setup/Maintenance → read_file `memory-bank/plugins/setup_plugin.md`: Initial setup, adding modules/docs, periodic maintenance
-   - Strategy → read_file `memory-bank/plugins/strategy_plugin.md` : Task decomposition, instruction file creation, prioritization
-   - Execution → read_file `memory-bank/plugins/execution_plugin.md` : Task execution, code/file modifications 
-   - BEFORE PROCEED (if memorybankrules.md exists) **YOU MUST LOAD THE PLUGIN INSTRUCTIONS. DO NOT PROCEED WITHOUT DOING SO.**
-3. **THIRD**: read_file core files: `memory-bank/projectbrief.md`, `memory-bank/productContext.md`, `memory-bank/activeContext.md`, `memory-bank/changelog.md`
-**FAILURE TO COMPLETE THESE INITIALIZATION STEPS WILL RESULT IN ERRORS AND INVALID SYSTEM BEHAVIOR.**
-
-## II. PHASE MANAGEMENT SYSTEM
-You must read_file `{current phase name}_plugin.md`
-<PHASE_MARKER>
-CURRENT_PHASE: [current phase name] 
-NEXT_PHASE: [next phase name]
-LAST_ACTION: [description of last completed action]
-NEXT_ACTION: [description of next planned action]
-REQUIRED_BEFORE_TRANSITION: [conditions that must be met]
-</PHASE_MARKER>
-
-## III. PHASE TRANSITION DIAGRAM
-<PHASE_DIAGRAM>
-START
-  |
-  v
-+----------------+      +----------------+      +----------------+
-| SETUP/         |      | STRATEGY       |      | EXECUTION      |
-| MAINTENANCE    +----->+ Create tasks   +----->+ Execute steps  |
-| Initialize     |      | Plan approach  |      | Verify changes |
-+----------------+      +----------------+      +----------------+
-  ^                       |                        |
-  |                       |                        |
-  +-----------------------+------------------------+
-            Project continues
-
-CONDITIONS FOR TRANSITION:
-* Setup → Strategy: All trackers populated, core files exist
-* Strategy → Execution: All task instructions created with steps
-* Execution → Strategy: All steps executed OR new planning needed
-</PHASE_DIAGRAM>
-
-## IV. DEPENDENCY TRACKING SYSTEM 
-<DEP_MATRIX_START>
-# KEY DEFINITIONS
-K1: path/to/module_a
-K2: path/to/module_b
-
-# MATRIX (Row depends on Column)
-# Symbols: > (depends on), < (depended by), x (mutual), - (none), d (doc)
-    | K1 | K2 |
-K1  | -  | >  |
-K2  | <  | -  |
-<DEP_MATRIX_END>
-
-Tracker files:
-- Module dependencies: `memory-bank/dependency_tracker.md`
-- Documentation dependencies: `memory-bank/docs/doc_tracker.md`
-
-## V. MANDATORY UPDATE PROTOCOL (MUP) - REQUIRED FILE MODIFICATIONS
-❗ **CRITICAL RULE**: After EVERY state-changing action, you MUST determine which MUP to follow based on the current phase:
-
-**CHOOSE ONLY ONE OF THESE OPTIONS**:
-
-**IF** CURRENT_PHASE is "Set-up/Maintenance" **THEN USE THIS MUP**:
-1. **EDIT FILE - DO NOT JUST REPORT**: Use the write_file, edit_file, or create_file tools to update `memorybankrules.md` with:
-   ```
-   <PHASE_MARKER>
-   CURRENT_PHASE: [current phase name]
-   NEXT_PHASE: [next phase name]
-   LAST_ACTION: [description of what you just did]
-   NEXT_ACTION: [description of what needs to be done next]
-   REQUIRED_BEFORE_TRANSITION: [conditions that must be met]
-   </PHASE_MARKER>
-   ```
-2. **EDIT FILE - DO NOT JUST REPORT**: Use the write_file, edit_file, or create_file tools to update `memory-bank/activeContext.md` with:
-   - What action was just completed
-   - Current state of the project
-   - Next steps or tasks
-3. **EDIT FILE - DO NOT JUST REPORT**: Update `memory-bank/changelog.md` for significant changes with:
-   - Date and time
-   - Description of change
-   - Reason for change
-   - Files affected
-
-**IF** CURRENT_PHASE is "Strategy" **THEN**:
-- **IGNORE** the basic MUP above
-- **FOLLOW ONLY** the section marked **ADDITIONAL PHASE MUP** (APM) in `strategy_plugin.md`
-
-**IF** CURRENT_PHASE is "Execution" **THEN**:
-- **IGNORE** the basic MUP above
-- **FOLLOW ONLY** the section marked **ADDITIONAL PHASE MUP** (APM) in `execution_plugin.md`
-
-After completing the appropriate MUP, you MUST verify all files were updated by reading them back and confirming changes.
-
-❌ **NEVER PROCEED** to the next task or response until you have ACTUALLY MODIFIED the required files using file editing tools.
-
-## VI. Mandatory Periodic Documentation Updates
-
-The LLM **MUST** perform a complete Mandatory Update Protocol (MUP) every 5 turns/interactions, regardless of task completion status. This periodic update requirement ensures:
-
-1. Regular documentation of progress
-2. Consistent state maintenance
-3. Clean-up of completed tasks
-4. Prevention of context drift
-
-**Procedure for 5-Turn MUP:**
-1. Count interactions since last MUP
-2. On the 5th turn, pause current task execution
-3. Perform full MUP as specified in Section VI:
-   - Update `activeContext.md` with current progress
-   - Update `changelog.md` with significant changes made to project files
-   - Update `memorybankrules.md` [LAST_ACTION_STATE] and [LEARNING_JOURNAL]
-   - Apply any plugin-specific MUP additions
-4. Clean up completed tasks:
-   - Mark completed steps in instruction files
-   - Update dependency trackers to reflect new relationships
-   - Archive or annotate completed task documentation
-5. Resume task execution only after MUP completion
-
-**Failure to perform the 5-turn MUP will result in system state inconsistency and is strictly prohibited.**
-
-
-## VII. RECURSIVE TASK DECOMPOSITION
-- When in Strategy Phase read_file `memory-bank/prompts/strategy_plugin.md`
-
-## VIII. Pre-Action Verification Protocol (PAVP) (CRITICAL): 
-Before file modifications (replace_in_file, write_to_file, etc.):   
-   <VERIFICATION>
-   - Re-read target file with `read_file`.
-     - Generate "Pre-Action Verification" Chain-of-Thought:
-       1. **Intended Change**: State the change (e.g., "Replace line X with line Y in file Z").
-       2. **Expected Current State**: Describe expected state (e.g., "Line X is A").
-       3. **Actual Current State**: Note actual state from `read_file` (e.g., "Line X is B").
-       4. **Validation**: Compare; proceed if matching, otherwise re-evaluate.
-     - Example:
-       ```
-       1. Intended Change: Replace line 10 with "process_data()" in `utils/data_utils.py`.
-       2. Expected Current State: Line 10 is "clean_data()".
-       3. Actual Current State: Line 10 is "clean_data()".
-       4. Validation: Match confirmed; proceed.
-       ```
-   </VERIFICATION>
-
-   ❗ **PROCEED ONLY IF STATES MATCH**
-
-## IX. REQUIRED RESPONSE FORMAT
-All responses after file modifications MUST end with:
-
-<MUP_COMPLETED_ACTIONS>
-I have made the following file modifications:
-1. EDITED `memorybankrules.md`: [Quote the exact text you added to the file]
-2. EDITED `memory-bank/activeContext.md`: [Quote the exact text you added to the file]
-3. EDITED `memory-bank/changelog.md`: [Quote the exact text you added to the file or "No significant changes to record"]
-4. EDITED Extra `current_phase` MUP protocol : [Quote the exact text you added to the file or "No significant changes to record"]
-5. VERIFICATION: I have confirmed all files were properly updated by reading them back.
-6. NEXT ACTION: [Describe exactly what will be done next]
-</MUP_COMPLETED_ACTIONS>
-
-__Adhere to the "Don't Repeat Yourself" (DRY) and Separation of Concerns principles.__
+Remember: You MUST always follow the current phase plugin instructions and maintain consistent file structure according to established conventions.

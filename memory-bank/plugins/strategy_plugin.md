@@ -1,37 +1,42 @@
 # STRATEGY PLUGIN
 
-<PROGRESS_TRACKER>
- - write_file/edit_file progress.md each step and state change on implementations/tasks, details instructions later
-</PROGRESS_TRACKER>
+> ⚠️ **CRITICAL WORKFLOW RULE:** You MUST create files in this exact sequence:
+> 1. Implementation Plan FIRST
+> 2. Tasks linked to that plan SECOND
+> 3. Subtasks (if needed) THIRD
+> ⚠️ **NEVER** create a task without first creating its parent implementation plan
 
+## INITIALIZATION
 
-## I. MANDATORY WORKFLOW SEQUENCE
-AFTER EACH STEP you MUST EXECUTE <PROGRESS_TRACKER> 
-1. **FIRST**: Create implementation plan (IP) and 
-2. **SECOND**: Create tasks (T) linked to implementation plan
-3. **THIRD**: Decompose complex tasks into subtasks if needed
-4. **FOURTH**: Update all cross-references
-
-⚠️ **WARNING**: NEVER create a task without first creating its parent implementation plan.
-
-## II. ENTERING/EXITING THIS PHASE
-
-**Enter if**: `memorybankrules.md` shows `CURRENT_PHASE: Strategy`
-**Exit when**: Plans and tasks created, linked, and prioritized
-**Exit action**: Update `memorybankrules.md` with `NEXT_PHASE: Execution`
-
-## III. IMPLEMENTATION PLAN CREATION
-
-❗ **PRE-CHECK**: Plan name follows `IP{number}_{plan_name}` format and stored in `memory-bank/implementation_plans/`
-
-1. Use write_file to create implementation plan:
+1. Read current state:
    ```
-   memory-bank/implementation_plans/IP{number}_{plan_name}.md
+   read_file memorybankrules.md
+   read_file memory-bank/projectbrief.md
+   read_file memory-bank/activeContext.md
+   read_file memory-bank/progress.md
    ```
 
-2. Template:
+2. Create implementation plan directory if missing:
    ```
-   # IP{number}_{plan_name}
+   create_directory memory-bank/implementation_plans
+   ```
+
+3. Create tasks directory if missing:
+   ```
+   create_directory memory-bank/tasks
+   ```
+
+## IMPLEMENTATION PLAN CREATION
+
+1. Check next available plan number
+2. Create plan using exact format:
+   ```
+   write_file memory-bank/implementation_plans/IP{number}_{PlanName}.md
+   ```
+   
+   Template:
+   ```
+   # IP{number}_{PlanName}
    
    ## Overview
    [High-level description]
@@ -44,120 +49,190 @@ AFTER EACH STEP you MUST EXECUTE <PROGRESS_TRACKER>
    [Description]
    
    ## Related Tasks
-   - T{ip_number}_{task_number}_{task_name} - [Brief description]
+   - T{number}_{task_number}_{TaskName} - [Brief description]
    
    ## Timeline & Risks
    [Timeline and risk information]
    ```
 
-3. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
+3. Update progress tracking:
+   ```
+   edit_file memory-bank/progress.md
+   ```
+   
+   Add:
    ```
    ## Implementation Plans
-   - IP1_UserDashboard: 0% (not started)
+   - IP{number}_{PlanName}: 0% (not started)
    ```
 
-## IV. TASK CREATION
-❗ **PRE-CHECK**: Parent plan EXISTS, task follows `T{ip_number}_{task_number}_{task_name}` format
+## TASK CREATION
 
-1. Use write_file to create task:
+1. Confirm parent plan exists
+2. Create task with exact format:
    ```
-   memory-bank/tasks/T{ip_number}_{task_number}_{task_name}_instructions.md
+   write_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
    ```
-
-2. Template:
+   
+   Template:
    ```
-   # T{ip_number}_{task_number}_{task_name} Instructions
+   # T{implementation_number}_{task_number}_{TaskName} Instructions
    
    ## Objective
    [Clear statement of purpose]
    
    ## Context
    [Background]
-   [Implementation Plan: IP{number}_{plan_name}]
+   [Implementation Plan: IP{implementation_number}_{PlanName}]
    
    ## Dependencies
    [Required modules/files]
    
    ## Steps
-   1. [First step]
-   2. [Second step]
+   1. ⬜ [First step]
+   2. ⬜ [Second step]
    
    ## Expected Output
    [Deliverables]
    ```
 
-3. Update the parent implementation plan's "Related Tasks" section:
+3. Update parent implementation plan:
    ```
-   ## Related Tasks
-   - T{ip_number}_{task_number}_{task_name} - [Brief description]
+   edit_file memory-bank/implementation_plans/IP{implementation_number}_{PlanName}.md
    ```
-
-4. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
+   
+   Add to "Related Tasks" section:
    ```
-   ## Task Tracking
-   - T1_1_DashboardLayout: 0% (not started) [IP1_UserDashboard]
+   - T{implementation_number}_{task_number}_{TaskName} - [Brief description]
    ```
 
-## V. SUBTASK CREATION (FOR COMPLEX TASKS)
-❗ **PRE-CHECK**: Parent task EXISTS, subtask follows `T{ip_number}_{task_number}_{subtask_number}_{subtask_name}`
-
-1. Use write_file to create subtask:
+4. Update progress tracking:
    ```
-   memory-bank/tasks/T{ip_number}_{task_number}_{subtask_number}_{subtask_name}_instructions.md
+   edit_file memory-bank/progress.md
+   ```
+   
+   Add to "Task Tracking" section:
+   ```
+   - T{implementation_number}_{task_number}_{TaskName}: 0% (not started) [IP{implementation_number}_{PlanName}]
    ```
 
-2. Use same template as tasks
+## SUBTASK CREATION
 
-3. Update parent task with subtask references:
+1. Confirm parent task exists
+2. Create subtask with exact format:
+   ```
+   write_file memory-bank/tasks/T{implementation_number}_{task_number}_{subtask_number}_{SubtaskName}_instructions.md
+   ```
+   
+   Use same template as tasks
+
+3. Update parent task:
+   ```
+   edit_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
+   ```
+   
+   Add "Subtasks" section:
    ```
    ## Subtasks
-   - T1_1_1_GridSystem
-   - T1_1_2_Responsiveness
+   - T{implementation_number}_{task_number}_{subtask_number}_{SubtaskName}
    ```
 
-4. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
+4. Update progress tracking:
    ```
-   ## Task Tracking
-   - T1_1_DashboardLayout: 0% [IP1_UserDashboard]
-     - T1_1_1_GridSystem: 0%
-     - T1_1_2_Responsiveness: 0%
+   edit_file memory-bank/progress.md
+   ```
+   
+   Add subtask under parent task:
+   ```
+   - T{implementation_number}_{task_number}_{TaskName}: 0% [IP{implementation_number}_{PlanName}]
+     - T{implementation_number}_{task_number}_{subtask_number}_{SubtaskName}: 0%
    ```
 
-## VI. TASK PRIORITIZATION
-1. Assess dependencies and align with project objectives
-2. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
+## TASK PRIORITIZATION
+
+1. Assess dependencies and objectives
+2. Update progress tracking:
+   ```
+   edit_file memory-bank/progress.md
+   ```
+   
+   Add "Task Priorities" section:
    ```
    ### Task Priorities
-   1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
-   2. T2_1_ProfileSettings (High) - Security requirement [IP2]
+   1. T{implementation_number}_{task_number}_{TaskName} (Highest) - [rationale] [IP{implementation_number}]
+   2. T{implementation_number}_{task_number}_{TaskName} (High) - [rationale] [IP{implementation_number}]
    ```
 
-## VII. RELATIONSHIP VERIFICATION
-Before proceeding, verify:
-- Every implementation plan has appropriate tasks listed
-- Every task references its parent implementation plan
-- Every subtask is referenced by its parent task
-- `memory-bank/progress.md` shows correct hierarchy and priorities
+## RELATIONSHIP VERIFICATION
 
-## VIII. **ADDITIONAL PHASE MUP** (APM)
-1. Veryfy Implentations and Tasks relationships are correcty on `memory-bank/progress.md`
+Before proceeding to execution phase, verify:
+1. Every implementation plan has at least one task
+2. Every task references its parent plan
+3. Every subtask references its parent task
+4. Progress.md shows correct hierarchy
 
-## IX. TRANSITION CHECKLIST
-Before transitioning to Execution phase, verify:
-- All implementation plans have at least one associated task
-- All tasks reference their parent implementation plan
-- All implementation plans list their associated tasks
-- Complex tasks are decomposed into subtasks if needed
-- `memorybankrules.md` updated with `NEXT_PHASE: Execution`
+## PHASE TRANSITION
 
-## X. REQUIRED RESPONSE FORMAT
-<MUP_COMPLETED_ACTIONS>
-I have made the following file modifications:
-1. EDITED `memorybankrules.md`: [quoted text]
-2. EDITED `memory-bank/activeContext.md`: [quoted text]
-3. EDITED `memory-bank/changelog.md`: [quoted text or "No significant changes"]
-4. EDITED `memory-bank/progress.md`: [shows correct hierarchy and priorities - YES/NO]
-5. EDITED ADDITIONAL FILES: [quoted relevant text]
-6. VERIFICATION: All files properly updated.
-7. NEXT ACTION: [next action]
-</MUP_COMPLETED_ACTIONS>
+When planning complete:
+1. Update memorybankrules.md:
+   ```
+   edit_file memorybankrules.md
+   ```
+   
+   Update phase marker:
+   ```
+   <PHASE_MARKER>
+   CURRENT_PHASE: Strategy
+   NEXT_PHASE: Execution
+   LAST_ACTION: Completed Strategy Phase - Tasks Planned
+   NEXT_ACTION: Begin Task Execution
+   REQUIRED_BEFORE_TRANSITION: User Action Required
+   </PHASE_MARKER>
+   ```
+
+2. Update activeContext.md with strategy summary:
+   ```
+   edit_file memory-bank/activeContext.md
+   ```
+   
+   Add strategy results:
+   ```
+   ## Strategy [Date]
+   - Created IP{number}_{PlanName}
+   - Defined tasks: T{implementation_number}_{task_number}_{TaskName}
+   - Priorities established
+   - Ready for execution phase
+   ```
+
+## MANDATORY UPDATE PROTOCOL (MUP)
+
+After EACH file creation or update:
+1. Update memorybankrules.md with current status
+2. Update activeContext.md with planning progress
+3. Verify progress.md shows correct hierarchical structure
+
+## EVIDENCE REQUIRED
+
+After completing planning for each implementation:
+```
+PLANNING COMPLETE:
+
+1. Implementation Plan:
+   - IP{number}_{PlanName} created
+   
+2. Tasks Defined:
+   - T{implementation_number}_{task_number}_{TaskName}
+   - T{implementation_number}_{task_number}_{TaskName}
+   
+3. Priorities Established:
+   1. T{implementation_number}_{task_number}_{TaskName} (Highest)
+   2. T{implementation_number}_{task_number}_{TaskName} (High)
+
+4. Files Modified:
+   - memorybankrules.md: [key changes]
+   - activeContext.md: [key changes]
+   - progress.md: [maintains correct hierarchy - YES/NO]
+   
+USER VERIFICATION REQUIRED:
+Please confirm these plans are correct before proceeding.
+```
