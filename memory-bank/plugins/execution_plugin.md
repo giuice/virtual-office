@@ -1,186 +1,253 @@
-# EXECUTION PLUGIN v4
+# EXECUTION PLUGIN
 
-> ⚠️ **CRITICAL:** ALWAYS use file tools to check if files exist BEFORE reading. ALWAYS perform the Mandatory Update Protocol (MUP) after EVERY step. NEVER proceed without updating all required files.
+> ⚠️ **MANDATORY:**
+> You **MUST** perform the full **Mandatory Update Protocol (MUP)** **immediately after completing every task or subtask**.
+> You **MUST ACTUALLY EDIT FILES** using your `write file` tool, `edit file` tool, or `create directory tools.
+> **Never** proceed to the next task, subtask, or phase transition **without** actually editing files.
+> **DO NOT just check boxes - you must use the file editing tools to make changes.**
 
-## EXECUTION WORKFLOW
-1. CHECK files → 
-2. READ context → 
-3. VERIFY state → 
-4. EXECUTE step → 
-5. TEST changes → 
-6. PERFORM MUP → 
-7. GET confirmation
+╔═════════════════════════════════════════════════════════════════════════════════╗
+║                        EXECUTION                                                ║
+║                                                                                 ║
+║  Verify  -->  Execute  -->  Document  -->  Update  Test/User Tests -->  Next    ║
+║  State       Step         Results       Trackers                        Step    ║
+╚═════════════════════════════════════════════════════════════════════════════════╝
 
-## INITIALIZATION SEQUENCE
+## I. ENTERING/EXITING THIS PHASE
 
-**STEP 1: Read Rules File**
+**Enter if**:
+- `memorybankrules.md` shows `CURRENT_PHASE: Execution`
+- Transitioning from Strategy
+- User Trigger: Start a new session post-Strategy or to resume execution.
+
+**Exit when**:
+- All steps in instruction files are executed
+- Expected outputs are generated
+- Results are documented
+
+**Exit action**:
+You MUST use write_file or edit file tool to update memorybankrules.md with:
 ```
-read_file memorybankrules.md
-read_file memory-bank/activeContext.md
-read_file memory-bank/progress.md
+<PHASE_MARKER>
+CURRENT_PHASE: Execution
+NEXT_PHASE: Strategy
+LAST_ACTION: Completed Execution Phase - Tasks Executed
+NEXT_ACTION: Transition to Strategy Phase Instructions
+REQUIRED_BEFORE_TRANSITION: User Action Required
+</PHASE_MARKER>
 ```
 
-**STEP 2: Find Implementation Plan**
-1. Check NEXT_ACTION in memorybankrules.md or in rule files to identify current/next task (e.g., T1_4_RealtimeIntegration)
-2. Extract implementation number (e.g., 1 from T1_4)
-3. Check if implementation plan exists:
+## II. CONTEXT LOADING
+
+1. Read core files:
+   - `memorybankrules.md`
+   - `memory-bank/projectbrief.md`
+   - `memory-bank/activeContext.md`
+   - `memory-bank/dependency_tracker.md`
+   - `memory-bank/progress.md`
+
+2. Identify and load the implementation plan:
+   - First determine current task from `memorybankrules.md` LAST_ACTION or NEXT_ACTION fields
+   - Extract implementation plan reference (IP#) from task name (e.g., T1_2_Login → IP1)
+   - Use read file tool to load the specific implementation plan:
+     `read file tool memory-bank/implementation_plans/IP{ip_number}_{name}.md`
+   - If plan reference isn't clear from task name, check `progress.md` for task-to-plan mapping
+
+3. Load the specific task instruction file:
+   - Use read file tool to load the current task: 
+     `read file tool memory-bank/tasks/T{task_id}_instructions.md`
+
+4. Load all dependency files listed in the task instruction file
+
+## III. STEP EXECUTION PROCESS
+
+For each step in the instruction file:
+
+1. **EXECUTE Pre-Action Verification Protocol (PAVP)** (CRITICAL): 
+   1. Before file modifications (replace_in_file tool, write_to_file tool, etc.):
+❗ **PROCEED ONLY IF STATES MATCH**
+
+2. **Execute Step**
+   - Perform the specified action
+   - If an error occurs, document and resolve
+
+3. **Document Results**
    ```
-   list_directory memory-bank/implementation_plans
-   ```
-4. Look for any file that starts with "IP{number}_"
-5. If found, read the file:
-   ```
-   read_file memory-bank/implementation_plans/IP{number}_{PlanName}.md
-   ```
-6. If not found, check progress.md then ASK USER:
-   ```
-   I cannot find the implementation plan for task T{number}. Can you help me locate it or should I create a new one?
+   <RESULTS>
+   - Action completed: [description]
+   - Outcome: [what changed]
+   - Observations: [notable findings]
+   - Issues encountered: [any problems]
+   </RESULTS>
    ```
 
-**STEP 3: Find Task Instructions**
-1. Check if task file exists:
-   ```
-   list_directory memory-bank/tasks
-   ```
-2. Look for file matching T{implementation_number}_{task_number}_{TaskName}
-3. Read the task file:
-   ```
-   read_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
-   ```
-4. If not found, ASK USER for guidance
+4. **Update Step Status**
+   - Use edit file tool to mark step as completed in the instruction file:
+     ```
+     ## Steps
+     1. ✅ [Step description]
+     2. ⬜ [Step description]
+     ```
 
+5. **Update DEPENDENCY TRACKING SYSTEM**
+   <DEP_MATRIX_START>
+      # KEY DEFINITIONS
+      K1: path/to/module_a
+      K2: path/to/module_b
 
-## TASK EXECUTION PROCESS
+      # MATRIX (Row depends on Column)
+      # Symbols: > (depends on), < (depended by), x (mutual), - (none), d (doc)
+         | K1 | K2 |
+      K1  | -  | >  |
+      K2  | <  | -  |
+   <DEP_MATRIX_END>
 
-**FOR EACH STEP:**
-1. Read the file(s) you'll be modifying
-2. Verify current state matches expectations
-3. Execute the step from task instructions
-4. Test changes with user:
+   Tracker files:
+   - Module dependencies: `memory-bank/dependency_tracker.md`
+   - Documentation dependencies: `memory-bank/docs/doc_tracker.md`
+
+## IV. MANDATORY FINALIZATION AFTER EACH TASK
+
+At the **end of every task or subtask**, you **MUST**:
+
+- Use write_file or edit file tool to update all relevant files:
+  1. `memorybankrules.md` - Update with phase marker showing last and next actions
+  2. `memory-bank/activeContext.md` - Update with current state and next steps
+  3. `memory-bank/progress.md` 
+     1. ## Implementation Plans
+         - IP1_UserDashboard: {0}% ({status})
+     2. ## Task Tracking
+         - T1_1_DashboardLayout: {0}% ({status}) [IP1_UserDashboard]
+     3. ### Task Priorities
+         1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
+         2. T2_1_ProfileSettings (High) - Security requirement [IP2] 
+  4. Task instruction file - Update with completed steps
+
+- After making all file edits, include the **full MUP_COMPLETED_ACTIONS block** in your response that quotes the actual text you added to each file
+
+- **Do NOT** start a new task, subtask, or phase transition **until** you have actually modified all required files
+❗ **This is critical to prevent project state gaps.**
+
+## V. ERROR HANDLING PROTOCOL
+
+When encountering errors:
+1. Document the error condition
    ```
-   Please test these changes to confirm they work as expected.
-   Do they function correctly?
+   <ERROR>
+   - Error message: [exact message]
+   - Context: [what you were doing]
+   - Probable cause: [your analysis]
+   </ERROR>
    ```
-5. Update task status:
+
+2. Determine resolution approach:
+   - Retry with adjustments
+   - Split into smaller steps
+   - Revert and reconsider approach
+
+3. Document resolution:
    ```
-   edit_file memory-bank/tasks/T{implementation_number}_{task_number}_{TaskName}_instructions.md
+   <RESOLUTION>
+   - Approach taken: [what you did]
+   - Result: [outcome]
+   - Preventative measures: [how to avoid this in future]
+   </RESOLUTION>
    ```
-   Mark step as complete:
+
+4. Use write_file or edit file tool to update all relevant files with error information and resolution
+
+## VI. SUBTASK HANDLING
+
+When a step requires subtask execution:
+1. Load subtask instruction file
+2. Execute all steps in the subtask
+3. Use edit file tool to mark the parent task step as completed
+4. Return to the parent task execution
+
+## ❗ BEFORE MUP PROTOCOL TEST IF POSSIBLE OR HELP USER TEST THE STEP
+
+## VII. **ADDITIONAL PHASE MUP** (APM)
+
+After EVERY step execution, you MUST:
+
+1. Use write_file or edit file tool to update `memorybankrules.md` with:
+   ```
+   <PHASE_MARKER>
+   CURRENT_PHASE: Execution
+   NEXT_PHASE: [appropriate next phase]
+   LAST_ACTION: [description of step just completed]
+   NEXT_ACTION: [description of next step]
+   REQUIRED_BEFORE_TRANSITION: [any requirements before transitioning]
+   </PHASE_MARKER>
+   ```
+
+2. Use write_file or edit file tool to update `memory-bank/activeContext.md` with:
+   - Details of the step just completed
+   - Current state of execution
+   - Next steps to be taken
+
+3. Use write_file or edit file tool to update `memory-bank/changelog.md` with:
+   ```
+   ## [YYYY-MM-DD]
+   - Completed: [step description]
+   - Task: T{number}_{name}
+   - Outcome: [result of the step]
+   - Files affected: [list of files modified]
+   ```
+4. Use write_file or edit file tool to update `memory-bank/progress.md` 
+     1. ## Implementation Plans
+         - IP1_UserDashboard: {0}% ({status})
+     2. ## Task Tracking
+         - T1_1_DashboardLayout: {0}% ({status}) [IP1_UserDashboard]
+     3. ### Task Priorities
+         1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
+         2. T2_1_ProfileSettings (High) - Security requirement [IP2] 
+5. Use edit file tool to update the task instruction file with step status:
    ```
    ## Steps
    1. ✅ [Completed step]
-   2. ⬜ [Next step]
-   ```
-6. **PERFORM MUP** (see section below)
-7. Get user confirmation before proceeding
-
-## MANDATORY UPDATE PROTOCOL (MUP)
-
-After EVERY step completion, you MUST:
-
-1. Update `memorybankrules.md`:
-   ```
-   edit_file memorybankrules.md
-   ```
-   Replace phase marker with:
-   ```
-   <PHASE_MARKER>
-   CURRENT_PHASE: Execution
-   NEXT_PHASE: Execution
-   LAST_ACTION: Completed Step X of T{implementation_number}_{task_number}_{TaskName}
-   NEXT_ACTION: Execute Step Y of T{implementation_number}_{task_number}_{TaskName}
-   REQUIRED_BEFORE_TRANSITION: None
-   </PHASE_MARKER>
+   2. ⬜ [Pending step]
    ```
 
-2. Update `memory-bank/activeContext.md`:
-   ```
-   edit_file memory-bank/activeContext.md
-   ```
-   Add dated entry:
-   ```
-   ## [YYYY-MM-DD]
-   - Completed step [number] of task T{implementation_number}_{task_number}_{TaskName}
-   - [Specific details about what changed]
-   - Next: [Next step description]
-   ```
+6. After making all file modifications, verify they were applied correctly by reading files back.
 
-3. Update `memory-bank/progress.md`:
-   ```
-   edit_file memory-bank/progress.md
-   ```
-   Update with exact format:
-   ```
-   ## Implementation Plans
-   - IP{implementation_number}_{PlanName}: [X]% ([status])
-   
-   ## Task Tracking
-   - T{implementation_number}_{task_number}_{TaskName}: [Y]% ([status]) [IP{implementation_number}_{PlanName}]
-     - [Any subtasks listed here with percentages]
-   
-   ### Task Priorities
-   1. T{implementation_number}_{task_number}_{TaskName} (priority) - rationale [IP{implementation_number}]
-   2. [Other tasks with priorities]
-   ```
+## VIII.CHECKPOINTS BEFORE TRANSITION
 
-4. If task is complete, update `memory-bank/changelog.md`:
-   ```
-   edit_file memory-bank/changelog.md
-   ```
-   Add:
-   ```
-   ## Recent Changes
-   - **[YYYY-MM-DD]:** Completed T{implementation_number}_{task_number}_{TaskName}.
-   ```
+Before transitioning to Strategy phase, use read file tool to verify:
+<TRANSITION_CHECKLIST>
+[ ] All steps in the instruction file are executed
+[ ] All expected outputs are generated
+[ ] Results and observations are documented
+[ ] Used edit file tool to update instruction file with step status
+[ ] Used write_file or edit file tool to update `memorybankrules.md` with NEXT_PHASE: Strategy
+</TRANSITION_CHECKLIST>
 
-5. Verify all updates by reading back files:
-   ```
-   read_file memorybankrules.md
-   read_file memory-bank/activeContext.md
-   read_file memory-bank/progress.md
-   ```
+## IX. REQUIRED RESPONSE FORMAT
 
-## TASK COMPLETION
+All responses after completing an action MUST end with verification of actual file modifications:
 
-When all steps in a task are complete:
-1. Update task percentage to 100%
-2. Update parent implementation plan status
-3. Update `memorybankrules.md` to indicate completion:
-   ```
-   <PHASE_MARKER>
-   CURRENT_PHASE: Execution
-   NEXT_PHASE: Strategy
-   LAST_ACTION: Completed T{implementation_number}_{task_number}_{TaskName}
-   NEXT_ACTION: Transition to Strategy Phase
-   REQUIRED_BEFORE_TRANSITION: User Action Required
-   </PHASE_MARKER>
-   ```
+<MUP_COMPLETED_ACTIONS>
+I have made the following file modifications:
 
-## ERROR HANDLING
+1. EDITED `memorybankrules.md`: [YYES/NO]
 
-If errors occur:
-1. Stop immediately
-2. Document the error:
-   ```
-   ERROR ENCOUNTERED:
-   Command: [exact command that failed]
-   Error: [exact error message]
-   Context: [what you were trying to do]
-   ```
-3. Suggest solutions and ask for guidance
+2. EDITED `memory-bank/activeContext.md`: [YES/NO]
 
-## EVIDENCE REQUIRED
+3. EDITED `memory-bank/changelog.md`: [YES/NO]
 
-After each step:
-```
-STEP COMPLETION:
-1. Step X of T{implementation_number}_{task_number}_{TaskName} complete
-2. Files modified:
-   - [file1]: [specific changes made]
-   - [file2]: [specific changes made]
-3. MUP COMPLETED: All required files updated
-4. CURRENT STATUS: [X/Y] steps complete
+4. EDITED `memory-bank/progress.md`: [YES/NO]
 
-USER VERIFICATION REQUIRED:
-Please confirm the changes work correctly before I proceed to the next step.
-```
+5. EDITED `[task instruction file]`: [YES/NO]
+
+6. EDITED ADDITIONAL FILES:
+   - [filename]: [Quote the relevant text you added/edited]
+   - [filename]: [Quote the relevant text you added/edited]
+
+7. VERIFICATION: I have confirmed all files were properly updated by reading them back.
+
+8. NEXT ACTION: [Describe exactly what will be done next]
+</MUP_COMPLETED_ACTIONS>
+
+❗ **IMPORTANT:**
+Every response **after completing a task or subtask** **MUST** include the **full MUP_COMPLETED_ACTIONS block** with actual quotes from the files you modified.
+If you forget, **stop immediately** and perform the file edits **before** any further actions.
