@@ -110,7 +110,114 @@ order by m.timestamp asc;
 - Add audit logging for access to private messages and entry requests.
 - Implement RLS (Row Level Security) policies in Supabase for strong enforcement.
 
----
+## Implementation Plan
 
-**Summary:**  
-This approach ensures that room messages are accessible only to authorized users, supports both public and private rooms, enables admin-controlled membership, implements a "knock to enter" workflow via UI notification, allows users to call others across spaces, and provides a persistent log of user presence and interactions for future dashboards.
+### Phase 1: Database Schema Updates (1-2 days)
+1. **Create New Tables**
+   - Create `space_members` table
+   - Create `space_presence_log` table
+   - Add visibility column to `conversations` table
+2. **Data Migration**
+   - Migrate existing space access data to new schema
+   - Backfill space_members from current space users
+   - Set initial conversation visibility values
+
+### Phase 2: Backend Implementation (2-3 days)
+1. **Repository Layer Updates**
+   - Update `ISpaceRepository` to handle space membership
+   - Extend `IConversationRepository` for visibility controls
+   - Create `SpacePresenceRepository` for logging
+   
+2. **API Routes Development**
+   - Implement space membership endpoints (add/remove members)
+   - Create "knock" request handling endpoint
+   - Add presence logging endpoints
+   - Update message fetching with visibility filters
+
+3. **Supabase RLS Policies**
+   - Configure Row Level Security for space_members
+   - Set up RLS for conversations based on visibility
+   - Implement RLS for messages access control
+
+### Phase 3: Frontend Components (3-4 days)
+1. **Space Access UI**
+   - Implement "Knock to Enter" UI flow
+   - Add member management interface for admins
+   - Create space access indicator components
+
+2. **Messaging Components Updates**
+   - Update RoomMessaging component for visibility rules
+   - Implement cross-space calling UI
+   - Add presence indicators and notifications
+
+3. **State Management**
+   - Extend space context for membership data
+   - Update messaging context for visibility rules
+   - Implement presence tracking hooks
+
+### Phase 4: Real-time Features (2-3 days)
+1. **Supabase Realtime Integration**
+   - Set up presence change subscriptions
+   - Implement knock request notifications
+   - Configure message visibility updates
+
+2. **Notification System**
+   - Implement toasts for knock requests
+   - Add real-time member updates
+   - Create cross-space call notifications
+
+### Phase 5: Testing & Documentation (2-3 days)
+1. **Testing**
+   - Unit tests for repositories
+   - Integration tests for API routes
+   - E2E tests for critical flows:
+     - Space entry/exit
+     - Message visibility
+     - Member management
+     - Real-time notifications
+
+2. **Documentation**
+   - Update API documentation
+   - Add usage guidelines
+   - Document RLS policies
+   - Create troubleshooting guide
+
+### Risk Mitigation
+1. **Data Consistency**
+   - Implement database constraints
+   - Use transactions for critical operations
+   - Add data validation middleware
+
+2. **Performance**
+   - Index critical query paths
+   - Monitor Supabase query performance
+   - Implement caching where appropriate
+
+3. **Security**
+   - Audit RLS policies
+   - Validate all access control paths
+   - Test edge cases in permissions
+
+### Rollout Strategy
+1. **Phase 1 (Beta)**
+   - Deploy schema changes
+   - Enable for test company
+   - Collect feedback and metrics
+
+2. **Phase 2 (General)**
+   - Gradual rollout to all companies
+   - Monitor performance and issues
+   - Gather user feedback
+
+3. **Phase 3 (Optimization)**
+   - Address performance bottlenecks
+   - Implement user feedback
+   - Fine-tune access controls
+
+## Success Metrics
+- Zero unauthorized access incidents
+- Sub-second message fetch times
+- <1s real-time notification delivery
+- Positive user feedback on access workflow
+- Reduced support tickets for access issues
+```

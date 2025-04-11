@@ -16,6 +16,11 @@ CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired');
 CREATE TYPE note_generator AS ENUM ('ai', 'user');
 CREATE TYPE announcement_priority AS ENUM ('low', 'medium', 'high');
 
+-- Create custom types for better type safety
+CREATE TYPE member_role_type AS ENUM ('member', 'admin', 'director');
+CREATE TYPE session_type_enum AS ENUM ('meeting', 'workspace', 'conference');
+CREATE TYPE conversation_visibility_type AS ENUM ('public', 'private', 'direct');
+
 -- Companies Table
 CREATE TABLE companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -97,7 +102,8 @@ CREATE TABLE conversations (
     is_archived BOOLEAN DEFAULT false NOT NULL,
     unread_count JSONB, -- Map of user IDs to unread counts { "user_id_1": 2, "user_id_2": 0 }
     room_id UUID REFERENCES spaces(id) ON DELETE SET NULL, -- Link to space for room conversations
-    created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    visibility conversation_visibility_type NOT NULL DEFAULT 'public'
 );
 -- Indexes for Conversations
 CREATE INDEX idx_conversations_participants ON conversations USING GIN (participants);
@@ -216,3 +222,113 @@ CREATE TABLE invitations (
 -- Indexes for Invitations
 CREATE INDEX idx_invitations_email ON invitations(email);
 CREATE INDEX idx_invitations_company_id ON invitations(company_id);
+
+-- Space Members Table (for access control)
+CREATE TABLE space_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    space_id UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role member_role_type NOT NULL,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (space_id, user_id)
+);
+CREATE INDEX idx_space_members_space_id ON space_members(space_id);
+CREATE INDEX idx_space_members_user_id ON space_members(user_id);
+
+-- Space Presence Log Table (for analytics)
+CREATE TABLE space_presence_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    space_id UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    entered_at TIMESTAMPTZ NOT NULL,
+    exited_at TIMESTAMPTZ,
+    session_type session_type_enum,
+    context TEXT,      -- Keeping as TEXT since it's free-form content
+    authorized_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT check_exit_after_entry CHECK (exited_at IS NULL OR exited_at > entered_at)
+);
+CREATE INDEX idx_space_presence_log_space_id ON space_presence_log(space_id);
+CREATE INDEX idx_space_presence_log_user_id ON space_presence_log(user_id);
+CREATE INDEX idx_space_presence_log_time ON space_presence_log(entered_at, exited_at);
+
+-- Add RLS Policies
+
+-- Space Members policies
+ALTER TABLE space_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own space memberships"
+    ON space_members FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Space admins can manage members"
+    ON space_members FOR ALL
+    USING (EXISTS (
+        SELECT 1 FROM space_members sm 
+        WHERE sm.space_id = space_members.space_id 
+        AND sm.user_id = auth.uid() 
+        AND sm.role = 'admin'
+    ));
+
+-- Conversations policies
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view public conversations in their spaces"
+    ON conversations FOR SELECT
+    USING (
+        visibility = 'public' AND
+        EXISTS (
+            SELECT 1 FROM space_members sm
+            WHERE sm.space_id = conversations.room_id
+            AND sm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can view private conversations they're part of"
+    ON conversations FOR SELECT
+    USING (
+        (visibility = 'private' OR visibility = 'direct') AND
+        auth.uid() = ANY(participants)
+    );
+
+-- Messages policies
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view messages in accessible conversations"
+    ON messages FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM conversations c
+            WHERE c.id = messages.conversation_id
+            AND (
+                (c.visibility = 'public' AND
+                EXISTS (
+                    SELECT 1 FROM space_members sm
+                    WHERE sm.space_id = c.room_id
+                    AND sm.user_id = auth.uid()
+                ))
+                OR
+                (c.visibility IN ('private', 'direct') AND
+                auth.uid() = ANY(c.participants))
+            )
+        )
+    );
+
+CREATE POLICY "Users can send messages to conversations they have access to"
+    ON messages FOR INSERT
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM conversations c
+            WHERE c.id = messages.conversation_id
+            AND (
+                (c.visibility = 'public' AND
+                EXISTS (
+                    SELECT 1 FROM space_members sm
+                    WHERE sm.space_id = c.room_id
+                    AND sm.user_id = auth.uid()
+                ))
+                OR
+                (c.visibility IN ('private', 'direct') AND
+                auth.uid() = ANY(c.participants))
+            )
+        )
+    );
