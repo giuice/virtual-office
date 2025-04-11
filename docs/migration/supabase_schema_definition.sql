@@ -61,7 +61,6 @@ CREATE TABLE spaces (
     capacity INTEGER DEFAULT 0 NOT NULL,
     features TEXT[], -- Array of feature strings
     position JSONB, -- Store x, y, width, height
-    user_ids UUID[], -- Array of User IDs currently in the space
     description TEXT,
     access_control JSONB, -- Store isPublic, allowedUsers, allowedRoles, ownerId
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -72,7 +71,6 @@ CREATE TABLE spaces (
 );
 -- Indexes for Spaces
 CREATE INDEX idx_spaces_company_id ON spaces(company_id);
-CREATE INDEX idx_spaces_user_ids ON spaces USING GIN (user_ids);
 
 
 -- Space Reservations Table

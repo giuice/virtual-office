@@ -129,10 +129,11 @@ order by m.timestamp asc;
    - Create `SpacePresenceRepository` for logging
    
 2. **API Routes Development**
-   - Implement space membership endpoints (add/remove members)
+   - Implement space membership endpoints (add/remove members) 
    - Create "knock" request handling endpoint
    - Add presence logging endpoints
    - Update message fetching with visibility filters
+
 
 3. **Supabase RLS Policies**
    - Configure Row Level Security for space_members
@@ -149,6 +150,9 @@ order by m.timestamp asc;
    - Update RoomMessaging component for visibility rules
    - Implement cross-space calling UI
    - Add presence indicators and notifications
+   - Implement add/remove members UI for admins
+   - Update management pages /company /dashboard/*
+  
 
 3. **State Management**
    - Extend space context for membership data
