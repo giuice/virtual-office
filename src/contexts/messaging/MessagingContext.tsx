@@ -1,17 +1,15 @@
 // src/contexts/messaging/MessagingContext.tsx
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   MessageType, 
-  FileAttachment, // Corrected name
-  // MessageDraft // Removed import
+  FileAttachment,
 } from '@/types/messaging';
 import { MessagingContextType } from './types';
-import { useConversations } from '@/hooks/useConversations'; // Updated path
-import { useMessages } from '@/hooks/useMessages'; // Updated path
-import { useSocketEvents } from '@/hooks/useSocketEvents'; // Updated path
+import { useConversations } from '@/hooks/useConversations';
+import { useMessages } from '@/hooks/useMessages';
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
@@ -20,7 +18,7 @@ const MessagingContext = createContext<MessagingContextType | undefined>(undefin
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
   // Get conversation management hooks
   const conversationsManager = useConversations();
-  const { user } = useAuth(); // Assuming you need user info for some reason
+  const { user } = useAuth();
   const { 
     activeConversation,
     setActiveConversation
@@ -29,29 +27,17 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
   
-  // Get socket event hooks
-  const socketManager = useSocketEvents(
-    activeConversation?.id || null,
-    messagesManager.addMessage,
-    messagesManager.updateMessageStatusLocal,
-    conversationsManager.updateConversationWithMessage
-  );
-  
-  // Removed message draft state and function
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
-    attachments?: FileAttachment[]; // Corrected type name
+    attachments?: FileAttachment[];
     type?: MessageType;
   }) => {
     if (!activeConversation) return;
     
-    // Clear draft
-    // updateMessageDraft(activeConversation.id, ''); // Removed draft clearing
-    
     // Send the message
-    await messagesManager.sendMessage(content, options);
-  }, [activeConversation, messagesManager.sendMessage]); // Removed updateMessageDraft from dependencies
+    return await messagesManager.sendMessage(content, options);
+  }, [activeConversation, messagesManager.sendMessage]);
   
   // Create context value by combining all the hooks
   const value: MessagingContextType = {
@@ -80,12 +66,6 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     addReaction: messagesManager.addReaction,
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
-    
-    // Removed message drafts from context value
-    
-    // Typing indicators (from socketManager)
-    typingUsers: {},  // This is managed internally in useSocketEvents
-    sendTypingIndicator: socketManager.sendTypingIndicator,
   };
   
   return (

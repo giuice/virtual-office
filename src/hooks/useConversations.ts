@@ -1,10 +1,11 @@
 // src/contexts/messaging/useConversations.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Conversation, ConversationType } from '@/types/messaging';
-// Removed named imports - will use messagingApi object
-import { messagingApi } from '@/lib/messaging-api'; // Import the named export
+import { messagingApi } from '@/lib/messaging-api';
+import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
+import { supabase } from '@/lib/supabase/client';
 
 export function useConversations() {
   const { user } = useAuth();
@@ -15,6 +16,9 @@ export function useConversations() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
+  
+  // Use the existing real-time conversation hook to handle Supabase subscriptions
+  useConversationRealtime(user?.uid);
   
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
@@ -158,7 +162,6 @@ export function useConversations() {
       );
     } catch (error) {
       console.error('Error unarchiving conversation:', error);
-      throw error;
     }
   }, []);
   

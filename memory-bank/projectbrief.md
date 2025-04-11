@@ -30,12 +30,37 @@ The database is crucial for supporting real-time features, user management, spac
   - **`meeting_notes`**: Archives meeting details (`id`, `room_id`, `title`, `meeting_date`, `transcript`, `summary`, `generated_by`, `edited_by`).
   - **`meeting_note_action_items`**: Tracks tasks from meetings (`id`, `note_id`, `description`, `assignee_id`, `due_date`, `completed`).
   - **`invitations`**: Manages user invitations to companies (`token`, `email`, `company_id`, `role`, `expires_at`, `status`).
+  - **`space_members`**: Manages explicit space membership (`id`, `space_id`, `user_id`, `role`, `joined_at`).
+  - **`space_presence_log`**: Tracks space entry/exit for analytics (`id`, `space_id`, `user_id`, `entered_at`, `exited_at`, `session_type`, `context`).
 
 ### Security and Access Control
+- **Space-Level Access Control**
+  - Explicit membership tracking via `space_members` table
+  - Role-based permissions (member, admin, director)
+  - "Knock to Enter" workflow for restricted spaces
+  - Cross-space calling capability
+  
+- **Message Visibility**
+  - Public messages visible to all space members
+  - Private messages for specific participants
+  - Direct messages between two users
+  
+- **Supabase RLS Policies**
+  - Fine-grained access control at row level
+  - Automatic filtering based on user roles and space membership
+  - Secure message visibility enforcement
+
 - **Supabase Authentication** for user login and session management.
 - **Supabase Row Level Security (RLS)** policies for fine-grained data access control.
 - **Repository Pattern** enforces data access rules within the application logic.
 - API routes protected via middleware and session checks.
+
+### Analytics & Monitoring
+- **Presence Tracking**
+  - Detailed entry/exit logging
+  - Session duration analysis
+  - Interaction patterns
+  - Meeting analytics
 
 ---
 

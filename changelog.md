@@ -49,6 +49,39 @@
 - Enhanced real-time capabilities using Supabase Realtime
 - Improved error handling and type safety
 
+## [Unreleased]
+### Changed
+- Refactored messaging system to use Supabase Realtime exclusively (T5_1_RefactorMessagingRealtime)
+  - Removed Socket.io remnants and typing indicators functionality
+  - Added robust error handling and reconnection logic to realtime hooks
+  - Enhanced useMessageRealtime and useConversationRealtime with proper connection status tracking
+  - Improved logging for better debugging of realtime events
+  - Added retry mechanisms for realtime connections (5s interval, 10s timeout)
+  - Updated MessagingContext to remove Socket.io dependencies
+  - Simplified MessageComposer by removing typing indicator functionality
+  - Enhanced realtime subscription filtering for better performance
+
+### Removed
+- Socket.io related functionality:
+  - Removed typing indicators
+  - Removed useSocketEvents.ts hook
+  - Removed isConnected property from messaging components
+  - Removed Socket.io event handlers from messaging context
+
+### Added
+- Enhanced realtime subscription features:
+  - Connection status tracking in realtime hooks
+  - Detailed logging with consistent prefixes
+  - Retry and timeout configurations
+  - Proper cleanup on component unmount
+  - React Query cache integration for realtime updates
+
+### Fixed
+- Fixed connection handling in realtime subscriptions
+- Improved error handling for message sending failures
+- Enhanced cleanup of realtime subscriptions
+- Fixed potential memory leaks in realtime hooks
+
 ## Project Features Status
 
 ### Completed Features

@@ -7,9 +7,11 @@ Define and implement a cohesive design system for the virtual office floor plan 
 [Implementation Plan: IP4_ModernFloorPlanUI]
 The current floor plan UI lacks a consistent and modern visual language. This task focuses on creating a unified design system and implementing the core building blocks for the modernized floor plan, replacing older implementations with a DOM-first approach using Tailwind CSS and Shadcn/UI.
 
+**IMPORTANT**: it's tailwind 4 Consult `tailwind-upgrade-guide.md` for more info
+
 ## Dependencies
 - React
-- Tailwind CSS / `tailwind.config.js`
+- Tailwind CSS / `tailwind.config.js` 
 - Shadcn/UI library (`@/components/ui/*`)
 - Existing floor plan components (`src/components/floor-plan/SpaceElement.tsx`, `src/components/floor-plan/UserAvatarPresence.tsx` for reference/replacement)
 - Presence context/hook (`@/hooks/useUserPresence`) for user status data

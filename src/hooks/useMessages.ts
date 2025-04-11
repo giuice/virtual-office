@@ -1,15 +1,15 @@
 // src/contexts/messaging/useMessages.ts
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase/client';
 import { 
   Message, 
   MessageStatus, 
   MessageType, 
-  FileAttachment, // Corrected type name
-  // Removed PaginationOptions as it's not exported
+  FileAttachment,
 } from '@/types/messaging';
-// Removed all old named imports
-import { messagingApi } from '@/lib/messaging-api'; // Import the named export 'messagingApi'
+import { messagingApi } from '@/lib/messaging-api';
+import { useMessageRealtime } from '@/hooks/realtime/useMessageRealtime';
 
 export function useMessages(activeConversationId: string | null) {
   const { user } = useAuth();
@@ -19,7 +19,6 @@ export function useMessages(activeConversationId: string | null) {
   const [loadingMessages, setLoadingMessages] = useState<boolean>(false);
   const [errorMessages, setErrorMessages] = useState<string | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
-  // Define pagination state inline as the type is not exported
   const [messagePagination, setMessagePagination] = useState<{
     limit: number;
     direction: 'older' | 'newer';
@@ -28,6 +27,9 @@ export function useMessages(activeConversationId: string | null) {
     limit: 20,
     direction: 'older',
   });
+
+  // Use the existing real-time message hook to handle Supabase subscriptions
+  useMessageRealtime(activeConversationId);
   
   // Function to refresh messages
   const refreshMessages = useCallback(async () => {
@@ -99,7 +101,7 @@ export function useMessages(activeConversationId: string | null) {
   // Function to send a message
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
-    attachments?: FileAttachment[]; // Corrected type name
+    attachments?: FileAttachment[];
     type?: MessageType;
   }) => {
     if (!user || !activeConversationId || !content.trim()) return;
@@ -121,8 +123,8 @@ export function useMessages(activeConversationId: string | null) {
         timestamp: new Date(),
         status: MessageStatus.SENDING,
         type: options?.type || MessageType.TEXT,
-        reactions: [], // Added missing property
-        isEdited: false, // Added missing property
+        reactions: [],
+        isEdited: false,
       };
       
       setMessages(prev => [...prev, optimisticMessage]);
@@ -177,7 +179,6 @@ export function useMessages(activeConversationId: string | null) {
     try {
       // Call the API to add the reaction
       await messagingApi.addReaction(messageId, emoji, user.uid);
-      // console.warn('addMessageReaction API call not implemented yet.'); // Keep warn temporarily? No, remove if uncommenting.
 
       // Update local state (Optimistic update remains)
       setMessages(prev => 
@@ -216,7 +217,6 @@ export function useMessages(activeConversationId: string | null) {
     try {
       // Call the API to remove the reaction
       await messagingApi.removeReaction(messageId, emoji, user.uid);
-      // console.warn('removeMessageReaction API call not implemented yet.'); // Keep warn temporarily? No, remove if uncommenting.
       
       // Update local state (Optimistic update remains)
       setMessages(prev => 
@@ -240,7 +240,7 @@ export function useMessages(activeConversationId: string | null) {
   }, [user]);
   
   // Function to upload an attachment
-  const uploadAttachment = useCallback(async (file: File): Promise<FileAttachment> => { // Corrected return type
+  const uploadAttachment = useCallback(async (file: File): Promise<FileAttachment> => {
     if (!activeConversationId) {
       throw new Error('No active conversation');
     }
@@ -249,15 +249,12 @@ export function useMessages(activeConversationId: string | null) {
       // TODO: Implement uploadMessageAttachment in messagingApi and uncomment
       // return await messagingApi.uploadMessageAttachment(file, activeConversationId); 
       console.warn('uploadMessageAttachment API call not implemented yet.');
-      throw new Error('Attachment upload not implemented'); // Prevent further execution
+      throw new Error('Attachment upload not implemented');
     } catch (error) {
       console.error('Error uploading attachment:', error);
       throw error;
     }
   }, [activeConversationId]);
-
-  // Note: updateMessageStatus and uploadMessageAttachment were not used in this hook, 
-  // but if they were, they would also need to be prefixed with messagingApi.
   
   return {
     messages,

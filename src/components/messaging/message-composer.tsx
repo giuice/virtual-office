@@ -9,7 +9,6 @@ import { Paperclip, Send, Smile, Image, X } from 'lucide-react';
 
 interface MessageComposerProps {
   onSendMessage: (content: string) => Promise<void>;
-  onTyping?: () => void;
   replyToMessage?: Message | null;
   onCancelReply?: () => void;
   disabled?: boolean;
@@ -20,7 +19,6 @@ interface MessageComposerProps {
 
 export function MessageComposer({
   onSendMessage,
-  onTyping,
   replyToMessage,
   onCancelReply,
   disabled = false,
@@ -31,7 +29,6 @@ export function MessageComposer({
   const [content, setContent] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastTypingTime = useRef<number>(0);
   
   // Update content when initialValue changes
   useEffect(() => {
@@ -53,13 +50,6 @@ export function MessageComposer({
     // Call onValueChange callback if provided
     if (onValueChange) {
       onValueChange(newContent);
-    }
-    
-    // Handle typing indicator with throttling
-    const now = Date.now();
-    if (onTyping && now - lastTypingTime.current > 2000) {
-      onTyping();
-      lastTypingTime.current = now;
     }
   };
   

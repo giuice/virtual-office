@@ -40,9 +40,6 @@ export function MessageFeed({
     activeConversation,
     setActiveConversation,
     getOrCreateRoomConversation,
-    // messageDrafts,
-    // updateMessageDraft,
-    sendTypingIndicator,
     addReaction,
   } = useMessaging();
   
@@ -92,13 +89,6 @@ export function MessageFeed({
     }
   };
   
-  // Handle typing indicator
-  const handleTyping = () => {
-    if (activeConversation) {
-      sendTypingIndicator(activeConversation.id);
-    }
-  };
-  
   // Handle reply
   const handleReply = (message: Message) => {
     setReplyToMessage(message);
@@ -108,19 +98,6 @@ export function MessageFeed({
   const handleReaction = (messageId: string, emoji: string) => {
     addReaction(messageId, emoji);
   };
-  
-  // Get current draft for the active conversation
-  // const getCurrentDraft = () => {
-  //   if (!activeConversation) return '';
-  //   return messageDrafts[activeConversation.id]?.content || '';
-  // };
-  
-  // // Handle draft update
-  // const handleDraftUpdate = (content: string) => {
-  //   if (activeConversation) {
-  //     updateMessageDraft(activeConversation.id, content);
-  //   }
-  // };
   
   // Render loading state
   if (isLoading || loadingMessages) {
@@ -226,11 +203,10 @@ export function MessageFeed({
       <CardFooter className="p-4 pt-2">
         <MessageComposer
           onSendMessage={handleSendMessage}
-          onTyping={handleTyping}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
-          initialValue={ ""/*getCurrentDraft()*/}
-          onValueChange={()=>{}/*handleDraftUpdate*/}
+          initialValue={""}
+          onValueChange={() => {}}
         />
       </CardFooter>
     </Card>

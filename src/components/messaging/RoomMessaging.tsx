@@ -24,7 +24,7 @@ export const RoomMessaging: React.FC<RoomMessagingProps> = ({
   onClose,
   position = 'right',
 }) => {
-  const { messages: allMessages, sendMessage, isConnected } = useMessaging();
+  const { messages: allMessages, sendMessage} = useMessaging();
   const { currentUserProfile } = useCompany();
   const [roomMessages, setRoomMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false); // Add loading state later
@@ -41,14 +41,8 @@ export const RoomMessaging: React.FC<RoomMessagingProps> = ({
       console.error("Cannot send message: User profile not loaded.");
       return; // Or show an error to the user
     }
-    sendMessage({
-      conversationId: roomId, // Use roomId as conversationId for room chat
-      senderId: currentUserProfile.id,
-      content: content,
+    sendMessage(content, {
       type: MessageType.TEXT,
-      status: MessageStatus.SENDING,
-      reactions: [],
-      isEdited: false,
     });
   };
 

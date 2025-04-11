@@ -72,6 +72,53 @@ Virtual Office is a modern web application designed to create an engaging and ef
 - Protected API routes
 - Typed database queries
 
+### Access Control Architecture
+1. **Space Membership System**
+   - Explicit membership tracking via `space_members` table
+   - Role-based permissions (member, admin, director)
+   - Database-level validation of membership
+   
+2. **Message Visibility Controls**
+   - Three visibility levels:
+     - Public (all space members)
+     - Private (specific participants)
+     - Direct (two users only)
+   - Enforced via RLS policies
+   
+3. **Space Entry Control**
+   - Controlled access to restricted spaces
+   - "Knock to Enter" workflow
+   - Real-time notifications for entry requests
+   - Audit logging of all entry/exit events
+
+### Row Level Security (RLS)
+1. **Space Members**
+   - Users can view their own memberships
+   - Admins can manage space members
+   - Automatic filtering based on roles
+
+2. **Conversations**
+   - Public conversation visibility by space membership
+   - Private conversation access by participant list
+   - Direct message access restricted to participants
+
+3. **Messages**
+   - Access controlled by conversation visibility
+   - Insert permissions validated against space membership
+   - Real-time updates filtered by access rights
+
+### Analytics & Auditing
+1. **Presence Tracking**
+   - Entry/exit logging
+   - Session duration tracking
+   - Authorization audit trail
+   - Analytics for space usage
+
+2. **Performance Monitoring**
+   - Query execution time tracking
+   - Real-time subscription monitoring
+   - Access pattern analysis
+
 ## Development Guidelines
 
 ### Code Organization
@@ -134,3 +181,42 @@ Virtual Office is a modern web application designed to create an engaging and ef
 - Current Phase: Active Development
 - Latest Version: 0.1.0
 - Current Focus: Meeting Notes System & Announcements
+
+## Implementation Details
+
+### Database Layer
+1. **Tables & Relationships**
+   - New tables:
+     - `space_members` for access control
+     - `space_presence_log` for analytics
+   - Modified tables:
+     - `conversations` with visibility column
+
+2. **Performance Optimizations**
+   - New indexes:
+     - Space membership queries
+     - Presence log analytics
+     - Message visibility filtering
+
+### API Layer
+// ...existing code...
+
+### Security Implementations
+1. **Access Control**
+   - Repository methods validate access
+   - API middleware checks permissions
+   - Real-time subscription filtering
+   
+2. **Audit Trail**
+   - Automatic logging of:
+     - Space entry/exit
+     - Permission changes
+     - Access requests
+   
+3. **Error Handling**
+   - Clear permission denied messages
+   - Automatic retry for temporary failures
+   - Logging of security events
+
+## System Health Monitoring
+// ...existing code...
