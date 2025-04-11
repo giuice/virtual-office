@@ -20,6 +20,7 @@ const MessagingContext = createContext<MessagingContextType | undefined>(undefin
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
   // Get conversation management hooks
   const conversationsManager = useConversations();
+  const { user } = useAuth(); // Assuming you need user info for some reason
   const { 
     activeConversation,
     setActiveConversation

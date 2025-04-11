@@ -43,8 +43,10 @@
 - **Apr 10, 2025:** Completed Step 3 of T1_4_RealtimeIntegration: Updated `src/hooks/useUserPresence.ts` to track and expose Supabase connection status.
 - **Apr 10, 2025:** Completed Task T1_4_RealtimeIntegration: Finished Socket.io cleanup and Supabase realtime verification/update. UI monitoring deferred.
 - **Apr 10, 2025:** Strategy Phase: Corrected task naming inconsistency for T4_1. Merged instructions into `T4_1_SpaceDesignSystem_instructions.md` and deleted `T4_1_ModernUIComponents_instructions.md`. Updated `IP4_ModernFloorPlanUI.md`.
+- **Apr 10, 2025:** Strategy Phase: Identified incomplete messaging realtime migration. Created `IP5_MessagingRealtimeUnification.md` and task `T5_1_RefactorMessagingRealtime_instructions.md`. Prioritized T5_1.
 
 ## Pending Changes
+- Implement T5_1_RefactorMessagingRealtime.
 - Implement T4_1_SpaceDesignSystem.
 - Implement UI for T1_4 connection status monitoring (Deferred).
 - Finalize modern floor plan UI components (T4_2 onwards).
