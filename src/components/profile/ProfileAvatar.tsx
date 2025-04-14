@@ -54,9 +54,10 @@ export function ProfileAvatar({
     lg: 'h-10 w-10 text-base',
     xl: 'h-12 w-12 text-lg',
   };
-
-  // Determine avatar source
-  const avatarSrc = previewUrl || user.avatarUrl || (user as UserWithPhoto).photoURL;
+  // Determine avatar source - previewUrl takes precedence during upload
+  // otherwise use the central getAvatarUrl utility for consistent resolution
+  const { getAvatarUrl } = require('@/lib/avatar-utils'); // Import here to avoid circular dependencies
+  const avatarSrc = previewUrl || getAvatarUrl(user);
   
   // Get initials for fallback
   const initials = getUserInitials(user.displayName || 'User');

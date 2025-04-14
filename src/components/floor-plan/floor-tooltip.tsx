@@ -14,7 +14,7 @@ import {
 import { Users, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { StatusAvatar } from '@/components/ui/status-avatar'
-import { dbUserToUIUser } from '@/lib/type-adapters'
+import { dbUserToUIUser } from '@/utils/user-type-adapters'
 
 // Type for the content prop
 type TooltipContent = {

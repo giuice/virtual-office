@@ -1,17 +1,24 @@
 // src/types/ui.ts
 import { SpaceType, UIUserStatus } from './database';
 
+
+
 /**
  * UI-specific interfaces and types that don't directly map to database entities
  */
 
 // UI-specific user representation
 export interface UIUser {
-  id: number; // UI uses numeric IDs while database uses string UUIDs
-  name: string;
-  avatar: string;
+  id: string; // Now using string IDs for consistency with database
+  displayName: string; // Renamed from 'name' to match database User
+  avatarUrl: string; // Renamed from 'avatar' to match database User
   status: UIUserStatus;
-  activity: string;
+  statusMessage?: string; // Renamed from 'activity' to align with database concepts
+  
+  // Legacy support - these will be deprecated
+  name?: string; // For backward compatibility
+  avatar?: string; // For backward compatibility
+  activity?: string; // For backward compatibility
 }
 
 // UI-specific announcement format

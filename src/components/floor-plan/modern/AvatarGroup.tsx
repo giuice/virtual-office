@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { floorPlanTokens } from './designTokens';
 
 interface AvatarGroupProps {
   users: UserPresenceData[];
@@ -51,16 +52,27 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   return (
     <div className={cn("flex items-center", className)}>
       {/* Visible avatars with overlap styling */}
-      <div className="flex">
+      <div className={floorPlanTokens.avatar.group.container}>
         {visibleUsers.map((user, index) => (
-          <ModernUserAvatar
-            key={user.id}
-            user={user}
-            size={size}
-            onClick={onUserClick}
-            isOverlapping={index > 0}
-            tooltipPlacement="top"
-          />
+          <div 
+            key={user.id} 
+            className={cn(
+              index > 0 && "relative",
+              // Apply progressive z-index to ensure proper stacking
+              `z-${30 - index}` // Higher z-index for earlier avatars
+            )}
+            style={{ 
+              marginLeft: index > 0 ? '-12px' : '0' // More reliable than class-based approach
+            }}
+          >
+            <ModernUserAvatar
+              user={user}
+              size={size}
+              onClick={onUserClick}
+              isOverlapping={index > 0}
+              tooltipPlacement="top"
+            />
+          </div>
         ))}
       </div>
 
@@ -72,7 +84,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
               <Badge 
                 variant="outline" 
                 className={cn(
-                  "ml-1 cursor-default rounded-full",
+                  "ml-2 cursor-default rounded-full", // Increased margin
                   size === 'xs' && "h-5 text-[10px] px-1.5",
                   size === 'sm' && "h-6 text-xs px-2",
                   size === 'md' && "h-8 text-sm px-2",

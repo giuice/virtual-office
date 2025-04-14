@@ -82,8 +82,9 @@ export const floorPlanTokens = {
     
     // Group positioning
     group: {
-      overlap: "-ml-2", // Overlapping avatars in a group
-      ring: "ring-2 ring-background" // Ring to separate from background
+      overlap: "-ml-3", // Overlapping avatars in a group
+      ring: "ring-2 ring-background", // Ring to separate from background
+      container: "flex items-center" // Container styling for avatar group
     }
   },
   

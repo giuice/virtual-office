@@ -4,6 +4,7 @@
 - IP1_PresenceBugsResolution: 100% (Completed)
 - IP4_ModernFloorPlanUI: 20% (In Progress)
 - IP5_MessagingRealtimeUnification: 100% (Completed)
+- IP6_AvatarSystemFixes: 0% (Not Started)
 
 ## Task Tracking
 - T1_1_AvatarSystem: 100% (Completed) [IP1_PresenceBugsResolution]
@@ -12,11 +13,15 @@
 - T1_4_RealtimeIntegration: 100% (Completed) [IP1_PresenceBugsResolution]
 - T4_1_SpaceDesignSystem: 50% (In Progress) [IP4_ModernFloorPlanUI]
 - T5_1_RefactorMessagingRealtime: 100% (Completed) [IP5_MessagingRealtimeUnification]
+- T6_1_AvatarDisplayFix: 0% (Not Started) [IP6_AvatarSystemFixes]
+- T6_2_AvatarStorageOptimization: 0% (Not Started) [IP6_AvatarSystemFixes]
+- T6_3_AvatarGroupLayoutFix: 0% (Not Started) [IP6_AvatarSystemFixes]
 
 ## Task Priorities
-1. T4_1_SpaceDesignSystem (Highest) - Modernize floor plan UI [IP4]
-2. T4_2_SpaceCardComponent (High) - Next task for floor plan UI modernization [IP4]
-3. TBD (Upcoming tasks after floor plan modernization)
+1. T6_1_AvatarDisplayFix (Highest) - Fix custom avatar display issues [IP6]
+2. T6_3_AvatarGroupLayoutFix (High) - Fix avatar group layout problems [IP6]
+3. T4_1_SpaceDesignSystem (Medium) - Continue modernizing floor plan UI [IP4]
+4. T6_2_AvatarStorageOptimization (Medium) - Optimize avatar storage [IP6]
 
 ## Notes
 - T1_3_SpaceInteraction is now complete based on user confirmation.

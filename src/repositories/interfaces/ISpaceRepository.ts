@@ -33,13 +33,6 @@ export interface ISpaceRepository {
    */
   update(id: string, updates: Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Space | null>;
 
-  /**
-   * Specifically updates the list of users within a space.
-   * @param id The unique ID of the space to update.
-   * @param userIds An array of user IDs currently in the space.
-   * @returns A promise that resolves to the updated Space object or null if not found.
-   */
-  updateUsers(id: string, userIds: string[]): Promise<Space | null>;
 
   /**
    * Deletes a space by its unique identifier.

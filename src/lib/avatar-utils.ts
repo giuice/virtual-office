@@ -1,5 +1,17 @@
 // src/lib/avatar-utils.ts
-import { User } from '@/components/floor-plan/types';
+import { User } from '@/types/database';
+import { UIUser } from '@/types/ui';
+
+// Interface for all possible user-like objects with avatar properties
+export interface AvatarUser {
+  id?: string | number;
+  displayName?: string;
+  name?: string;
+  avatarUrl?: string;
+  avatar?: string;
+  photoURL?: string;
+  status?: string;
+}
 
 // Generate a consistent color based on user name
 export function getUserColor(name: string): string {
@@ -35,9 +47,12 @@ export function getUserInitials(name: string): string {
 }
 
 // Generate a data URI for a colored avatar with initials
-export function generateAvatarDataUri(user: User | { name: string, avatar?: string }): string {
+export function generateAvatarDataUri(user: AvatarUser): string {
+  // Get the user's name from either displayName or name property
+  const userName = user?.displayName || user?.name || '';
+  
   // Handle case where user might be null or user name is empty
-  if (!user || !user.name) {
+  if (!userName) {
     const defaultSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
         <rect width="100" height="100" fill="hsl(210, 70%, 80%)" />
@@ -49,8 +64,8 @@ export function generateAvatarDataUri(user: User | { name: string, avatar?: stri
     return `data:image/svg+xml;base64,${btoa(defaultSvg)}`;
   }
   
-  const initials = getUserInitials(user.name);
-  const color = getUserColor(user.name);
+  const initials = getUserInitials(userName);
+  const color = getUserColor(userName);
   
   // Create an SVG string
   const svg = `
@@ -66,17 +81,55 @@ export function generateAvatarDataUri(user: User | { name: string, avatar?: stri
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
-// Get avatar with appropriate fallback handling
-export function getAvatarUrl(user: User | { name: string, avatar?: string }): string {
+// Debug helper to trace avatar resolution
+function debugAvatarResolution(user: any, source: string, value: string | null | undefined) {
+  if (process.env.NODE_ENV === 'development') {
+    console.debug(`[Avatar] Checking ${source}: ${value ? 'Found' : 'Not found'}`);
+    if (value) {
+      console.debug(`[Avatar] Using ${source}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+    }
+  }
+}
+
+/**
+ * Get avatar with appropriate fallback handling
+ * 
+ * Follows priority order:
+ * 1. Database avatarUrl (highest priority)
+ * 2. Social login photoURL
+ * 3. Legacy avatar field
+ * 4. Generate default avatar with initials (lowest priority)
+ */
+export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined): string {
   // Handle null or undefined user
   if (!user) {
+    debugAvatarResolution(user, 'user', null);
     return generateAvatarDataUri({ name: '' });
   }
   
-  // If the avatar is empty or starts with /api/placeholder, use a generated one
-  if (!user.avatar || user.avatar.startsWith('/api/placeholder')) {
-    return generateAvatarDataUri(user);
+  // Check in correct priority order:
+  // 1. Database avatarUrl (highest priority)
+  debugAvatarResolution(user, 'avatarUrl', user.avatarUrl);
+  if (user.avatarUrl && !user.avatarUrl.startsWith('/api/placeholder')) {
+    return user.avatarUrl;
   }
   
-  return user.avatar;
+  // 2. Social login photoURL
+  debugAvatarResolution(user, 'photoURL', (user as any).photoURL);
+  if ((user as any).photoURL) {
+    return (user as any).photoURL;
+  }
+  
+  // 3. Legacy avatar field
+  debugAvatarResolution(user, 'avatar', (user as any).avatar);
+  if ((user as any).avatar && !(user as any).avatar.startsWith('/api/placeholder')) {
+    return (user as any).avatar;
+  }
+  
+  // 4. Generate default avatar with initials (lowest priority)
+  debugAvatarResolution(user, 'generateAvatarDataUri', 'Generating default avatar');
+  return generateAvatarDataUri({ 
+    displayName: user.displayName || (user as any).name || '',
+    name: (user as any).name || user.displayName || ''
+  });
 }

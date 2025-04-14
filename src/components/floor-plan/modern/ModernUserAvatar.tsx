@@ -10,10 +10,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
-import { getUserInitials } from '@/lib/avatar-utils';
+// Import the centralized utility and the AvatarUser type
+import { getUserInitials, getAvatarUrl, AvatarUser } from '@/lib/avatar-utils';
 
 interface ModernUserAvatarProps {
-  user: UserPresenceData;
+  // Ensure the user prop type is compatible with AvatarUser
+  user: UserPresenceData & AvatarUser;
   onClick?: (userId: string) => void;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   showStatus?: boolean;
@@ -57,10 +59,13 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   // Get initials for the fallback
   const initials = getUserInitials(user.displayName || 'User');
 
-  // Determine if avatar URL is a placeholder or empty
-  const hasRealAvatar = !!user.avatarUrl && !user.avatarUrl.includes('/api/placeholder') && !user.avatarUrl.startsWith('data:');
+  // Use the centralized getAvatarUrl function
+  const avatarSrc = getAvatarUrl(user);
 
-  // Track loading and error states
+  // Determine if avatar URL is a real image or a generated one
+  const hasRealAvatar = !!avatarSrc && !avatarSrc.startsWith('data:image/svg+xml');
+
+  // Track loading and error states ONLY for real avatars
   const [isLoading, setIsLoading] = React.useState(hasRealAvatar);
   const [hasError, setHasError] = React.useState(false);
 
@@ -71,8 +76,7 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
           <div
             className={cn(
               "relative inline-block",
-              isOverlapping && floorPlanTokens.avatar.group.overlap,
-              isOverlapping && floorPlanTokens.avatar.group.ring,
+              isOverlapping && "ring-2 ring-background",
               className
             )}
             onClick={handleClick}
@@ -86,9 +90,10 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
                 onClick && "hover:ring-2 hover:ring-primary/50 cursor-pointer"
               )}
             >
+              {/* Only attempt to load AvatarImage if it's a real URL */}
               {hasRealAvatar && !hasError && (
-                <AvatarImage 
-                  src={user.avatarUrl} 
+                <AvatarImage
+                  src={avatarSrc} // Use the resolved avatarSrc
                   alt={user.displayName || 'User'}
                   onLoad={() => {
                     setIsLoading(false);
@@ -112,9 +117,9 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
                 </AvatarFallback>
               )}
               
-              {/* Show fallback for no avatar or error */}
-              {(!hasRealAvatar || hasError) && !isLoading && (
-                <AvatarFallback 
+              {/* Show fallback for generated avatars, errors, or while loading real avatars */}
+              {(!hasRealAvatar || hasError || isLoading) && (
+                <AvatarFallback
                   className={cn(
                     "bg-primary/20 text-primary-foreground",
                     size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'

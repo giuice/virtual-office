@@ -84,11 +84,10 @@ export function EnhancedUserMenu() {
       </Button>
     );
   }
-
-  // Combine Firebase user data with our database user profile
+  // Combine Supabase user data with our database user profile
   const combinedUser = {
     ...currentUserProfile,
-    photoURL: user?.photoURL,
+    photoURL: user?.user_metadata?.avatar_url || currentUserProfile.avatarUrl || user?.photoURL,
   };
 
   return (

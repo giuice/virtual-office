@@ -13,6 +13,7 @@ import { ViewRoomTabs } from './view-room-tabs';
 import { useCreateSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations'; // Import useUpdateSpace
 import { useNotification } from '@/hooks/useNotification';
 import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
+import { useAuth } from '@/contexts/AuthContext';
 
 // Define the type for the creation payload based on the hook
 type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>;
@@ -29,6 +30,7 @@ export function RoomDialog({
   isCreating = false,
   companyId // Added companyId prop
 }: RoomDialogProps & { companyId: string }) { // Remove onUpdate from props if no longer needed externally
+  const { user } = useAuth(); 
   // Room state - Use global Space type
   const [roomData, setRoomData] = useState<Partial<Space>>({
     id: '',
@@ -38,7 +40,6 @@ export function RoomDialog({
     capacity: 4,
     features: [],
     position: { x: 100, y: 100, width: 200, height: 150 },
-    userIds: [],
     description: '',
     accessControl: { isPublic: true },
     reservations: []
@@ -67,7 +68,6 @@ export function RoomDialog({
     if (room && !isCreating) {
       setRoomData({
         ...room,
-        userIds: room.userIds || [],
         accessControl: room.accessControl || { isPublic: true },
         reservations: room.reservations || []
       });
@@ -81,7 +81,6 @@ export function RoomDialog({
         capacity: 4,
         features: [],
         position: { x: 100, y: 100, width: 200, height: 150 },
-        userIds: [],
         description: '',
         accessControl: { isPublic: true },
         reservations: []
@@ -143,11 +142,10 @@ export function RoomDialog({
         capacity: roomData.capacity || 4,
         features: roomData.features || [],
         position: roomData.position || { x: 100, y: 100, width: 200, height: 150 },
-        userIds: roomData.userIds || [],
         description: roomData.description,
         accessControl: roomData.accessControl || { isPublic: true },
         isTemplate: roomData.isTemplate || false,
-        templateName: roomData.templateName,
+        templateName: roomData.templateName
       };
       createSpace.mutate(createPayload, {
         onSuccess: () => {
@@ -171,8 +169,7 @@ export function RoomDialog({
         status: finalStatus,
         capacity: roomData.capacity,
         features: roomData.features,
-        position: roomData.position,
-        userIds: roomData.userIds, // Assuming userIds might be updated here, otherwise handle separately
+        position: roomData.position, // Assuming userIds might be updated here, otherwise handle separately
         description: roomData.description,
         accessControl: roomData.accessControl,
         isTemplate: roomData.isTemplate,

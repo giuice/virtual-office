@@ -34,7 +34,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
-  const [hoveredSpaceId, setHoveredSpaceId] = useState<string | null>(null);
   const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,11 +62,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     
     if (currentUser?.current_space_id === space.id) {
       return true;
-    }
-    
-    // Fallback method: Check legacy space.userIds
-    if (space.userIds && Array.isArray(space.userIds)) {
-      return space.userIds.includes(currentUserProfile.id);
     }
     
     return false;
@@ -163,18 +157,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       {/* Grid container for spaces */}
       <div className={gridLayoutClass}>
         {spaces.map((space, index) => {
-          // Ensure space.userIds is always treated as an array
-          let spaceUserIds: string[] = [];
-          
-          if (space.userIds === null || space.userIds === undefined) {
-            spaceUserIds = [];
-          } else if (Array.isArray(space.userIds)) {
-            spaceUserIds = space.userIds;
-          } else {
-            console.error(`Space ${space.name} has invalid userIds format:`, space.userIds);
-            spaceUserIds = [];
-          }
-          
           // Get users in this space from presence system
           const spaceUsers = usersInSpaces.get(space.id) || [];
           

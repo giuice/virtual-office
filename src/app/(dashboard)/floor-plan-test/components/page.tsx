@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import { ModernSpaceCard, ModernUserAvatar, AvatarGroup, SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from '@/components/floor-plan/modern';
 import { SpaceStatus, SpaceType, Space, UserPresenceData } from '@/types/database';
+import { DashboardShell } from '@/components/shell';
+import { DashboardHeader } from '@/components/shell/dashboard-header';
 export default function ComponentsTestPage() {
   // Sample data for testing
   const sampleSpace : Space = {
@@ -15,7 +17,6 @@ export default function ComponentsTestPage() {
     companyId: 'company-1',
     position: { x: 0, y: 0, width: 100, height: 100 },
     features: ['video', 'whiteboard'],
-    userIds: [],
     accessControl: { isPublic: true },
     description: 'A spacious meeting room for team discussions and presentations.'
   };
@@ -27,6 +28,11 @@ export default function ComponentsTestPage() {
   ];
   
   return (
+    <DashboardShell>
+          <DashboardHeader
+            heading="Avatar Components Demo"
+            description="Explore and test various avatar components"
+          />
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Component Test Page</h1>
       
@@ -100,5 +106,6 @@ export default function ComponentsTestPage() {
         </div>
       </div>
     </div>
+    </DashboardShell>
   );
 }

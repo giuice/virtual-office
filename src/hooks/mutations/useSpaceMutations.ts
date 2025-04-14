@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Space, SpaceType } from "@/types/database";
 import type { RoomTemplate } from "@/components/floor-plan/types";
-
 // Existing mutation types
 type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>;
 type SpaceUpdateData = Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>>;
+
+
 
 // Create from template type
 type CreateFromTemplateData = {
@@ -67,7 +68,6 @@ const createFromTemplate = async ({ template, companyId, position }: CreateFromT
       width: template.defaultWidth,
       height: template.defaultHeight
     },
-    userIds: [],
     description: template.description,
     accessControl: { isPublic: template.isPublic },
     isTemplate: false,

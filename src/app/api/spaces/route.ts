@@ -18,13 +18,8 @@ export async function GET(request: Request) {
     // Use the repository method to fetch spaces
     const spaces = await spaceRepository.findByCompany(companyId);
 
-    // Ensure userIds array exists, even if empty
-    const spacesWithUsers = spaces.map(space => ({
-      ...space,
-      userIds: space.userIds || []
-    }));
 
-    return NextResponse.json({ spaces: spacesWithUsers });
+    return NextResponse.json({ spaces: spaces });
   } catch (error) {
     console.error('Error fetching spaces:', error);
     return NextResponse.json({ message: 'Failed to fetch spaces' }, { status: 500 });

@@ -6,9 +6,8 @@ import { DashboardHeader } from '@/components/shell/dashboard-header';
 import { UserProfile } from '@/components/dashboard/user-profile';
 import { EnhancedUserProfile } from '@/components/profile/EnhancedUserProfile';
 
-export default function SettingsPage() {
-  // Toggle this to use either the original or enhanced profile component
-  const useEnhancedProfile = false;
+export default function SettingsPage() {  // Toggle this to use either the original or enhanced profile component
+  const useEnhancedProfile = true;
   
   return (
     <DashboardShell>

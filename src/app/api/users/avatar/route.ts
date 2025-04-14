@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import sharp from 'sharp'; // For image processing
 
 export const dynamic = 'force-dynamic';
 
@@ -38,20 +39,73 @@ export async function POST(req: NextRequest) {
         { error: 'File must be an image' },
         { status: 400 }
       );
-    }
-
-    // Validate file size (max 2MB)
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    if (avatarFile.size > maxSize) {
+    }    // We'll accept files up to 5MB initially, then process them down to 1MB
+    const initialMaxSize = 5 * 1024 * 1024; // 5MB
+    if (avatarFile.size > initialMaxSize) {
       return NextResponse.json(
-        { error: 'File size exceeds 2MB limit' },
+        { error: 'File size exceeds 5MB limit' },
         { status: 400 }
       );
     }
 
     // Convert the file to an array buffer
     const arrayBuffer = await avatarFile.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
+    let buffer = new Uint8Array(arrayBuffer);
+    
+    try {
+      // Process the image to ensure it's under 1MB
+      // 1. Determine image format based on file type
+      const inputFormat = avatarFile.type.replace('image/', '');
+      const outputFormat = ['jpeg', 'jpg', 'png', 'webp'].includes(inputFormat) ? inputFormat : 'jpeg';
+      
+      // 2. Process image with sharp
+      let processedImage = sharp(buffer);
+      const metadata = await processedImage.metadata();
+      
+      // 3. Resize large images
+      if (metadata.width && metadata.height) {
+        // If image is larger than 800px in any dimension, resize it
+        if (metadata.width > 800 || metadata.height > 800) {
+          processedImage = processedImage.resize({
+            width: Math.min(800, metadata.width),
+            height: Math.min(800, metadata.height),
+            fit: 'inside',
+            withoutEnlargement: true
+          });
+        }
+      }
+      
+      // 4. Convert and compress the image
+      // Start with quality of 90% and reduce if needed
+      let quality = 90;
+      let processedBuffer;
+      
+      // Process in decreasing quality steps until under target size
+      const targetSize = 1024 * 1024; // 1MB
+      
+      while (quality >= 60) { // Don't go below 60% quality
+        processedBuffer = await processedImage[outputFormat]({
+          quality: quality
+        }).toBuffer();
+        
+        if (processedBuffer.length <= targetSize) {
+          break;
+        }
+        
+        // Reduce quality and try again
+        quality -= 10;
+      }
+        // If we still can't get it under 1MB, use the smallest version
+      buffer = processedBuffer || buffer;
+      
+      // Log the file size reduction
+      console.log(`Avatar image processed: Original size: ${(arrayBuffer.byteLength / 1024).toFixed(2)} KB, Processed size: ${(buffer.length / 1024).toFixed(2)} KB`);
+    } catch (processingError) {
+      console.error('Error processing image:', processingError);
+      // Continue with original buffer if processing fails
+      console.log('Using original image due to processing error');
+      // We don't return an error here, we'll just use the original image
+    }
 
     // Create a unique file name
     const fileName = `avatar-${userDbId}-${Date.now()}.${avatarFile.name.split('.').pop()}`;

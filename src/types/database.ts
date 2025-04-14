@@ -109,7 +109,6 @@ export interface Space {
   capacity: number;
   features: string[];
   position: Position;
-  userIds: string[]; // User IDs currently in the space
   description?: string;
   accessControl: AccessControl;
   createdBy?: string; // User ID who created the room
