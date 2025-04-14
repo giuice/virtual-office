@@ -2,6 +2,54 @@
 import { User } from '@/types/database';
 import { UIUser } from '@/types/ui';
 
+// Import the avatar debug utilities
+import { logAvatarDiagnostics } from './avatar-debug';
+
+// Global version counter for avatar cache-busting
+let globalAvatarVersion = Date.now();
+
+// Set this to true to force cache refresh for all avatars
+// Useful after a user updates their avatar
+let forceRefreshAvatars = false;
+
+/**
+ * Force refresh of all avatars by updating the global version
+ * Call this when an avatar is updated
+ */
+export function invalidateAvatarCache(): void {
+  globalAvatarVersion = Date.now();
+  forceRefreshAvatars = true;
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[AvatarCache] Invalidated all avatars at version ${globalAvatarVersion}`);
+  }
+  
+  // After 5 seconds, stop forcing refresh to avoid performance issues
+  setTimeout(() => {
+    forceRefreshAvatars = false;
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AvatarCache] Stopped forcing refresh of all avatars');
+    }
+  }, 5000);
+}
+
+/**
+ * Add cache-busting parameters to a URL
+ * @param url The URL to add cache-busting to
+ * @param userId Optional user ID for user-specific caching
+ * @returns URL with cache-busting parameters
+ */
+export function addCacheBusting(url: string, userId?: string | number): string {
+  if (!url || url.startsWith('data:')) return url;
+  
+  // Calculate a cache key based on the global version and optionally the user ID
+  const cacheKey = userId ? `${globalAvatarVersion}_${userId}` : globalAvatarVersion.toString();
+  
+  // Add or update query parameter
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${cacheKey}`;
+}
+
 // Interface for all possible user-like objects with avatar properties
 export interface AvatarUser {
   id?: string | number;
@@ -91,9 +139,6 @@ function debugAvatarResolution(user: any, source: string, value: string | null |
   }
 }
 
-// Import the avatar debug utilities
-import { logAvatarDiagnostics } from './avatar-debug';
-
 // Check if the URL is a valid image URL
 function isValidImageUrl(url: string): boolean {
   if (!url) return false;
@@ -158,11 +203,18 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined
     if (avatarUrl.includes('supabase.co/storage')) {
       logAvatarDiagnostics(avatarUrl, userId, 'AvatarResolver-DB');
       
-      // Force cache-busting for Supabase storage URLs if there's a potential caching issue
-      // Only in development for debugging
-      if (process.env.NODE_ENV === 'development' && !avatarUrl.includes('?')) {
-        avatarUrl = `${avatarUrl}?t=${Date.now()}`;
-        console.log(`[AvatarResolver] Added cache-busting to URL: ${avatarUrl}`);
+      // Always apply cache busting for Supabase avatars
+      // Use global avatar version for cache invalidation
+      if (!avatarUrl.includes('?v=')) {
+        avatarUrl = addCacheBusting(avatarUrl, userId);
+      }
+      
+      // Force cache refresh if the global flag is set (after a user updates their avatar)
+      if (forceRefreshAvatars) {
+        avatarUrl = addCacheBusting(avatarUrl, `${userId}_${Date.now()}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[AvatarResolver] Forced refresh for user ${userId}: ${avatarUrl}`);
+        }
       }
     }
     

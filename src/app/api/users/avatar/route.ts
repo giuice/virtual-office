@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import sharp from 'sharp'; // For image processing
+import { invalidateAvatarCache } from '@/lib/avatar-utils'; // Import the cache invalidation function
 
 export const dynamic = 'force-dynamic';
 
@@ -162,6 +163,11 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    
+    // Invalidate the avatar cache to ensure all components display the new avatar
+    invalidateAvatarCache();
+    
+    console.log(`Avatar cache invalidated for user ${userDbId} - new URL: ${publicUrl}`);
 
     return NextResponse.json({
       avatarUrl: publicUrl,

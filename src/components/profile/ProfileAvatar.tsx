@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getUserInitials } from '@/lib/avatar-utils';
+import { getUserInitials, addCacheBusting, invalidateAvatarCache } from '@/lib/avatar-utils';
 import { logAvatarDiagnostics } from '@/lib/avatar-debug';
 
 interface ProfileAvatarProps {
@@ -77,14 +77,13 @@ export function ProfileAvatar({
   const getImageUrl = () => {
     if (!avatarSrc) return '';
     
-    // Add cache-busting for Supabase storage URLs in development
-    if (process.env.NODE_ENV === 'development' && 
-        avatarSrc.includes('supabase.co/storage') && 
-        !avatarSrc.includes('?')) {
-      return `${avatarSrc}?t=${cacheKey}`;
+    // Return preview URL as is (it's a local object URL) or apply cache busting for remote URLs
+    if (previewUrl) {
+      return previewUrl;
     }
     
-    return avatarSrc;
+    // Apply consistent cache busting to remote URLs
+    return addCacheBusting(avatarSrc, user.id);
   };
   
   // Get initials for fallback
@@ -103,6 +102,13 @@ export function ProfileAvatar({
       setIsUploading(true);
       try {
         await onAvatarChange(file);
+        
+        // Manually invalidate the avatar cache to ensure immediate update across all components
+        invalidateAvatarCache();
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ProfileAvatar] Avatar updated, cache invalidated');
+        }
       } catch (error) {
         console.error('Error uploading avatar:', error);
         // Reset preview on error

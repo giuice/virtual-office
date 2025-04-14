@@ -10,10 +10,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
-// Import the centralized utility and the AvatarUser type
-import { getUserInitials, getAvatarUrl, AvatarUser } from '@/lib/avatar-utils';
 // Import avatar debugging utilities
 import { logAvatarDiagnostics } from '@/lib/avatar-debug';
+// Import the avatar utilities
+import { getUserInitials, getAvatarUrl, AvatarUser, addCacheBusting } from '@/lib/avatar-utils';
 
 interface ModernUserAvatarProps {
   // Ensure the user prop type is compatible with AvatarUser
@@ -115,14 +115,9 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   const getImageUrl = () => {
     if (!avatarSrc) return '';
     
-    // Add cache-busting for Supabase storage URLs in development
-    if (process.env.NODE_ENV === 'development' && 
-        avatarSrc.includes('supabase.co/storage') && 
-        !avatarSrc.includes('?')) {
-      return `${avatarSrc}?t=${cacheKey}`;
-    }
-    
-    return avatarSrc;
+    // Apply cache busting to ensure avatar is up-to-date
+    // User ID is used to ensure targeted cache invalidation
+    return addCacheBusting(avatarSrc, user.id);
   };
 
   return (

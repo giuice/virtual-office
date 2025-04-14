@@ -12,11 +12,13 @@ Phase: Execution. We're about to begin implementing the avatar system fixes iden
 - Completed Step 1 of T6_1_AvatarDisplayFix: Investigated URL formats and added comprehensive diagnostic tools.
 - Completed Step 2 of T6_1_AvatarDisplayFix: Identified and fixed the root cause - Supabase bucket was not set to public.
 - Completed Step 3 of T6_1_AvatarDisplayFix: Enhanced image loading with better error handling, caching, and fallback mechanisms.
+- Completed Step 4 of T6_1_AvatarDisplayFix: Implemented a robust cache invalidation system for avatar updates.
 
 ## Next Steps
-- Continue with Step 4 of T6_1_AvatarDisplayFix: Add Cache Invalidation for Image Updates.
-- Implement techniques to ensure updated avatars are properly refreshed in the UI.
-- Add appropriate cache headers or URL parameters for avatar images.
+- Continue with Step 5 of T6_1_AvatarDisplayFix: Verify and Test Fixes.
+- Test with different image types (JPG, PNG, WebP).
+- Confirm avatar rendering in all places where avatars appear.
+- Check fallback behavior when images are unavailable.
 - Follow the execution steps in sequence for each avatar system fix task.
 
 ## Dependencies

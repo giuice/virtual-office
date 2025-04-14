@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { logAvatarDiagnostics, testAvatarUrlAccess } from '@/lib/avatar-debug';
+import { addCacheBusting } from '@/lib/avatar-utils';
 
 interface AvatarWithFallbackProps {
   src?: string | null;
@@ -95,12 +96,9 @@ export function AvatarWithFallback({
   const getImageUrl = () => {
     if (!src) return '';
     
-    // Add cache-busting for Supabase storage URLs (to help diagnose caching issues)
-    if (src.includes('supabase.co/storage') && !src.includes('?')) {
-      return `${src}?t=${cacheKey}`;
-    }
-    
-    return src;
+    // Use our shared cache-busting function for all URLs
+    // This ensures avatars are refreshed across components when updated
+    return addCacheBusting(src);
   };
 
   // Handler for image load success

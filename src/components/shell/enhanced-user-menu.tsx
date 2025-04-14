@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
+import { invalidateAvatarCache } from '@/lib/avatar-utils';
 
 export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
@@ -59,6 +60,13 @@ export function EnhancedUserMenu() {
       }
       
       const data = await response.json();
+      
+      // Manually invalidate the avatar cache to ensure immediate update across all components
+      invalidateAvatarCache();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EnhancedUserMenu] Avatar updated, cache invalidated');
+      }
       
       // Show success message
       showSuccess({ description: 'Avatar updated successfully' });

@@ -57,6 +57,7 @@
 - **Apr 14, 2025:** Enhanced avatar components with better error handling, diagnostics, and cache-busting for problematic URLs.
 - **Apr 14, 2025:** Identified and fixed root cause of avatar display issues: Supabase storage bucket was not set to public.
 - **Apr 14, 2025:** Implemented avatar caching system using localStorage to improve performance and reduce failed load attempts.
+- **Apr 14, 2025:** Added a global avatar cache invalidation system to ensure immediate avatar updates across all components.
 
 ## Pending Changes
 - Execute tasks for IP6_AvatarSystemFixes:
