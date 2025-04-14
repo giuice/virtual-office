@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { User } from '@/types/database';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,12 @@ import {
   Camera, 
   Upload, 
   X,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getUserInitials } from '@/lib/avatar-utils';
+import { logAvatarDiagnostics } from '@/lib/avatar-debug';
 
 interface ProfileAvatarProps {
   user: User | UserWithPhoto;
@@ -58,6 +60,32 @@ export function ProfileAvatar({
   // otherwise use the central getAvatarUrl utility for consistent resolution
   const { getAvatarUrl } = require('@/lib/avatar-utils'); // Import here to avoid circular dependencies
   const avatarSrc = previewUrl || getAvatarUrl(user);
+  const [cacheKey, setCacheKey] = useState<string>(Date.now().toString());
+  const [avatarError, setAvatarError] = useState<boolean>(false);
+  
+  // Log detailed diagnostics about the avatar URL
+  useEffect(() => {
+    if (avatarSrc && process.env.NODE_ENV === 'development') {
+      // Only diagnose Supabase storage URLs (likely to have issues)
+      if (avatarSrc.includes('supabase.co/storage')) {
+        logAvatarDiagnostics(avatarSrc, String(user.id), 'ProfileAvatar');
+      }
+    }
+  }, [avatarSrc, user.id]);
+  
+  // Use cache busting for potentially problematic URLs
+  const getImageUrl = () => {
+    if (!avatarSrc) return '';
+    
+    // Add cache-busting for Supabase storage URLs in development
+    if (process.env.NODE_ENV === 'development' && 
+        avatarSrc.includes('supabase.co/storage') && 
+        !avatarSrc.includes('?')) {
+      return `${avatarSrc}?t=${cacheKey}`;
+    }
+    
+    return avatarSrc;
+  };
   
   // Get initials for fallback
   const initials = getUserInitials(user.displayName || 'User');
@@ -143,9 +171,22 @@ export function ProfileAvatar({
         >
           {avatarSrc && (
             <AvatarImage 
-              src={avatarSrc} 
+              src={getImageUrl()} 
               alt={user.displayName || 'User'} 
               className={isUploading ? 'opacity-50' : ''}
+              onError={(e) => {
+                console.warn(`[ProfileAvatar] Failed to load avatar for ${user.displayName || 'User'}`);
+                console.warn(`[ProfileAvatar] URL: ${avatarSrc}`);
+                setAvatarError(true);
+                
+                // If in development mode and it's a Supabase URL, try cache busting
+                if (process.env.NODE_ENV === 'development' && 
+                    avatarSrc.includes('supabase.co/storage') && 
+                    !avatarSrc.includes('?')) {
+                  console.log(`[ProfileAvatar] Attempting cache-busting`);
+                  setCacheKey(Date.now().toString());
+                }
+              }}
             />
           )}
           <AvatarFallback className="bg-primary/10 text-primary">
@@ -155,6 +196,16 @@ export function ProfileAvatar({
               initials
             )}
           </AvatarFallback>
+          
+          {/* Show error indicator for broken Supabase storage URLs in dev mode */}
+          {process.env.NODE_ENV === 'development' && 
+           avatarError && 
+           avatarSrc?.includes('supabase.co/storage') && (
+            <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1" 
+                title="Avatar URL error">
+              <AlertCircle className="h-3 w-3" />
+            </div>
+          )}
         </Avatar>
         
         {/* Status indicator */}

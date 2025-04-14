@@ -13,7 +13,7 @@
 - T1_4_RealtimeIntegration: 100% (Completed) [IP1_PresenceBugsResolution]
 - T4_1_SpaceDesignSystem: 50% (In Progress) [IP4_ModernFloorPlanUI]
 - T5_1_RefactorMessagingRealtime: 100% (Completed) [IP5_MessagingRealtimeUnification]
-- T6_1_AvatarDisplayFix: 0% (Not Started) [IP6_AvatarSystemFixes]
+- T6_1_AvatarDisplayFix: 60% (In Progress) [IP6_AvatarSystemFixes]
 - T6_2_AvatarStorageOptimization: 0% (Not Started) [IP6_AvatarSystemFixes]
 - T6_3_AvatarGroupLayoutFix: 0% (Not Started) [IP6_AvatarSystemFixes]
 

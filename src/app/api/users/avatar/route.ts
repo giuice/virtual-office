@@ -133,6 +133,23 @@ export async function POST(req: NextRequest) {
     const { data: { publicUrl } } = supabase.storage
       .from('user-uploads')
       .getPublicUrl(filePath);
+      
+    // Log detailed information about the generated URL
+    console.log('Generated public URL details:', {
+      filePath,
+      publicUrl,
+      urlLength: publicUrl.length,
+      isSupabaseStorage: publicUrl.includes('supabase.co/storage'),
+      userDbId
+    });
+    
+    // Verify the URL is accessible
+    try {
+      const { status } = await fetch(publicUrl, { method: 'HEAD' });
+      console.log(`Avatar URL accessibility check: ${status === 200 ? 'Success ✅' : 'Failed ❌'} (Status: ${status})`);
+    } catch (error) {
+      console.error('Avatar URL accessibility check failed with error:', error);
+    }
 
     // Update the user using the repository with userDbId (the database UUID)
     const updatedUser = await userRepository.update(userDbId, { 

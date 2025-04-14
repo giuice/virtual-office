@@ -1,5 +1,5 @@
 // src/components/floor-plan/modern/ModernUserAvatar.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPresenceData } from '@/types/database';
 import { 
   Tooltip,
@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 // Import the centralized utility and the AvatarUser type
 import { getUserInitials, getAvatarUrl, AvatarUser } from '@/lib/avatar-utils';
+// Import avatar debugging utilities
+import { logAvatarDiagnostics } from '@/lib/avatar-debug';
 
 interface ModernUserAvatarProps {
   // Ensure the user prop type is compatible with AvatarUser
@@ -66,8 +68,62 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   const hasRealAvatar = !!avatarSrc && !avatarSrc.startsWith('data:image/svg+xml');
 
   // Track loading and error states ONLY for real avatars
-  const [isLoading, setIsLoading] = React.useState(hasRealAvatar);
-  const [hasError, setHasError] = React.useState(false);
+  const [isLoading, setIsLoading] = useState(hasRealAvatar);
+  const [hasError, setHasError] = useState(false);
+  const [cacheKey, setCacheKey] = useState<string>(Date.now().toString());
+  
+  // Check if URL is from third-party (not from Supabase)
+  const isThirdPartyAvatar = avatarSrc && !avatarSrc.startsWith('data:') && !avatarSrc.includes('supabase.co/storage');
+
+  // Load cached error status
+  useEffect(() => {
+    if (!avatarSrc || avatarSrc.startsWith('data:')) return;
+    
+    // Check cache for known problematic URLs
+    if (typeof window !== 'undefined') {
+      const cachedStatus = localStorage.getItem(`avatar_status_${avatarSrc}`);
+      if (cachedStatus === 'error' && !hasError) {
+        // Use cached error status to avoid unnecessary loading attempts
+        setIsLoading(false);
+        setHasError(true);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[ModernUserAvatar] Using cached error status for ${user.displayName}`);
+        }
+      }
+    }
+  }, [avatarSrc, hasError, user.displayName]);
+  
+  // Auto retry loading for failed images
+  useEffect(() => {
+    if (hasError && avatarSrc && !avatarSrc.startsWith('data:')) {
+      // Set a retry timer for problematic URLs, but only in development
+      if (process.env.NODE_ENV === 'development') {
+        const retryTimer = setTimeout(() => {
+          console.log(`[ModernUserAvatar] Attempting to reload avatar for ${user.displayName}`);
+          setCacheKey(Date.now().toString());
+          setIsLoading(true);
+          setHasError(false);
+        }, 5000); // 5 second retry delay
+        
+        return () => clearTimeout(retryTimer);
+      }
+    }
+  }, [hasError, avatarSrc, user.displayName]);
+  
+  // Force refresh of problematic avatars in development mode
+  const getImageUrl = () => {
+    if (!avatarSrc) return '';
+    
+    // Add cache-busting for Supabase storage URLs in development
+    if (process.env.NODE_ENV === 'development' && 
+        avatarSrc.includes('supabase.co/storage') && 
+        !avatarSrc.includes('?')) {
+      return `${avatarSrc}?t=${cacheKey}`;
+    }
+    
+    return avatarSrc;
+  };
 
   return (
     <TooltipProvider>
@@ -93,11 +149,17 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
               {/* Only attempt to load AvatarImage if it's a real URL */}
               {hasRealAvatar && !hasError && (
                 <AvatarImage
-                  src={avatarSrc} // Use the resolved avatarSrc
+                  src={getImageUrl()} // Use the enhanced URL with cache-busting when needed
                   alt={user.displayName || 'User'}
                   onLoad={() => {
                     setIsLoading(false);
                     setHasError(false);
+                    
+                    // Clear any cached error status
+                    if (typeof window !== 'undefined' && avatarSrc) {
+                      localStorage.setItem(`avatar_status_${avatarSrc}`, 'success');
+                    }
+                    
                     if (process.env.NODE_ENV === 'development') {
                       console.log(`[ModernUserAvatar] Avatar loaded for ${user.displayName}`);
                     }
@@ -105,8 +167,33 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
                   onError={() => {
                     setIsLoading(false);
                     setHasError(true);
+                    
+                    // Cache error status for faster fallback in future
+                    if (typeof window !== 'undefined' && avatarSrc) {
+                      localStorage.setItem(`avatar_status_${avatarSrc}`, 'error');
+                    }
+                    
                     console.warn(`[ModernUserAvatar] Failed to load avatar for ${user.displayName}`);
+                    console.warn(`[ModernUserAvatar] URL: ${avatarSrc}`);
+                    
+                    // Log detailed diagnostics if in development mode
+                    if (process.env.NODE_ENV === 'development' && avatarSrc) {
+                      logAvatarDiagnostics(avatarSrc, user.id, 'ModernUserAvatar');
+                    }
+                    
+                    // If in development mode and it's a Supabase URL, try cache busting
+                    if (process.env.NODE_ENV === 'development' && 
+                        avatarSrc.includes('supabase.co/storage') && 
+                        !avatarSrc.includes('?')) {
+                      console.log(`[ModernUserAvatar] Attempting cache-busting for avatar`);
+                      setCacheKey(Date.now().toString());
+                      // We don't auto-reset the error state here, we'll use the auto-retry timer
+                    }
                   }}
+                  className="object-cover"
+                  crossOrigin={isThirdPartyAvatar ? 'anonymous' : undefined}
+                  loading="eager"
+                  referrerPolicy="no-referrer"
                 />
               )}
               
@@ -140,6 +227,24 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
                   statusColor
                 )}
                 aria-hidden="true"
+              />
+            )}
+            
+            {/* Dev-only indicator for Supabase storage URLs with issues */}
+            {process.env.NODE_ENV === 'development' && 
+             hasError && avatarSrc?.includes('supabase.co/storage') && (
+              <span 
+                className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"
+                title="Avatar failed to load"
+              />
+            )}
+            
+            {/* Dev-only indicator for third-party URLs */}
+            {process.env.NODE_ENV === 'development' && 
+             !hasError && isThirdPartyAvatar && (
+              <span 
+                className="absolute top-0 left-0 h-2 w-2 bg-yellow-400 rounded-full"
+                title="Third-party avatar URL"
               />
             )}
           </div>

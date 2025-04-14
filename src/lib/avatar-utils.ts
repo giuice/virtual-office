@@ -91,6 +91,28 @@ function debugAvatarResolution(user: any, source: string, value: string | null |
   }
 }
 
+// Import the avatar debug utilities
+import { logAvatarDiagnostics } from './avatar-debug';
+
+// Check if the URL is a valid image URL
+function isValidImageUrl(url: string): boolean {
+  if (!url) return false;
+  
+  // These are valid image sources we accept
+  const validPatterns = [
+    // Data URIs (svg, png, jpeg, etc)
+    /^data:image\//,
+    // External URLs
+    /^https?:\/\//,
+    // Supabase storage URLs
+    /supabase\.co\/storage\/v1\/object\/public\//,
+    // Placeholder URLs (for testing)
+    /^\/api\/placeholder/
+  ];
+  
+  return validPatterns.some(pattern => pattern.test(url));
+}
+
 /**
  * Get avatar with appropriate fallback handling
  * 
@@ -101,35 +123,82 @@ function debugAvatarResolution(user: any, source: string, value: string | null |
  * 4. Generate default avatar with initials (lowest priority)
  */
 export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined): string {
+  // The final avatarUrl that will be returned
+  let avatarUrl: string | null = null;
+  
   // Handle null or undefined user
   if (!user) {
     debugAvatarResolution(user, 'user', null);
-    return generateAvatarDataUri({ name: '' });
+    avatarUrl = generateAvatarDataUri({ name: '' });
+    return avatarUrl;
+  }
+  
+  // Track user ID for better debugging
+  const userId = user.id ? String(user.id) : 'unknown';
+  
+  // Enhanced debug log for investigation
+  if (process.env.NODE_ENV === 'development') {
+    console.group(`[AvatarResolver] Getting avatar for user: ${userId}`);
+    console.log('User data:', {
+      id: userId,
+      displayName: user.displayName || (user as any).name || 'No Name',
+      avatarUrl: user.avatarUrl,
+      photoURL: (user as any).photoURL,
+      avatar: (user as any).avatar,
+    });
+    console.groupEnd();
   }
   
   // Check in correct priority order:
   // 1. Database avatarUrl (highest priority)
-  debugAvatarResolution(user, 'avatarUrl', user.avatarUrl);
   if (user.avatarUrl && !user.avatarUrl.startsWith('/api/placeholder')) {
-    return user.avatarUrl;
+    avatarUrl = user.avatarUrl;
+    
+    // Log detailed diagnostics for supabase storage URLs
+    if (avatarUrl.includes('supabase.co/storage')) {
+      logAvatarDiagnostics(avatarUrl, userId, 'AvatarResolver-DB');
+      
+      // Force cache-busting for Supabase storage URLs if there's a potential caching issue
+      // Only in development for debugging
+      if (process.env.NODE_ENV === 'development' && !avatarUrl.includes('?')) {
+        avatarUrl = `${avatarUrl}?t=${Date.now()}`;
+        console.log(`[AvatarResolver] Added cache-busting to URL: ${avatarUrl}`);
+      }
+    }
+    
+    // Validate URL
+    if (isValidImageUrl(avatarUrl)) {
+      debugAvatarResolution(user, 'avatarUrl', avatarUrl);
+      return avatarUrl;
+    } else {
+      console.warn(`[AvatarResolver] Invalid avatarUrl format: ${avatarUrl.substring(0, 100)}`);
+    }
   }
   
   // 2. Social login photoURL
-  debugAvatarResolution(user, 'photoURL', (user as any).photoURL);
   if ((user as any).photoURL) {
-    return (user as any).photoURL;
+    avatarUrl = (user as any).photoURL;
+    if (isValidImageUrl(avatarUrl)) {
+      debugAvatarResolution(user, 'photoURL', avatarUrl);
+      return avatarUrl;
+    }
   }
   
   // 3. Legacy avatar field
-  debugAvatarResolution(user, 'avatar', (user as any).avatar);
   if ((user as any).avatar && !(user as any).avatar.startsWith('/api/placeholder')) {
-    return (user as any).avatar;
+    avatarUrl = (user as any).avatar;
+    if (isValidImageUrl(avatarUrl)) {
+      debugAvatarResolution(user, 'avatar', avatarUrl);
+      return avatarUrl;
+    }
   }
   
   // 4. Generate default avatar with initials (lowest priority)
   debugAvatarResolution(user, 'generateAvatarDataUri', 'Generating default avatar');
-  return generateAvatarDataUri({ 
+  avatarUrl = generateAvatarDataUri({ 
     displayName: user.displayName || (user as any).name || '',
     name: (user as any).name || user.displayName || ''
   });
+  
+  return avatarUrl;
 }

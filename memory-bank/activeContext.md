@@ -1,33 +1,42 @@
 # Active Context
 
 ## Current Project State
-Transitioned to Execution phase. Task T1_4 is complete. Due to identifying incomplete realtime migration in the messaging system, planning was done in Strategy phase to address this. The next task is the newly created T5_1_RefactorMessagingRealtime, which is now prioritized over T4_1.
+Phase: Execution. We're about to begin implementing the avatar system fixes identified in IP6_AvatarSystemFixes. We have completed T5_1_RefactorMessagingRealtime and previously identified issues with the avatar system that need to be fixed, including custom avatar display problems, redundant storage, and avatar group layout issues.
 
 ## Recent Actions
-- Identified incomplete messaging realtime migration (post-T1_4).
-- Transitioned to Strategy phase.
-- Created Implementation Plan: `IP5_MessagingRealtimeUnification.md`.
-- Created Task Instructions: `T5_1_RefactorMessagingRealtime_instructions.md`.
-- Updated `progress.md` to include IP5, T5_1, and set T5_1 as highest priority.
-- Transitioned back to Execution phase.
+- Completed T5_1_RefactorMessagingRealtime.
+- Identified avatar system bugs: custom avatars not displaying properly, duplicate images being created, and avatar group layout issues.
+- Created Implementation Plan: `IP6_AvatarSystemFixes.md`.
+- Created Task Instructions: `T6_1_AvatarDisplayFix_instructions.md`, `T6_2_AvatarStorageOptimization_instructions.md`, and `T6_3_AvatarGroupLayoutFix_instructions.md`.
+- Updated `progress.md` to include IP6 and related tasks.
+- Completed Step 1 of T6_1_AvatarDisplayFix: Investigated URL formats and added comprehensive diagnostic tools.
+- Completed Step 2 of T6_1_AvatarDisplayFix: Identified and fixed the root cause - Supabase bucket was not set to public.
+- Completed Step 3 of T6_1_AvatarDisplayFix: Enhanced image loading with better error handling, caching, and fallback mechanisms.
 
 ## Next Steps
-- Initialize Execution Phase: Load Execution plugin and core files.
-- Start execution of T5_1_RefactorMessagingRealtime, beginning with Step 1: Analyze Current State.
+- Continue with Step 4 of T6_1_AvatarDisplayFix: Add Cache Invalidation for Image Updates.
+- Implement techniques to ensure updated avatars are properly refreshed in the UI.
+- Add appropriate cache headers or URL parameters for avatar images.
+- Follow the execution steps in sequence for each avatar system fix task.
 
 ## Dependencies
-- T5_1 depends heavily on messaging context, hooks (`useMessages`, `useConversations`), Supabase client, and consuming UI components.
+- T6_1 depends on Supabase client configuration, avatar components, and user repository.
+- T6_2 depends on avatar upload/removal APIs and Supabase storage.
+- T6_3 depends on AvatarGroup component and related UI components.
 
 ## Potential Issues
-- High risk of performance issues or update loops if Supabase subscriptions are not implemented carefully in T5_1. Requires thorough testing.
+- Avatar URL construction may have inconsistencies across different components.
+- Storage optimization might require careful handling to avoid data loss.
+- Browser-specific rendering differences may affect avatar group layout fixes.
 
 ## Progress Summary
 - IP1_PresenceBugsResolution: 100% complete.
-- IP4_ModernFloorPlanUI: 0% complete.
-- IP5_MessagingRealtimeUnification: 0% complete (Task T5_1 is starting).
-- Task T1_4_RealtimeIntegration: 100% complete.
-- Task T4_1_SpaceDesignSystem: 0% complete (Deferred).
-- Task T5_1_RefactorMessagingRealtime: 0% complete.
+- IP4_ModernFloorPlanUI: 20% complete (Task T4_1 is in progress).
+- IP5_MessagingRealtimeUnification: 100% complete.
+- IP6_AvatarSystemFixes: 0% complete (Tasks starting).
+- Task T4_1_SpaceDesignSystem: 50% complete (In Progress).
+- Task T5_1_RefactorMessagingRealtime: 100% complete.
+- Tasks T6_1, T6_2, and T6_3: 0% complete (Not started).
 
 ## Environment Notes
 - Current mode: crct
@@ -50,30 +59,24 @@ This file has been updated to reflect the latest actions and state.
   - Enhanced cleanup of subscriptions to prevent memory leaks
 
 ## Current System State
-- Messaging system now exclusively uses Supabase Realtime for:
-  - Real-time message updates (new messages, edits, reactions)
-  - Conversation status changes
-  - Connection status monitoring
+- Messaging system now exclusively uses Supabase Realtime for real-time updates
 - Implementation follows the same pattern as useSpaceRealtime
 - React Query integration for efficient cache management
 - Enhanced logging for better debugging capabilities
+- Avatar system currently experiencing issues with custom avatar display, storage optimization, and group layouts
 
 ## Known Issues/Limitations
+- Custom avatars not displaying properly despite successful storage
+- Multiple avatar images created when users update their profile pictures
+- Avatar group component has spacing and overlap issues
 - Authentication errors (401) when trying to send messages need to be addressed
 - Server errors (500) in message creation endpoint require investigation
-- Typing indicators functionality removed but could be reimplemented using Supabase broadcast channels
 
 ## Upcoming Work
-- Address authentication issues in messaging API endpoints
-- Investigate and fix server errors in message creation
-- Consider reimplementing typing indicators using Supabase broadcast channels if needed
-- Begin work on T4_1_SpaceDesignSystem for modernizing floor plan UI
+- Address avatar system bugs through tasks T6_1, T6_2, and T6_3
+- Continue work on T4_1_SpaceDesignSystem for modernizing floor plan UI when avatar fixes are complete
 
 ## Technical Notes
-- Supabase Realtime subscriptions configured with:
-  - 5-second retry intervals
-  - 10-second timeouts
-  - Proper cleanup on unmount
-  - Connection status tracking
-- React Query cache integration for optimistic updates
-- Enhanced error handling and logging throughout the system
+- Supabase storage is being used for avatar images
+- Current avatar URL construction may need review for proper public access
+- AvatarGroup component needs more robust positioning and z-index management
