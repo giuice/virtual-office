@@ -3,8 +3,8 @@ import { User, UserRole } from '@/types/database';
 
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
+  findBySupabaseUid(supabaseUid: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
-  findByFirebaseUid(firebaseUid: string): Promise<User | null>;
   findByCompany(companyId: string): Promise<User[]>;
   create(userData: Omit<User, 'id' | 'createdAt' | 'lastActive'>): Promise<User>;
   update(id: string, updates: Partial<User>): Promise<User | null>;

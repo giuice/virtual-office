@@ -1,5 +1,4 @@
 // src/types/database.ts
-import { Timestamp } from 'firebase/firestore';
 
 // User role types
 export type UserRole = 'admin' | 'member';
@@ -25,7 +24,7 @@ export type NoteGenerator = 'ai' | 'user';
 
 import { MessageStatus } from '@/types/messaging'; // Added for Message status
 // Define a TimeStamp type that works with both Firebase and DynamoDB
-export type TimeStampType = Timestamp | string;
+export type TimeStampType = string; // Supabase returns ISO strings for timestamps
 
 // Company Collection
 export interface Company {
@@ -45,7 +44,7 @@ export interface Company {
 export interface User {
   id: string;
   companyId: string;
-  firebase_uid: string; // Added to link to Firebase Auth
+  supabase_uid: string; // Now links to Supabase Auth
   email: string;
   displayName: string;
   avatarUrl?: string;
@@ -123,26 +122,6 @@ export interface Space {
   reservations?: Reservation[];
 }
 
-// Room Collection (DEPRECATED - Use Space instead)
-/*
-export interface Room {
-  id: string;
-  companyId: string;
-  name: string;
-  description?: string;
-  isLocked: boolean;
-  capacity?: number;
-  occupants: string[]; // User IDs
-  position?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  createdBy: string; // User ID
-  createdAt: TimeStampType;
-}
-*/
 
 // Message Collection
 export interface Message {

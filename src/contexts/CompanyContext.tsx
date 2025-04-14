@@ -1,18 +1,13 @@
 // src/contexts/CompanyContext.tsx
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'; // Added useCallback
-import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
-import { User as FirebaseUser } from 'firebase/auth';
-import { Timestamp } from 'firebase/firestore';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { Company, User, UserRole, Space } from '@/types/database'; // Added Space
+import { Company, User, UserRole, Space } from '@/types/database';
 // Using API client instead of direct DynamoDB access
 import {
-  getUserByFirebaseId,
   getUserById,
-  createUser,
+  syncUserProfile, // Use syncUserProfile
   updateUserStatus,
   updateUserRole as apiUpdateUserRole,
   removeUserFromCompany as apiRemoveUserFromCompany,
@@ -20,26 +15,21 @@ import {
   getCompany,
   updateCompany,
   getUsersByCompany,
-  getSpacesByCompany, // Added getSpacesByCompany
-  cleanupDuplicateCompanies
+  getSpacesByCompany,
 } from '@/lib/api';
 
 interface CompanyContextType {
   company: Company | null;
   companyUsers: User[];
-  spaces: Space[]; // Added spaces state
+  spaces: Space[];
   currentUserProfile: User | null;
   isLoading: boolean;
   error: string | null;
-  // Company CRUD
   createNewCompany: (name: string) => Promise<string>;
   updateCompanyDetails: (data: Partial<Company>) => Promise<void>;
-  // User management
-  // createUserProfile: (userData: Partial<User>) => Promise<string>; // Removed - Handled by accept invite flow
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
   removeUserFromCompany: (userId: string) => Promise<void>;
-  // Add loadCompanyData to the interface
   loadCompanyData: (userId: string) => Promise<void>;
 }
 
@@ -49,115 +39,94 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
-  const [spaces, setSpaces] = useState<Space[]>([]); // Added spaces state
+  const [spaces, setSpaces] = useState<Space[]>([]);
   const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Load user profile, company, users, and spaces
-  const loadCompanyData = useCallback(async (userId: string) => {
+  const loadCompanyData = useCallback(async (authUserId: string) => {
+    // authUserId here is the Supabase Auth UID
     try {
       setIsLoading(true);
       setError(null);
 
-      // Removed the call to cleanupDuplicateCompanies as it was causing errors
-      // and its logic during login is questionable.
+      console.log(`[CompanyContext] Starting data load for Supabase UID: ${authUserId}`);
 
-      // Check if userId is a valid Firebase UID or a UUID
-      // Firebase UIDs typically don't have hyphens, while UUIDs do
-      const isUUID = userId.includes('-') && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
-      
-      // If it's a UUID, we need to find the user by database ID instead of Firebase UID
-      let userProfile;
-      if (isUUID) {
-        console.log(`User ID ${userId} appears to be a UUID, not a Firebase UID. Trying to find user by ID...`);
-        // This would require a new API endpoint to get user by ID
-        // For now, we'll try to get the user by Firebase UID and handle the error
-        userProfile = await getUserById(userId);
-      } else {
-        // Get user profile by Firebase UID
-        userProfile = await getUserByFirebaseId(userId);
+      // Ensure the user profile exists using syncUserProfile
+      if (!user) {
+        console.error("[CompanyContext] loadCompanyData called but Supabase auth user object is null.");
+        throw new Error("Authenticated user data is unexpectedly null during data load.");
       }
 
-      // If user doesn't exist in Supabase yet, create them now
-      if (!userProfile) {
-        console.log(`User ${userId} not found in Supabase, creating...`);
-        // We need the authenticated user object here to get email/displayName
-        // Assuming 'user' from useAuth() is accessible or passed differently.
-        // For now, let's assume 'user' from useAuth() is available in this scope
-        // Add explicit null check for user to satisfy TypeScript,
-        // although useEffect should prevent this block from running if user is null.
-        if (!user) {
-           console.error("loadCompanyData called for user creation, but user object is null. This indicates a logic error.");
-           throw new Error("Authenticated user data is unexpectedly null during profile creation.");
-        }
-        
-        try {
-          // Now TypeScript knows 'user' is not null here.
-          // because 'user' is included in the useCallback dependency array below.
-          // The useEffect ensures this code only runs when 'user' is truthy.
-          const createdProfile = await createUser({
-            firebase_uid: userId, // Always use the userId as firebase_uid
-            email: user.email || '',
-            displayName: user.displayName || 'User',
-            status: 'online' as const
-          });
-          // Fetch the newly created profile to ensure we have the Supabase ID etc.
-          userProfile = createdProfile;
-        } catch (err) {
-          console.error("Error creating user profile:", err);
-          // If creation failed, try to get the user one more time
-          // This handles the case where the user already exists but we got an error
-          if (isUUID) {
-            userProfile = await getUserById(userId);
-          } else {
-            userProfile = await getUserByFirebaseId(userId);
-          }
-          if (!userProfile) {
-            throw new Error("Failed to create or retrieve user profile");
-          }
-        }
+      let userProfile: User | null = null;
+      try {
+        // Call syncUserProfile to get or create the profile
+        userProfile = await syncUserProfile({
+          supabase_uid: authUserId, // Use correct parameter name
+          email: user.email || '',
+          displayName: user.user_metadata?.name || user.email || 'New User',
+        });
+        console.log(`[CompanyContext] User profile synced/retrieved for ${authUserId}, DB ID: ${userProfile.id}`);
+        setCurrentUserProfile(userProfile);
+      } catch (syncError) {
+         console.error('[CompanyContext] Error syncing user profile:', syncError);
+         // Attempt to fetch one last time in case sync failed but user exists
+         userProfile = await getUserById(authUserId);
+         if (!userProfile) {
+            setError(syncError instanceof Error ? syncError.message : 'Failed to load user profile');
+            throw new Error(`Failed to sync or retrieve user profile for Supabase UID ${authUserId}`);
+         }
+         console.warn(`[CompanyContext] Synced failed, but retrieved existing profile ${userProfile.id} for ${authUserId}.`);
+         setCurrentUserProfile(userProfile);
       }
-      
-      // Set the profile state (either existing or newly created)
-      setCurrentUserProfile(userProfile);
 
-      // Now check for company association and load company data if applicable
+
+      // Load company data if the user is associated with one
       if (userProfile?.companyId) {
-        console.log(`User ${userId} belongs to company ${userProfile.companyId}, loading company data...`);
+        console.log(`[CompanyContext] User ${userProfile.id} belongs to company ${userProfile.companyId}, loading company data...`);
         const companyData = await getCompany(userProfile.companyId);
         setCompany(companyData);
-        const users = await getUsersByCompany(userProfile.companyId);
-        setCompanyUsers(users);
-        const fetchedSpaces = await getSpacesByCompany(userProfile.companyId);
-        setSpaces(fetchedSpaces);
-        console.log(`[CompanyContext] Loaded ${fetchedSpaces.length} spaces for company ${userProfile.companyId}:`, JSON.stringify(fetchedSpaces, null, 2));
+        if (companyData) {
+            const users = await getUsersByCompany(userProfile.companyId);
+            setCompanyUsers(users);
+            const fetchedSpaces = await getSpacesByCompany(userProfile.companyId);
+            setSpaces(fetchedSpaces);
+            console.log(`[CompanyContext] Loaded ${users.length} users and ${fetchedSpaces.length} spaces for company ${userProfile.companyId}`);
+        } else {
+            console.warn(`[CompanyContext] User ${userProfile.id} has companyId ${userProfile.companyId}, but company data could not be fetched.`);
+            // Reset company specific data if company fetch fails
+            setCompany(null);
+            setCompanyUsers([]);
+            setSpaces([]);
+        }
       } else {
-        console.log(`User ${userId} exists but has no company association.`);
-        // Reset company-related state if user has no company
+        console.log(`[CompanyContext] User ${userProfile.id} (Supabase UID: ${authUserId}) has no company association.`);
         setCompany(null);
         setCompanyUsers([]);
         setSpaces([]);
       }
     } catch (err) {
-      console.error('Error loading company data:', err);
+      console.error('[CompanyContext] Error loading company data:', err);
       setError(err instanceof Error ? err.message : 'Error loading data');
-      // Reset state on error
+      // Reset all state on error
       setCompany(null);
       setCurrentUserProfile(null);
       setCompanyUsers([]);
       setSpaces([]);
     } finally {
       setIsLoading(false);
+      console.log("[CompanyContext] Data loading finished.");
     }
-  }, [user]); // Add `user` to dependency array
+  }, [user]); // Depend on the Supabase auth user object
 
   // Effect to trigger loading when auth user changes
   useEffect(() => {
-    if (user) {
-      loadCompanyData(user.uid);
+    if (user?.id) { // Ensure user and user.id exist
+      loadCompanyData(user.id);
     } else {
-      // Reset all state if user logs out
+      // Reset all state if user logs out or is not available
+      console.log("[CompanyContext] User logged out or not available, resetting state.");
       setCompany(null);
       setCurrentUserProfile(null);
       setCompanyUsers([]);
@@ -169,129 +138,111 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
   // Create a new company
   const createNewCompany = async (name: string): Promise<string> => {
-    if (!user) {
-      throw new Error('User must be authenticated to create a company');
+    if (!user?.id || !user.email) { // Ensure user, id, and email are available
+      throw new Error('User must be authenticated with valid details to create a company');
     }
+    const authUserId = user.id; // Supabase Auth UID
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Check if user already has a company association
-      const existingProfile = await getUserByFirebaseId(user.uid);
-      if (existingProfile?.companyId) {
-        console.log('User already has a company, returning existing company ID');
-        
-        // If the user already has a company, reload all data
-        await loadCompanyData(user.uid);
-        return existingProfile.companyId;
+      // 1. Ensure user profile exists (get or create)
+      let userProfile = await syncUserProfile({
+          supabase_uid: authUserId,
+          email: user.email,
+          displayName: user.user_metadata?.name || user.email || 'Admin User',
+      });
+      setCurrentUserProfile(userProfile); // Set profile state immediately
+
+      // 2. Check if user already belongs to a company
+      if (userProfile.companyId) {
+        console.log(`[CompanyContext] User ${userProfile.id} already belongs to company ${userProfile.companyId}. Reloading data.`);
+        // Reload data to ensure consistency, though ideally state is already correct
+        await loadCompanyData(authUserId);
+        return userProfile.companyId;
       }
 
-      // Define settings if needed (optional)
-      const settings = {
-        allowGuestAccess: false,
-        maxRooms: 10,
-        theme: 'light',
-      };
+      // 3. Create the new company
+      const settings = { /* Define settings if needed */ };
+      console.log(`[CompanyContext] Creating new company "${name}" for Supabase user ${authUserId}`);
+      // Pass Supabase Auth UID as creator
+      const newCompany = await createCompany(name, authUserId, settings);
+      const companyId = newCompany.id;
+      console.log(`[CompanyContext] New company created with ID: ${companyId}`);
 
-      console.log('Creating new company:', name);
-      // Call the updated createCompany helper with specific arguments
-      const newCompany = await createCompany(name, user.uid, settings); // Pass name, firebaseUid, settings
-      const companyId = newCompany.id; // Get ID from the returned company object
-      console.log('New company created successfully with ID:', companyId);
-
-      // Create or update user profile to link with company
-      let userProfile = await getUserByFirebaseId(user.uid);
-      
-      if (!userProfile) {
-        // Create new user profile
-        console.log('Creating new user profile with company ID:', companyId);
-        // Call createUser directly with the correct arguments
-        await createUser({
-          firebase_uid: user.uid, // Use user.uid from Firebase Auth
-          email: user.email || '',
-          displayName: user.displayName || 'User',
-          status: 'online' as const, // Set initial status
-          companyId // Add companyId directly to the creation payload
+      // 4. Update the user profile to link company and set role to admin
+      console.log(`[CompanyContext] Updating user profile ${userProfile.id} with company ${companyId} and admin role.`);
+      try {
+        // Use the user's DB ID (userProfile.id) for the update API call
+        // Assuming /api/users/update identifies user by DB ID in query param 'id'
+        const response = await fetch(`/api/users/update?id=${userProfile.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: companyId,
+            role: 'admin',
+            // Optionally update status if needed, e.g., ensure 'online'
+            // status: 'online'
+          }),
         });
-        userProfile = await getUserByFirebaseId(user.uid);
-      } else {
-        // Update existing user profile with new company ID, role, and status
-        console.log('Updating existing user profile with company ID:', companyId);
-        
-        // Update the user's company ID using the API directly rather than fetch
-        try {
-          await fetch(`/api/users/update?id=${userProfile.id}`, { // Use Supabase UUID here
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              companyId,
-              role: 'admin',
-              status: 'online'
-            }),
-          });
-          
-          // Update the local state immediately without waiting for reload
-          userProfile = { 
-            ...userProfile, 
-            companyId, 
-            role: 'admin', 
-            status: 'online' 
-          };
-          
-          // Update the current user profile state immediately
-          setCurrentUserProfile(userProfile);
-        } catch (updateError) {
-          console.error('Error updating user profile:', updateError);
-          throw new Error('Failed to update user profile with company ID');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to update user profile: ${errorData.message || response.statusText}`);
         }
+        const updatedProfileData = await response.json(); // Assuming API returns updated user
+
+        // Update local state immediately with the fully updated profile
+        userProfile = { ...userProfile, ...updatedProfileData };
+        setCurrentUserProfile(userProfile);
+        console.log(`[CompanyContext] User profile ${userProfile.id} updated successfully.`);
+
+      } catch (updateError) {
+        console.error('[CompanyContext] Error updating user profile after company creation:', updateError);
+        // Consider rollback or cleanup logic for the created company if user update fails critically
+        throw new Error('Failed to link user profile to the new company');
       }
 
-      // Get company data
-      const companyData2 = await getCompany(companyId);
-      setCompany(companyData2);
-      
-      // Reload all company data after creation
-      console.log('Reloading company data after creation');
-      await loadCompanyData(user.uid);
+      // 5. Reload all company data after successful creation and linking
+      console.log('[CompanyContext] Reloading company data after creation/user linking');
+      await loadCompanyData(authUserId); // Use Supabase Auth UID
 
-      // Forcing navigation to dashboard after successful company creation
-      window.location.href = '/dashboard';
-      
+      // 6. Navigate to dashboard
+      // Consider using Next.js router for better integration:
+      // import { useRouter } from 'next/navigation';
+      // const router = useRouter(); router.push('/dashboard');
+      window.location.href = '/dashboard'; // Keep existing navigation for now
+
       return companyId;
     } catch (err) {
-      console.error('Error creating/updating company:', err);
+      console.error('[CompanyContext] Error in createNewCompany process:', err);
       setError(err instanceof Error ? err.message : 'Error creating company');
-      throw err;
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Ensure loading state is reset on error
+      throw err; // Re-throw error for calling component
     }
+    // No finally block needed here as it's handled within the try/catch
   };
 
   // Update company details
   const updateCompanyDetails = async (data: Partial<Company>): Promise<void> => {
-    if (!company || !user) {
-      throw new Error('Company and user required');
+    if (!company || !user?.id) { // Check user.id
+      throw new Error('Company and authenticated user required');
     }
 
-    // Check if user is admin
-    if (!company.adminIds.includes(user.uid)) {
+    // Check if user is admin (assuming company.adminIds stores Supabase UIDs)
+    if (!company.adminIds.includes(user.id)) {
       throw new Error('Only admins can update company details');
     }
 
     try {
       setIsLoading(true);
       setError(null);
-
-      // Use API client to update company
       await updateCompany(company.id, data);
-      
-      // Update company state
-      setCompany({ ...company, ...data });
+      // Optimistically update local state
+      setCompany(prev => prev ? { ...prev, ...data } : null);
+      console.log(`[CompanyContext] Company details updated for ${company.id}`);
     } catch (err) {
-      console.error('Error updating company:', err);
+      console.error('[CompanyContext] Error updating company:', err);
       setError(err instanceof Error ? err.message : 'Error updating company');
       throw err;
     } finally {
@@ -299,12 +250,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Removed createUserProfile function - Handled by accept invite flow
-  // const createUserProfile = async (...) => { ... };
 
-  // Update user profile
+  // Update user profile (status, status message etc.)
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
-    if (!user || !currentUserProfile) {
+    // user.id is Supabase Auth UID
+    // currentUserProfile.id is the DB User ID
+    if (!user?.id || !currentUserProfile?.id) { // Check both IDs
       throw new Error('User must be authenticated with a profile');
     }
 
@@ -312,24 +263,30 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // Use API client to update user
+      // Call API to update user status/statusMessage using Supabase Auth UID
+      // Assuming updateUserStatus expects Supabase Auth UID
       await updateUserStatus(
-        user.uid, 
+        user.id, // Pass Supabase Auth UID
         data.status || currentUserProfile.status,
         data.statusMessage
       );
-      
-      // Update user profile state
-      setCurrentUserProfile({ ...currentUserProfile, ...data });
-      
-      // Update user in company users list
-      const updatedUsers = companyUsers.map(u => 
-        u.id === user.uid ? { ...u, ...data } : u
+
+      // Optimistically update local state
+      const updatedProfile = { ...currentUserProfile, ...data };
+      setCurrentUserProfile(updatedProfile);
+
+      // Update user in the company users list using the DB User ID
+      setCompanyUsers(prevUsers =>
+        prevUsers.map(u =>
+          u.id === currentUserProfile.id ? updatedProfile : u // Match by DB ID
+        )
       );
-      setCompanyUsers(updatedUsers);
+      console.log(`[CompanyContext] User profile updated for ${currentUserProfile.id}`);
+
     } catch (err) {
-      console.error('Error updating user profile:', err);
+      console.error('[CompanyContext] Error updating user profile:', err);
       setError(err instanceof Error ? err.message : 'Error updating user profile');
+      // Optionally revert optimistic updates here
       throw err;
     } finally {
       setIsLoading(false);
@@ -337,44 +294,67 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Update user role
-  const updateUserRole = async (userId: string, newRole: UserRole): Promise<void> => {
-    if (!user || !company) {
-      throw new Error('User must be authenticated with a company');
+  const updateUserRole = async (userDbIdToUpdate: string, newRole: UserRole): Promise<void> => {
+    // userDbIdToUpdate is the DB ID of the user whose role is being changed
+    // user.id is the Supabase Auth UID of the *current* admin performing the action
+    if (!user?.id || !company || !currentUserProfile) {
+      throw new Error('Admin user must be authenticated with a company profile');
     }
 
-    // Check if current user is admin
-    if (!company.adminIds.includes(user.uid)) {
+    // Check if the *current* user is admin (assuming company.adminIds stores Supabase UIDs)
+    if (!company.adminIds.includes(user.id)) {
       throw new Error('Only admins can update user roles');
     }
+
+    // Optional: Prevent admin from changing their own role via this function
+    // if (userDbIdToUpdate === currentUserProfile.id && newRole !== 'admin') {
+    //   throw new Error("Admins cannot demote themselves using this function.");
+    // }
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Use API client to update user role
-      await apiUpdateUserRole(userId, newRole);
-      
-      // If user is being promoted to admin, add to company adminIds
-      if (newRole === 'admin' && !company.adminIds.includes(userId)) {
-        const updatedAdminIds = [...company.adminIds, userId];
-        await updateCompany(company.id, { adminIds: updatedAdminIds });
-        setCompany({ ...company, adminIds: updatedAdminIds });
+      // Use API client to update user role, passing the DB User ID
+      await apiUpdateUserRole(userDbIdToUpdate, newRole); // api.ts expects DB ID
+
+      // Find the target user in local state to get their Supabase UID for adminIds update
+      const targetUser = companyUsers.find(u => u.id === userDbIdToUpdate);
+      if (!targetUser?.supabase_uid) {
+        console.warn(`[CompanyContext] Could not find Supabase UID for user ${userDbIdToUpdate} in local state to update adminIds.`);
+        // Consider reloading users or handling this case more robustly
+      } else {
+        const targetUserSupabaseUid = targetUser.supabase_uid;
+        let updatedAdminIds = [...company.adminIds];
+        const isAdmin = company.adminIds.includes(targetUserSupabaseUid);
+
+        let needsCompanyUpdate = false;
+        if (newRole === 'admin' && !isAdmin) {
+            updatedAdminIds.push(targetUserSupabaseUid);
+            needsCompanyUpdate = true;
+        } else if (newRole !== 'admin' && isAdmin) {
+            updatedAdminIds = updatedAdminIds.filter(id => id !== targetUserSupabaseUid);
+            needsCompanyUpdate = true;
+        }
+
+        if (needsCompanyUpdate) {
+            await updateCompany(company.id, { adminIds: updatedAdminIds });
+            // Update local company state optimistically
+            setCompany(prev => prev ? { ...prev, adminIds: updatedAdminIds } : null);
+            console.log(`[CompanyContext] Company adminIds updated for user ${targetUserSupabaseUid}.`);
+        }
       }
-      
-      // If user is being demoted from admin, remove from company adminIds
-      if (newRole === 'member' && company.adminIds.includes(userId)) {
-        const updatedAdminIds = company.adminIds.filter(id => id !== userId);
-        await updateCompany(company.id, { adminIds: updatedAdminIds });
-        setCompany({ ...company, adminIds: updatedAdminIds });
-      }
-      
-      // Update user in state
-      const updatedUsers = companyUsers.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
+
+      // Update user role in local state (companyUsers) using DB User ID
+      setCompanyUsers(prevUsers =>
+        prevUsers.map(u =>
+          u.id === userDbIdToUpdate ? { ...u, role: newRole } : u
+        )
       );
-      setCompanyUsers(updatedUsers);
+      console.log(`[CompanyContext] User role updated for ${userDbIdToUpdate} to ${newRole}.`);
+
     } catch (err) {
-      console.error('Error updating user role:', err);
+      console.error('[CompanyContext] Error updating user role:', err);
       setError(err instanceof Error ? err.message : 'Error updating user role');
       throw err;
     } finally {
@@ -383,40 +363,49 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Remove user from company
-  const removeUserFromCompany = async (userId: string): Promise<void> => {
-    if (!user || !company) {
-      throw new Error('User must be authenticated with a company');
+  const removeUserFromCompany = async (userDbIdToRemove: string): Promise<void> => {
+    // userDbIdToRemove is the DB ID of the user being removed
+    // user.id is the Supabase Auth UID of the *current* admin performing the action
+    if (!user?.id || !company || !currentUserProfile) {
+      throw new Error('Admin user must be authenticated with a company profile');
     }
 
-    // Check if current user is admin
-    if (!company.adminIds.includes(user.uid)) {
+    // Check if the *current* user is admin (assuming company.adminIds stores Supabase UIDs)
+    if (!company.adminIds.includes(user.id)) {
       throw new Error('Only admins can remove users');
     }
 
-    // Prevent removing yourself
-    if (userId === user.uid) {
-      throw new Error('You cannot remove yourself from the company');
+    // Find the user being removed to check if they are the current user
+    const userToRemoveProfile = companyUsers.find(u => u.id === userDbIdToRemove);
+
+    // Prevent removing yourself (check against Supabase Auth UID)
+    if (userToRemoveProfile?.supabase_uid === user.id) {
+      throw new Error('You cannot remove yourself from the company using this function.');
     }
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Use API client to remove user from company
-      await apiRemoveUserFromCompany(userId, company.id);
-      
-      // If user is admin, remove from company adminIds
-      if (company.adminIds.includes(userId)) {
-        const updatedAdminIds = company.adminIds.filter(id => id !== userId);
+      // Use API client to remove user from company, passing the DB User ID
+      await apiRemoveUserFromCompany(userDbIdToRemove, company.id); // api.ts expects DB ID
+
+      // If removed user was an admin, update company adminIds (using their Supabase UID)
+      const removedUserSupabaseUid = userToRemoveProfile?.supabase_uid;
+      if (removedUserSupabaseUid && company.adminIds.includes(removedUserSupabaseUid)) {
+        const updatedAdminIds = company.adminIds.filter(id => id !== removedUserSupabaseUid);
         await updateCompany(company.id, { adminIds: updatedAdminIds });
-        setCompany({ ...company, adminIds: updatedAdminIds });
+        // Update local company state optimistically
+        setCompany(prev => prev ? { ...prev, adminIds: updatedAdminIds } : null);
+        console.log(`[CompanyContext] Company adminIds updated after removing admin ${removedUserSupabaseUid}.`);
       }
-      
-      // Remove user from state
-      const updatedUsers = companyUsers.filter(u => u.id !== userId);
-      setCompanyUsers(updatedUsers);
+
+      // Remove user from local state using DB User ID
+      setCompanyUsers(prevUsers => prevUsers.filter(u => u.id !== userDbIdToRemove));
+      console.log(`[CompanyContext] User ${userDbIdToRemove} removed from company ${company.id}.`);
+
     } catch (err) {
-      console.error('Error removing user from company:', err);
+      console.error('[CompanyContext] Error removing user from company:', err);
       setError(err instanceof Error ? err.message : 'Error removing user from company');
       throw err;
     } finally {
@@ -427,7 +416,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const value = {
     company,
     companyUsers,
-    spaces, // Expose spaces
+    spaces,
     currentUserProfile,
     isLoading,
     error,

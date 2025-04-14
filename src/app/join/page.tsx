@@ -45,7 +45,7 @@ export default function JoinPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           token, 
-          firebaseUid: testUuid  // Use a proper UUID format for testing
+          supabaseUid: testUuid  // Use a proper UUID format for testing
         }),
       });
 

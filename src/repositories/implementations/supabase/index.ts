@@ -8,3 +8,5 @@ export * from './SupabaseConversationRepository';
 export * from './SupabaseInvitationRepository';
 export * from './SupabaseAnnouncementRepository';
 export * from './SupabaseMeetingNoteRepository';
+export * from './SupabaseMessageRepository';
+export * from './SupabaseConversationRepository';

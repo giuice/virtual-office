@@ -25,18 +25,38 @@ export default function LoginPage() {
     // Skip if loading or if no user is authenticated
     if (!user || companyLoading) return;
 
-    // If user is logged in but doesn't have a company, redirect to company creation
-    if (!company || !currentUserProfile?.companyId) {
-      console.log('Redirecting to create-company...', { 
-        hasCompany: !!company, 
-        hasCompanyId: !!currentUserProfile?.companyId,
-        currentUserProfile
-      });
-      router.push('/create-company');
-    } else {
-      // User has a company, redirect to office
-      router.push('/office');
-    }
+    // Add debug logging to track state during redirection decision
+    console.log('[Debug] Login Page Redirect Check:', { 
+      isAuthenticated: !!user, 
+      userId: user?.id,
+      isCompanyLoading: companyLoading,
+      hasCompany: !!company, 
+      companyId: company?.id,
+      profileCompanyId: currentUserProfile?.companyId,
+      currentUserProfile
+    });
+    
+    // Add a small delay to ensure all state is properly settled
+    const redirectTimer = setTimeout(() => {
+      // If user is logged in but doesn't have a company, redirect to company creation
+      if (!company || !currentUserProfile?.companyId) {
+        console.log('Redirecting to create-company...', { 
+          hasCompany: !!company, 
+          hasCompanyId: !!currentUserProfile?.companyId,
+          currentUserProfile
+        });
+        router.push('/create-company');
+      } else {
+        // User has a company, redirect to office
+        console.log('Redirecting to office - user has company:', {
+          company,
+          companyId: currentUserProfile?.companyId
+        });
+        router.push('/office');
+      }
+    }, 500); // 500ms delay
+    
+    return () => clearTimeout(redirectTimer);
   }, [user, company, companyLoading, router, currentUserProfile]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

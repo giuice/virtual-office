@@ -4,8 +4,12 @@
 import { DashboardShell } from '@/components/shell/dashboard-shell';
 import { DashboardHeader } from '@/components/shell/dashboard-header';
 import { UserProfile } from '@/components/dashboard/user-profile';
+import { EnhancedUserProfile } from '@/components/profile/EnhancedUserProfile';
 
 export default function SettingsPage() {
+  // Toggle this to use either the original or enhanced profile component
+  const useEnhancedProfile = false;
+  
   return (
     <DashboardShell>
       <DashboardHeader
@@ -14,7 +18,11 @@ export default function SettingsPage() {
       />
       
       <div className="grid gap-8">
-        <UserProfile />
+        {useEnhancedProfile ? (
+          <EnhancedUserProfile />
+        ) : (
+          <UserProfile />
+        )}
       </div>
     </DashboardShell>
   );

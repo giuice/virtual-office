@@ -10,7 +10,7 @@ import { cleanupDuplicateCompanies } from '@/lib/api';
 
 export default function CleanupCompaniesPage() {
   const { user } = useAuth();
-  const [userId, setUserId] = useState(user?.uid || '');
+  const [userId, setUserId] = useState(user?.id || '');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;

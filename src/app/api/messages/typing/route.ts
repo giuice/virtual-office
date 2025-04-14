@@ -8,7 +8,7 @@ import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories'
 export async function POST(request: Request) {
   try {
     // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
-    const { userId, error: sessionError } = await validateUserSession();
+    const { supabaseUid: userId, error: sessionError } = await validateUserSession();
     
     if (sessionError || !userId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });

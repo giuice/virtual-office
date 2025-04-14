@@ -19,19 +19,19 @@ The current floor plan UI lacks a consistent and modern visual language. This ta
 - `src/lib/utils.ts`
 
 ## Steps
-1.  **Analyze & Define Visual Style:**
+1.  ✅ **Analyze & Define Visual Style:**
     - Review current space representations, identify inconsistencies, and document states/interactions needing visual representation.
     - Establish/refine core visual guidelines (color palette, typography, spacing, border-radius, shadows) for spaces and related components, aligning with the "cozy and elegant" aesthetic. Define hover, active, and selected states.
-2.  **Design & Implement Space Component:**
+2.  ✅ **Design & Implement Space Component:**
     - Design the primary component for displaying a space (e.g., as a card) using the defined visual style. Ensure clear visual hierarchy and areas for name, occupancy, and status.
     - Implement this component using React/Tailwind/Shadcn (DOM-based), potentially refactoring/replacing parts of `SpaceElement.tsx`.
-3.  **Design & Implement Avatar Component:**
+3.  ✅ **Design & Implement Avatar Component:**
     - Design the component for displaying user avatars within the floor plan context, using the defined visual style.
     - Implement this component using React/Tailwind/Shadcn, clearly showing user presence status (online, away, etc.), potentially refactoring/replacing `UserAvatarPresence.tsx`.
-4.  **Design & Implement Status Indicators:**
+4.  ✅ **Design & Implement Status Indicators:**
     - Design visual indicators for space status (available, occupied, locked, etc.), occupancy levels (empty, partially filled, full), and space types.
     - Create/implement these indicators (e.g., badges, icons, color cues) and integrate them into the new Space component.
-5.  **Document Design Tokens & Guidelines:**
+5.  ✅ **Document Design Tokens & Guidelines:**
     - Create/update design tokens (e.g., in `tailwind.config.js` or a separate file) for colors, sizes, etc.
     - Briefly document component variations and usage guidelines.
 6.  **Verify Implementation:**

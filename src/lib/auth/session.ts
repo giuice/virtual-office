@@ -3,16 +3,16 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 type SessionResult = {
-  userId?: string;
-  userDbId?: string; // Database UUID (different from Firebase UID)
+  supabaseUid?: string; // Supabase Auth UID
+  userDbId?: string; // Database UUID (from users table)
   error?: string;
 };
 
 /**
  * Validates the user session and returns the user ID if valid
- * Handles the mismatch between Firebase UIDs and Database UUIDs
- * 
- * @returns Object containing userId (Firebase UID), userDbId (Database UUID), and error (if any)
+ * Handles the relationship between Supabase Auth UIDs and Database UUIDs
+ *
+ * @returns Object containing supabaseUid (Supabase Auth UID), userDbId (Database UUID), and error (if any)
  */
 export async function validateUserSession(): Promise<SessionResult> {
   try {
@@ -29,23 +29,23 @@ export async function validateUserSession(): Promise<SessionResult> {
       return { error: 'No active session' };
     }
     
-    const firebaseUid = session.user.id; // This is the Firebase UID
+    const supabaseUid = session.user.id; // This is the Supabase Auth UID
     
     // Get the database user record to fetch the database UUID
     const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('id') // Database UUID
-      .eq('auth_id', firebaseUid) // auth_id column holds the Firebase UID
+      .eq('supabase_uid', supabaseUid) // supabase_uid column holds the Supabase Auth UID
       .single();
     
     if (userError) {
       console.error('User lookup error:', userError.message);
-      return { userId: firebaseUid, error: 'User record not found' };
+      return { supabaseUid, error: 'User record not found' };
     }
     
     // Return both IDs for flexible usage
     return { 
-      userId: firebaseUid,   // Firebase UID (from auth)
+      supabaseUid,   // Supabase Auth UID (from auth)
       userDbId: userRecord.id // Database UUID (from users table)
     };
     

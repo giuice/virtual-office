@@ -11,7 +11,7 @@ import { validateUserSession } from '@/lib/auth/session';
 export async function GET(request: NextRequest) {
   try {
     // Validate user session
-    const { userId, error: sessionError } = await validateUserSession();
+    const { supabaseUid: userId, error: sessionError } = await validateUserSession();
     
     if (sessionError || !userId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
