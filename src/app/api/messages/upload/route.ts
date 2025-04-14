@@ -12,7 +12,7 @@ import { validateUserSession } from '@/lib/auth/session';
 export async function POST(request: NextRequest) {
   try {
     // Validate user session
-    const { userId, userDbId, error: sessionError } = await validateUserSession();
+    const { supabaseUid:userId, userDbId, error: sessionError } = await validateUserSession();
 
     if (sessionError || !userId || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       type,
       size,
       url: urlData.publicUrl,
-      thumbnailUrl
+      thumbnailUrl: thumbnailUrl === null ? undefined : thumbnailUrl
     };
     
     // If messageId is provided, link attachment to message

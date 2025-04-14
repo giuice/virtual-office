@@ -1,27 +1,38 @@
 import { ICompanyRepository, IUserRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { Company, User } from '@/types/database';
+import { Company } from '@/types/database';
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase/client';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+
+  // Get Supabase client using the server helper
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    // Check if the user is authenticated
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
   const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
   const userRepository: IUserRepository = new SupabaseUserRepository();
 
   try {
-    const { name, creatorFirebaseUid, settings } = await request.json();
+    const { name, creatorSupabaseUid, settings } = await request.json();
 
     // Validate required fields
-    if (!name || !creatorFirebaseUid) {
+    if (!name || !creatorSupabaseUid) {
       return NextResponse.json(
         { error: 'Missing required fields: name and creatorFirebaseUid are required.' },
         { status: 400 }
       );
     }
 
-    // 1. Find the Supabase User using the Firebase UID
-    const creatorUser: User | null = await userRepository.findByFirebaseUid(creatorFirebaseUid);
+    // 1. Get the user 
+    const creatorUser = await userRepository.findBySupabaseUid(creatorSupabaseUid);
 
     if (!creatorUser) {
       return NextResponse.json(

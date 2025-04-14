@@ -57,6 +57,11 @@ export enum ConversationType {
   ROOM = 'room'
 }
 
+export enum ConversationVisibility {
+  PUBLIC = 'public',
+  PRIVATE = 'private',
+  DIRECT = 'direct'
+}
 // Conversation Interface
 export interface Conversation {
   id: string;
@@ -67,4 +72,5 @@ export interface Conversation {
   isArchived: boolean;
   unreadCount: Record<string, number>; // Map of user IDs to unread counts
   roomId?: string; // Only for room conversations
+  visibility?: ConversationVisibility; // For room conversations
 }

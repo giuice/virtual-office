@@ -9,7 +9,7 @@ import { MessageStatus } from '@/types/messaging';
 export async function PATCH(request: Request) {
   try {
     // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
-    const { userId, userDbId, error: sessionError } = await validateUserSession();
+    const { supabaseUid: userId, userDbId, error: sessionError } = await validateUserSession();
 
     if (sessionError || !userId || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });

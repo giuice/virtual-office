@@ -26,7 +26,9 @@ import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import DomFloorPlan  from './dom-floor-plan';
+import { ModernFloorPlan } from './modern';
+
+
 
 export function FloorPlan() {
   // Get data from context
@@ -46,12 +48,13 @@ export function FloorPlan() {
   const [chatRoom, setChatRoom] = useState<Space | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
-  
+  const [useModernUI, setUseModernUI] = useState(false);
+
   // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
     const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
 
@@ -61,62 +64,69 @@ export function FloorPlan() {
     // Check for unusual space data
     if (spaces.length > 0) {
       const spacesWithInvalidPosition = spaces.filter(
-        space => !space.position || 
-          typeof space.position.x !== 'number' || 
+        space => !space.position ||
+          typeof space.position.x !== 'number' ||
           typeof space.position.y !== 'number' ||
           typeof space.position.width !== 'number' ||
           typeof space.position.height !== 'number'
       );
-      
+
       if (spacesWithInvalidPosition.length > 0) {
         debugLogger.warn('FloorPlan', 'Found spaces with invalid position data:', spacesWithInvalidPosition);
       }
     }
   }, [spaces]);
-  
+
+  const handleSpaceSelect = (space: Space) => {
+    setSelectedSpace(space);
+    setHighlightedSpaceId(space.id);
+    handleEnterSpace(space);
+    // Other handlers...
+  };
+
   // TODO: Refactor room management functions (create, update, delete, duplicate)
   // to interact with the backend API via context or direct API calls,
   // instead of modifying local state directly.
   // For now, these functions will not work correctly as they modify the old local state.
 
   // Room creation is now handled by the mutation hooks in the RoomDialog component
-
   // Room updates are now handled by the mutation hooks in the RoomDialog component
-const deleteSpaceMutation = useDeleteSpace();
-const updateSpaceMutation = useUpdateSpace();
-const { toast } = useToast();
+  const deleteSpaceMutation = useDeleteSpace();
+  const updateSpaceMutation = useUpdateSpace();
 
-const handleDeleteRoom = (roomId: string) => {
-  if (!roomId) {
-    toast({
-      title: "Error",
-      description: "Cannot delete room: Missing room ID.",
-      variant: "destructive"
-    });
-    return;
-  }
+  const { toast } = useToast();
 
-  deleteSpaceMutation.mutate(roomId, {
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Room deleted successfully"
-      });
-      // Clear selection and chat if the deleted room was selected/active
-      setSelectedSpace(null);
-      if (chatRoom && chatRoom.id === roomId) {
-        setChatRoom(null);
-      }
-    },
-    onError: (error: Error) => {
+  const handleDeleteRoom = (roomId: string) => {
+    if (!roomId) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete room",
+        description: "Cannot delete room: Missing room ID.",
         variant: "destructive"
       });
+      return;
     }
-  });
-};
+
+    deleteSpaceMutation.mutate(roomId, {
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Room deleted successfully"
+        });
+        // Clear selection and chat if the deleted room was selected/active
+        setSelectedSpace(null);
+        if (chatRoom && chatRoom.id === roomId) {
+          setChatRoom(null);
+        }
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to delete room",
+          variant: "destructive"
+        });
+      }
+    });
+  };
 
   const handleDuplicateRoom = (room: Space) => { // Expect global Space
     console.warn("handleDuplicateRoom needs API integration");
@@ -143,15 +153,15 @@ const handleDeleteRoom = (roomId: string) => {
 
     // Save this space as the last selected space for the user
     saveLastSpace(space.id);
-    
+
     // Highlight the selected space
     setHighlightedSpaceId(space.id);
-    
+
     // Just select the space without automatically adding the user to it
     setSelectedSpace(space);
-    
+
     console.log(`User viewing space: ${space.name} (${space.id})`);
-    
+
     // NOTE: We've removed the automatic user assignment to spaces
     // Users should now be explicitly added to spaces through a dedicated UI action
   };
@@ -171,9 +181,9 @@ const handleDeleteRoom = (roomId: string) => {
     const updatedUserIds = [...(space.userIds || [])];
     if (!updatedUserIds.includes(currentUserProfile.id)) {
       updatedUserIds.push(currentUserProfile.id);
-      
+
       // Update the space with the new userIds using the mutation hook
-      updateSpaceMutation.mutate({ 
+      updateSpaceMutation.mutate({
         id: space.id,
         updates: { userIds: updatedUserIds }
       }, {
@@ -182,8 +192,8 @@ const handleDeleteRoom = (roomId: string) => {
             title: "Success",
             description: `You joined ${space.name}`
           });
-          setSelectedSpace(prev => prev?.id === space.id ? 
-            {...prev, userIds: updatedUserIds} : prev);
+          setSelectedSpace(prev => prev?.id === space.id ?
+            { ...prev, userIds: updatedUserIds } : prev);
         },
         onError: (error: Error) => {
           toast({
@@ -205,10 +215,10 @@ const handleDeleteRoom = (roomId: string) => {
     if (!space || !space.id || !currentUserProfile) {
       return;
     }
-    
+
     // Remove the user from the space's userIds
     const updatedUserIds = (space.userIds || []).filter(id => id !== currentUserProfile.id);
-    
+
     updateSpaceMutation.mutate({
       id: space.id,
       updates: { userIds: updatedUserIds }
@@ -218,12 +228,12 @@ const handleDeleteRoom = (roomId: string) => {
           title: "Left Space",
           description: `You have left ${space.name}`
         });
-        
+
         // Clear the saved space if it's the one we're leaving
         if (lastSpaceId === space.id) {
           clearLastSpace();
         }
-        
+
         // If this was the selected space, deselect it
         if (selectedSpace?.id === space.id) {
           setSelectedSpace(null);
@@ -244,7 +254,7 @@ const handleDeleteRoom = (roomId: string) => {
   const handleOpenChat = (room: Space) => {
     setChatRoom(room);
   };
-  
+
   // Handle closing chat
   const handleCloseChat = () => {
     setChatRoom(null);
@@ -265,19 +275,19 @@ const handleDeleteRoom = (roomId: string) => {
     <div className="space-y-4 w-full">
       {/* Add debug button and panel */}
       <div className="flex justify-end mb-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setShowDebugPanel(!showDebugPanel)}
           className="text-xs"
         >
           {showDebugPanel ? 'Hide' : 'Show'} Debug Panel
         </Button>
       </div>
-      
+
       {showDebugPanel && (
-        <SpaceDebugPanel 
-          spaces={spaces} 
+        <SpaceDebugPanel
+          spaces={spaces}
           onHighlightSpace={(space) => setHighlightedSpaceId(space.id)}
           onHidePanel={() => setShowDebugPanel(false)}
         />
@@ -325,8 +335,8 @@ const handleDeleteRoom = (roomId: string) => {
       {/* Room Management Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="flex items-center gap-2"
             onClick={() => setIsRoomManagementOpen(true)}
@@ -334,9 +344,9 @@ const handleDeleteRoom = (roomId: string) => {
             <Settings className="h-4 w-4" />
             Manage Rooms
           </Button>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             size="sm"
             className="flex items-center gap-2"
             onClick={() => setIsTemplateDialogOpen(true)}
@@ -344,10 +354,10 @@ const handleDeleteRoom = (roomId: string) => {
             <Copy className="h-4 w-4" />
             Use Template
           </Button>
-          
+
           <div className="flex items-center gap-2">
-            <Select 
-              value={filterType} 
+            <Select
+              value={filterType}
               onValueChange={setFilterType}
             >
               <SelectTrigger className="w-[180px] h-9">
@@ -365,7 +375,7 @@ const handleDeleteRoom = (roomId: string) => {
                 <SelectItem value="lab">Lab</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Input
               placeholder="Search rooms..."
               value={searchQuery}
@@ -374,10 +384,10 @@ const handleDeleteRoom = (roomId: string) => {
             />
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Button 
-            variant="default" 
+          <Button
+            variant="default"
             size="sm"
             className="flex items-center gap-2"
             onClick={() => setIsRoomDialogOpen(true)}
@@ -385,10 +395,10 @@ const handleDeleteRoom = (roomId: string) => {
             <Plus className="h-4 w-4" />
             Create Room
           </Button>
-          
+
           {selectedSpace && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               className="flex items-center gap-2"
               onClick={() => handleOpenChat(selectedSpace)}
@@ -400,45 +410,24 @@ const handleDeleteRoom = (roomId: string) => {
         </div>
       </div>
 
-      {/* Main Floor Plan Card */}
-      <Card className="w-full">
-        <div className="p-4 min-h-[600px]"> {/* Added min-height */}
-          {isCompanyLoading ? (
-            <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-          ) : (
-            // <FloorPlanCanvas 
-            //   spaces={filteredSpaces} // Pass global Space[]
-            //   onSpaceSelect={(space: Space) => { // Ensure type is global Space
-            //     setSelectedSpace(space);
-            //     // Enter the space when clicked
-            //     handleEnterSpace(space);
-            //   }}
-            //   onSpaceDoubleClick={(space) => {
-            //     // Open chat panel on double-click
-            //     handleOpenChat(space);
-            //   }}
-            //   isEditable={true} // TODO: Make this dependent on user role (admin)
-            //   highlightedSpaceId={highlightedSpaceId} // Pass highlighted space ID
-            // />
-
-            <DomFloorPlan 
-              spaces={filteredSpaces} // Pass global Space[]
-              onSpaceSelect={(space: Space) => { // Ensure type is global Space
-                setSelectedSpace(space);
-                setHighlightedSpaceId(space.id);
-                // Enter the space when clicked
-                handleEnterSpace(space);
-              }}
-              onSpaceDoubleClick={(space) => {
-                // Open chat panel on double-click
-                handleOpenChat(space);
-              }}
-              isEditable={true} // TODO: Make this dependent on user role (admin)
-              highlightedSpaceId={highlightedSpaceId} // Pass highlighted space ID
-            />
+      
+        {/* Main Floor Plan Card */}
+        <Card className="w-full">
+          <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+            {isCompanyLoading ? (
+              <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
+            ) : (
+              
+                <ModernFloorPlan
+                  spaces={filteredSpaces || []}
+                  onSpaceSelect={handleSpaceSelect}
+                  onSpaceDoubleClick={(space) => handleOpenChat(space)}
+                  highlightedSpaceId={highlightedSpaceId}
+                />
+              
             )}
-        </div>
-      </Card>
+          </div>
+        </Card>
 
       {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
       <RoomDialog
@@ -477,7 +466,7 @@ const handleDeleteRoom = (roomId: string) => {
         open={isRoomManagementOpen}
         onOpenChange={setIsRoomManagementOpen}
       />
-      
+
       {/* Template Selection Dialog */}
       <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -502,37 +491,13 @@ const handleDeleteRoom = (roomId: string) => {
           />
         </DialogContent>
       </Dialog>
-      
+
       {/* Room Chat Integration */}
-      <RoomChatIntegration 
-        selectedRoom={chatRoom} 
+      <RoomChatIntegration
+        selectedRoom={chatRoom}
         onCloseChat={handleCloseChat}
         position="right"
       />
-
-      {/* User Info Bar - Correctly commented out */}
-      {/*
-      <Card className="w-full">
-        <CardContent className="py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {hoveredUser ? (
-                <>
-                  <UserHoverCard user={hoveredUser} />
-                  <span className="text-sm text-muted-foreground">{hoveredUser.activity}</span>
-                </>
-              ) : (
-                <span className="text-sm text-muted-foreground">Hover over a user to see details</span>
-              )}
-            </div>
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              {companyUsers.filter(u => u.status === 'online').length} Online
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-      */}
     </div>
   )
 }

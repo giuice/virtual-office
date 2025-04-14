@@ -43,9 +43,9 @@ function AcceptInviteContent() {
     // Check if authentication is complete, we have a user, a token, and are not already processing
     if (!authLoading && user && token && !isProcessing) {
       setIsProcessing(true); // Prevent multiple calls
-      console.log(`[AcceptInvitePage] User ${user.uid} authenticated with token ${token}. Preparing to call accept API.`); // Added log
+      console.log(`[AcceptInvitePage] User ${user.id} authenticated with token ${token}. Preparing to call accept API.`); // Added log
 
-      const payload = { token, firebaseUid: user.uid };
+      const payload = { token, supabaseUid: user.id };
       console.log('[AcceptInvitePage] Calling /api/invitations/accept with payload:', payload); // Added log
 
       // Call the backend API to accept the invitation

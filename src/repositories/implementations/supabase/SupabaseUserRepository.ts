@@ -1,7 +1,7 @@
 // src/repositories/implementations/supabase/SupabaseUserRepository.ts
 import { supabase } from '@/lib/supabase/client';
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
-import { User, UserRole, UserStatus, TimeStampType } from '@/types/database'; // Import necessary types
+import { User, UserRole, UserStatus } from '@/types/database'; // Import necessary types
 
 // Helper function to map DB snake_case to TS camelCase
 function mapToCamelCase(data: any): User {
@@ -9,7 +9,7 @@ function mapToCamelCase(data: any): User {
   return {
     id: data.id,
     companyId: data.company_id,
-    firebase_uid: data.firebase_uid, // Keep snake_case if type uses it, or map if needed
+    supabase_uid: data.supabase_uid, // Keep snake_case if type uses it, or map if needed
     email: data.email,
     displayName: data.display_name,
     avatarUrl: data.avatar_url,
@@ -48,6 +48,21 @@ export class SupabaseUserRepository implements IUserRepository {
     return data ? mapToCamelCase(data) : null;
   }
 
+  async findBySupabaseUid(supabaseUid: string): Promise<User | null> {
+    const { data, error } = await supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .eq('supabase_uid', supabaseUid) 
+      .single(); // .single() returns one object or null
+
+    if (error && error.code !== 'PGRST116') { // PGRST116: Row not found
+      console.error('Error fetching user by ID:', error);
+      throw error; // Or handle more gracefully
+    }
+    // Map DB response
+    return data ? mapToCamelCase(data) : null;
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     const { data, error } = await supabase
       .from(this.TABLE_NAME)
@@ -57,22 +72,6 @@ export class SupabaseUserRepository implements IUserRepository {
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching user by email:', error);
-      throw error;
-    }
-    // Map DB response
-    return data ? mapToCamelCase(data) : null;
-  }
-
-  async findByFirebaseUid(firebaseUid: string): Promise<User | null> {
-     // Ensure your 'users' table has a 'firebase_uid' column
-     const { data, error } = await supabase
-      .from(this.TABLE_NAME)
-      .select('*')
-      .eq('firebase_uid', firebaseUid)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching user by Firebase UID:', error);
       throw error;
     }
     // Map DB response
@@ -106,7 +105,7 @@ export class SupabaseUserRepository implements IUserRepository {
         status_message: userData.statusMessage,
         preferences: userData.preferences || {}, // Ensure object exists
         role: userData.role,
-        firebase_uid: userData.firebase_uid, // Assuming type has firebase_uid
+        supabase_uid: userData.supabase_uid, // Assuming type has supabase_uid
         // last_active and created_at handled by Supabase defaults
      };
 
@@ -127,14 +126,14 @@ export class SupabaseUserRepository implements IUserRepository {
   async update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>): Promise<User | null> {
      // Map camelCase fields from User type to snake_case for DB
      // Exclude fields that shouldn't be updated directly (id, createdAt, lastActive)
-     const { companyId, displayName, avatarUrl, statusMessage, firebase_uid, ...restUpdates } = updates; // email, status, preferences, role
+     const { companyId, displayName, avatarUrl, statusMessage, supabase_uid, ...restUpdates } = updates; // email, status, preferences, role
      const dbUpdates: Record<string, any> = { ...restUpdates };
 
      if (companyId !== undefined) dbUpdates.company_id = companyId;
      if (displayName !== undefined) dbUpdates.display_name = displayName;
      if (avatarUrl !== undefined) dbUpdates.avatar_url = avatarUrl;
      if (statusMessage !== undefined) dbUpdates.status_message = statusMessage;
-     if (firebase_uid !== undefined) dbUpdates.firebase_uid = firebase_uid; // Allow updating firebase_uid if needed
+     if (supabase_uid !== undefined) dbUpdates.supabase_uid = supabase_uid; // Allow updating supabase_uid if needed
      // Update last_active automatically on any update
      dbUpdates.last_active = new Date().toISOString();
 

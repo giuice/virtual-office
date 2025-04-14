@@ -14,6 +14,10 @@ import { useNotification } from '@/hooks/useNotification';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
 import Link from 'next/link';
+import { EnhancedUserMenu } from './enhanced-user-menu';
+
+// Feature flag for enhanced user menu
+const USE_ENHANCED_USER_MENU = true;
 
 interface DashboardHeaderProps {
   heading?: string;
@@ -80,21 +84,12 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
           </Button>
           
           {/* User Menu */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar>
-                  <AvatarImage 
-                    src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
-                    alt="User avatar" 
-                  />
-                  <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56" align="end">
-              <div className="grid gap-4">
-                <div className="flex items-center gap-4">
+          {USE_ENHANCED_USER_MENU ? (
+            <EnhancedUserMenu />
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar>
                     <AvatarImage 
                       src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
@@ -102,30 +97,43 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                     />
                     <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{getUserDisplayName()}</p>
-                    <p className="text-xs text-muted-foreground">{user?.email || 'No email'}</p>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56" align="end">
+                <div className="grid gap-4">
+                  <div className="flex items-center gap-4">
+                    <Avatar>
+                      <AvatarImage 
+                        src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
+                        alt="User avatar" 
+                      />
+                      <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email || 'No email'}</p>
+                    </div>
                   </div>
+                  <Separator />
+                  <Button variant="ghost" className="flex items-center justify-start gap-2" asChild>
+                    <Link href="/settings">
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" 
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
+                  </Button>
                 </div>
-                <Separator />
-                <Button variant="ghost" className="flex items-center justify-start gap-2" asChild>
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" 
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
       
