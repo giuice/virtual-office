@@ -16,38 +16,41 @@ Currently, the avatar upload system creates a new image file in Supabase storage
 - Image processing libraries (sharp)
 
 ## Steps
-1. **Implement Consistent Avatar Naming Convention:**
+1. ✅ **Implement Consistent Avatar Naming Convention:**
    - Modify the avatar filename generation to use a predictable format based solely on user ID
    - Update the `route.ts` file to use a format like `avatar-{userId}.{extension}` instead of including timestamps
    - Ensure that the file extension is preserved from the original upload
 
-2. **Add Logic to Check for Existing Avatars:**
+2. ✅ **Add Logic to Check for Existing Avatars:**
    - Before uploading a new avatar, check if the user already has an avatar in storage
    - Query the storage bucket for files matching the user's avatar naming pattern
    - Implement this logic in the avatar upload API endpoint
 
-3. **Implement Avatar Replacement Strategy:**
+3. ✅ **Implement Avatar Replacement Strategy:**
    - If an existing avatar is found, use the `upsert: true` option to replace it
    - Ensure proper error handling if replacement fails
    - Verify that the public URL remains consistent after replacement
 
-4. **Add Cleanup for Orphaned Avatars:**
-   - Create a utility function to identify and remove orphaned avatar files
+4. ✅ **Add Cleanup for Orphaned Avatars:**
+   - Create a utility function to identify and remove orphaned avatar files (`src/server/storage-cleanup.ts`)
    - This could be run periodically or as part of a maintenance task
    - Add logging for any cleanup operations
 
-5. **Update User Repository Interface:**
+5. ✅ **Update User Repository Interface:**
    - Modify the user repository to support updating avatar URLs consistently
    - Ensure that the database record is properly updated when an avatar is replaced
    - Add methods to retrieve a user's current avatar information if needed
+   *Verification: Existing `update` method in interface and implementation already supports `avatarUrl` updates. No changes needed.*
 
-6. **Enhance Error Handling and Validation:**
-   - Add robust error handling for storage operations
-   - Validate uploaded images more thoroughly before storage
-   - Implement fallback mechanisms if optimization fails
+6. ✅ **Enhance Error Handling and Validation:**
+   - Add robust error handling for storage operations (upload, remove, list)
+   - Validate uploaded images more thoroughly (size checks before/after processing)
+   - Implement fallback mechanisms (use original image if processing fails)
    - Add appropriate logging for debugging and monitoring
+   - Add check for user profile existence in DB
+   - Add rollback logic for failed DB updates
 
-7. **Test Optimization with Various Scenarios:**
+7. ✅ **Test Optimization with Various Scenarios:**
    - Test initial avatar upload for new users
    - Test avatar updates for existing users
    - Test deletion and re-upload scenarios

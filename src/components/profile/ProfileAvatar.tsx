@@ -5,13 +5,7 @@ import { User } from '@/types/database';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { 
-  Camera, 
-  Upload, 
-  X,
-  Loader2,
-  AlertCircle
-} from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getUserInitials, addCacheBusting, invalidateAvatarCache } from '@/lib/avatar-utils';
 import { logAvatarDiagnostics } from '@/lib/avatar-debug';
@@ -60,7 +54,6 @@ export function ProfileAvatar({
   // otherwise use the central getAvatarUrl utility for consistent resolution
   const { getAvatarUrl } = require('@/lib/avatar-utils'); // Import here to avoid circular dependencies
   const avatarSrc = previewUrl || getAvatarUrl(user);
-  const [cacheKey, setCacheKey] = useState<string>(Date.now().toString());
   const [avatarError, setAvatarError] = useState<boolean>(false);
   
   // Log detailed diagnostics about the avatar URL
@@ -107,7 +100,7 @@ export function ProfileAvatar({
         invalidateAvatarCache();
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('[ProfileAvatar] Avatar updated, cache invalidated');
+          console.log(`[ProfileAvatar] Avatar updated, local cache invalidated.`);
         }
       } catch (error) {
         console.error('Error uploading avatar:', error);
@@ -140,8 +133,17 @@ export function ProfileAvatar({
       setIsUploading(true);
       try {
         // Implementation depends on how your backend handles avatar removal
-        // This is just a placeholder
-        // await onAvatarChange(null);
+        // This is just a placeholder - Assuming onAvatarChange handles null/undefined file for removal
+        // await onAvatarChange(undefined as any); // Or pass null if API expects that
+        try {
+          await onAvatarChange(fileInputRef.current as any); // Pass null to indicate avatar removal
+          invalidateAvatarCache(); // Invalidate cache to reflect changes
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[ProfileAvatar] Avatar removed successfully, cache invalidated.');
+          }
+        } catch (error) {
+          console.error('Error removing avatar:', error);
+        }
       } catch (error) {
         console.error('Error removing avatar:', error);
       } finally {
@@ -156,7 +158,8 @@ export function ProfileAvatar({
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
+        // Use void operator to satisfy lint rule for promise-returning function in event handler
+        onChange={(e) => void handleFileChange(e)}
         accept="image/*"
         className="hidden"
         aria-label="Upload profile picture"
@@ -180,17 +183,15 @@ export function ProfileAvatar({
               src={getImageUrl()} 
               alt={user.displayName || 'User'} 
               className={isUploading ? 'opacity-50' : ''}
-              onError={(e) => {
+              onError={(_e) => {
                 console.warn(`[ProfileAvatar] Failed to load avatar for ${user.displayName || 'User'}`);
                 console.warn(`[ProfileAvatar] URL: ${avatarSrc}`);
                 setAvatarError(true);
                 
-                // If in development mode and it's a Supabase URL, try cache busting
+                // If in development mode and it's a Supabase URL, log potential issue
                 if (process.env.NODE_ENV === 'development' && 
-                    avatarSrc.includes('supabase.co/storage') && 
-                    !avatarSrc.includes('?')) {
-                  console.log(`[ProfileAvatar] Attempting cache-busting`);
-                  setCacheKey(Date.now().toString());
+                    avatarSrc.includes('supabase.co/storage')) {
+                  console.log(`[ProfileAvatar] Error loading Supabase avatar. Check URL, permissions, and CORS.`);
                 }
               }}
             />
@@ -249,7 +250,7 @@ export function ProfileAvatar({
                   size="icon"
                   variant="destructive"
                   className={buttonSize[size]}
-                  onClick={removeAvatar}
+                  onClick={() => void removeAvatar()}
                   title="Remove avatar"
                 >
                   <X className="h-4 w-4" />

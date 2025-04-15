@@ -13,13 +13,19 @@ Phase: Execution. We're about to begin implementing the avatar system fixes iden
 - Completed Step 2 of T6_1_AvatarDisplayFix: Identified and fixed the root cause - Supabase bucket was not set to public.
 - Completed Step 3 of T6_1_AvatarDisplayFix: Enhanced image loading with better error handling, caching, and fallback mechanisms.
 - Completed Step 4 of T6_1_AvatarDisplayFix: Implemented a robust cache invalidation system for avatar updates.
+- Completed Step 5 of T6_1_AvatarDisplayFix: Verified and tested avatar display fixes across different scenarios and components.
+- Completed Step 1 of T6_2_AvatarStorageOptimization: Implemented consistent avatar naming convention (avatar-{userId}.{extension}) in the upload API.
+- Completed Step 2 of T6_2_AvatarStorageOptimization: Added logic to check for existing avatars before upload in the API route.
+- Completed Step 3 of T6_2_AvatarStorageOptimization: Implemented avatar replacement strategy (remove existing files then upload new one) to handle different file types.
+- Completed Step 4 of T6_2_AvatarStorageOptimization: Created utility function `cleanupOrphanedAvatars` in `src/server/storage-cleanup.ts`.
+- Completed Step 5 of T6_2_AvatarStorageOptimization: Verified User Repository Interface already supports avatar URL updates.
+- Completed Step 6 of T6_2_AvatarStorageOptimization: Enhanced error handling, validation, and rollback logic in the avatar upload API (`src/app/api/users/avatar/route.ts`).
+- Completed Step 7 of T6_2_AvatarStorageOptimization: Tested optimization scenarios successfully.
+- Completed Task T6_2_AvatarStorageOptimization.
 
 ## Next Steps
-- Continue with Step 5 of T6_1_AvatarDisplayFix: Verify and Test Fixes.
-- Test with different image types (JPG, PNG, WebP).
-- Confirm avatar rendering in all places where avatars appear.
-- Check fallback behavior when images are unavailable.
-- Follow the execution steps in sequence for each avatar system fix task.
+- Start Task T6_3_AvatarGroupLayoutFix: Fix avatar group layout issues.
+- Follow the execution steps in `memory-bank/tasks/T6_3_AvatarGroupLayoutFix_instructions.md`.
 
 ## Dependencies
 - T6_1 depends on Supabase client configuration, avatar components, and user repository.
@@ -35,10 +41,12 @@ Phase: Execution. We're about to begin implementing the avatar system fixes iden
 - IP1_PresenceBugsResolution: 100% complete.
 - IP4_ModernFloorPlanUI: 20% complete (Task T4_1 is in progress).
 - IP5_MessagingRealtimeUnification: 100% complete.
-- IP6_AvatarSystemFixes: 0% complete (Tasks starting).
+- IP6_AvatarSystemFixes: 67% complete (T6_1, T6_2 completed).
 - Task T4_1_SpaceDesignSystem: 50% complete (In Progress).
 - Task T5_1_RefactorMessagingRealtime: 100% complete.
-- Tasks T6_1, T6_2, and T6_3: 0% complete (Not started).
+- Task T6_1_AvatarDisplayFix: 100% (Completed) [IP6_AvatarSystemFixes]
+- Task T6_2_AvatarStorageOptimization: 100% complete (Completed).
+- Task T6_3_AvatarGroupLayoutFix: 0% complete (Not started).
 
 ## Environment Notes
 - Current mode: crct

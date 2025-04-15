@@ -58,6 +58,22 @@
 - **Apr 14, 2025:** Identified and fixed root cause of avatar display issues: Supabase storage bucket was not set to public.
 - **Apr 14, 2025:** Implemented avatar caching system using localStorage to improve performance and reduce failed load attempts.
 - **Apr 14, 2025:** Added a global avatar cache invalidation system to ensure immediate avatar updates across all components.
+- Completed: Step 5 (Verify and Test Fixes) of T6_1_AvatarDisplayFix
+- Task: T6_1_AvatarDisplayFix
+- Outcome: Confirmed custom avatars display correctly, fallbacks work, and cache invalidation is effective.
+- Files affected: None (Testing step)
+- Completed: Step 4 (Add Cleanup for Orphaned Avatars) of T6_2_AvatarStorageOptimization
+- Task: T6_2_AvatarStorageOptimization
+- Outcome: Created utility function `src/server/storage-cleanup.ts` to identify and remove avatar files belonging to non-existent users.
+- Files affected: `src/server/storage-cleanup.ts` (created)
+- Completed: Step 6 (Enhance Error Handling and Validation) of T6_2_AvatarStorageOptimization
+- Task: T6_2_AvatarStorageOptimization
+- Outcome: Improved error handling, validation (size, type), logging, and added rollback logic to the avatar upload API (`src/app/api/users/avatar/route.ts`).
+- Files affected: `src/app/api/users/avatar/route.ts`
+- Completed: Task T6_2_AvatarStorageOptimization
+- Task: T6_2_AvatarStorageOptimization
+- Outcome: Successfully optimized avatar storage by implementing consistent naming, replacement strategy, orphaned file cleanup utility, and enhanced error handling/validation in the upload API. Verified through testing.
+- Files affected: `src/app/api/users/avatar/route.ts`, `src/server/storage-cleanup.ts`
 
 ## Pending Changes
 - Execute tasks for IP6_AvatarSystemFixes:
