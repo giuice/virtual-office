@@ -57,7 +57,7 @@ const sampleUsers = [
 const sampleSpace = {
   id: 'space-1',
   companyId: 'company-1',
-  name: 'Meeting Room A',
+  displayName: 'Meeting Room A',
   type: 'conference',
   status: 'available',
   capacity: 8,

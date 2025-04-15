@@ -152,7 +152,9 @@ function isValidImageUrl(url: string): boolean {
     // Supabase storage URLs
     /supabase\.co\/storage\/v1\/object\/public\//,
     // Placeholder URLs (for testing)
-    /^\/api\/placeholder/
+    /^\/api\/placeholder/,
+    // Google Photo URLs
+    /googleusercontent\.com/
   ];
   
   return validPatterns.some(pattern => pattern.test(url));
@@ -232,7 +234,12 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined
     avatarUrl = (user as any).photoURL;
     if (isValidImageUrl(avatarUrl)) {
       debugAvatarResolution(user, 'photoURL', avatarUrl);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Avatar] Using social login photoURL: ${avatarUrl}`);
+      }
       return avatarUrl;
+    } else {
+      console.warn(`[Avatar] Invalid photoURL format: ${avatarUrl?.substring(0, 100) || 'undefined'}`);
     }
   }
   

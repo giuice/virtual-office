@@ -17,9 +17,10 @@ import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
 import  AvatarGroup  from '@/components/floor-plan/modern/AvatarGroup';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { UserPresenceData } from '@/types/database';
 
 // Sample users for demonstration
-const sampleUsers = [
+const sampleUsers :UserPresenceData[] = [
   {
     id: '1',
     displayName: 'Alice Johnson',

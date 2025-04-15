@@ -37,7 +37,7 @@ export function FloorPlan() {
 
   // State for UI interactions
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
-  const [hoveredUser, setHoveredUser] = useState<User | null>(null);
+  
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState<boolean>(false);
   const [isRoomManagementOpen, setIsRoomManagementOpen] = useState<boolean>(false);
@@ -166,89 +166,7 @@ export function FloorPlan() {
     // Users should now be explicitly added to spaces through a dedicated UI action
   };
 
-  // Add a new explicit function for users to join a space
-  const handleJoinSpace = (space: Space) => {
-    if (!space || !space.id || !currentUserProfile?.id) {
-      toast({
-        title: "Error",
-        description: "Cannot join space: Missing data.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Only add the user if they're not already in the space
-    const updatedUserIds = [...(space.userIds || [])];
-    if (!updatedUserIds.includes(currentUserProfile.id)) {
-      updatedUserIds.push(currentUserProfile.id);
-
-      // Update the space with the new userIds using the mutation hook
-      updateSpaceMutation.mutate({
-        id: space.id,
-        updates: { userIds: updatedUserIds }
-      }, {
-        onSuccess: () => {
-          toast({
-            title: "Success",
-            description: `You joined ${space.name}`
-          });
-          setSelectedSpace(prev => prev?.id === space.id ?
-            { ...prev, userIds: updatedUserIds } : prev);
-        },
-        onError: (error: Error) => {
-          toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "Failed to join space",
-            variant: "destructive"
-          });
-        }
-      });
-    } else {
-      toast({
-        description: `You are already in ${space.name}`
-      });
-    }
-  };
-
-  // Handle leaving a space
-  const handleLeaveSpace = (space: Space) => {
-    if (!space || !space.id || !currentUserProfile) {
-      return;
-    }
-
-    // Remove the user from the space's userIds
-    const updatedUserIds = (space.userIds || []).filter(id => id !== currentUserProfile.id);
-
-    updateSpaceMutation.mutate({
-      id: space.id,
-      updates: { userIds: updatedUserIds }
-    }, {
-      onSuccess: () => {
-        toast({
-          title: "Left Space",
-          description: `You have left ${space.name}`
-        });
-
-        // Clear the saved space if it's the one we're leaving
-        if (lastSpaceId === space.id) {
-          clearLastSpace();
-        }
-
-        // If this was the selected space, deselect it
-        if (selectedSpace?.id === space.id) {
-          setSelectedSpace(null);
-          setChatRoom(null);
-        }
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: `Failed to leave space: ${error.message}`,
-          variant: "destructive"
-        });
-      }
-    });
-  };
+  
 
   // Handle opening chat for a room
   const handleOpenChat = (room: Space) => {
@@ -420,9 +338,11 @@ export function FloorPlan() {
               
                 <ModernFloorPlan
                   spaces={filteredSpaces || []}
+                  layout='spaced' // Use the selected layout
                   onSpaceSelect={handleSpaceSelect}
                   onSpaceDoubleClick={(space) => handleOpenChat(space)}
                   highlightedSpaceId={highlightedSpaceId}
+                  compactCards={false} // Set to false for full-size cards
                 />
               
             )}
