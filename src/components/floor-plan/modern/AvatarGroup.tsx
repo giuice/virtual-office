@@ -62,7 +62,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
               `z-${30 - index}` // Higher z-index for earlier avatars
             )}
             style={{ 
-              marginLeft: index > 0 ? '-12px' : '0' // More reliable than class-based approach
+              marginLeft: index > 0 ? '2px' : '0' // More reliable than class-based approach
             }}
           >
             <ModernUserAvatar
