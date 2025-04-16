@@ -2,7 +2,7 @@ import { ICompanyRepository, IUserRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { Company } from '@/types/database';
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { validateUserSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,12 +10,11 @@ export async function POST(request: Request) {
 
   // Get Supabase client using the server helper
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    // Check if the user is authenticated
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { supabaseUid: userId, userDbId, error: sessionError } = await validateUserSession();
+
+  if (sessionError || !userId || !userDbId) {
+    return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
+  }
 
   const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
   const userRepository: IUserRepository = new SupabaseUserRepository();

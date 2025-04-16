@@ -1,7 +1,5 @@
 // src/lib/auth/session.ts
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-
+import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Use the new server client helper
 type SessionResult = {
   supabaseUid?: string; // Supabase Auth UID
   userDbId?: string; // Database UUID (from users table)
@@ -16,20 +14,20 @@ type SessionResult = {
  */
 export async function validateUserSession(): Promise<SessionResult> {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseServerClient();
     
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
       console.error('Session error:', error.message);
       return { error: error.message };
     }
     
-    if (!session) {
+    if (!user) {
       return { error: 'No active session' };
     }
     
-    const supabaseUid = session.user.id; // This is the Supabase Auth UID
+    const supabaseUid = user.id; // This is the Supabase Auth UID
     
     // Get the database user record to fetch the database UUID
     const { data: userRecord, error: userError } = await supabase

@@ -1,50 +1,39 @@
 // src/app/api/conversations/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Conversation, ConversationType } from '@/types/messaging';
-import { IConversationRepository } from '@/repositories/interfaces'; 
-import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; 
+import { IConversationRepository } from '@/repositories/interfaces';
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { supabase } from '@/lib/supabase/client';
+import { validateUserSession } from '@/lib/auth/session';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    // Get the Firebase UID from the Authorization header
-    const authHeader = request.headers.get('Authorization');
-    let userId = '';
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Extract the token
-      const token = authHeader.substring(7);
-      // In a real implementation, you would verify this token
-      // For now, we'll assume it's the Firebase UID directly for simplicity
-      userId = token;
+
+    const { supabaseUid: userId, userDbId, error: sessionError } = await validateUserSession();
+
+    if (sessionError || !userId || !userDbId) {
+      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
-    
-    // If no Authorization header, try to get userId from the request body
-    if (!userId && body.userId) {
-      userId = body.userId;
-    }
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized: Missing user ID' }, { status: 401 });
     }
-    
+
     console.log('Creating conversation with user ID:', userId);
-    
+
     // Create repository instances
     const conversationRepository: IConversationRepository = new SupabaseConversationRepository();
     const userRepository: IUserRepository = new SupabaseUserRepository();
-    
+
     // Get the database UUID for this user if needed
     let userDatabaseId = userId;
-    
+
     // Check if the ID is a Firebase UID (not a UUID)
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
       // This is a Firebase UID, get the corresponding database ID
-      const user = await userRepository.findByFirebaseUid(userId);
+      const user = await userRepository.findBySupabaseUid(userId);
       if (!user) {
         console.error('User not found with Firebase UID:', userId);
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -69,7 +58,7 @@ export async function POST(request: NextRequest) {
       participants.push(userDatabaseId);
       console.log('Added current user to participants:', userDatabaseId);
     }
-    
+
     // Replace any Firebase UIDs with database UUIDs in participants
     const updatedParticipants = [...participants];
     for (let i = 0; i < updatedParticipants.length; i++) {
@@ -77,7 +66,7 @@ export async function POST(request: NextRequest) {
       // Check if this is a Firebase UID
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participantId)) {
         // Get the database UUID
-        const user = await userRepository.findByFirebaseUid(participantId);
+        const user = await userRepository.findBySupabaseUid(participantId);
         if (user) {
           updatedParticipants[i] = user.id;
           console.log(`Replaced Firebase UID ${participantId} with database ID ${user.id}`);
@@ -115,7 +104,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ conversation: newConversation }, { status: 201 });
   } catch (error) {
     console.error('Error creating conversation:', error);
-    
+
     // Detailed error for debugging
     let errorDetails = '';
     if (error instanceof Error) {
@@ -126,16 +115,16 @@ export async function POST(request: NextRequest) {
     } else {
       errorDetails = String(error);
     }
-    
+
     console.error('Error details:', errorDetails);
-    
+
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { 
-        error: 'Failed to create conversation', 
+      {
+        error: 'Failed to create conversation',
         message: error instanceof Error ? error.message : String(error),
         details: errorDetails
       },

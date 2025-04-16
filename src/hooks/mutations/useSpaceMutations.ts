@@ -92,12 +92,29 @@ const deleteSpace = async (spaceId: string): Promise<string> => {
 // Mutation hooks
 export function useCreateSpace() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: createSpace,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['spaces'] });
+    // Destructure variables to get companyId
+    onSuccess: (data, variables) => {
+      // Invalidate the specific query for the spaces of the relevant company
+      // Key structure: ['companies', 'detail', companyId, 'spaces']
+      if (variables.companyId) {
+        queryClient.invalidateQueries({
+          queryKey: ['companies', 'detail', variables.companyId, 'spaces']
+        });
+        console.log(`Invalidated spaces query for company: ${variables.companyId}`);
+      } else {
+        // Fallback or warning if companyId wasn't in variables for some reason
+        console.warn('Company ID not found in mutation variables, could not invalidate specific spaces query.');
+        // Optionally invalidate a broader key, but this might be too aggressive
+        // queryClient.invalidateQueries({ queryKey: ['companies', 'detail'] });
+      }
     },
+    onError: (error) => {
+      // Log error for debugging
+      console.error("Failed to create space:", error);
+    }
   });
 }
 

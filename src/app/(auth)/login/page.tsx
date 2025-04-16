@@ -33,7 +33,8 @@ export default function LoginPage() {
       hasCompany: !!company, 
       companyId: company?.id,
       profileCompanyId: currentUserProfile?.companyId,
-      currentUserProfile
+      currentUserProfile,
+      user
     });
     
     // Add a small delay to ensure all state is properly settled
@@ -45,7 +46,7 @@ export default function LoginPage() {
           hasCompanyId: !!currentUserProfile?.companyId,
           currentUserProfile
         });
-        router.push('/create-company');
+      router.push('/create-company');
       } else {
         // User has a company, redirect to office
         console.log('Redirecting to office - user has company:', {
@@ -66,6 +67,10 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       showSuccess({ description: 'Successfully logged in!' });
+      // Clean up invite flag if present
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('isAcceptingInvite');
+      }
       // Redirects will be handled by the useEffect above
     } catch (error) {
       showError({
@@ -80,6 +85,10 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully logged in with Google!' });
+      // Clean up invite flag if present
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('isAcceptingInvite');
+      }
       // Redirects will be handled by the useEffect above
     } catch (error) {
       showError({

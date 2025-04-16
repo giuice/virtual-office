@@ -8,9 +8,9 @@ import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories'
 export async function PATCH(request: Request) {
   try {
     // Validate user session to handle Firebase UID vs Database UUID mismatch
-    const { userId, userDbId, error: sessionError } = await validateUserSession();
+    const { supabaseUid, userDbId, error: sessionError } = await validateUserSession();
     
-    if (sessionError || !userId || !userDbId) {
+    if (sessionError || !supabaseUid || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
     
@@ -38,12 +38,12 @@ export async function PATCH(request: Request) {
     }
     
     // Verify user is a participant in the conversation
-    // participants field likely contains Firebase UIDs, so compare with userId (not userDbId)
-    if (!conversation.participants.includes(userId)) {
+    // participants field likely contains Supabase UIDs, so compare with userId (not userDbId)
+    if (!conversation.participants.includes(supabaseUid)) {
       return NextResponse.json({ error: 'Not authorized to modify this conversation' }, { status: 403 });
     }
     
-    console.log(`API: Marking conversation ${conversationId} as read for user ${userId} (DB ID: ${userDbId})`);
+    console.log(`API: Marking conversation ${conversationId} as read for user ${supabaseUid} (DB ID: ${userDbId})`);
     
     // Call the repository method to mark as read
     // Use userDbId (Database UUID) for database operations where required by repository

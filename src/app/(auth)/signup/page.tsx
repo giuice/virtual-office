@@ -35,7 +35,20 @@ export default function SignupPage() {
       await signUp(email, password, displayName);
       showSuccess({ description: 'Account created successfully!' });
       console.log('Account created successfully!');
-      router.push('/create-company');
+
+      // Check if signing up as part of accepting an invite
+      const isAcceptingInvite = typeof window !== 'undefined' && sessionStorage.getItem('isAcceptingInvite') === 'true';
+
+      if (isAcceptingInvite) {
+        console.log('Signup part of invite flow, redirecting to dashboard...');
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('isAcceptingInvite'); // Clean up the flag
+        }
+        router.push('/dashboard'); // Or '/office' or appropriate destination
+      } else {
+        console.log('Normal signup flow, redirecting to create-company...');
+        router.push('/create-company');
+      }
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to create account'
@@ -69,7 +82,7 @@ export default function SignupPage() {
           <CardDescription>Sign up to join your virtual office</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={() => handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
                 Email
@@ -149,7 +162,7 @@ export default function SignupPage() {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={handleGoogleSignIn}
+              onClick={() => handleGoogleSignIn}
               disabled={isLoading}
             >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">

@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase/client'; // Keep for direct auth actions
 import { AuthContextType } from '@/types/auth'; // Updated type
-import { getUserById, updateUserStatus, syncUserProfile } from '@/lib/api';
+import { getUserById, updateUserStatus } from '@/lib/api';
 import { User } from '@supabase/supabase-js';
 import { useSession } from '@/hooks/useSession'; // Import the new hook
 
@@ -29,11 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if user has a profile in the database using Supabase UID
         const userProfile = await getUserById(currentUser.id); // getUserById expects supabase_uid
         if (userProfile) {
-          // Update status using the Database User ID (assuming updateUserStatus expects DB ID)
-          // If updateUserStatus expects supabase_uid, change userProfile.id to currentUser.id
-          await updateUserStatus(userProfile.id, status);
+          // Update status using the Supabase Auth UID, which the API endpoint expects via the 'id' query param
+          await updateUserStatus(currentUser.id, status);
         } else {
-          console.warn(`User profile not found for supabase_uid: ${currentUser.id}. Cannot update status.`);
+          // It's possible the profile doesn't exist yet if signup/sync is slow, log warning but don't error
+          console.warn(`User profile not found for supabase_uid: ${currentUser.id}. Cannot update status yet.`);
         }
       } catch (error) {
         console.error('Error updating user status:', error);
@@ -43,28 +43,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Effect to update status when user logs in/out (based on useSession)
-  useEffect(() => {
+  useEffect(()  =>  {
     if (user) {
-      updateStatus(user, 'online');
+       void updateStatus(user, 'online'); // Explicitly ignore promise
     }
-    // No explicit 'offline' on logout needed here if handled by beforeunload
+
 
     // Update user status to offline when they close the tab or navigate away
     const handleBeforeUnload = () => {
       // Use the user state variable directly
       if (user) {
-        // Note: This is best-effort and might not always run reliably,
-        // especially on mobile or abrupt closes. Consider backend mechanisms too.
-        updateStatus(user, 'offline');
+
+        void updateStatus(user, 'offline');
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // No need to unsubscribe from onAuthStateChange here, useSession handles it
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [user]); // Depend on the user object from useSession
 
   // --- Auth Actions ---
@@ -104,19 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (error) throw error;
       // Sign up successful, user object might be available in data.user
-      // Sync profile if user data is present (might require email confirmation first depending on settings)
+      // Profile synchronization is now handled by the database trigger 'on_auth_user_created'.
       if (data.user) {
-        try {
-          await syncUserProfile({
-            supabase_uid: data.user.id,
-            email: data.user.email!, // Email should exist on user object after signup
-            displayName: data.user.user_metadata?.displayName || displayName || email.split('@')[0],
-            status: 'online' as const,
-          });
-        } catch (syncError) {
-          console.error("Error syncing profile after sign up:", syncError);
-          // Decide how to handle profile sync failure - maybe notify user?
-        }
+        console.log(`Sign up successful for ${data.user.email}. Profile sync handled by trigger.`);
       } else {
          // Handle case where sign up requires email confirmation
          console.log("Sign up successful, awaiting email confirmation potentially.");

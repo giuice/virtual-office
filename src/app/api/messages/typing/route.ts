@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { validateUserSession } from '@/lib/auth/session';
-import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 
 export async function POST(request: Request) {
   try {
