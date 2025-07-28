@@ -10,6 +10,7 @@ import {
 } from '@/types/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -24,12 +25,18 @@ import {
 
 interface MessageItemProps {
   message: Message;
+  sender?: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
   onReply?: (message: Message) => void;
   onReaction?: (messageId: string, emoji: string) => void;
 }
 
 export function MessageItem({ 
   message, 
+  sender,
   onReply,
   onReaction
 }: MessageItemProps) {
@@ -200,10 +207,13 @@ export function MessageItem({
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      {showAvatar && (
-        <Avatar className="h-8 w-8 mr-2">
-          {/* TODO: Add user avatar */}
-        </Avatar>
+      {showAvatar && sender && (
+        <EnhancedAvatar
+          user={sender}
+          size="sm"
+          className="mr-2"
+          fallbackName={sender.displayName}
+        />
       )}
       
       <div
@@ -214,7 +224,7 @@ export function MessageItem({
       >
         {!isCurrentUser && (
           <div className="text-xs text-muted-foreground mb-1">
-            {message.senderId}
+            {sender?.displayName || message.senderId}
           </div>
         )}
         

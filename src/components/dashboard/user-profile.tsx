@@ -6,6 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -69,22 +70,15 @@ export function UserProfile() {
       <CardContent className="space-y-6">
         {/* Profile Picture & Basic Info */}
         <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-          <div className="relative">
-            <Avatar className="h-24 w-24">
-              {currentUserProfile.avatarUrl ? (
-                <img src={currentUserProfile.avatarUrl} alt={currentUserProfile.displayName} />
-              ) : (
-                <div className="flex h-full w-full text-2xl items-center justify-center bg-primary/10 text-primary">
-                  {getUserInitials(currentUserProfile.displayName)}
-                </div>
-              )}
-            </Avatar>
-            <span 
-              className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-background ${
-                statusOptions.find(s => s.value === currentUserProfile.status)?.color || 'bg-gray-400'
-              }`}
-            />
-          </div>
+          <EnhancedAvatar
+            user={currentUserProfile}
+            size="xl"
+            showStatus={true}
+            status={currentUserProfile.status}
+            onError={(error, url) => {
+              console.warn(`Avatar load failed for current user:`, error.message);
+            }}
+          />
           
           <div className="space-y-1 text-center md:text-left">
             <h3 className="text-xl font-medium">{currentUserProfile.displayName}</h3>

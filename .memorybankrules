@@ -1,6 +1,0 @@
-[PHASE_MARKER]
-CURRENT: STRATEGY
-NEXT: EXECUTION
-LAST_ACTION: Transitioned from Setup/Maintenance to Strategy phase
-REQUIRED_BEFORE_TRANSITION: Create task instructions with detailed steps
-[/PHASE_MARKER]

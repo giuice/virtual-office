@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
+import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -239,20 +240,15 @@ export function CompanyMembers() {
           {companyUsers.map((user) => (
             <div key={user.id} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Avatar className="h-10 w-10">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt={user.displayName} />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary">
-                        {getUserInitials(user.displayName)}
-                      </div>
-                    )}
-                  </Avatar>
-                  <span 
-                    className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${getStatusColor(user.status)}`}
-                  />
-                </div>
+                <EnhancedAvatar
+                  user={user}
+                  size="md"
+                  showStatus={true}
+                  status={user.status}
+                  onError={(error, url) => {
+                    console.warn(`Avatar load failed for user ${user.displayName}:`, error.message);
+                  }}
+                />
                 <div>
                   <div className="font-medium">{user.displayName}</div>
                   <div className="text-sm text-muted-foreground">{user.email}</div>
