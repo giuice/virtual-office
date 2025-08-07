@@ -6,6 +6,37 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Us
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 
+// Helper function to validate Google avatar URLs
+function isValidGoogleAvatarUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    
+    // Check for Google domains
+    const googleDomains = [
+      'googleapis.com',
+      'googleusercontent.com',
+      'google.com'
+    ];
+    
+    const isGoogleDomain = googleDomains.some(domain => 
+      parsedUrl.hostname.includes(domain)
+    );
+    
+    if (!isGoogleDomain) {
+      return false;
+    }
+    
+    // Check for HTTPS protocol
+    if (parsedUrl.protocol !== 'https:') {
+      return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 
 const userRepository: IUserRepository = new SupabaseUserRepository();
 
@@ -33,9 +64,54 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate Google avatar URL if provided
+    if (userData.googleAvatarUrl) {
+      if (typeof userData.googleAvatarUrl !== 'string') {
+        return NextResponse.json(
+          { error: 'Invalid googleAvatarUrl: must be a string' },
+          { status: 400 }
+        );
+      }
+      
+      if (!isValidGoogleAvatarUrl(userData.googleAvatarUrl)) {
+        console.warn('Invalid Google avatar URL provided:', userData.googleAvatarUrl);
+        // Don't fail the request, just log the warning and continue without the avatar
+        userData.googleAvatarUrl = undefined;
+      }
+    }
+
     // Check if user already exists
     const existingUser = await userRepository.findBySupabaseUid(userData.supabaseUid);
     if (existingUser) {
+      // If user exists but we have a Google avatar URL to update, update it
+      if (userData.googleAvatarUrl && userData.googleAvatarUrl !== existingUser.avatarUrl) {
+        console.log('Updating existing user with Google avatar URL:', {
+          userId: existingUser.id,
+          currentAvatarUrl: existingUser.avatarUrl,
+          newGoogleAvatarUrl: userData.googleAvatarUrl
+        });
+        
+        try {
+          const updatedUser = await userRepository.update(existingUser.id, {
+            avatarUrl: userData.googleAvatarUrl
+          });
+          
+          return NextResponse.json({
+            success: true,
+            user: updatedUser,
+            message: 'User profile updated with Google avatar'
+          });
+        } catch (updateError) {
+          console.error('Error updating user with Google avatar:', updateError);
+          // Return existing user if update fails
+          return NextResponse.json({
+            success: true,
+            user: existingUser,
+            message: 'User profile exists, avatar update failed'
+          });
+        }
+      }
+      
       return NextResponse.json({
         success: true,
         user: existingUser,
@@ -43,7 +119,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Create new user profile
+    // Create new user profile with Google avatar if provided
     const newUser = await userRepository.create({
       supabase_uid: userData.supabaseUid,
       email: userData.email,
@@ -51,7 +127,14 @@ export async function POST(request: Request) {
       status: userData.status || 'online',
       companyId: userData.companyId,
       role: userData.role || 'member',
-      preferences: {}
+      preferences: {},
+      avatarUrl: userData.googleAvatarUrl || undefined // Store Google avatar URL if provided
+    });
+
+    console.log('Created new user profile with Google avatar:', {
+      userId: newUser.id,
+      email: newUser.email,
+      hasGoogleAvatar: !!userData.googleAvatarUrl
     });
 
     return NextResponse.json({

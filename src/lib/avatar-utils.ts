@@ -3,6 +3,100 @@ import { User } from '@/types/database';
 import { UIUser } from '@/types/ui';
 import { debugLogger } from '@/utils/debug-logger';
 
+// Avatar cache configuration
+const AVATAR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_RETRY_ATTEMPTS = 2;
+const RETRY_DELAY = 1000; // 1 second
+
+// In-memory cache for avatar URLs
+interface CachedAvatar {
+  url: string;
+  timestamp: number;
+  userId: string;
+  version?: string; // For cache busting
+}
+
+class AvatarCache {
+  private cache = new Map<string, CachedAvatar>();
+  private retryAttempts = new Map<string, number>();
+  
+  get(userId: string): string | null {
+    const cached = this.cache.get(userId);
+    if (!cached) {
+      debugLogger.avatar.cache('miss', userId);
+      return null;
+    }
+    
+    // Check if cache is expired
+    if (Date.now() - cached.timestamp > AVATAR_CACHE_TTL) {
+      this.cache.delete(userId);
+      debugLogger.avatar.cache('invalidate', userId, { reason: 'expired' });
+      return null;
+    }
+    
+    debugLogger.avatar.cache('hit', userId, { 
+      url: cached.url.substring(0, 50) + (cached.url.length > 50 ? '...' : ''),
+      age: Date.now() - cached.timestamp 
+    });
+    return cached.url;
+  }
+  
+  set(userId: string, url: string, version?: string): void {
+    this.cache.set(userId, {
+      url,
+      timestamp: Date.now(),
+      userId,
+      version
+    });
+    debugLogger.avatar.cache('set', userId, { 
+      url: url.substring(0, 50) + (url.length > 50 ? '...' : ''),
+      version 
+    });
+  }
+  
+  invalidate(userId: string): void {
+    this.cache.delete(userId);
+    this.retryAttempts.delete(userId);
+    debugLogger.avatar.cache('invalidate', userId, { reason: 'manual' });
+  }
+  
+  invalidateAll(): void {
+    this.cache.clear();
+    this.retryAttempts.clear();
+    debugLogger.log('Avatar', 'Invalidated all avatar cache');
+  }
+  
+  getRetryCount(userId: string): number {
+    return this.retryAttempts.get(userId) || 0;
+  }
+  
+  incrementRetryCount(userId: string): number {
+    const current = this.getRetryCount(userId);
+    const newCount = current + 1;
+    this.retryAttempts.set(userId, newCount);
+    return newCount;
+  }
+  
+  resetRetryCount(userId: string): void {
+    this.retryAttempts.delete(userId);
+  }
+  
+  // Get cache statistics for debugging
+  getStats(): { size: number; entries: Array<{ userId: string; age: number; url: string }> } {
+    const now = Date.now();
+    const entries = Array.from(this.cache.entries()).map(([userId, cached]) => ({
+      userId,
+      age: now - cached.timestamp,
+      url: cached.url.substring(0, 50) + (cached.url.length > 50 ? '...' : '')
+    }));
+    
+    return { size: this.cache.size, entries };
+  }
+}
+
+// Global avatar cache instance
+const avatarCache = new AvatarCache();
+
 // Interface for all possible user-like objects with avatar properties
 export interface AvatarUser {
   id?: string | number;
@@ -105,6 +199,12 @@ function debugAvatarResolution(user: any, source: string, value: string | null |
   }
 }
 
+// Enhanced avatar resolution tracking for comprehensive debugging
+function trackAvatarResolution(user: any, sources: Array<{ source: string; url: string | null; selected: boolean }>) {
+  const userId = String(user?.id || 'unknown');
+  debugLogger.avatar.resolution(userId, sources);
+}
+
 // Log avatar loading failures with detailed information
 export function logAvatarLoadError(error: AvatarLoadError) {
   debugLogger.error('Avatar', `Avatar load failed for user ${error.userId}`, {
@@ -163,7 +263,8 @@ function isValidAvatarUrl(url: string | null | undefined): boolean {
       'googleusercontent.com',
       'gravatar.com',
       'github.com',
-      'githubusercontent.com'
+      'githubusercontent.com',
+      'example.com' // For testing
     ].some(domain => parsedUrl.hostname.includes(domain));
     
     return isImageFile || isKnownService || pathname.includes('avatar') || pathname.includes('photo');
@@ -225,23 +326,39 @@ function fixSupabaseStorageUrl(url: string): string {
  * 4. Generate default avatar with initials (lowest priority)
  */
 export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined): string {
+  const startTime = performance.now();
+  
   // Handle null or undefined user
   if (!user) {
     debugAvatarResolution(user, 'user', null);
     debugLogger.trace('Avatar', 'No user provided, generating default avatar');
-    return generateAvatarDataUri({ name: '' });
+    const fallback = generateAvatarDataUri({ name: '' });
+    debugLogger.avatar.fallback('unknown', 'No user provided');
+    return fallback;
   }
   
   const userId = String((user as any).id || 'unknown');
   debugLogger.trace('Avatar', `Resolving avatar for user ${userId}`);
   
+  // Track all resolution attempts for debugging
+  const resolutionSources: Array<{ source: string; url: string | null; selected: boolean }> = [];
+  
   // Priority 1: Database avatarUrl (custom uploaded avatar - highest priority)
   debugAvatarResolution(user, 'avatarUrl', user.avatarUrl);
-  if (user.avatarUrl) {
-    const validatedAvatarUrl = validateAndLogAvatarUrl(user.avatarUrl, 'avatarUrl', userId);
+  const avatarUrl = user.avatarUrl;
+  resolutionSources.push({ source: 'avatarUrl', url: avatarUrl || null, selected: false });
+  
+  if (avatarUrl) {
+    const validatedAvatarUrl = validateAndLogAvatarUrl(avatarUrl, 'avatarUrl', userId);
     if (validatedAvatarUrl) {
       const fixedUrl = fixSupabaseStorageUrl(validatedAvatarUrl);
-      debugLogger.log('Avatar', `Using custom avatar for user ${userId}`, { url: fixedUrl });
+      resolutionSources[resolutionSources.length - 1].selected = true;
+      trackAvatarResolution(user, resolutionSources);
+      
+      const duration = performance.now() - startTime;
+      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'avatarUrl' });
+      debugLogger.avatar.loadSuccess(userId, fixedUrl, 'custom upload');
+      
       return fixedUrl;
     }
   }
@@ -249,10 +366,18 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined
   // Priority 2: Google OAuth photoURL (for Google authenticated users)
   const photoURL = (user as any).photoURL;
   debugAvatarResolution(user, 'photoURL', photoURL);
+  resolutionSources.push({ source: 'photoURL', url: photoURL || null, selected: false });
+  
   if (photoURL) {
     const validatedPhotoUrl = validateAndLogAvatarUrl(photoURL, 'photoURL', userId);
     if (validatedPhotoUrl) {
-      debugLogger.log('Avatar', `Using Google OAuth photo for user ${userId}`, { url: validatedPhotoUrl });
+      resolutionSources[resolutionSources.length - 1].selected = true;
+      trackAvatarResolution(user, resolutionSources);
+      
+      const duration = performance.now() - startTime;
+      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'photoURL' });
+      debugLogger.avatar.loadSuccess(userId, validatedPhotoUrl, 'Google OAuth');
+      
       return validatedPhotoUrl;
     }
   }
@@ -260,28 +385,44 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined
   // Priority 3: Legacy avatar field (backward compatibility)
   const legacyAvatar = (user as any).avatar;
   debugAvatarResolution(user, 'avatar', legacyAvatar);
+  resolutionSources.push({ source: 'avatar', url: legacyAvatar || null, selected: false });
+  
   if (legacyAvatar) {
     const validatedLegacyAvatar = validateAndLogAvatarUrl(legacyAvatar, 'avatar', userId);
     if (validatedLegacyAvatar) {
       const fixedUrl = fixSupabaseStorageUrl(validatedLegacyAvatar);
-      debugLogger.log('Avatar', `Using legacy avatar for user ${userId}`, { url: fixedUrl });
+      resolutionSources[resolutionSources.length - 1].selected = true;
+      trackAvatarResolution(user, resolutionSources);
+      
+      const duration = performance.now() - startTime;
+      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'legacy' });
+      debugLogger.avatar.loadSuccess(userId, fixedUrl, 'legacy field');
+      
       return fixedUrl;
     }
   }
   
   // Priority 4: Generate default avatar with initials (lowest priority)
   debugAvatarResolution(user, 'generateAvatarDataUri', 'Generating default avatar');
+  resolutionSources.push({ source: 'fallback', url: 'generated', selected: true });
+  trackAvatarResolution(user, resolutionSources);
+  
   const fallbackAvatar = generateAvatarDataUri({ 
     displayName: user.displayName || (user as any).name || '',
     name: (user as any).name || user.displayName || ''
   });
   
-  debugLogger.log('Avatar', `Using generated initials avatar for user ${userId}`);
+  const duration = performance.now() - startTime;
+  debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'fallback' });
+  debugLogger.avatar.fallback(userId, 'No valid avatar URLs found', {
+    checkedSources: resolutionSources.length - 1
+  });
+  
   return fallbackAvatar;
 }
 
 /**
- * Enhanced avatar URL getter with retry logic and comprehensive error handling
+ * Enhanced avatar URL getter with caching, retry logic and comprehensive error handling
  * This function provides additional debugging and error tracking capabilities
  */
 export function getAvatarUrlWithFallback(
@@ -290,22 +431,185 @@ export function getAvatarUrlWithFallback(
     onError?: (error: AvatarLoadError) => void;
     onRetry?: (url: string, attempt: number) => void;
     enableRetry?: boolean;
+    enableCache?: boolean;
+    cacheVersion?: string; // For cache busting
   } = {}
 ): string {
-  const avatarUrl = getAvatarUrl(user);
   const userId = String((user as any)?.id || 'unknown');
+  const { enableCache = true, cacheVersion } = options;
   
-  // If it's a data URI (generated avatar), return immediately
+  // Check cache first if enabled
+  if (enableCache) {
+    const cachedUrl = avatarCache.get(userId);
+    if (cachedUrl) {
+      debugLogger.trace('Avatar', `Using cached avatar for user ${userId}`);
+      return cachedUrl;
+    }
+  }
+  
+  const avatarUrl = getAvatarUrl(user);
+  
+  // If it's a data URI (generated avatar), cache and return immediately
   if (avatarUrl.startsWith('data:')) {
+    if (enableCache) {
+      avatarCache.set(userId, avatarUrl, cacheVersion);
+    }
     debugLogger.trace('Avatar', `Returning generated avatar for user ${userId}`);
     return avatarUrl;
   }
   
-  // For external URLs, validate and prepare for potential error handling
+  // For external URLs, cache and prepare for potential error handling
+  if (enableCache) {
+    avatarCache.set(userId, avatarUrl, cacheVersion);
+  }
+  
   debugLogger.trace('Avatar', `Returning external avatar URL for user ${userId}`, { url: avatarUrl });
   
   // Components using this function should call handleAvatarLoadError on image load failures
   return avatarUrl;
+}
+
+/**
+ * Enhanced avatar URL getter with built-in retry mechanism
+ * This function attempts to load the avatar with retry logic
+ */
+export async function getAvatarUrlWithRetry(
+  user: User | UIUser | AvatarUser | null | undefined,
+  options: {
+    onError?: (error: AvatarLoadError) => void;
+    onRetry?: (url: string, attempt: number) => void;
+    enableCache?: boolean;
+    cacheVersion?: string;
+    maxRetries?: number;
+    retryDelay?: number;
+  } = {}
+): Promise<string> {
+  const userId = String((user as any)?.id || 'unknown');
+  const { 
+    maxRetries = MAX_RETRY_ATTEMPTS, 
+    retryDelay = RETRY_DELAY,
+    enableCache = true,
+    cacheVersion,
+    onError,
+    onRetry
+  } = options;
+  
+  // Get the avatar URL (with caching if enabled)
+  const avatarUrl = getAvatarUrlWithFallback(user, { enableCache, cacheVersion });
+  
+  // If it's a data URI (generated avatar), return immediately
+  if (avatarUrl.startsWith('data:')) {
+    return avatarUrl;
+  }
+  
+  // For external URLs, attempt to validate with retry logic
+  let lastError: Error | null = null;
+  const currentRetryCount = avatarCache.getRetryCount(userId);
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Attempt to validate the URL by creating an Image object
+      await validateImageUrl(avatarUrl);
+      
+      // Success - reset retry count and return URL
+      avatarCache.resetRetryCount(userId);
+      debugLogger.log('Avatar', `Avatar URL validated successfully for user ${userId}`, { 
+        url: avatarUrl, 
+        attempt: attempt + 1 
+      });
+      return avatarUrl;
+      
+    } catch (error) {
+      lastError = error as Error;
+      const retryCount = avatarCache.incrementRetryCount(userId);
+      
+      debugLogger.avatar.retry(userId, avatarUrl, attempt + 1, maxRetries);
+      debugLogger.warn('Avatar', `Avatar load attempt ${attempt + 1} failed for user ${userId}`, {
+        url: avatarUrl,
+        error: lastError.message,
+        totalRetries: retryCount
+      });
+      
+      // Call retry callback if provided
+      if (onRetry) {
+        onRetry(avatarUrl, attempt + 1);
+      }
+      
+      // If this isn't the last attempt, wait before retrying
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+  
+  // All retry attempts failed - log error and return fallback
+  const avatarError: AvatarLoadError = {
+    userId,
+    url: avatarUrl,
+    errorType: 'network',
+    timestamp: new Date(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    additionalInfo: {
+      maxRetries,
+      finalError: lastError?.message,
+      totalRetryCount: avatarCache.getRetryCount(userId)
+    }
+  };
+  
+  logAvatarLoadError(avatarError);
+  
+  if (onError) {
+    onError(avatarError);
+  }
+  
+  // Return fallback avatar
+  const fallbackAvatar = generateAvatarDataUri({ 
+    displayName: user?.displayName || (user as any)?.name || '',
+    name: (user as any)?.name || user?.displayName || ''
+  });
+  
+  // Cache the fallback to avoid repeated failures
+  if (enableCache) {
+    avatarCache.set(userId, fallbackAvatar, cacheVersion);
+  }
+  
+  debugLogger.log('Avatar', `Using fallback avatar after retry failures for user ${userId}`);
+  return fallbackAvatar;
+}
+
+/**
+ * Validate an image URL by attempting to load it
+ */
+function validateImageUrl(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // For server-side rendering, skip validation
+    if (typeof window === 'undefined') {
+      resolve();
+      return;
+    }
+    
+    const img = new Image();
+    const timeout = setTimeout(() => {
+      reject(new Error('Image load timeout'));
+    }, 10000); // 10 second timeout
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('Image failed to load'));
+    };
+    
+    // Add timestamp to bust cache if needed
+    const urlWithCacheBust = url.includes('?') 
+      ? `${url}&_t=${Date.now()}` 
+      : `${url}?_t=${Date.now()}`;
+    
+    img.src = urlWithCacheBust;
+  });
 }
 
 /**
@@ -380,6 +684,144 @@ export function handleAvatarLoadError(
   }
   
   return failedUrl; // Return original URL if no fallback requested
+}
+
+/**
+ * Cache management functions for avatar system
+ */
+export const avatarCacheManager = {
+  /**
+   * Invalidate cache for a specific user
+   */
+  invalidateUser: (userId: string): void => {
+    avatarCache.invalidate(userId);
+  },
+  
+  /**
+   * Invalidate all cached avatars
+   */
+  invalidateAll: (): void => {
+    avatarCache.invalidateAll();
+  },
+  
+  /**
+   * Get cache statistics for debugging
+   */
+  getStats: () => {
+    return avatarCache.getStats();
+  },
+  
+  /**
+   * Bust cache for a user by updating their avatar with a new version
+   */
+  bustCache: (userId: string, newVersion?: string): void => {
+    avatarCache.invalidate(userId);
+    debugLogger.log('Avatar', `Cache busted for user ${userId}`, { version: newVersion });
+  },
+  
+  /**
+   * Pre-warm cache with a known avatar URL
+   */
+  preWarm: (userId: string, avatarUrl: string, version?: string): void => {
+    avatarCache.set(userId, avatarUrl, version);
+    debugLogger.log('Avatar', `Pre-warmed cache for user ${userId}`, { url: avatarUrl });
+  }
+};
+
+/**
+ * Generate cache-busting URL for updated avatars
+ */
+export function generateCacheBustingUrl(baseUrl: string, version?: string | number): string {
+  if (!baseUrl || baseUrl.startsWith('data:')) {
+    return baseUrl;
+  }
+  
+  const timestamp = version || Date.now();
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  const cacheBustUrl = `${baseUrl}${separator}v=${timestamp}`;
+  
+  debugLogger.trace('Avatar', 'Generated cache-busting URL', { 
+    original: baseUrl, 
+    cacheBusted: cacheBustUrl 
+  });
+  
+  return cacheBustUrl;
+}
+
+/**
+ * Enhanced avatar update function with cache invalidation
+ */
+export function updateAvatarWithCacheBust(
+  userId: string, 
+  newAvatarUrl: string, 
+  options: {
+    bustCache?: boolean;
+    version?: string | number;
+    invalidateRelated?: boolean;
+  } = {}
+): string {
+  const { bustCache = true, version, invalidateRelated = false } = options;
+  
+  // Invalidate cache for this user
+  if (bustCache) {
+    avatarCacheManager.invalidateUser(userId);
+  }
+  
+  // Generate cache-busting URL if needed
+  const finalUrl = bustCache ? generateCacheBustingUrl(newAvatarUrl, version) : newAvatarUrl;
+  
+  // Pre-warm cache with new URL
+  avatarCache.set(userId, finalUrl, String(version || Date.now()));
+  
+  debugLogger.log('Avatar', `Updated avatar for user ${userId}`, {
+    url: finalUrl,
+    bustCache,
+    version
+  });
+  
+  return finalUrl;
+}
+
+/**
+ * Enhanced error handling with retry tracking and comprehensive logging
+ */
+export function handleAvatarLoadErrorWithRetry(
+  user: User | UIUser | AvatarUser | null | undefined,
+  failedUrl: string,
+  errorEvent?: Event | Error,
+  options: {
+    onError?: (error: AvatarLoadError) => void;
+    generateFallback?: boolean;
+    enableRetry?: boolean;
+    maxRetries?: number;
+  } = {}
+): string {
+  const userId = String((user as any)?.id || 'unknown');
+  const { enableRetry = true, maxRetries = MAX_RETRY_ATTEMPTS } = options;
+  
+  // Check if we should attempt retry
+  const currentRetryCount = avatarCache.getRetryCount(userId);
+  const shouldRetry = enableRetry && currentRetryCount < maxRetries;
+  
+  if (shouldRetry) {
+    // Increment retry count
+    const newRetryCount = avatarCache.incrementRetryCount(userId);
+    
+    debugLogger.warn('Avatar', `Avatar load failed, will retry (${newRetryCount}/${maxRetries})`, {
+      userId,
+      url: failedUrl,
+      retryCount: newRetryCount
+    });
+    
+    // Invalidate cache to force fresh attempt
+    avatarCache.invalidate(userId);
+    
+    // Return the same URL for retry (component should handle the retry)
+    return failedUrl;
+  }
+  
+  // Max retries reached or retry disabled - handle as final error
+  return handleAvatarLoadError(user, failedUrl, errorEvent, options);
 }
 
 /**

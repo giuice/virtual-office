@@ -7,6 +7,7 @@ import { AuthContextType } from '@/types/auth'; // Updated type
 import { getUserById, updateUserStatus, syncUserProfile } from '@/lib/api';
 import { User } from '@supabase/supabase-js';
 import { useSession } from '@/hooks/useSession'; // Import the new hook
+import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -46,6 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) {
       updateStatus(user, 'online');
+
+      // Check if this is a Google OAuth user and sync their profile
+      if (user.app_metadata?.provider === 'google' && user.user_metadata) {
+        syncGoogleOAuthUser(user);
+      }
     }
     // No explicit 'offline' on logout needed here if handled by beforeunload
 
@@ -118,8 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Decide how to handle profile sync failure - maybe notify user?
         }
       } else {
-         // Handle case where sign up requires email confirmation
-         console.log("Sign up successful, awaiting email confirmation potentially.");
+        // Handle case where sign up requires email confirmation
+        console.log("Sign up successful, awaiting email confirmation potentially.");
       }
     } catch (error: any) {
       console.error("Sign up error:", error);
@@ -129,6 +135,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setActionLoading(false);
     }
   };
+
+  // Helper function to sync Google OAuth user profile
+  const syncGoogleOAuthUser = async (user: User): Promise<void> => {
+    try {
+      // Extract Google avatar URL from user metadata
+      let googleAvatarUrl: string | null = null;
+
+      try {
+        googleAvatarUrl = extractGoogleAvatarUrl(user.user_metadata);
+      } catch (extractError) {
+        console.warn('Error extracting Google avatar URL:', extractError);
+        // Continue without avatar URL
+      }
+
+      console.log('Syncing Google OAuth user profile:', {
+        userId: user.id,
+        email: user.email,
+        hasGoogleAvatar: !!googleAvatarUrl,
+        userMetadata: user.user_metadata ? Object.keys(user.user_metadata) : []
+      });
+
+      // Validate extracted Google avatar URL
+      if (googleAvatarUrl) {
+        try {
+          new URL(googleAvatarUrl); // Basic URL validation
+          if (!googleAvatarUrl.includes('google')) {
+            console.warn('Avatar URL does not appear to be from Google:', googleAvatarUrl);
+            googleAvatarUrl = null;
+          }
+        } catch (urlError) {
+          console.warn('Invalid Google avatar URL format:', googleAvatarUrl);
+          googleAvatarUrl = null;
+        }
+      }
+
+      // Sync user profile with Google avatar data
+      await syncUserProfile({
+        supabase_uid: user.id,
+        email: user.email!,
+        displayName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
+        status: 'online' as const,
+        googleAvatarUrl: googleAvatarUrl || undefined,
+      });
+    } catch (syncError) {
+      console.error("Error syncing Google OAuth user profile:", syncError);
+      // Don't throw error to avoid breaking the auth flow
+    }
+  };
+
   // Google sign in
   const signInWithGoogle = async (): Promise<void> => {
     setActionLoading(true);
@@ -139,6 +194,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           // Specify where to redirect after successful OAuth flow
           redirectTo: `${window.location.origin}/api/auth/callback`,
+          // Request additional scopes to get profile picture
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
       if (error) throw error;

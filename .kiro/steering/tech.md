@@ -46,6 +46,37 @@ npm run lint            # ESLint check
 - **Real-time**: Supabase Realtime for live updates
 - **Schema**: Company-based multi-tenancy with proper isolation
 - **Migrations**: SQL files in `src/migrations/`
+**IMPORTANT** When user choose to sign up with username/password we are using supabase auth, and we have a trigger that inserts the user on 'Users' table.
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Insert into public.users, letting 'id' default, and setting 'supabase_uid'
+  INSERT INTO public.users (supabase_uid, email, display_name, role, status, preferences, avatar_url)
+VALUES ( NEW.id,
+         NEW.email,
+         COALESCE(NEW.raw_user_meta_data->>'displayName', NEW.email),
+         'member',
+         'online',
+         '{"theme":"light","notifications":true}',
+         NEW.raw_user_meta_data->>'avatar_url')
+ON CONFLICT (supabase_uid) DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+-- Trigger to call the function after a new user is created in auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+```
 
 ## Performance Considerations
 - Server Components for initial page loads

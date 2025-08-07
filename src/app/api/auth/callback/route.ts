@@ -1,6 +1,7 @@
 // src/app/api/auth/callback/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Use our server client helper
+import { googleAvatarService } from '@/lib/services/google-avatar-service';
 // import { Database } from '@/lib/supabase/database.types'; // Uncomment if using types
 
 export const dynamic = 'force-dynamic'; // Keep dynamic export
@@ -25,6 +26,26 @@ export async function GET(request: NextRequest) {
 
         if (!authError && user) {
           console.log(`[Callback] Code exchange successful for user: ${user.id}`);
+
+          // Handle Google OAuth avatar extraction if this is a Google user
+          if (user.app_metadata?.provider === 'google' && user.user_metadata) {
+            try {
+              console.log(`[Callback] Processing Google OAuth user avatar for user: ${user.id}`);
+              const avatarResult = await googleAvatarService.extractAndStoreGoogleAvatar(
+                user.id,
+                user.user_metadata
+              );
+              
+              if (avatarResult.success) {
+                console.log(`[Callback] Successfully stored Google avatar for user: ${user.id}`);
+              } else {
+                console.warn(`[Callback] Failed to store Google avatar for user: ${user.id}`, avatarResult.error);
+              }
+            } catch (avatarError) {
+              console.error(`[Callback] Error processing Google avatar for user: ${user.id}`, avatarError);
+              // Don't fail the auth flow due to avatar issues
+            }
+          }
 
           try {
             // Check if the user has a company by querying user profiles

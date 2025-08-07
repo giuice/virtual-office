@@ -15,6 +15,7 @@ export async function syncUserProfile(userData: {
   status?: UserStatus; // Optional status
   companyId?: string; // Optional company ID
   role?: UserRole; // Optional role
+  googleAvatarUrl?: string; // Google avatar URL from OAuth
 }): Promise<User> {
   try {
     console.log('Syncing user profile via API:', userData);
@@ -31,6 +32,7 @@ export async function syncUserProfile(userData: {
         status: userData.status, // Optional status
         companyId: userData.companyId, // Optional company ID
         role: userData.role, // Optional role
+        googleAvatarUrl: userData.googleAvatarUrl, // Google avatar URL from OAuth
       }),
     });
 
