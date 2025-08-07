@@ -83,7 +83,8 @@
   - Write unit tests for avatar sync operations
   - _Requirements: 5.4, 4.5_
 
-- [-] 8. Fix and enhance existing avatar upload functionality
+- [ ] 8. Fix and enhance existing avatar upload functionality
+
 
 
 
