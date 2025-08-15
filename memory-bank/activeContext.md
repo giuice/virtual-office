@@ -1,79 +1,35 @@
 # Active Context
 
-## Current Project State
-Transitioned to Execution phase. Task T1_4 is complete. Due to identifying incomplete realtime migration in the messaging system, planning was done in Strategy phase to address this. The next task is the newly created T5_1_RefactorMessagingRealtime, which is now prioritized over T4_1.
+## Current Work Focus:
+- **Phase:** Execution
+- **Focus Area:** Critical Presence System Bugs (IP1_PresenceBugsResolution)
+- **Current Task:** Completed T1_1_AvatarSystem (Fixed avatar display and data flow through presence system)
 
-## Recent Actions
-- Identified incomplete messaging realtime migration (post-T1_4).
-- Transitioned to Strategy phase.
-- Created Implementation Plan: `IP5_MessagingRealtimeUnification.md`.
-- Created Task Instructions: `T5_1_RefactorMessagingRealtime_instructions.md`.
-- Updated `progress.md` to include IP5, T5_1, and set T5_1 as highest priority.
-- Transitioned back to Execution phase.
+## Next Steps:
+1. Implement T1_3_SpaceInteraction (High Priority):
+   - Fix room click/double-click functionality
+2. Implement T1_4_RealtimeIntegration (Medium Priority):
+   - Clean up Socket.io remnants
+3. Begin planning for IP4_ModernFloorPlanUI (Medium Priority):
+   - Create a modern, elegant, and cozy floor plan UI
 
-## Next Steps
-- Initialize Execution Phase: Load Execution plugin and core files.
-- Start execution of T5_1_RefactorMessagingRealtime, beginning with Step 1: Analyze Current State.
+## Active Decisions and Considerations:
+- Moving away from userIds in spaces table to current_space_id in users table
+- Transitioning from Socket.io to Supabase realtime
+- Need to handle PGRST116 errors properly in space updates
+- Optimizing debug logging and state updates
+- Planning to modernize the floor plan UI with an elegant, cozy aesthetic
+- Considering component-based approach for the new floor plan UI
 
-## Dependencies
-- T5_1 depends heavily on messaging context, hooks (`useMessages`, `useConversations`), Supabase client, and consuming UI components.
+## Recent Changes Summary
+- **Apr 9:** Created implementation plan for presence system bugs (IP1_PresenceBugsResolution)
+- **Apr 9:** Identified root causes of avatar, state management, and interaction issues
+- **Apr 9:** Created tasks T1_1 through T1_4 with detailed instructions
+- **Apr 9:** Prioritized tasks with state management as highest priority
+- **Apr 9:** Completed T1_2_StateManagement: Fixed 404/500 errors by correcting API/repo logic (useSpaceMutations, useLastSpace, SupabaseUserRepository), optimized logging, added error handling to presence updates and subscriptions.
+- **Apr 10:** Completed T1_1_AvatarSystem: Enhanced avatar rendering with improved error handling, created a new AvatarWithFallback component, added proper loading states, and improved user data validation.
+- **Apr 10:** Created implementation plan IP4_ModernFloorPlanUI for modernizing the floor plan UI with an elegant, cozy aesthetic.
+- **Apr 10:** Created tasks T4_1 through T4_5 for implementing the modern floor plan UI.
 
-## Potential Issues
-- High risk of performance issues or update loops if Supabase subscriptions are not implemented carefully in T5_1. Requires thorough testing.
-
-## Progress Summary
-- IP1_PresenceBugsResolution: 100% complete.
-- IP4_ModernFloorPlanUI: 0% complete.
-- IP5_MessagingRealtimeUnification: 0% complete (Task T5_1 is starting).
-- Task T1_4_RealtimeIntegration: 100% complete.
-- Task T4_1_SpaceDesignSystem: 0% complete (Deferred).
-- Task T5_1_RefactorMessagingRealtime: 0% complete.
-
-## Environment Notes
-- Current mode: crct
-- Workspace: f:/Cursos2/React/collab-office-app-anthropic/virtual-office
-
-## Mandatory Updates
-This file has been updated to reflect the latest actions and state.
-
-## Current Focus
-- Addressing avatar system bugs
-- Fixing issues with custom avatar rendering and storage
-- Improving avatar group component spacing issues
-
-## Recent Major Changes
-- T5_1_RefactorMessagingRealtime completed:
-  - Removed useSocketEvents.ts and all Socket.io dependencies
-  - Implemented robust Supabase Realtime subscriptions for messages and conversations
-  - Added proper error handling and connection status tracking
-  - Removed typing indicators functionality (could be reimplemented using Supabase broadcast channels if needed)
-  - Enhanced cleanup of subscriptions to prevent memory leaks
-
-## Current System State
-- Messaging system now exclusively uses Supabase Realtime for:
-  - Real-time message updates (new messages, edits, reactions)
-  - Conversation status changes
-  - Connection status monitoring
-- Implementation follows the same pattern as useSpaceRealtime
-- React Query integration for efficient cache management
-- Enhanced logging for better debugging capabilities
-
-## Known Issues/Limitations
-- Authentication errors (401) when trying to send messages need to be addressed
-- Server errors (500) in message creation endpoint require investigation
-- Typing indicators functionality removed but could be reimplemented using Supabase broadcast channels
-
-## Upcoming Work
-- Address authentication issues in messaging API endpoints
-- Investigate and fix server errors in message creation
-- Consider reimplementing typing indicators using Supabase broadcast channels if needed
-- Begin work on T4_1_SpaceDesignSystem for modernizing floor plan UI
-
-## Technical Notes
-- Supabase Realtime subscriptions configured with:
-  - 5-second retry intervals
-  - 10-second timeouts
-  - Proper cleanup on unmount
-  - Connection status tracking
-- React Query cache integration for optimistic updates
-- Enhanced error handling and logging throughout the system
+## Status
+- Actively implementing fixes for IP1_PresenceBugsResolution. Next task: T1_3_SpaceInteraction.

@@ -92,19 +92,24 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
       }
   
       // Add space validation checks
-      if (selectedSpace) {
-        if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
-          throw new Error('[FloorPlan] Space is at capacity');
-        }
-  
-        if (selectedSpace.status !== 'available') {
-          throw new Error('[FloorPlan] Space is not available');
-        }
-      } else {
-        throw new Error('[FloorPlan] Selected space not found');
+      if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
+        throw new Error('[FloorPlan] Space is at capacity');
+      }
+
+      if (selectedSpace.status !== 'available') {
+        throw new Error('[FloorPlan] Space is not available');
       }
   
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
+      
+      // Avoid duplicate requests if already processing
+      if (spaceId === lastRequestedSpaceId) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[FloorPlan] Already requested this space, skipping');
+        }
+        return;
+      }
+
       if (currentUser && currentUser.current_space_id === spaceId) {
         if (process.env.NODE_ENV === 'development') {
           console.log(`User already in space ${spaceId}`);
@@ -125,7 +130,7 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
           throw new Error('Unknown error during location update');
         }
       }
-  
+
       if (selectedSpace) {
         props.onSpaceSelect?.(selectedSpace);
         props.onOpenChat?.(selectedSpace);
