@@ -19,7 +19,7 @@ export function CompanySettings() {
 
   // Company Name
   const [companyName, setCompanyName] = useState(company?.name || '');
-  
+
   // Company Settings
   const [allowGuestAccess, setAllowGuestAccess] = useState(
     company?.settings?.allowGuestAccess || false
@@ -92,7 +92,7 @@ export function CompanySettings() {
             <TabsTrigger value="features">Features</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
-          
+
           {/* General Settings Tab */}
           <TabsContent value="general">
             <div className="space-y-4">
@@ -111,7 +111,7 @@ export function CompanySettings() {
                   This name will be displayed throughout the virtual office
                 </p>
               </div>
-              
+
               <div className="pt-4">
                 <Button onClick={handleSaveGeneral} disabled={isLoading || !companyName}>
                   {isLoading ? 'Saving...' : 'Save General Settings'}
@@ -119,7 +119,7 @@ export function CompanySettings() {
               </div>
             </div>
           </TabsContent>
-          
+
           {/* Features Tab */}
           <TabsContent value="features">
             <div className="space-y-4">
@@ -136,9 +136,9 @@ export function CompanySettings() {
                   disabled={isLoading}
                 />
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-2">
                 <label htmlFor="maxRooms" className="text-sm font-medium">
                   Maximum Number of Rooms
@@ -156,10 +156,10 @@ export function CompanySettings() {
                   Limit the number of rooms that can be created in your office (1-50)
                 </p>
               </div>
-              
+
               <div className="pt-4">
-                <Button 
-                  onClick={handleSaveFeatures} 
+                <Button
+                  onClick={handleSaveFeatures}
                   disabled={isLoading || parseInt(maxRooms, 10) < 1 || parseInt(maxRooms, 10) > 50}
                 >
                   {isLoading ? 'Saving...' : 'Save Feature Settings'}
@@ -167,7 +167,7 @@ export function CompanySettings() {
               </div>
             </div>
           </TabsContent>
-          
+
           {/* Appearance Tab */}
           <TabsContent value="appearance">
             <div className="space-y-4">
@@ -176,10 +176,9 @@ export function CompanySettings() {
                   Default Theme
                 </label>
                 <div className="flex space-x-4">
-                  <div 
-                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
-                      theme === 'light' ? 'border-primary bg-primary/5' : 'border-border'
-                    }`}
+                  <div
+                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${theme === 'light' ? 'border-primary bg-primary/5' : 'border-border'
+                      }`}
                     onClick={() => setTheme('light')}
                     style={{ width: '48%' }}
                   >
@@ -188,11 +187,10 @@ export function CompanySettings() {
                     </div>
                     <p className="text-sm text-center font-medium">Light</p>
                   </div>
-                  
-                  <div 
-                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
-                      theme === 'dark' ? 'border-primary bg-primary/5' : 'border-border'
-                    }`}
+
+                  <div
+                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${theme === 'dark' ? 'border-primary bg-primary/5' : 'border-border'
+                      }`}
                     onClick={() => setTheme('dark')}
                     style={{ width: '48%' }}
                   >
@@ -206,7 +204,7 @@ export function CompanySettings() {
                   Set the default theme for all users. Users can override this in their personal settings.
                 </p>
               </div>
-              
+
               <div className="pt-4">
                 <Button onClick={handleSaveFeatures} disabled={isLoading}>
                   {isLoading ? 'Saving...' : 'Save Appearance Settings'}

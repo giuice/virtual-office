@@ -1,6 +1,6 @@
 // components/floor-plan/user-avatar.tsx
 import { UIUser as User } from './types'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatar } from '@/components/ui/avatar-system'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -18,18 +18,23 @@ export function UserAvatar({ user }: UserAvatarProps) {
   return (
     <Popover>
       <PopoverTrigger>
-        <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
-          <AvatarImage src={user.avatar} alt={user.name} />
-          <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-        </Avatar>
+        <EnhancedAvatar
+          user={user}
+          size="sm"
+          showStatus={true}
+          status={user.status}
+          fallbackName={user.name}
+          className="cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+        />
       </PopoverTrigger>
       <PopoverContent className="w-64">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Avatar>
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-            </Avatar>
+            <EnhancedAvatar
+              user={user}
+              size="md"
+              fallbackName={user.name}
+            />
             <div>
               <h4 className="font-medium">{user.name}</h4>
               <p className="text-sm text-gray-500">{user.activity}</p>

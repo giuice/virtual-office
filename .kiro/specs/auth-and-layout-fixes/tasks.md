@@ -1,6 +1,8 @@
 # Implementation Plan
 
-- [-] 1. Enhance authentication system for multi-account support
+- [x] 1. Enhance authentication system for multi-account support
+
+
 
 
   - Extend existing AuthProvider with session cleanup utilities
@@ -8,61 +10,91 @@
   - Implement proper error handling with user-friendly messages
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 1.1 Create session management utilities
+- [x] 1.1 Create session management utilities
+
+
   - Write clearBrowserData function to clear all auth-related storage
   - Implement validateSession function for session integrity checks
   - Create handleAuthConflicts function for multi-account scenarios
   - Add switchAccount utility for testing different accounts
   - _Requirements: 1.1, 1.4, 1.5_
 
-- [ ] 1.2 Enhance AuthProvider with multi-account support
+- [x] 1.2 Enhance AuthProvider with multi-account support
+
+
   - Add clearAuthState method to AuthContextType interface
   - Implement refreshSession method for token refresh
   - Add switchAccount method for account switching
   - Update error handling to provide actionable recovery options
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.2_
 
-- [ ] 1.3 Implement comprehensive auth error handling
+- [x] 1.3 Implement comprehensive auth error handling
+
+
   - Create AuthErrorType enum with specific error categories
   - Write AuthErrorHandler with recovery strategies
   - Add user-friendly error messages with suggested actions
   - Implement retry mechanisms for network errors
   - _Requirements: 5.1, 5.2, 5.4, 5.5_
 
-- [ ] 2. Create user invitation system
-  - Design and implement invitation database schema
-  - Build invitation generation and validation APIs
-  - Create admin dashboard components for user management
-  - Implement invitation acceptance flow with auto-assignment
+- [x] 2. Enhance existing user invitation system
+
+
+
+
+
+  - Fix accept-invite page authentication integration
+  - Add invitation management UI for admins
+  - Implement invitation revocation functionality
+  - Enhance error handling and user feedback
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 2.1 Design invitation database schema
-  - Create invitations table with proper relationships
-  - Add invitation token generation and validation logic
-  - Implement expiration handling and cleanup
-  - Write database migration for invitation system
-  - _Requirements: 2.2, 2.3, 2.4, 2.5_
+- [x] 2.1 Fix accept-invite page authentication flow
 
-- [ ] 2.2 Implement invitation API endpoints
-  - Create POST /api/invitations for generating invitations
-  - Build GET /api/invitations/validate/:token for validation
-  - Implement POST /api/invitations/accept for acceptance
-  - Add DELETE /api/invitations/:id for revocation
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 2.3 Build admin dashboard invitation components
-  - Create InviteUserDialog component for invitation creation
-  - Implement MemberList component to display company members
-  - Build InvitationList component for managing pending invitations
-  - Add RoleSelector component for role assignment
+  - Replace placeholder Firebase Auth UI with Supabase Auth components
+  - Integrate with existing AuthProvider and Google OAuth
+  - Fix routing from pages directory to app directory structure
+  - Add proper loading states and error handling
+  - _Requirements: 2.3, 2.4, 2.5_
+
+
+
+- [x] 2.2 Add invitation revocation API endpoint
+
+
+
+
+
+  - Create DELETE /api/invitations/:id endpoint for revoking invitations
+  - Add authorization checks for admin-only access
+  - Update invitation status to 'expired' when revoked
+  - Add proper error handling and validation
+
+
+  - _Requirements: 2.1, 2.2_
+
+- [x] 2.3 Enhance admin invitation management UI
+
+
+
+
+
+  - Check for existing admin invitation files to not create new ones
+  - Add InvitationList component to display pending invitations
+  - Implement invitation revocation functionality in UI
+
+
+  - Add invitation status indicators and expiration dates
+  - Enhance existing InviteUserDialog with better validation
   - _Requirements: 2.1, 6.1, 6.2, 6.3_
 
-- [ ] 2.4 Implement invitation acceptance flow
-  - Create accept-invite page with proper validation
-  - Add automatic company assignment on invitation acceptance
-  - Implement user onboarding flow for invited users
-  - Handle expired and invalid invitation scenarios
-  - _Requirements: 2.3, 2.4, 2.5_
+- [ ] 2.4 Improve invitation system error handling
+  - Add comprehensive error messages for all failure scenarios
+  - Implement retry mechanisms for network failures
+  - Add user-friendly feedback for expired invitations
+  - Create proper validation for duplicate invitations
+  - _Requirements: 2.5, 5.1, 5.2_
 
 - [ ] 3. Fix layout consistency and enhance theming
   - Audit existing layout issues and create comprehensive fixes

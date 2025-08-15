@@ -6,7 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatar } from '@/components/ui/avatar-system';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';

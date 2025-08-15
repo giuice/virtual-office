@@ -1,141 +1,68 @@
 // src/app/admin/invitations/page.tsx
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { InvitationManagement } from '@/components/dashboard/invitation-management';
+import { useCompany } from '@/contexts/CompanyContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Shield, AlertTriangle } from 'lucide-react';
 
 export default function InvitationsPage() {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('member');
-  const [companyId, setCompanyId] = useState('');
-  const [invitations, setInvitations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { currentUserProfile, isLoading } = useCompany();
 
-  // Create invitation
-  const handleCreateInvitation = async () => {
-    if (!email || !role || !companyId) {
-      toast.error('Please fill all fields');
-      return;
-    }
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-10">
+        <div className="flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    setLoading(true);
-    try {
-      const response = await fetch('/api/invitations/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role, companyId }),
-      });
+  // Check if user is admin
+  const isAdmin = currentUserProfile?.role === 'admin';
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create invitation');
-      }
-
-      toast.success('Invitation created successfully');
-      setInvitations([...invitations, data.invitation]);
-      
-      // Copy invitation link to clipboard
-      const invitationLink = `${window.location.origin}/join?token=${data.invitation.token}`;
-      navigator.clipboard.writeText(invitationLink);
-      toast.info('Invitation link copied to clipboard');
-      
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create invitation');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-8">Invitation Management</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card>
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto py-10">
+        <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>Create New Invitation</CardTitle>
-            <CardDescription>Generate an invitation link for a new user</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Email</label>
-              <Input 
-                type="email" 
-                placeholder="user@example.com" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Role</label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Company ID</label>
-              <Input 
-                placeholder="Enter company ID" 
-                value={companyId} 
-                onChange={(e) => setCompanyId(e.target.value)} 
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              onClick={handleCreateInvitation} 
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create Invitation'}
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Invitations</CardTitle>
-            <CardDescription>View and manage invitations</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Access Denied
+            </CardTitle>
+            <CardDescription>
+              You need administrator privileges to access this page.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {invitations.length === 0 ? (
-              <p className="text-muted-foreground">No invitations created yet</p>
-            ) : (
-              <div className="space-y-4">
-                {invitations.map((invitation) => (
-                  <div key={invitation.id} className="border rounded-md p-4">
-                    <p><strong>Email:</strong> {invitation.email}</p>
-                    <p><strong>Token:</strong> {invitation.token.substring(0, 8)}...</p>
-                    <p><strong>Expires:</strong> {new Date(invitation.expiresAt * 1000).toLocaleString()}</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => {
-                        const invitationLink = `${window.location.origin}/join?token=${invitation.token}`;
-                        navigator.clipboard.writeText(invitationLink);
-                        toast.info('Invitation link copied to clipboard');
-                      }}
-                    >
-                      Copy Link
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Only company administrators can manage invitations and user access. 
+              Please contact your administrator if you need access to this feature.
+            </p>
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-10">
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="h-6 w-6 text-primary" />
+          <h1 className="text-3xl font-bold">Admin Panel</h1>
+        </div>
+        <p className="text-muted-foreground">
+          Manage your team and company settings
+        </p>
+      </div>
+      
+      <InvitationManagement />
     </div>
   );
 }

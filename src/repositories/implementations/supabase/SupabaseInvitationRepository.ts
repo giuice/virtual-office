@@ -93,4 +93,58 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
   // Optional: Implement deleteByToken if needed
   // async deleteByToken(token: string): Promise<boolean> { ... }
 
+  async findByCompany(companyId: string, status?: string, limit?: number, offset?: number): Promise<Invitation[]> {
+    let query = supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .eq('company_id', companyId);
+
+    // Apply status filter if provided and not 'all'
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    // Apply pagination
+    if (limit) {
+      query = query.limit(limit);
+    }
+    if (offset) {
+      query = query.range(offset, offset + (limit || 50) - 1);
+    }
+
+    // Order by creation date (newest first)
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching invitations by company:', error);
+      throw error;
+    }
+
+    // Map DB response array to Invitation types
+    return data ? data.map(item => mapToCamelCase(item)) : [];
+  }
+
+  async countByCompany(companyId: string, status?: string): Promise<number> {
+    let query = supabase
+      .from(this.TABLE_NAME)
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId);
+
+    // Apply status filter if provided and not 'all'
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      console.error('Error counting invitations by company:', error);
+      throw error;
+    }
+
+    return count || 0;
+  }
+
 }

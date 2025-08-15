@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatar } from '@/components/ui/avatar-system';
 import { testSupabaseStorageConfiguration, testAvatarUrl } from '@/lib/supabase-storage-test';
 import { debugAvatarUrl, testSupabaseStorageAccess, logAvatarDebugInfo } from '@/lib/avatar-debug';
 import { useAuth } from '@/contexts/AuthContext';

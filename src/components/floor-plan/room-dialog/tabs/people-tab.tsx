@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Users } from 'lucide-react';
 import { UIUser as LocalUser } from '../../types';
-import { StatusAvatar } from '@/components/ui/status-avatar';
+import { StatusAvatar } from '@/components/ui/avatar-system';
 import { useCompany } from '@/contexts/CompanyContext';
 import { RoomPeopleTabProps } from '../types';
 

@@ -8,6 +8,8 @@ import { getUserById, updateUserStatus, syncUserProfile } from '@/lib/api';
 import { User } from '@supabase/supabase-js';
 import { useSession } from '@/hooks/useSession'; // Import the new hook
 import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
+import { SessionManager } from '@/lib/auth/session-manager';
+import { AuthErrorHandler } from '@/lib/auth/error-handler';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -82,13 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Use the memoized client instance
       const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       // No need to setState here, useSession hook will update
     } catch (error: any) {
       console.error("Sign in error:", error);
-      setActionError(error.message || 'An error occurred during sign in.');
-      // Re-throw the error so the calling component can handle it if needed
-      throw error;
+      
+      // Use comprehensive error handler
+      const categorizedError = await AuthErrorHandler.handleError(error);
+      setActionError(categorizedError.userMessage);
+      
+      // Re-throw with user-friendly message
+      throw new Error(categorizedError.userMessage);
     } finally {
       setActionLoading(false);
     }
@@ -108,7 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: { displayName: displayName || email.split('@')[0] }, // Add display name if provided
         },
       });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       // Sign up successful, user object might be available in data.user
       // Sync profile if user data is present (might require email confirmation first depending on settings)
       if (data.user) {
@@ -129,8 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error("Sign up error:", error);
-      setActionError(error.message || 'An error occurred during sign up.');
-      throw error;
+      
+      // Use comprehensive error handler
+      const categorizedError = await AuthErrorHandler.handleError(error);
+      setActionError(categorizedError.userMessage);
+      
+      throw new Error(categorizedError.userMessage);
     } finally {
       setActionLoading(false);
     }
@@ -201,12 +215,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         },
       });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       // User will be redirected by Supabase to the provider and then back to your callback URL
     } catch (error: any) {
       console.error("Google sign in error:", error);
-      setActionError(error.message || 'An error occurred during Google sign in.');
-      throw error;
+      
+      // Use comprehensive error handler
+      const categorizedError = await AuthErrorHandler.handleError(error);
+      setActionError(categorizedError.userMessage);
+      
+      throw new Error(categorizedError.userMessage);
     } finally {
       // Set loading false only if error occurred, otherwise redirection happens
       // Correction: actionLoading should always be set to false in finally
@@ -238,6 +258,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // --- Multi-account support methods ---
+
+  /**
+   * Clear authentication state and browser data
+   * Useful for resolving multi-account conflicts
+   */
+  const clearAuthState = () => {
+    try {
+      setActionError(null);
+      SessionManager.clearBrowserData();
+      console.log('Auth state cleared successfully');
+    } catch (error: any) {
+      console.error('Error clearing auth state:', error);
+      setActionError(error.message || 'Failed to clear authentication state');
+    }
+  };
+
+  /**
+   * Refresh the current session token
+   * Handles token expiration gracefully
+   */
+  const refreshSession = async () => {
+    setActionLoading(true);
+    setActionError(null);
+    
+    try {
+      const success = await SessionManager.refreshSession();
+      if (!success) {
+        throw new Error('Failed to refresh session. Please sign in again.');
+      }
+      console.log('Session refreshed successfully');
+    } catch (error: any) {
+      console.error('Session refresh error:', error);
+      
+      // Use comprehensive error handler
+      const categorizedError = await AuthErrorHandler.handleError(error);
+      setActionError(categorizedError.userMessage);
+      
+      throw new Error(categorizedError.userMessage);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  /**
+   * Switch to a different account
+   * Signs out current user and clears all auth data
+   */
+  const switchAccount = async () => {
+    setActionLoading(true);
+    setActionError(null);
+    
+    try {
+      // Update current user status to offline before switching
+      if (user) {
+        await updateStatus(user, 'offline');
+      }
+      
+      await SessionManager.switchAccount();
+      console.log('Account switch completed');
+    } catch (error: any) {
+      console.error('Account switch error:', error);
+      
+      // Use comprehensive error handler
+      const categorizedError = await AuthErrorHandler.handleError(error);
+      setActionError(categorizedError.userMessage);
+      
+      throw new Error(categorizedError.userMessage);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // --- Context Value ---
   // Provide session state from useSession and the action methods
   const value: AuthContextType = {
@@ -252,6 +345,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     signUp,
     signInWithGoogle,
+
+    // Multi-account support methods
+    clearAuthState,
+    refreshSession,
+    switchAccount,
 
     // Action-specific loading/error states
     actionLoading,

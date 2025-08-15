@@ -54,13 +54,13 @@ export default function DashboardPage() {
               <CardContent className="space-y-2">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button asChild variant="outline" className="w-full justify-start">
-                    <Link href="/team">
+                    <Link href="/admin/invitations">
                       <Users2Icon className="mr-2 h-4 w-4" />
-                      Manage Team
+                      Manage Invitations
                     </Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full justify-start">
-                    <Link href="/settings">
+                    <Link href="/company?tab=settings">
                       <SettingsIcon className="mr-2 h-4 w-4" />
                       Company Settings
                     </Link>

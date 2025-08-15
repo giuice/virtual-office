@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserPresenceData } from '@/types/database';
-import { AvatarWithFallback } from '@/components/ui/avatar-with-fallback';
+import { EnhancedAvatar } from '@/components/ui/avatar-system';
 import { 
   Tooltip,
   TooltipContent,
@@ -15,13 +15,6 @@ interface UserAvatarPresenceProps {
 }
 
 const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }) => {
-  const statusColor = {
-    online: 'bg-green-500',
-    away: 'bg-yellow-500',
-    busy: 'bg-red-500',
-    offline: 'bg-gray-400',
-  }[user.status || 'offline'] || 'bg-gray-400';
-
   const handleClick = () => {
     if (onClick) {
       onClick(user.id);
@@ -33,29 +26,17 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="relative inline-block"
             onClick={handleClick}
             role={onClick ? 'button' : undefined}
             aria-label={onClick ? `User ${user.displayName}` : undefined}
           >
-            <AvatarWithFallback
-              src={user.avatarUrl}
-              alt={user.displayName || 'User'}
+            <EnhancedAvatar
+              user={user}
               size="md"
-              onLoad={() => {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[UserAvatarPresence] Avatar loaded for ${user.displayName}`);
-                }
-              }}
-              onError={() => {
-                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}`);
-              }}
-            />
-            <span
-              className={cn(
-                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background',
-                statusColor
-              )}
+              showStatus={true}
+              status={user.status}
+              fallbackName={user.displayName || 'User'}
+              onClick={onClick ? () => onClick(user.id) : undefined}
             />
           </div>
         </TooltipTrigger>

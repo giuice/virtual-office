@@ -10,7 +10,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
-import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
+import { UploadableAvatar } from '@/components/ui/avatar-system';
 
 export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
@@ -28,8 +28,8 @@ export function EnhancedUserMenu() {
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      showError({ 
-        description: error instanceof Error ? error.message : 'An error occurred while signing out' 
+      showError({
+        description: error instanceof Error ? error.message : 'An error occurred while signing out'
       });
     } finally {
       setIsSigningOut(false);
@@ -39,33 +39,33 @@ export function EnhancedUserMenu() {
   // Handle avatar upload
   const handleAvatarUpload = async (file: File) => {
     if (!currentUserProfile) return;
-    
+
     setIsUploading(true);
-    
+
     try {
       // Create form data for the upload
       const formData = new FormData();
       formData.append('avatar', file);
-      
+
       // Send to the API
       const response = await fetch('/api/users/avatar', {
         method: 'POST',
         body: formData,
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to upload avatar');
       }
-      
+
       const data = await response.json();
-      
+
       // Show success message
       showSuccess({ description: 'Avatar updated successfully' });
-      
+
       // You might want to refresh the user profile here
       // or handle it through a context update
-      
+
     } catch (error) {
       console.error('Avatar upload error:', error);
       showError({
@@ -94,21 +94,25 @@ export function EnhancedUserMenu() {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-          <ProfileAvatar
-            user={combinedUser}
+          <UploadableAvatar
+            userId={combinedUser.id}
+            displayName={combinedUser.displayName}
+            currentAvatarUrl={combinedUser.avatarUrl}
             size="sm"
-            className="cursor-pointer"
+            status={combinedUser.status}
           />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64" align="end">
         <div className="grid gap-4">
           <div className="flex gap-4 items-start">
-            <ProfileAvatar
-              user={combinedUser}
-              onAvatarChange={handleAvatarUpload}
+            <UploadableAvatar
+              userId={combinedUser.id}
+              displayName={combinedUser.displayName}
+              currentAvatarUrl={combinedUser.avatarUrl}
+              onAvatarChange={(url) => handleAvatarUpload(url)}
               size="sm"
-              uploading={isUploading}
+              status={combinedUser.status}
             />
             <div className="grid gap-1">
               <p className="text-sm font-medium">{currentUserProfile.displayName}</p>
@@ -118,10 +122,10 @@ export function EnhancedUserMenu() {
               <div className="flex items-center mt-1">
                 <span className={`
                   h-2 w-2 rounded-full mr-1
-                  ${currentUserProfile.status === 'online' ? 'bg-emerald-500' : 
-                    currentUserProfile.status === 'away' ? 'bg-amber-500' : 
-                    currentUserProfile.status === 'busy' ? 'bg-rose-500' : 
-                    'bg-gray-400'}
+                  ${currentUserProfile.status === 'online' ? 'bg-emerald-500' :
+                    currentUserProfile.status === 'away' ? 'bg-amber-500' :
+                      currentUserProfile.status === 'busy' ? 'bg-rose-500' :
+                        'bg-gray-400'}
                 `} />
                 <span className="text-xs capitalize">{currentUserProfile.status}</span>
               </div>
@@ -153,9 +157,9 @@ export function EnhancedUserMenu() {
                 <span>Settings</span>
               </Link>
             </Button>
-            <Button 
-              variant="ghost" 
-              className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-9" 
+            <Button
+              variant="ghost"
+              className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-9"
               onClick={handleSignOut}
               disabled={isSigningOut}
             >

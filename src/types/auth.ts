@@ -15,6 +15,11 @@ export interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
 
+  // Multi-account support methods
+  clearAuthState: () => void;
+  refreshSession: () => Promise<void>;
+  switchAccount: () => Promise<void>;
+
   // Action-specific loading/error states
   actionLoading: boolean;
   actionError: string | null;

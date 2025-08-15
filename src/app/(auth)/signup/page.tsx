@@ -1,8 +1,8 @@
 // src/app/(auth)/signup/page.tsx
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,20 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { signUp, signInWithGoogle } = useAuth();
+  const searchParams = useSearchParams();
+  const { signUp, signInWithGoogle, user } = useAuth();
   const { showSuccess, showError } = useNotification();
+
+  // Get redirect URL from search params
+  const redirectUrl = searchParams?.get('redirect');
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (user && redirectUrl) {
+      console.log('User already authenticated, redirecting to:', redirectUrl);
+      router.push(redirectUrl);
+    }
+  }, [user, redirectUrl, router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -35,7 +47,10 @@ export default function SignupPage() {
       await signUp(email, password, displayName);
       showSuccess({ description: 'Account created successfully!' });
       console.log('Account created successfully!');
-      router.push('/create-company');
+      
+      // Redirect to specified URL or default to create-company
+      const targetUrl = redirectUrl || '/create-company';
+      router.push(targetUrl);
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to create account'
@@ -51,7 +66,10 @@ export default function SignupPage() {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully signed up with Google!' });
       console.log('Successfully signed up with Google!');
-      router.push('/create-company');
+      
+      // Redirect to specified URL or default to create-company
+      const targetUrl = redirectUrl || '/create-company';
+      router.push(targetUrl);
     } catch (error) {
       showError({
         description: error instanceof Error ? error.message : 'Failed to sign up with Google'

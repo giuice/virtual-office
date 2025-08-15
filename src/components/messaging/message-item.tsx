@@ -10,7 +10,7 @@ import {
 } from '@/types/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatar } from '@/components/ui/avatar-system';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,7 @@ export function MessageItem({
   const { user } = useAuth();
   const [showActions, setShowActions] = useState(false);
   
-  const isCurrentUser = message.senderId === user?.uid;
+  const isCurrentUser = message.senderId === user?.id;
   const showAvatar = !isCurrentUser;
   
   // Format message timestamp

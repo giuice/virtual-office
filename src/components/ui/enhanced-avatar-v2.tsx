@@ -21,7 +21,7 @@ interface EnhancedAvatarV2Props {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   showStatus?: boolean;
-  status?: 'online' | 'away' | 'busy' | 'offline';
+  status?: 'online' | 'away' | 'busy' | 'offline' | 'active' | 'presenting' | 'viewing';
   fallbackName?: string;
   onError?: (error: AvatarLoadError) => void;
   onRetry?: (url: string, attempt: number) => void;
@@ -30,6 +30,7 @@ interface EnhancedAvatarV2Props {
   enableRetry?: boolean;
   showLoadingState?: boolean;
   showErrorIndicator?: boolean;
+  showStatusIndicator?: boolean; // For floor plan compatibility
   onClick?: () => void;
   'aria-label'?: string;
 }
@@ -70,12 +71,37 @@ const sizeConfig = {
   }
 };
 
-// Status color mapping
+// Status color mapping for both database and UI status types
 const statusColors = {
+  // Database status types
   online: 'bg-emerald-500 border-emerald-600',
   away: 'bg-amber-500 border-amber-600',
   busy: 'bg-rose-500 border-rose-600',
   offline: 'bg-gray-400 border-gray-500',
+  
+  // UI status types (for floor plan compatibility)
+  active: 'bg-emerald-500 border-emerald-600',
+  presenting: 'bg-blue-500 border-blue-600',
+  viewing: 'bg-purple-500 border-purple-600',
+};
+
+// Theme-aware status colors using CSS variables (for floor plan compatibility)
+const getThemeAwareStatusColor = (status: string) => {
+  switch (status) {
+    case 'active': 
+    case 'online': 
+      return 'hsl(var(--success))';
+    case 'away': 
+      return 'hsl(var(--warning))';
+    case 'presenting': 
+      return 'hsl(var(--primary))';
+    case 'viewing': 
+      return 'hsl(var(--secondary))';
+    case 'busy':
+      return 'hsl(var(--destructive))';
+    default: 
+      return 'hsl(var(--muted-foreground))';
+  }
 };
 
 // Loading states
@@ -95,6 +121,7 @@ export function EnhancedAvatarV2({
   enableRetry = true,
   showLoadingState = true,
   showErrorIndicator = false,
+  showStatusIndicator = true, // For floor plan compatibility
   onClick,
   'aria-label': ariaLabel,
 }: EnhancedAvatarV2Props) {
@@ -382,15 +409,19 @@ export function EnhancedAvatarV2({
         {renderAvatarContent()}
       </Avatar>
 
-      {/* Status indicator */}
-      {showStatus && userStatus && (
+      {/* Status indicator - supports both showStatus and showStatusIndicator for compatibility */}
+      {(showStatus || showStatusIndicator) && userStatus && (
         <span
           className={cn(
-            'absolute rounded-full border-2 border-background',
+            'absolute rounded-full border-2 border-background shadow-sm transition-all',
             config.status,
             config.statusPosition,
             statusColors[userStatus as keyof typeof statusColors] || statusColors.offline
           )}
+          style={{ 
+            backgroundColor: getThemeAwareStatusColor(userStatus),
+            boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${getThemeAwareStatusColor(userStatus)}20`
+          }}
           aria-hidden="true"
         />
       )}
@@ -414,3 +445,6 @@ export function EnhancedAvatarV2({
 
 // Export with a more convenient name
 export { EnhancedAvatarV2 as EnhancedAvatar };
+
+// Export the main component as default for easier importing
+export default EnhancedAvatarV2;

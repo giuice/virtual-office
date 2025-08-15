@@ -44,7 +44,7 @@ Before using the app, you need to set up the DynamoDB tables:
 2. Run the setup endpoint:
 
 ```bash
-curl http://localhost:3000/api/setup-dynamo-tables
+curl http://localhost:3000/api/setup-dynamo-tables(deprecated now we are using supabase)
 ```
 
 ## Admin Tools

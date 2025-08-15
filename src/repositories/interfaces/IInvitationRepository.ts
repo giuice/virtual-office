@@ -32,5 +32,21 @@ export interface IInvitationRepository {
    */
   // deleteByToken(token: string): Promise<boolean>;
 
-  // Add other methods as needed, e.g., findByEmail, findByCompany, listPending, etc.
+  /**
+   * Finds invitations by company ID with optional filtering.
+   * @param companyId The company ID to filter by.
+   * @param status Optional status filter ('pending', 'accepted', 'expired', or 'all').
+   * @param limit Optional limit for pagination.
+   * @param offset Optional offset for pagination.
+   * @returns A promise that resolves to an array of Invitation objects.
+   */
+  findByCompany(companyId: string, status?: string, limit?: number, offset?: number): Promise<Invitation[]>;
+
+  /**
+   * Counts invitations by company ID with optional filtering.
+   * @param companyId The company ID to filter by.
+   * @param status Optional status filter ('pending', 'accepted', 'expired', or 'all').
+   * @returns A promise that resolves to the count of matching invitations.
+   */
+  countByCompany(companyId: string, status?: string): Promise<number>;
 }

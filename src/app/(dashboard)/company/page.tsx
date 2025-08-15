@@ -11,6 +11,7 @@ import { CompanyMembers } from '@/components/dashboard/company-members';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Shield } from 'lucide-react';
 
 export default function CompanyPage() {
   const { company, currentUserProfile, isLoading } = useCompany();
@@ -104,6 +105,18 @@ export default function CompanyPage() {
         heading="Company Management"
         description={`Manage ${company?.name || 'your company'} settings, members and permissions`}
       />
+      
+      {/* Helper message for admins */}
+      {isAdmin && (
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Admin Tip:</strong> Use the "Invite User" button in the Team Members tab to add new team members to your company.
+            </p>
+          </div>
+        </div>
+      )}
       
       <div className="grid gap-8">
         <Tabs 

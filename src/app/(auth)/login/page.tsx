@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signIn, signInWithGoogle, user } = useAuth();
   const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
   const { showSuccess, showError } = useNotification();
+
+  // Get redirect URL from search params
+  const redirectUrl = searchParams?.get('redirect');
 
   // Check if the user is authenticated and redirect accordingly
   useEffect(() => {
@@ -38,6 +42,13 @@ export default function LoginPage() {
     
     // Add a small delay to ensure all state is properly settled
     const redirectTimer = setTimeout(() => {
+      // Check if there's a redirect URL (e.g., from invitation flow)
+      if (redirectUrl) {
+        console.log('Redirecting to specified URL:', redirectUrl);
+        router.push(redirectUrl);
+        return;
+      }
+
       // If user is logged in but doesn't have a company, redirect to company creation
       if (!company || !currentUserProfile?.companyId) {
         console.log('Redirecting to create-company...', { 
@@ -57,7 +68,7 @@ export default function LoginPage() {
     }, 500); // 500ms delay
     
     return () => clearTimeout(redirectTimer);
-  }, [user, company, companyLoading, router, currentUserProfile]);
+  }, [user, company, companyLoading, router, currentUserProfile, redirectUrl]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

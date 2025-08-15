@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { UserStatus } from '@/types/database';
-import { ProfileAvatar } from './ProfileAvatar';
+import { UploadableAvatar } from '@/components/ui/avatar-system';
 
 // File upload handler - this is where you'd implement your avatar upload logic
 // This is just a sample implementation
@@ -116,11 +116,13 @@ export function EnhancedUserProfile() {
         {/* Profile Picture & Basic Info */}
         <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
           {/* Enhanced avatar component with upload capability */}
-          <ProfileAvatar
-            user={currentUserProfile}
-            onAvatarChange={handleAvatarChange}
+          <UploadableAvatar
+            userId={currentUserProfile.id}
+            displayName={currentUserProfile.displayName}
+            currentAvatarUrl={currentUserProfile.avatarUrl}
+            onAvatarChange={(url) => handleAvatarChange(url)}
             size="xl"
-            uploading={isUploading}
+            status={currentUserProfile.status}
           />
           
           <div className="space-y-1 text-center md:text-left">

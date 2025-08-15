@@ -20,24 +20,10 @@ export function QuickLinksGrid({ isAdmin }: { isAdmin: boolean }) {
     },
     {
       title: 'Team Members',
-      description: 'View all team members',
+      description: 'View and manage team members',
       icon: Users2Icon,
       href: '/company',
       color: 'bg-green-100 dark:bg-green-900',
-    },
-    {
-      title: 'Messages',
-      description: 'Chat with colleagues',
-      icon: MessageSquareIcon,
-      href: '/messages',
-      color: 'bg-yellow-100 dark:bg-yellow-900',
-    },
-    {
-      title: 'Calendar',
-      description: 'Schedule meetings and events',
-      icon: CalendarIcon,
-      href: '/calendar',
-      color: 'bg-purple-100 dark:bg-purple-900',
     },
     {
       title: 'Settings',
@@ -50,10 +36,10 @@ export function QuickLinksGrid({ isAdmin }: { isAdmin: boolean }) {
 
   if (isAdmin) {
     quickLinks.push({
-      title: 'Admin Portal',
-      description: 'Manage company settings',
-      icon: SettingsIcon,
-      href: '/admin',
+      title: 'Manage Invitations',
+      description: 'Send and manage team invitations',
+      icon: Users2Icon,
+      href: '/admin/invitations',
       color: 'bg-red-100 dark:bg-red-900',
     });
   }
