@@ -55,10 +55,12 @@ export async function GET(req: NextRequest) {
     // Return invitation details (without sensitive information)
     return NextResponse.json({
       valid: true,
-      email: invitation.email,
-      companyName,
-      role: invitation.role,
-      expiresAt: invitation.expiresAt
+      invitation: {
+        email: invitation.email,
+        companyName,
+        role: invitation.role,
+        expiresAt: invitation.expiresAt
+      }
     }, { status: 200 });
 
   } catch (error) {

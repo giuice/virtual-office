@@ -34,8 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Check if user profile already exists for this supabaseUid using repository
-    // Assuming findById looks up by supabase_uid (adjust if method name is different)
-    let userProfile = await userRepository.findById(supabaseUid);
+    let userProfile = await userRepository.findBySupabaseUid(supabaseUid);
     let userIdToUpdate: string | undefined = userProfile?.id; // Store the database ID if user exists
 
     if (userProfile) {

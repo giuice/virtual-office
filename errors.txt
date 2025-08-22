@@ -1,0 +1,25 @@
+[Avatar] User 5cf7e176-4ac2-441d-8819-f6266cb20429 - Using avatarUrl 
+{url: 'https://lh3.googleusercontent.com/a/ACg8ocLxvxWtCy6XLamwQ50zTr87Y3t5ND6SDMZf3XCExLBrVEEUmcS_vg=s96-c', fullUrl: 'https://lh3.googleusercontent.com/a/ACg8ocLxvxWtCy6XLamwQ50zTr87Y3t5ND6SDMZf3XCExLBrVEEUmcS_vg=s96-c'}
+debug-logger.ts:126 🖼️ [AVATAR:5cf7e176] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://lh3.googleusercontent.com/a/ACg8ocLxvxWtCy6XLamwQ50z...
+debug-logger.ts:141 🖼️ [AVATAR:5cf7e176] 🚀 getAvatarUrl took 2.300000011920929ms 
+{source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:5cf7e176] ✅ Loaded from custom upload 
+{url: 'https://lh3.googleusercontent.com/a/ACg8ocLxvxWtCy6XLamwQ50zTr87Y3t5ND6SDMZf3XCE...', source: 'custom upload'}
+invite-user-dialog.tsx:89 
+ 
+ GET http://localhost:3000/api/invitations/list?status=pending 404 (Not Found)
+invite-user-dialog.tsx:167 [InviteUserDialog] Sending invitation request with payload: 
+{email: 'giuice@yahoo.com', role: 'member', companyId: '7d71f32f-5436-4aad-8bb6-80ffa5d78f97'}
+invite-user-dialog.tsx:169 
+ 
+ POST http://localhost:3000/api/invitations/create 404 (Not Found)
+useInvitationOperation.ts:66 
+ Invitation create error: Error: User profile not found
+    at createInvitationOperation (invite-user-dialog.tsx:179:17)
+    at async useInvitationOperation.useCallback[executeOperation].performOperation (useInvitationOperation.ts:46:24)
+    at async handleSubmit (invite-user-dialog.tsx:186:7)
+invite-user-dialog.tsx:193 
+ Error in invitation creation: 
+{type: 'invitation_not_found', message: 'User profile not found', userMessage: 'This invitation link is invalid or has been remove…lease check the link or request a new invitation.', isRetryable: false, suggestedActions: Array(2)}
+﻿

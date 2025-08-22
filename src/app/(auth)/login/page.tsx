@@ -58,12 +58,12 @@ export default function LoginPage() {
         });
         router.push('/create-company');
       } else {
-        // User has a company, redirect to office
-        console.log('Redirecting to office - user has company:', {
+        // User has a company, redirect to dashboard
+        console.log('Redirecting to dashboard - user has company:', {
           company,
           companyId: currentUserProfile?.companyId
         });
-        router.push('/office');
+        router.push('/dashboard');
       }
     }, 500); // 500ms delay
     
@@ -186,7 +186,10 @@ export default function LoginPage() {
 
             <p className="text-sm text-center text-muted-foreground">
               Don't have an account?{' '}
-              <Link href="/signup" className="text-primary hover:underline">
+              <Link 
+                href={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : '/signup'} 
+                className="text-primary hover:underline"
+              >
                 Sign up
               </Link>
             </p>

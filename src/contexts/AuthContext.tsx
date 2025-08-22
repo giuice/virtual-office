@@ -119,20 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         throw error;
       }
-      // Sign up successful, user object might be available in data.user
-      // Sync profile if user data is present (might require email confirmation first depending on settings)
+      // Sign up successful - the database trigger will automatically create the user profile
       if (data.user) {
-        try {
-          await syncUserProfile({
-            supabase_uid: data.user.id,
-            email: data.user.email!, // Email should exist on user object after signup
-            displayName: data.user.user_metadata?.displayName || displayName || email.split('@')[0],
-            status: 'online' as const,
-          });
-        } catch (syncError) {
-          console.error("Error syncing profile after sign up:", syncError);
-          // Decide how to handle profile sync failure - maybe notify user?
-        }
+        console.log("Sign up successful! User profile will be created automatically by database trigger.");
       } else {
         // Handle case where sign up requires email confirmation
         console.log("Sign up successful, awaiting email confirmation potentially.");

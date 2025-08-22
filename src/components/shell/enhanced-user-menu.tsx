@@ -36,40 +36,21 @@ export function EnhancedUserMenu() {
     }
   };
 
-  // Handle avatar upload
-  const handleAvatarUpload = async (file: File) => {
+  // Handle avatar change (receives avatar URL from UploadableAvatar)
+  const handleAvatarUpload = async (avatarUrl: string) => {
     if (!currentUserProfile) return;
 
     setIsUploading(true);
 
     try {
-      // Create form data for the upload
-      const formData = new FormData();
-      formData.append('avatar', file);
-
-      // Send to the API
-      const response = await fetch('/api/users/avatar', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload avatar');
-      }
-
-      const data = await response.json();
-
-      // Show success message
+      // The upload itself is handled by UploadableAvatar; here we refresh the profile and show feedback.
       showSuccess({ description: 'Avatar updated successfully' });
-
-      // You might want to refresh the user profile here
-      // or handle it through a context update
-
+      // Refresh any data that depends on the user profile
+      try { router.refresh(); } catch {}
     } catch (error) {
-      console.error('Avatar upload error:', error);
+      console.error('Avatar update error:', error);
       showError({
-        description: error instanceof Error ? error.message : 'Failed to upload avatar'
+        description: error instanceof Error ? error.message : 'Failed to update avatar'
       });
     } finally {
       setIsUploading(false);
@@ -84,6 +65,7 @@ export function EnhancedUserMenu() {
       </Button>
     );
   }
+
   // Combine Supabase user data with our database user profile
   const combinedUser = {
     ...currentUserProfile,
@@ -93,7 +75,7 @@ export function EnhancedUserMenu() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+        <div className="flex items-center justify-center h-10 w-10">
           <UploadableAvatar
             userId={combinedUser.id}
             displayName={combinedUser.displayName}
@@ -101,7 +83,7 @@ export function EnhancedUserMenu() {
             size="sm"
             status={combinedUser.status}
           />
-        </Button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-64" align="end">
         <div className="grid gap-4">
@@ -113,6 +95,7 @@ export function EnhancedUserMenu() {
               onAvatarChange={(url) => handleAvatarUpload(url)}
               size="sm"
               status={combinedUser.status}
+              enableHoverActions={false}
             />
             <div className="grid gap-1">
               <p className="text-sm font-medium">{currentUserProfile.displayName}</p>

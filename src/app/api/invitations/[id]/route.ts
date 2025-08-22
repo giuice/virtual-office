@@ -27,7 +27,7 @@ export async function DELETE(
     }
 
     // Get the current user's profile to check if they're an admin
-    const currentUser = await userRepository.findById(session.user.id);
+    const currentUser = await userRepository.findBySupabaseUid(session.user.id);
     if (!currentUser) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
@@ -128,7 +128,7 @@ export async function GET(
     }
 
     // Get the current user's profile to check if they're an admin
-    const currentUser = await userRepository.findById(session.user.id);
+    const currentUser = await userRepository.findBySupabaseUid(session.user.id);
     if (!currentUser) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }

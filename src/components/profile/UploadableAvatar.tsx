@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar-system';
 import { Button } from '@/components/ui/button';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { 
   Camera, 
   X,
@@ -41,6 +42,7 @@ interface UploadableAvatarProps {
   className?: string;
   onAvatarChange?: (url: string) => void;
   status?: 'online' | 'away' | 'busy' | 'offline';
+  enableHoverActions?: boolean;
 }
 
 export function UploadableAvatar({
@@ -51,6 +53,7 @@ export function UploadableAvatar({
   className,
   onAvatarChange,
   status,
+  enableHoverActions = true,
 }: UploadableAvatarProps) {
   const [hovered, setHovered] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -103,7 +106,7 @@ export function UploadableAvatar({
   });
   
   // Get active avatar URL (preview or current)
-  const avatarUrl = preview || currentAvatarUrl;
+  const avatarUrl = preview || (currentAvatarUrl ? fixSupabaseStorageUrl(currentAvatarUrl) : null);
   
   // Get initials for fallback
   const initials = getUserInitials(displayName);
@@ -208,52 +211,40 @@ export function UploadableAvatar({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <Avatar
-          className={cn(
-            sizeClasses[size],
-            'border-2 border-background',
-            className
-          )}
-        >
-          {avatarUrl && (
-            <AvatarImage
-              src={avatarUrl}
-              alt={displayName}
-              className={isActive ? 'opacity-50' : ''}
-            />
-          )}
-          <AvatarFallback className="bg-primary/10 text-primary">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <EnhancedAvatarV2
+          user={{ 
+            id: userId, 
+            displayName, 
+            avatarUrl,
+            status
+          }}
+          size={size}
+          showStatus={!!status}
+          isActive={isActive}
+          className={cn(sizeClasses[size], 'border-2 border-background', className)}
+        />
         
-        {/* Status indicator */}
-        {status && (
-          <span
-            className={cn(
-              'absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background',
-              getStatusColor()
-            )}
-          />
-        )}
+        
         
         {/* Upload controls (on hover) */}
-        {hovered && !isActive && (
+        {hovered && !isActive && (enableHoverActions !== false) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-full">
             <div className="flex gap-2">
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className={buttonSizeClasses[size]}
-                      onClick={triggerFileSelect}
-                    >
-                      <Camera className="h-4 w-4" />
-                      <span className="sr-only">Upload avatar</span>
-                    </Button>
-                  </TooltipTrigger>
+                                                              {enableHoverActions !== false && (
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="secondary"
+                                      className={buttonSizeClasses[size]}
+                                      onClick={triggerFileSelect}
+                                    >
+                                      <Camera className="h-4 w-4" />
+                                      <span className="sr-only">Upload avatar</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                )}
                   <TooltipContent>Upload new avatar</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -261,7 +252,7 @@ export function UploadableAvatar({
               {avatarUrl && (
                 <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger>
                       <Button
                         size="icon"
                         variant="destructive"
@@ -296,7 +287,7 @@ export function UploadableAvatar({
             {state === 'error' && error && (
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
+                  <TooltipTrigger>
                     <div className="text-rose-500">
                       <FileWarning className="h-5 w-5" />
                     </div>
@@ -334,3 +325,10 @@ export function UploadableAvatar({
     </>
   );
 }
+function fixSupabaseStorageUrl(url: string): string {
+  if (url.includes('supabase.co') && url.includes('/storage/v1/object/public/')) {
+    return url;
+  }
+  return url;
+}
+
