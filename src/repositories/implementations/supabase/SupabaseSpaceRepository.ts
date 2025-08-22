@@ -75,20 +75,9 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
 
     // Process each space individually to ensure proper data mapping
     const spaces = data.map(spaceData => {
-      // Log each space's user_ids directly from the database
-      console.log(`Space ${spaceData.name} (${spaceData.id}) raw user_ids:`, spaceData.user_ids);
-      
-      
-      
-      // Create a properly mapped space object with clean userIds
-      const mappedSpace = mapToCamelCase({
-        ...spaceData,
-        
-      });
-      
-      // Log the final mapped space object
-      console.log(`Mapped space ${mappedSpace.name} (${mappedSpace.id}) `);
-      
+      const mappedSpace = mapToCamelCase(
+        spaceData
+      );
       return mappedSpace;
     });
     
