@@ -28,6 +28,19 @@
 - Modernization of floor plan UI (IP4_ModernFloorPlanUI).
 
 ## Recent Changes
+- **Aug 26, 2025:** Executed T4_1_SpaceDesignSystem_v2 Step 1: refined Tailwind v4 tokens and updated modern UI components guide. Files affected: `src/components/floor-plan/modern/designTokens.ts`, `docs/components/modern-ui-components-guide.md`, task instruction file updated.
+ - **Aug 26, 2025:** Executed T4_2_SpaceCardComponent_v2 Step 1: scaffolded `SpaceCard.tsx` wrapper and exports for ModernSpaceCard. Files affected: `src/components/floor-plan/modern/SpaceCard.tsx`, `src/components/floor-plan/modern/index.ts`, updated task instructions.
+
+## 2025-08-26
+- Completed: T4_1_SpaceDesignSystem_v2 Step 1 (Token refinement + docs)
+- Task: T4_1_SpaceDesignSystem_v2
+- Outcome: Tokens extended with interactive states; docs updated with tokens, states, and a11y guidance.
+- Files affected: src/components/floor-plan/modern/designTokens.ts; docs/components/modern-ui-components-guide.md; memory-bank/tasks/T4_1_SpaceDesignSystem_v2_instructions.md; memorybankrules.md; memory-bank/progress.md; memory-bank/activeContext.md
+- Completed: T4_2_SpaceCardComponent_v2 Step 1 (Scaffold + exports)
+- Task: T4_2_SpaceCardComponent_v2
+- Outcome: Added `SpaceCard.tsx` wrapper delegating to `ModernSpaceCard`; updated modern index exports; marked task step complete.
+- Files affected: src/components/floor-plan/modern/SpaceCard.tsx; src/components/floor-plan/modern/index.ts; memory-bank/tasks/T4_2_SpaceCardComponent_v2_instructions.md; memorybankrules.md; memory-bank/progress.md; memory-bank/activeContext.md; memory-bank/dependency_tracker.md
+- **Aug 26, 2025:** Verified IP4_ModernFloorPlanUI_v2 plan and T4 v2 tasks; updated priorities to execute T4_1 → T4_2 → T4_3; ready to transition to Execution.
 - **Aug 26, 2025:** Switched to Strategy phase to re-plan IP4_ModernFloorPlanUI after regressions. Will create IP4 v2 and refresh T4 tasks under Tailwind v4, DOM-first approach.
 - **Apr 9, 2025:** Created implementation plan for presence system bugs.
 - **Apr 9, 2025:** Identified and fixed root causes of avatar and state management issues.

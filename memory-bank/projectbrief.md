@@ -155,6 +155,42 @@ The database is crucial for supporting real-time features, user management, spac
 
 ---
 
+## Project Structure & Import Patterns
+- Follow the `src/` layout: `app/`, `components/`, `contexts/`, `hooks/`, `lib/`, `repositories/`, `types/`, `utils/`.
+- Co-locate related components and keep one component per file.
+- Use the `@/` alias for internal imports.
+- Group imports: external → internal (`@/`) → relative.
+
+Detailed `src/` structure (recommended)
+```
+src/
+├── app/                 # Next.js App Router pages and layouts
+│   ├── (auth)/         # Authentication route group
+│   ├── (dashboard)/    # Dashboard route group
+│   ├── api/            # API route handlers
+│   └── globals.css     # Global styles
+├── components/         # React components
+│   ├── ui/             # Shadcn/UI base components (Button, Dialog, etc.)
+│   ├── dashboard/      # Dashboard-specific components
+│   ├── floor-plan/     # Virtual office floor plan components
+│   ├── messaging/      # Chat and communication components
+│   ├── profile/        # User profile components
+│   └── shell/          # Layout and shell components
+├── contexts/           # React Context providers
+├── hooks/              # Custom React hooks
+│   ├── queries/        # TanStack Query hooks
+│   ├── mutations/      # Data mutation hooks
+│   └── realtime/       # Real-time subscription hooks
+├── lib/                # Utility functions and configurations
+│   ├── supabase/       # Supabase client and utilities
+│   └── auth/           # Authentication utilities
+├── repositories/       # Data access layer
+│   ├── interfaces/     # Repository interfaces
+│   └── implementations/ # Concrete implementations
+├── types/              # TypeScript type definitions
+└── utils/              # General utility functions
+```
+
 # Planning
 
 ## Step 1: Define Epics (Revised for Supabase & Current Progress)

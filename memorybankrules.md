@@ -1,11 +1,11 @@
 # Memory Bank Rules
 
 <PHASE_MARKER>
-CURRENT_PHASE: Strategy
-NEXT_PHASE: Execution
-LAST_ACTION: Confirmed Strategy phase and initiated IP4 Modern Floor Plan re-planning due to regressions.
-NEXT_ACTION: Create revised IP4 plan and update/extend T4 tasks; verify relationships in progress tracker.
-REQUIRED_BEFORE_TRANSITION: All IP4 tasks defined and linked; priorities reviewed; user confirms to start execution.
+CURRENT_PHASE: Execution
+NEXT_PHASE: Strategy
+LAST_ACTION: T4_2_SpaceCardComponent_v2 Step 1 completed — scaffolded SpaceCard wrapper and exports.
+NEXT_ACTION: T4_2_SpaceCardComponent_v2 Step 2 — implement header, status badge, occupancy, and avatar group using tokens.
+REQUIRED_BEFORE_TRANSITION: Finish T4_2 core implementation and update progress/docs.
 </PHASE_MARKER>
 
 # Other rules and configurations remain unchanged.

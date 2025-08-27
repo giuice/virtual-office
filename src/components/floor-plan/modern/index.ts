@@ -3,6 +3,7 @@
 
 export { default as ModernFloorPlan } from './ModernFloorPlan';
 export { default as ModernSpaceCard } from './ModernSpaceCard';
+export { default as SpaceCard } from './SpaceCard';
 export { default as ModernUserAvatar } from './ModernUserAvatar';
 export { default as AvatarGroup } from './AvatarGroup';
 export { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';

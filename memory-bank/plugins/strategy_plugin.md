@@ -1,163 +1,205 @@
-# STRATEGY PLUGIN
+# Strategy Phase Instructions
 
-<PROGRESS_TRACKER>
- - write_file/edit_file progress.md each step and state change on implementations/tasks, details instructions later
-</PROGRESS_TRACKER>
+This phase breaks down the project into features and tasks. Each feature gets its own file.
 
+## Step 1: Create Task Index
 
-## I. MANDATORY WORKFLOW SEQUENCE
-AFTER EACH STEP you MUST EXECUTE <PROGRESS_TRACKER> 
-1. **FIRST**: Create implementation plan (IP) and 
-2. **SECOND**: Create tasks (T) linked to implementation plan
-3. **THIRD**: Decompose complex tasks into subtasks if needed
-4. **FOURTH**: Update all cross-references
+Create `memory-bank/tasks/index.md` to track all features:
 
-⚠️ **WARNING**: NEVER create a task without first creating its parent implementation plan.
+```markdown
+# Project Features
 
-## II. ENTERING/EXITING THIS PHASE
+## Active Development
+(features currently being worked on)
 
-**Enter if**: `memorybankrules.md` shows `CURRENT_PHASE: Strategy`
-**Exit when**: Plans and tasks created, linked, and prioritized
-**Exit action**: Update `memorybankrules.md` with `NEXT_PHASE: Execution`
+## Ready to Start
+(features fully planned)
 
-## III. IMPLEMENTATION PLAN CREATION
+## Backlog
+(features identified but not planned yet)
 
-❗ **PRE-CHECK**: Plan name follows `IP{number}_{plan_name}` format and stored in `memory-bank/implementation_plans/`
+## Completed
+(finished features)
+```
 
-1. Use write_file to create implementation plan:
-   ```
-   memory-bank/implementation_plans/IP{number}_{plan_name}.md
-   ```
+## Step 2: Identify Features to Build
 
-2. Template:
-   ```
-   # IP{number}_{plan_name}
-   
-   ## Overview
-   [High-level description]
-   
-   ## Goals
-   - [Goal 1]
-   - [Goal 2]
-   
-   ## Technical Approach
-   [Description]
-   
-   ## Related Tasks
-   - T{ip_number}_{task_number}_{task_name} - [Brief description]
-   
-   ## Timeline & Risks
-   [Timeline and risk information]
-   ```
+List the main features/stories your project needs. Examples:
+- User authentication
+- Dashboard interface  
+- Payment processing
+- Admin panel
+- API endpoints
 
-3. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
-   ```
-   ## Implementation Plans
-   - IP1_UserDashboard: 0% (not started)
-   ```
+For each feature, create a planning file: `memory-bank/tasks/[feature]_implementation.md`
 
-## IV. TASK CREATION
-❗ **PRE-CHECK**: Parent plan EXISTS, task follows `T{ip_number}_{task_number}_{task_name}` format
+## Step 3: Create Feature Task Files
 
-1. Use write_file to create task:
-   ```
-   memory-bank/tasks/T{ip_number}_{task_number}_{task_name}_instructions.md
-   ```
+For each feature, create a file like `memory-bank/tasks/auth_implementation.md`:
 
-2. Template:
-   ```
-   # T{ip_number}_{task_number}_{task_name} Instructions
-   
-   ## Objective
-   [Clear statement of purpose]
-   
-   ## Context
-   [Background]
-   [Implementation Plan: IP{number}_{plan_name}]
-   
-   ## Dependencies
-   [Required modules/files]
-   
-   ## Steps
-   1. [First step]
-   2. [Second step]
-   
-   ## Expected Output
-   [Deliverables]
-   ```
+```markdown
+# [Feature Name] Implementation
 
-3. Update the parent implementation plan's "Related Tasks" section:
-   ```
-   ## Related Tasks
-   - T{ip_number}_{task_number}_{task_name} - [Brief description]
-   ```
+## Overview
+Brief description of what this feature does and why it's needed
 
-4. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
-   ```
-   ## Task Tracking
-   - T1_1_DashboardLayout: 0% (not started) [IP1_UserDashboard]
-   ```
+## Tasks
+- [ ] Task 1: Clear, specific task description
+- [ ] Task 2: Another concrete task
+  - [ ] 2.1: Subtask if needed
+  - [ ] 2.2: Another subtask
+- [ ] Task 3: Final task for this feature
 
-## V. SUBTASK CREATION (FOR COMPLEX TASKS)
-❗ **PRE-CHECK**: Parent task EXISTS, subtask follows `T{ip_number}_{task_number}_{subtask_number}_{subtask_name}`
+## Dependencies
+- Requires: What must be done before this
+- Blocks: What can't start until this is done
 
-1. Use write_file to create subtask:
-   ```
-   memory-bank/tasks/T{ip_number}_{task_number}_{subtask_number}_{subtask_name}_instructions.md
-   ```
+## Technical Notes
+- Key decisions or approaches
+- Technologies to use
+- Files that will be created/modified
+```
 
-2. Use same template as tasks
+## Step 4: Break Down Tasks Properly
 
-3. Update parent task with subtask references:
-   ```
-   ## Subtasks
-   - T1_1_1_GridSystem
-   - T1_1_2_Responsiveness
-   ```
+### Good task breakdown:
+```markdown
+## Tasks
+- [ ] Task 1: Set up database tables
+  - [ ] 1.1: Create users table with email, password_hash
+  - [ ] 1.2: Add indexes for email lookups
+  - [ ] 1.3: Create sessions table
+- [ ] Task 2: Build login endpoint
+  - [ ] 2.1: Create POST /api/login route
+  - [ ] 2.2: Add password verification
+  - [ ] 2.3: Generate JWT token
+- [ ] Task 3: Create login UI
+  - [ ] 3.1: Design login form component
+  - [ ] 3.2: Add form validation
+  - [ ] 3.3: Handle success/error states
+```
 
-4. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
-   ```
-   ## Task Tracking
-   - T1_1_DashboardLayout: 0% [IP1_UserDashboard]
-     - T1_1_1_GridSystem: 0%
-     - T1_1_2_Responsiveness: 0%
-   ```
+### Each task should:
+- Take less than a day to complete
+- Produce something concrete (file, feature, fix)
+- Be testable independently
+- Have clear completion criteria
 
-## VI. TASK PRIORITIZATION
-1. Assess dependencies and align with project objectives
-2. **CRITICAL** use write_file or edit_file `memory-bank/progress.md` with:
-   ```
-   ### Task Priorities
-   1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
-   2. T2_1_ProfileSettings (High) - Security requirement [IP2]
-   ```
+## Step 5: Add Implementation Details
 
-## VII. RELATIONSHIP VERIFICATION
-Before proceeding, verify:
-- Every implementation plan has appropriate tasks listed
-- Every task references its parent implementation plan
-- Every subtask is referenced by its parent task
-- `memory-bank/progress.md` shows correct hierarchy and priorities
+For complex tasks, add a section with specifics:
 
-## VIII. **ADDITIONAL PHASE MUP** (APM)
-1. Veryfy Implentations and Tasks relationships are correcty on `memory-bank/progress.md`
+```markdown
+## Implementation Guide
 
-## IX. TRANSITION CHECKLIST
-Before transitioning to Execution phase, verify:
-- All implementation plans have at least one associated task
-- All tasks reference their parent implementation plan
-- All implementation plans list their associated tasks
-- Complex tasks are decomposed into subtasks if needed
-- `memorybankrules.md` updated with `NEXT_PHASE: Execution`
+### Task 1: Set up database tables
+**Files involved:**
+- migrations/001_create_users.sql
+- src/db/schema.sql
 
-## X. REQUIRED RESPONSE FORMAT
-<MUP_COMPLETED_ACTIONS>
-I have made the following file modifications:
-1. EDITED `memorybankrules.md`: [Y/N]
-2. EDITED `memory-bank/activeContext.md`: [Y/N]
-3. EDITED `memory-bank/changelog.md`: [Y/N]
-4. EDITED `memory-bank/progress.md`: [Y/N]
-5. EDITED ADDITIONAL FILES: [Y/N]
-6. VERIFICATION: All files properly updated.
-7. NEXT ACTION: [next action]
-</MUP_COMPLETED_ACTIONS>
+**Approach:**
+1. Create migration file with users table
+2. Add email unique constraint  
+3. Run migration
+4. Test with sample insert
+
+### Task 2: Build login endpoint
+**Files involved:**
+- src/api/auth/login.js
+- src/utils/jwt.js
+
+**Approach:**
+1. Set up POST route handler
+2. Validate email/password from request
+3. Check against database
+4. Return JWT if valid
+```
+
+## Step 6: Update Index and Context
+
+### Update index.md:
+```markdown
+## Ready to Start
+- auth_implementation.md (5 tasks)
+- dashboard_setup.md (8 tasks)
+
+## Backlog
+- payment_integration.md
+```
+
+### Update activeContext.md:
+```markdown
+## Current Status
+- Strategy phase completed
+- Planned 3 features with 21 total tasks
+- Priority: Start with auth_implementation
+- Next phase: Execution
+
+## Features Planned
+1. Authentication (5 tasks) - Critical path
+2. Dashboard (8 tasks) - Depends on auth
+3. Payment (8 tasks) - Can be done later
+```
+
+## Step 7: Set Priorities
+
+In index.md, order features by priority:
+
+```markdown
+## Priority Order
+1. auth_implementation.md - Required for everything
+2. dashboard_setup.md - Core user experience  
+3. api_endpoints.md - Needed for frontend
+4. payment_integration.md - Can be added later
+```
+
+## Ready for Execution?
+
+Check:
+- ✓ All critical features have task files
+- ✓ Tasks are broken into manageable pieces
+- ✓ Dependencies are noted
+- ✓ Index.md shows clear priorities
+
+Update `memorybankrules.md`:
+```
+current_phase: Execution
+last_action: "Planned [X] features with [Y] tasks"
+next_action: "Start with [first feature]"
+```
+
+## Tips for Large Projects
+
+### Organize by milestone
+Group features into releases:
+```
+tasks/
+├── index.md
+├── v1.0/
+│   ├── auth_implementation.md
+│   └── basic_dashboard.md
+└── v2.0/
+    ├── payment_integration.md
+    └── admin_panel.md
+```
+
+### Keep task files focused
+- One feature per file
+- 5-15 tasks per feature
+- If more than 15, split into two features
+
+### Use clear naming
+- auth_implementation.md (not auth.md)
+- payment_integration.md (not pay.md)
+- Makes purpose obvious
+
+## Response Format
+
+After planning:
+```
+Strategy Complete:
+- Created: [X] feature files in tasks/
+- Total tasks: [Y] across all features  
+- Priority: Starting with [feature]
+- Phase: Ready for Execution
+```

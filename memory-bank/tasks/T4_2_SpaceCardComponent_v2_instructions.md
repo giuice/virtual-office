@@ -14,7 +14,7 @@ SpaceCard is the central unit. It must be responsive, accessible, and performant
 - Presence data hooks
 
 ## Steps
-1. Create `src/components/floor-plan/modern/SpaceCard.tsx` with props for space info and presence list.
+1. ✅ Create `src/components/floor-plan/modern/SpaceCard.tsx` with props for space info and presence list.
 2. Render header (name/type), status badge, occupancy visualization, avatar group with overflow.
 3. Add interaction handlers: onClick enter, onDetails for more.
 4. Apply animations for hover/focus and selection using CSS transitions.

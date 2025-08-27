@@ -78,6 +78,18 @@ import {
 <CapacityIndicator current={3} capacity={10} />
 ```
 
+### Tokens and States (Tailwind v4)
+- Colors: Uses CSS variables defined in `src/app/globals.css` (e.g., `--background`, `--card`, `--ring`). Access via Tailwind utilities like `bg-background`, `text-foreground`, `border-border`.
+- Radius: `--radius` with derived sizes via `@theme inline` (`rounded-[var(--radius)]` family). Tokens mapped in Tailwind config for `rounded-lg`, etc.
+- Shadows: Tailwind v4 scales (`shadow-xs`, `shadow-sm`, `shadow-md`). Prefer subtle shadows for cozy feel.
+- SpaceCard states: base `bg-card border-border`, `hover:bg-accent/40`, `data-[selected=true]:ring-3 ring-primary/40`, `focus-visible:ring-3 ring-primary/50`, `disabled:opacity-50`.
+- Capacity colors: low `text-emerald-500`, medium `text-amber-500`, high `text-rose-500`.
+
+### Accessibility
+- Focus: Ensure `focus-visible:ring-3 ring-primary/50` on actionable elements. Avoid outline jitter by setting color outside transitions when needed.
+- Contrast: Status badges meet AA on both themes.
+- Reduced motion: Keep transitions at `duration-200` and avoid large transforms; respect `prefers-reduced-motion` if adding complex animations later.
+
 ---
 
 ## Enhanced Avatar System

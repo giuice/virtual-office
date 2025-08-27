@@ -23,6 +23,16 @@ export const floorPlanTokens = {
     
     // Hover scale factor - subtle growth on hover
     hoverScale: "hover:scale-[1.02]",
+
+    // Interactive state variants (Tailwind v4 naming where applicable)
+    states: {
+      base: "bg-card text-card-foreground border border-border",
+      hover: "hover:bg-accent/40 hover:shadow-sm",
+      active: "active:shadow-md active:translate-y-[0.5px]",
+      selected: "data-[selected=true]:ring-3 data-[selected=true]:ring-primary/40",
+      disabled: "disabled:opacity-50 disabled:pointer-events-none",
+      focus: "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/50",
+    },
     
     // Space status indicators
     statusColors: {

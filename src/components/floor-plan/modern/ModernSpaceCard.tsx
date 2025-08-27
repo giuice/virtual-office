@@ -48,10 +48,6 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     usersInSpace.length > 0
   );
 
-  // Functions to format space properties
-  const formatSpaceType = (type: string) => {
-    return type.replace(/_/g, ' ');
-  };
 
   return (
     <div
@@ -59,7 +55,12 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         "flex flex-col relative rounded-lg border-2 p-4",
         floorPlanTokens.spaceCard.shadow.default,
         floorPlanTokens.spaceCard.transition,
+        // Respect reduced motion preferences
+        "motion-reduce:transition-none motion-reduce:transform-none",
+        // Accessible focus styles
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
         typeClasses,
+        statusClasses,
         hovered && [
           floorPlanTokens.spaceCard.shadow.hover,
           floorPlanTokens.spaceCard.hoverScale

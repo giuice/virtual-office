@@ -1,253 +1,220 @@
-# EXECUTION PLUGIN
+# Execution Phase Instructions
 
-> ⚠️ **MANDATORY:**
-> You **MUST** perform the full **Mandatory Update Protocol (MUP)** **immediately after completing every task or subtask**.
-> You **MUST ACTUALLY EDIT FILES** using your `write file` tool, `edit file` tool, or `create directory tools.
-> **Never** proceed to the next task, subtask, or phase transition **without** actually editing files.
-> **DO NOT just check boxes - you must use the file editing tools to make changes.**
+This phase implements features from the task files created in Strategy phase.
 
-╔═════════════════════════════════════════════════════════════════════════════════╗
-║                        EXECUTION                                                ║
-║                                                                                 ║
-║  Verify  -->  Execute  -->  Document  -->  Update  Test/User Tests -->  Next    ║
-║  State       Step         Results       Trackers                        Step    ║
-╚═════════════════════════════════════════════════════════════════════════════════╝
+## Step 1: Check What to Work On
 
-## I. ENTERING/EXITING THIS PHASE
+### 1.1 Read the index
+Look at `memory-bank/tasks/index.md` to see feature priorities:
+- **Active Development**: Continue working on these
+- **Ready to Start**: Pick the highest priority
+- **Completed**: Skip these
 
-**Enter if**:
-- `memorybankrules.md` shows `CURRENT_PHASE: Execution`
-- Transitioning from Strategy
-- User Trigger: Start a new session post-Strategy or to resume execution.
+### 1.2 Load the feature file
+Open the specific feature file, e.g., `memory-bank/tasks/auth_implementation.md`
+Find the first unchecked task `[ ]` or continue where you left off `[~]`
 
-**Exit when**:
-- All steps in instruction files are executed
-- Expected outputs are generated
-- Results are documented
+## Step 2: Work Through Tasks
 
-**Exit action**:
-You MUST use write_file or edit file tool to update memorybankrules.md with:
-```
-<PHASE_MARKER>
-CURRENT_PHASE: Execution
-NEXT_PHASE: Strategy
-LAST_ACTION: Completed Execution Phase - Tasks Executed
-NEXT_ACTION: Transition to Strategy Phase Instructions
-REQUIRED_BEFORE_TRANSITION: User Action Required
-</PHASE_MARKER>
+### 2.1 Starting a task
+Mark it as in-progress in the feature file:
+```markdown
+- [~] Task 2: Build login endpoint ← WORKING ON THIS
 ```
 
-## II. CONTEXT LOADING
+### 2.2 For subtasks
+Work through them one by one:
+```markdown
+- [~] Task 2: Build login endpoint
+  - [x] 2.1: Create POST /api/login route ✓
+  - [~] 2.2: Add password verification ← CURRENT
+  - [ ] 2.3: Generate JWT token
+```
 
-1. Read core files:
-   - `memorybankrules.md`
-   - `memory-bank/projectbrief.md`
-   - `memory-bank/activeContext.md`
-   - `memory-bank/dependency_tracker.md`
-   - `memory-bank/progress.md`
+### 2.3 Execute the actual work
+- Create/modify the files mentioned in the task
+- Follow any implementation notes provided
+- Test that your changes work
+- Handle errors gracefully
 
-2. Identify and load the implementation plan:
-   - First determine current task from `memorybankrules.md` LAST_ACTION or NEXT_ACTION fields
-   - Extract implementation plan reference (IP#) from task name (e.g., T1_2_Login → IP1)
-   - Use read file tool to load the specific implementation plan:
-     `read file tool memory-bank/implementation_plans/IP{ip_number}_{name}.md`
-   - If plan reference isn't clear from task name, check `progress.md` for task-to-plan mapping
+### 2.4 Complete the task
+Update the feature file:
+```markdown
+- [x] Task 2: Build login endpoint ✓ DONE
+  - [x] 2.1: Create POST /api/login route
+  - [x] 2.2: Add password verification  
+  - [x] 2.3: Generate JWT token
+```
 
-3. Load the specific task instruction file:
-   - Use read file tool to load the current task: 
-     `read file tool memory-bank/tasks/T{task_id}_instructions.md`
+## Step 3: Track Progress
 
-4. Load all dependency files listed in the task instruction file
+### 3.1 Update the feature file
+Add notes about what was accomplished:
+```markdown
+## Current Focus
+~~Working on Task 2.2~~ → Completed Task 2, moving to Task 3
 
-## III. STEP EXECUTION PROCESS
+## Completion Notes
+- Task 2: Login endpoint working at POST /api/login
+  - Returns JWT token on success
+  - Proper error messages for invalid credentials
+  - Rate limiting added
+```
 
-For each step in the instruction file:
+### 3.2 Update activeContext.md
+Keep the overall project status current:
+```markdown
+## Current Status
+- Feature: Authentication (auth_implementation.md)
+- Progress: 3 of 5 tasks complete
+- Just finished: Login endpoint with JWT
+- Next: Password reset flow
 
-1. **EXECUTE Pre-Action Verification Protocol (PAVP)** (CRITICAL): 
-   1. Before file modifications (replace_in_file tool, write_to_file tool, etc.):
-❗ **PROCEED ONLY IF STATES MATCH**
+## Recent Changes  
+- Created src/api/auth/login.js
+- Added JWT utility in src/utils/jwt.js
+- Updated database schema with sessions table
+```
 
-2. **Execute Step**
-   - Perform the specified action
-   - If an error occurs, document and resolve
+### 3.3 Update index.md
+Show which features are active:
+```markdown
+## Active Development
+- auth_implementation.md - Task 3 of 5 (60%)
 
-3. **Document Results**
-   ```
-   <RESULTS>
-   - Action completed: [description]
-   - Outcome: [what changed]
-   - Observations: [notable findings]
-   - Issues encountered: [any problems]
-   </RESULTS>
-   ```
+## Ready to Start
+- dashboard_setup.md (waiting for auth)
+```
 
-4. **Update Step Status**
-   - Use edit file tool to mark step as completed in the instruction file:
-     ```
-     ## Steps
-     1. ✅ [Step description]
-     2. ⬜ [Step description]
-     ```
+## Step 4: Feature Completion
 
-5. **Update DEPENDENCY TRACKING SYSTEM**
-   <DEP_MATRIX_START>
-      # KEY DEFINITIONS
-      K1: path/to/module_a
-      K2: path/to/module_b
+When ALL tasks in a feature file are done:
 
-      # MATRIX (Row depends on Column)
-      # Symbols: > (depends on), < (depended by), x (mutual), - (none), d (doc)
-         | K1 | K2 |
-      K1  | -  | >  |
-      K2  | <  | -  |
-   <DEP_MATRIX_END>
+### 4.1 Mark feature complete
+In the feature file:
+```markdown
+# Authentication Implementation ✓ COMPLETED
 
-   Tracker files:
-   - Module dependencies: `memory-bank/dependency_tracker.md`
-   - Documentation dependencies: `memory-bank/docs/doc_tracker.md`
+## Overview
+[...]
 
-## IV. MANDATORY FINALIZATION AFTER EACH TASK
+## Tasks
+- [x] Task 1: Set up database tables
+- [x] Task 2: Build login endpoint
+- [x] Task 3: Password reset flow
+- [x] Task 4: Session management
 
-At the **end of every task or subtask**, you **MUST**:
+## Status: COMPLETE - All tasks finished on [date]
+```
 
-- Use write_file or edit file tool to update all relevant files:
-  1. `memorybankrules.md` - Update with phase marker showing last and next actions
-  2. `memory-bank/activeContext.md` - Update with current state and next steps
-  3. `memory-bank/progress.md` 
-     1. ## Implementation Plans
-         - IP1_UserDashboard: {0}% ({status})
-     2. ## Task Tracking
-         - T1_1_DashboardLayout: {0}% ({status}) [IP1_UserDashboard]
-     3. ### Task Priorities
-         1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
-         2. T2_1_ProfileSettings (High) - Security requirement [IP2] 
-  4. Task instruction file - Update with completed steps
+### 4.2 Update index.md
+Move to completed section:
+```markdown
+## Active Development
+(empty or next feature)
 
-- After making all file edits, include the **full MUP_COMPLETED_ACTIONS block** in your response that quotes the actual text you added to each file
+## Completed
+- auth_implementation.md ✓ (4 tasks done)
+```
 
-- **Do NOT** start a new task, subtask, or phase transition **until** you have actually modified all required files
-❗ **This is critical to prevent project state gaps.**
+### 4.3 Start next feature
+Pick the highest priority from "Ready to Start" and begin Step 1 again.
 
-## V. ERROR HANDLING PROTOCOL
+## Step 5: Switching Between Features
 
-When encountering errors:
-1. Document the error condition
-   ```
-   <ERROR>
-   - Error message: [exact message]
-   - Context: [what you were doing]
-   - Probable cause: [your analysis]
-   </ERROR>
-   ```
+Sometimes you need to work on multiple features in parallel:
 
-2. Determine resolution approach:
-   - Retry with adjustments
-   - Split into smaller steps
-   - Revert and reconsider approach
+### Managing multiple active features:
+```markdown
+## Active Development
+- auth_implementation.md - Task 3 of 5 (blocked)
+- api_endpoints.md - Task 1 of 6 (in progress)
+```
 
-3. Document resolution:
-   ```
-   <RESOLUTION>
-   - Approach taken: [what you did]
-   - Result: [outcome]
-   - Preventative measures: [how to avoid this in future]
-   </RESOLUTION>
-   ```
+### When blocked:
+Note why in the feature file:
+```markdown
+## Current Focus
+Task 3 blocked - waiting for email service setup
+Switched to api_endpoints.md meanwhile
+```
 
-4. Use write_file or edit file tool to update all relevant files with error information and resolution
+## Step 6: Handling Dependencies
 
-## VI. SUBTASK HANDLING
+### Check before starting:
+```markdown
+## Dependencies
+- Requires: database_schema.md ✓ Complete
+- Requires: config_setup.md ✓ Complete
+```
 
-When a step requires subtask execution:
-1. Load subtask instruction file
-2. Execute all steps in the subtask
-3. Use edit file tool to mark the parent task step as completed
-4. Return to the parent task execution
+### Update when creating dependencies:
+In `dependencytracker.md`:
+```markdown
+## Feature Dependencies
+- dashboard_setup → requires → auth_implementation
+- payment_integration → requires → api_endpoints
 
-## ❗ BEFORE MUP PROTOCOL TEST IF POSSIBLE OR HELP USER TEST THE STEP
+## File Dependencies  
+- src/api/users.js → depends on → src/utils/auth.js
+- src/components/Dashboard.js → depends on → src/api/client.js
+```
 
-## VII. **ADDITIONAL PHASE MUP** (APM)
+## All Features Complete?
 
-After EVERY step execution, you MUST:
+When all features in "Ready to Start" are done:
 
-1. Use write_file or edit file tool to update `memorybankrules.md` with:
-   ```
-   <PHASE_MARKER>
-   CURRENT_PHASE: Execution
-   NEXT_PHASE: [appropriate next phase]
-   LAST_ACTION: [description of step just completed]
-   NEXT_ACTION: [description of next step]
-   REQUIRED_BEFORE_TRANSITION: [any requirements before transitioning]
-   </PHASE_MARKER>
-   ```
+Update `memorybankrules.md`:
+```
+current_phase: Strategy  
+last_action: "Completed all planned features"
+next_action: "Plan next batch of features"
+```
 
-2. Use write_file or edit file tool to update `memory-bank/activeContext.md` with:
-   - Details of the step just completed
-   - Current state of execution
-   - Next steps to be taken
+## Working with Large Projects
 
-3. Use write_file or edit file tool to update `memory-bank/changelog.md` with:
-   ```
-   ## [YYYY-MM-DD]
-   - Completed: [step description]
-   - Task: T{number}_{name}
-   - Outcome: [result of the step]
-   - Files affected: [list of files modified]
-   ```
-4. Use write_file or edit file tool to update `memory-bank/progress.md` 
-     1. ## Implementation Plans
-         - IP1_UserDashboard: {0}% ({status})
-     2. ## Task Tracking
-         - T1_1_DashboardLayout: {0}% ({status}) [IP1_UserDashboard]
-     3. ### Task Priorities
-         1. T1_1_DashboardLayout (Highest) - Required for all dashboard work [IP1]
-         2. T2_1_ProfileSettings (High) - Security requirement [IP2] 
-5. Use edit file tool to update the task instruction file with step status:
-   ```
-   ## Steps
-   1. ✅ [Completed step]
-   2. ⬜ [Pending step]
-   ```
+### Focus on one feature:
+- Load only the feature file you're working on
+- Don't try to load all 30 feature files at once
+- Use index.md to navigate between features
 
-6. After making all file modifications, verify they were applied correctly by reading files back.
+### Track carefully:
+- Always mark tasks as you work `[~]` 
+- Complete them when done `[x]`
+- Add notes about important decisions
 
-## VIII.CHECKPOINTS BEFORE TRANSITION
+### Test frequently:
+- After each task, verify it works
+- Don't wait until the end of a feature
+- Document any issues found
 
-Before transitioning to Strategy phase, use read file tool to verify:
-<TRANSITION_CHECKLIST>
-[ ] All steps in the instruction file are executed
-[ ] All expected outputs are generated
-[ ] Results and observations are documented
-[ ] Used edit file tool to update instruction file with step status
-[ ] Used write_file or edit file tool to update `memorybankrules.md` with NEXT_PHASE: Strategy
-</TRANSITION_CHECKLIST>
+## Response Format
 
-## IX. REQUIRED RESPONSE FORMAT
+After working on tasks:
+```
+Execution Progress:
+- Feature: [feature name]
+- Completed: Task X.Y - [description]
+- Created/Modified: [files changed]
+- Feature Progress: X of Y tasks done
+- Next: [next task or feature]
+```
 
-All responses after completing an action MUST end with verification of actual file modifications:
+## Quick Reference
 
-<MUP_COMPLETED_ACTIONS>
-I have made the following file modifications:
+**Task States:**
+- `[ ]` Not started
+- `[~]` In progress
+- `[x]` Complete
 
-1. EDITED `memorybankrules.md`: [YYES/NO]
+**Where to look:**
+- Overall status → `tasks/index.md`
+- Feature details → `tasks/[feature]_implementation.md`
+- Current state → `activeContext.md`
+- Dependencies → `dependencytracker.md`
 
-2. EDITED `memory-bank/activeContext.md`: [YES/NO]
-
-3. EDITED `memory-bank/changelog.md`: [YES/NO]
-
-4. EDITED `memory-bank/progress.md`: [YES/NO]
-
-5. EDITED `[task instruction file]`: [YES/NO]
-
-6. EDITED ADDITIONAL FILES:
-   - [filename]: [Quote the relevant text you added/edited]
-   - [filename]: [Quote the relevant text you added/edited]
-
-7. VERIFICATION: I have confirmed all files were properly updated by reading them back.
-
-8. NEXT ACTION: [Describe exactly what will be done next]
-</MUP_COMPLETED_ACTIONS>
-
-❗ **IMPORTANT:**
-Every response **after completing a task or subtask** **MUST** include the **full MUP_COMPLETED_ACTIONS block** with actual quotes from the files you modified.
-If you forget, **stop immediately** and perform the file edits **before** any further actions.
+**When stuck:**
+1. Check dependencies are met
+2. Break task into smaller subtasks
+3. Note the blocker and switch features
+4. Update activeContext.md with the issue

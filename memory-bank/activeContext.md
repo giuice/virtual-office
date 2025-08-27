@@ -1,18 +1,16 @@
 # Active Context
 
 ## Current Project State
-Currently in Strategy phase to re-plan IP4 (Modern Floor Plan UI) after regressions broke prior work. Execution on avatar and messaging items is paused while we restructure the floor plan plan and tasks.
+Currently executing IP4 v2. Completed T4_1 token refinement and docs update; moving to T4_2 SpaceCard implementation.
 
 ## Recent Actions
 - Confirmed Strategy phase for IP4 re-plan.
-- Will create revised implementation plan `IP4_ModernFloorPlanUI_v2.md`.
-- Will update or recreate T4 tasks to align with Tailwind v4 and DOM-first requirements.
-- Will verify progress and priorities before transitioning to Execution.
+- IP4_ModernFloorPlanUI_v2 plan validated.
+- T4_1..T4_6 v2 tasks exist with instructions; priorities updated.
+- Progress and priorities verified; transition to Execution next.
 
 ## Next Steps
-- Create revised IP4 plan and tasks.
-- Update `progress.md` with IP4 v2 and T4 task statuses/priorities.
-- After verification, transition to Execution to implement T4 tasks.
+- Continue T4_2_SpaceCardComponent_v2: implement header/status/occupancy and interactions.
 
 ## Dependencies
 - T4 tasks depend on Tailwind v4 configuration, Shadcn/UI components, presence hooks/contexts, and existing DOM floor plan components for reference/replacement.
@@ -33,7 +31,7 @@ Currently in Strategy phase to re-plan IP4 (Modern Floor Plan UI) after regressi
 - Workspace: /home/giuice/apps/virtual-office
 
 ## Mandatory Updates
-This file has been updated to reflect the Strategy phase for IP4 re-planning.
+This file reflects Execution phase progress for IP4 v2.
 
 ## Current Focus
 - Re-planning Modern Floor Plan UI (IP4 v2)
@@ -66,7 +64,7 @@ This file has been updated to reflect the Strategy phase for IP4 re-planning.
 - Address authentication issues in messaging API endpoints
 - Investigate and fix server errors in message creation
 - Consider reimplementing typing indicators using Supabase broadcast channels if needed
-- Begin work on T4_1_SpaceDesignSystem for modernizing floor plan UI
+- Begin work on T4_2_SpaceCardComponent leveraging updated tokens (Step 1 completed: wrapper scaffold created)
 
 ## Technical Notes
 - Supabase Realtime subscriptions configured with:
