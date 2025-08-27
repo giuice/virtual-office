@@ -2,7 +2,8 @@
 
 ## Implementation Plans
 - IP1_PresenceBugsResolution: 100% (Completed)
-- IP4_ModernFloorPlanUI: 20% (In Progress)
+- IP4_ModernFloorPlanUI: superseded by v2 (planning)
+- IP4_ModernFloorPlanUI_v2: 0% (Not Started)
 - IP5_MessagingRealtimeUnification: 100% (Completed)
 - IP6_AvatarSystemFixes: 0% (Not Started)
 
@@ -12,6 +13,12 @@
 - T1_3_SpaceInteraction: 100% (Completed) [IP1_PresenceBugsResolution]
 - T1_4_RealtimeIntegration: 100% (Completed) [IP1_PresenceBugsResolution]
 - T4_1_SpaceDesignSystem: 50% (In Progress) [IP4_ModernFloorPlanUI]
+- T4_1_SpaceDesignSystem_v2: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
+- T4_2_SpaceCardComponent_v2: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
+- T4_3_FloorPlanLayout_v2: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
+- T4_4_AnimationsTransitions_v2: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
+- T4_5_ResponsiveAdaptation_v2: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
+- T4_6_KonvaCleanup: 0% (Not Started) [IP4_ModernFloorPlanUI_v2]
 - T5_1_RefactorMessagingRealtime: 100% (Completed) [IP5_MessagingRealtimeUnification]
 - T6_1_AvatarDisplayFix: 0% (Not Started) [IP6_AvatarSystemFixes]
 - T6_2_AvatarStorageOptimization: 0% (Not Started) [IP6_AvatarSystemFixes]
@@ -20,8 +27,10 @@
 ## Task Priorities
 1. T6_1_AvatarDisplayFix (Highest) - Fix custom avatar display issues [IP6]
 2. T6_3_AvatarGroupLayoutFix (High) - Fix avatar group layout problems [IP6]
-3. T4_1_SpaceDesignSystem (Medium) - Continue modernizing floor plan UI [IP4]
+3. T4_1_SpaceDesignSystem_v2 (Medium) - Rebuild design system for Tailwind v4 [IP4 v2]
 4. T6_2_AvatarStorageOptimization (Medium) - Optimize avatar storage [IP6]
+5. T4_2_SpaceCardComponent_v2 (Medium) - Build core space card [IP4 v2]
+6. T4_3_FloorPlanLayout_v2 (Medium) - Implement modern layout [IP4 v2]
 
 ## Notes
 - T1_3_SpaceInteraction is now complete based on user confirmation.

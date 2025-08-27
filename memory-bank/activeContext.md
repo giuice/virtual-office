@@ -1,45 +1,44 @@
 # Active Context
 
 ## Current Project State
-Transitioned to Execution phase. Task T1_4 is complete. Due to identifying incomplete realtime migration in the messaging system, planning was done in Strategy phase to address this. The next task is the newly created T5_1_RefactorMessagingRealtime, which is now prioritized over T4_1.
+Currently in Strategy phase to re-plan IP4 (Modern Floor Plan UI) after regressions broke prior work. Execution on avatar and messaging items is paused while we restructure the floor plan plan and tasks.
 
 ## Recent Actions
-- Identified incomplete messaging realtime migration (post-T1_4).
-- Transitioned to Strategy phase.
-- Created Implementation Plan: `IP5_MessagingRealtimeUnification.md`.
-- Created Task Instructions: `T5_1_RefactorMessagingRealtime_instructions.md`.
-- Updated `progress.md` to include IP5, T5_1, and set T5_1 as highest priority.
-- Transitioned back to Execution phase.
+- Confirmed Strategy phase for IP4 re-plan.
+- Will create revised implementation plan `IP4_ModernFloorPlanUI_v2.md`.
+- Will update or recreate T4 tasks to align with Tailwind v4 and DOM-first requirements.
+- Will verify progress and priorities before transitioning to Execution.
 
 ## Next Steps
-- Initialize Execution Phase: Load Execution plugin and core files.
-- Start execution of T5_1_RefactorMessagingRealtime, beginning with Step 1: Analyze Current State.
+- Create revised IP4 plan and tasks.
+- Update `progress.md` with IP4 v2 and T4 task statuses/priorities.
+- After verification, transition to Execution to implement T4 tasks.
 
 ## Dependencies
-- T5_1 depends heavily on messaging context, hooks (`useMessages`, `useConversations`), Supabase client, and consuming UI components.
+- T4 tasks depend on Tailwind v4 configuration, Shadcn/UI components, presence hooks/contexts, and existing DOM floor plan components for reference/replacement.
 
 ## Potential Issues
-- High risk of performance issues or update loops if Supabase subscriptions are not implemented carefully in T5_1. Requires thorough testing.
+- Risk: Regressions in Tailwind v4 migration and DOM-based layout performance; ensure no Konva dependencies remain. Accessibility must be preserved.
 
 ## Progress Summary
 - IP1_PresenceBugsResolution: 100% complete.
-- IP4_ModernFloorPlanUI: 0% complete.
-- IP5_MessagingRealtimeUnification: 0% complete (Task T5_1 is starting).
+- IP4_ModernFloorPlanUI: being re-planned (v2).
+- IP5_MessagingRealtimeUnification: 100% complete.
 - Task T1_4_RealtimeIntegration: 100% complete.
-- Task T4_1_SpaceDesignSystem: 0% complete (Deferred).
-- Task T5_1_RefactorMessagingRealtime: 0% complete.
+- Task T4_1_SpaceDesignSystem: to be refreshed for v2.
+- Task T5_1_RefactorMessagingRealtime: 100% complete.
 
 ## Environment Notes
 - Current mode: crct
-- Workspace: f:/Cursos2/React/collab-office-app-anthropic/virtual-office
+- Workspace: /home/giuice/apps/virtual-office
 
 ## Mandatory Updates
-This file has been updated to reflect the latest actions and state.
+This file has been updated to reflect the Strategy phase for IP4 re-planning.
 
 ## Current Focus
-- Addressing avatar system bugs
-- Fixing issues with custom avatar rendering and storage
-- Improving avatar group component spacing issues
+- Re-planning Modern Floor Plan UI (IP4 v2)
+- Ensuring Tailwind v4 alignment and DOM-first approach
+- Preparing refreshed T4 tasks for execution
 
 ## Recent Major Changes
 - T5_1_RefactorMessagingRealtime completed:

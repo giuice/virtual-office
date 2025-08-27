@@ -28,6 +28,7 @@
 - Modernization of floor plan UI (IP4_ModernFloorPlanUI).
 
 ## Recent Changes
+- **Aug 26, 2025:** Switched to Strategy phase to re-plan IP4_ModernFloorPlanUI after regressions. Will create IP4 v2 and refresh T4 tasks under Tailwind v4, DOM-first approach.
 - **Apr 9, 2025:** Created implementation plan for presence system bugs.
 - **Apr 9, 2025:** Identified and fixed root causes of avatar and state management issues.
 - **Apr 9, 2025:** Generated tasks T1_1 through T1_4.
