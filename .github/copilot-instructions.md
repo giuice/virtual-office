@@ -4,15 +4,15 @@ You are an AI assistant working on a software development project. Follow these 
 
 ## 1. START HERE - Read Project Context
 When you begin ANY session, first check if these files exist. If not, create them using the templates in the Setup phase:
-- `memory-bank/product.md` - What we're building and why
-- `memory-bank/structure.md` - Where files go in the project  
-- `memory-bank/tech.md` - Technologies and tools we use
+- `product.md` - What we're building and why
+- `structure.md` - Where files go in the project  
+- `tech.md` - Technologies and tools we use
 
 If they exist, read them to understand the project.
 
 ## 2. Check Current Phase
 Read `memorybankrules.md` to see which phase the project is in:
-- **Setup Phase**: Setting up the project, adding new features
+- **Setup Phase**: Setting up the project, adding new features, `memorybankrules.md` does not exists
 - **Strategy Phase**: Planning tasks and breaking down work
 - **Execution Phase**: Actually coding and implementing tasks
 
@@ -21,16 +21,18 @@ Based on the phase, load ONE additional instruction file:
 - Strategy → Read `memory-bank/plugins/strategy_plugin.md`  
 - Execution → Read `memory-bank/plugins/execution_plugin.md`
 
+**IMPORTANT: ALWAYS keep `memorybankrules.md` [STATE_TRACKER] fields current. After any major action or task completion, update `LAST_ACTION` and set an accurate `NEXT_ACTION` — do not wait for phase changes.**
+
 ## 3. Track Your Work
 After completing ANY action that changes the project:
 
 ### Update these tracking files:
-1. **`memory-bank/activeContext.md`** - Add a brief note about:
+1. **`activeContext.md`** - Add a brief note about:
    - What you just did
    - Current state of the project
    - What needs to be done next
 
-2. **`memory-bank/dependencytracker.md`** - If you created or modified code that depends on other files:
+2. **`dependencytracker.md`** - If you created or modified code that depends on other files:
    - List which files depend on which
    - Use simple format: `FileA → depends on → FileB`
 
@@ -38,12 +40,29 @@ After completing ANY action that changes the project:
    - Mark tasks as complete `[x]` when done
    - Update progress notes in the file
 
-### Phase Status (only if changing phases):
-If moving to a different phase, update `memorybankrules.md`:
+4. **`memorybankrules.md`** - Keep [STATE_TRACKER] up-to-date:
+   - Update `LAST_ACTION` immediately after completing a significant step
+   - Update `NEXT_ACTION` whenever the next focus changes
+   - Only change `CURRENT_PHASE`/`NEXT_PHASE` on phase transitions, but action fields must always be accurate
+   - [LEARNING_LOG] for learning points, only extremely important ones
+
+### Phase and Action Status
+Maintain `memorybankrules.md` continuously. On phase transitions, also update the phase fields. Example status template:
 ```
-current_phase: [Setup/Strategy/Execution]
-last_action: "What was just completed"
-next_action: "What needs to be done next"
+[STATE_TRACKER]
+CURRENT_PHASE: Setup/Maintenance
+NEXT_PHASE: Strategy  
+LAST_ACTION: "Identified core directories and documentation structure"
+NEXT_ACTION: "Analyze existing task structure and create modernized format"
+
+[TRANSITION_REQUIREMENTS]
+- [ ] Core directories catalogued
+- [ ] Documentation structure mapped .. 
+
+[LEARNING_LOG]
+- NEVER, EVER, GUESS!. your job is to find answers
+- ALWAYS verify information before presenting it as fact.
+- If you don't know, say "I don't know" or "I need to look that up"—never make assumptions.
 ```
 
 ## 4. Simple Workflow Rules

@@ -1,9 +1,7 @@
 // src/app/floor-plan-components/page.tsx
 'use client';
-
-import { useState } from 'react';
 import { ModernSpaceCard, ModernUserAvatar, AvatarGroup, SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from '@/components/floor-plan/modern';
-import { SpaceStatus, SpaceType, Space, UserPresenceData } from '@/types/database';
+import { SpaceStatus, Space, UserPresenceData } from '@/types/database';
 import { DashboardShell } from '@/components/shell';
 import { DashboardHeader } from '@/components/shell/dashboard-header';
 export default function ComponentsTestPage() {
@@ -51,6 +49,30 @@ export default function ComponentsTestPage() {
               usersInSpace={sampleUsers.slice(0, 1)}
               onEnterSpace={(id) => console.log('Enter space:', id)}
               compact={true}
+            />
+          </div>
+
+          {/* Loading, Error, and Empty states */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ModernSpaceCard 
+              space={{...sampleSpace, name: 'Loading…'}} 
+              usersInSpace={[]}
+              onEnterSpace={() => {}}
+              isLoading
+              empty
+            />
+            <ModernSpaceCard 
+              space={{...sampleSpace, name: 'Error'}} 
+              usersInSpace={[]}
+              onEnterSpace={() => {}}
+              isError
+              empty
+            />
+            <ModernSpaceCard 
+              space={{...sampleSpace, name: 'Empty'}} 
+              usersInSpace={[]}
+              onEnterSpace={() => {}}
+              empty
             />
           </div>
         </div>

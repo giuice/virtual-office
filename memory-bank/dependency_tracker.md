@@ -41,3 +41,15 @@ K16 | -  | -  | -  | -  | -  | >  | <  | -  | -  | -  | -  | -  | -  | -  | <  |
 Additional Docs Links:
 - K16: src/components/floor-plan/modern/designTokens.ts (docs depend on this)
 - K17: docs/components/modern-ui-components-guide.md (documents tokens and guidelines)
+ - K18: src/components/floor-plan/modern/ModernSpaceCard.tsx (depends on K16, K15, StatusIndicators, AvatarGroup)
+ - K19: src/components/floor-plan/modern/StatusIndicators.tsx (depends on K15 tokens and Badge variants)
+ - K20: src/components/floor-plan/modern/AvatarGroup.tsx (depends on ModernUserAvatar)
+
+Direct Dependencies (new):
+- ModernSpaceCard.tsx → depends on → StatusIndicators.tsx
+- ModernSpaceCard.tsx → depends on → AvatarGroup.tsx
+- ModernSpaceCard.tsx → depends on → designTokens.ts
+- ModernSpaceCard.tsx → depends on → src/components/ui/badge.tsx
+- StatusIndicators.tsx → depends on → src/components/ui/badge.tsx
+- StatusIndicators.tsx → depends on → designTokens.ts
+- AvatarGroup.tsx → depends on → ModernUserAvatar.tsx

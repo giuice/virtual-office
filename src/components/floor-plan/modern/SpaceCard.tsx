@@ -14,6 +14,11 @@ export interface SpaceCardProps {
   isUserInSpace?: boolean;
   className?: string;
   compact?: boolean;
+  // New optional states
+  isLoading?: boolean;
+  isError?: boolean;
+  empty?: boolean;
+  href?: string;
 }
 
 const SpaceCard: React.FC<SpaceCardProps> = (props) => {

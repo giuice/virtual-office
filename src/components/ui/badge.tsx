@@ -15,6 +15,15 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
         outline: "text-foreground",
+        // Presence status variants mapped to Tailwind v4 tokens
+        online:
+          "border-transparent bg-status-online text-status-online-foreground",
+        away:
+          "border-transparent bg-status-away text-status-away-foreground",
+        busy:
+          "border-transparent bg-status-busy text-status-busy-foreground",
+        offline:
+          "border-transparent bg-status-offline text-status-offline-foreground",
       },
     },
     defaultVariants: {

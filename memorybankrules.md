@@ -3,9 +3,16 @@
 <PHASE_MARKER>
 CURRENT_PHASE: Execution
 NEXT_PHASE: Strategy
-LAST_ACTION: T4_2_SpaceCardComponent_v2 Step 1 completed — scaffolded SpaceCard wrapper and exports.
-NEXT_ACTION: T4_2_SpaceCardComponent_v2 Step 2 — implement header, status badge, occupancy, and avatar group using tokens.
-REQUIRED_BEFORE_TRANSITION: Finish T4_2 core implementation and update progress/docs.
+LAST_ACTION: Completed T4_2_SpaceCardComponent_v2 (core card with states, a11y, demo/docs updated).
+NEXT_ACTION: Implement T4_3_FloorPlanLayout_v2 — container, zones, responsive grid/flex, zone headers; CSS transforms only.
+REQUIRED_BEFORE_TRANSITION: Complete T4_3; then proceed to T4_4_AnimationsTransitions_v2.
 </PHASE_MARKER>
+
+[
+CODE_DIRECTORIES
+]
+- src
+- __tests__
+- scripts
 
 # Other rules and configurations remain unchanged.

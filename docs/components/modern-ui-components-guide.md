@@ -84,6 +84,30 @@ import {
 - Shadows: Tailwind v4 scales (`shadow-xs`, `shadow-sm`, `shadow-md`). Prefer subtle shadows for cozy feel.
 - SpaceCard states: base `bg-card border-border`, `hover:bg-accent/40`, `data-[selected=true]:ring-3 ring-primary/40`, `focus-visible:ring-3 ring-primary/50`, `disabled:opacity-50`.
 - Capacity colors: low `text-emerald-500`, medium `text-amber-500`, high `text-rose-500`.
+ - Presence tokens: `bg-status-online|away|busy|offline` with matching `text-...-foreground` for badges and indicators. Badge variants available: `variant="online|away|busy|offline"`.
+ - Motion tokens: Use `.transition-base`, `.transition-fast|slow`, `.ease-standard|emphasized`. Reduced motion honored via media query.
+
+### SpaceCard
+
+Usage example:
+
+```tsx
+import { ModernSpaceCard } from '@/components/floor-plan/modern';
+
+<ModernSpaceCard
+  space={{ id: 's1', name: 'Design Pod', type: 'workspace', status: 'available', capacity: 6, description: 'Heads-down work zone' }}
+  usersInSpace={[]}
+  onEnterSpace={(id) => console.log('enter', id)}
+  isLoading={false}
+  isError={false}
+  empty
+/>
+```
+
+Notes:
+- Keyboard focusable and activatable via Enter/Space.
+- Occupancy meter uses `success/warning/status-busy` tokens.
+- `aria-busy` while loading; `aria-describedby` references the occupancy meter.
 
 ### Accessibility
 - Focus: Ensure `focus-visible:ring-3 ring-primary/50` on actionable elements. Avoid outline jitter by setting color outside transitions when needed.

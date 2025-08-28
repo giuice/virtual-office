@@ -35,6 +35,22 @@
   --success-foreground: 355.7 100% 97.3%;
   --warning: 38 92% 50%;
   --warning-foreground: 48 96% 89%;
+  /* Presence status colors */
+  --status-online: 142 72% 35%;
+  --status-online-foreground: 0 0% 100%;
+  --status-away: 38 92% 50%;
+  --status-away-foreground: 24 100% 12%;
+  --status-busy: 350 84% 57%;
+  --status-busy-foreground: 0 0% 100%;
+  --status-offline: 240 5% 64%;
+  --status-offline-foreground: 240 20% 15%;
+
+  /* Motion tokens (durations and easing) */
+  --motion-duration-fast: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-duration-slow: 300ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
@@ -68,6 +84,14 @@
     --success-foreground: 144.9 80.4% 10%;
     --warning: 48 96% 50%;
     --warning-foreground: 48 96% 89%;
+    --status-online: 142 70% 45%;
+    --status-online-foreground: 145 80% 10%;
+    --status-away: 48 96% 50%;
+    --status-away-foreground: 48 96% 12%;
+    --status-busy: 350 84% 63%;
+    --status-busy-foreground: 350 84% 12%;
+    --status-offline: 240 5% 64.9%;
+    --status-offline-foreground: 240 20% 92%;
   }
 }
 
@@ -116,6 +140,21 @@ body {
   --sidebar-ring: oklch(0.708 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  /* Presence status tokens (OKLCH) */
+  --status-online: oklch(0.62 0.18 149);
+  --status-online-foreground: oklch(0.98 0 0);
+  --status-away: oklch(0.85 0.17 85);
+  --status-away-foreground: oklch(0.32 0.03 80);
+  --status-busy: oklch(0.65 0.21 27);
+  --status-busy-foreground: oklch(0.98 0 0);
+  --status-offline: oklch(0.7 0.02 258);
+  --status-offline-foreground: oklch(0.2 0 0);
+  /* Motion tokens (duplicated at root for consistency) */
+  --motion-duration-fast: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-duration-slow: 300ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .dark {
@@ -150,6 +189,15 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Presence status tokens (OKLCH dark) */
+  --status-online: oklch(0.72 0.18 149);
+  --status-online-foreground: oklch(0.2 0 0);
+  --status-away: oklch(0.82 0.17 85);
+  --status-away-foreground: oklch(0.2 0 0);
+  --status-busy: oklch(0.75 0.2 27);
+  --status-busy-foreground: oklch(0.2 0 0);
+  --status-offline: oklch(0.68 0.02 258);
+  --status-offline-foreground: oklch(0.95 0 0);
 }
 
 @theme inline {
@@ -188,13 +236,42 @@ body {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Presence status mapped to tailwind tokens */
+  --color-status-online: var(--status-online);
+  --color-status-online-foreground: var(--status-online-foreground);
+  --color-status-away: var(--status-away);
+  --color-status-away-foreground: var(--status-away-foreground);
+  --color-status-busy: var(--status-busy);
+  --color-status-busy-foreground: var(--status-busy-foreground);
+  --color-status-offline: var(--status-offline);
+  --color-status-offline-foreground: var(--status-offline-foreground);
+  /* Success/Warning for general use */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 }
 
 @layer base {
+  /* Base typography and focus styles */
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Motion preference handling and utilities */
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-duration-fast: 0ms; --motion-duration-medium: 0ms; --motion-duration-slow: 0ms; }
+}
+
+@layer utilities {
+  .transition-base { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-duration: var(--motion-duration-medium); transition-timing-function: var(--motion-ease-standard); }
+  .transition-fast { transition-duration: var(--motion-duration-fast); }
+  .transition-slow { transition-duration: var(--motion-duration-slow); }
+  .ease-standard { transition-timing-function: var(--motion-ease-standard); }
+  .ease-emphasized { transition-timing-function: var(--motion-ease-emphasized); }
 }

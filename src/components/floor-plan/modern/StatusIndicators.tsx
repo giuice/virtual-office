@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/tooltip';
 import { 
   Users, Lock, Clock, Wrench, 
-  CheckCircle2, AlertCircle, Building, 
+  CheckCircle2, Building, 
   Coffee, Briefcase, Video, Users2, 
   FlaskConical, LayoutGrid
 } from 'lucide-react';
@@ -36,32 +36,32 @@ export const SpaceStatusBadge: React.FC<StatusBadgeProps> = ({
     available: { 
       text: 'Available',
       icon: <CheckCircle2 className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.available
+      variant: 'online' as const,
     },
     maintenance: { 
       text: 'Maintenance',
       icon: <Wrench className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.maintenance
+      variant: 'away' as const,
     },
     locked: { 
       text: 'Locked',
       icon: <Lock className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.locked
+      variant: 'busy' as const,
     },
     reserved: { 
       text: 'Reserved',
       icon: <Clock className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.locked
+      variant: 'away' as const,
     },
     in_use: { 
       text: 'In Use',
       icon: <Users className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.occupied
+      variant: 'online' as const,
     },
     active: { 
       text: 'Active',
       icon: <Users className="h-3 w-3" />,
-      classes: floorPlanTokens.statusBadge.colors.occupied
+      variant: 'online' as const,
     }
   };
 
@@ -69,10 +69,9 @@ export const SpaceStatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <Badge 
-      variant="outline"
+      variant={config.variant}
       className={cn(
         floorPlanTokens.statusBadge.base,
-        config.classes,
         size === 'sm' && "text-xs",
         size === 'md' && "text-sm",
         size === 'lg' && "text-base",

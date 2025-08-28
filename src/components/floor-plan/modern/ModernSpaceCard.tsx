@@ -18,6 +18,9 @@ interface ModernSpaceCardProps {
   isUserInSpace?: boolean;
   className?: string;
   compact?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
+  empty?: boolean;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({ 
@@ -30,11 +33,15 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   isHighlighted = false,
   isUserInSpace = false,
   className = '',
-  compact = false
+  compact = false,
+  isLoading = false,
+  isError = false,
+  empty = false,
 }) => {
   const [hovered, setHovered] = useState(false);
   
   const handleClick = () => {
+    if (isLoading || isError) return;
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);
@@ -74,7 +81,8 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       onDoubleClick={() => onSpaceDoubleClick?.(space)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label={`Enter space ${space.name}`}
+  aria-label={`Enter space ${space.name}`}
+      aria-busy={isLoading || undefined}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -83,7 +91,26 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         }
       }}
     >
-      {/* Header section */}
+      {/* Error state banner */}
+      {isError && (
+        <div className="mb-2 rounded-md bg-warning/15 text-warning-foreground border border-warning/30 px-3 py-2 text-sm">
+          Couldn’t load this space. Please try again.
+        </div>
+      )}
+
+      {/* Loading skeleton state */}
+      {isLoading ? (
+        <div className="flex flex-col gap-3 animate-pulse">
+          <div className="h-4 w-1/3 bg-muted rounded" />
+          {!compact && <div className="h-3 w-2/3 bg-muted rounded" />}
+          <div className="mt-auto flex items-center gap-2">
+            <div className="h-6 w-24 bg-muted rounded" />
+            <div className="h-6 w-16 bg-muted rounded" />
+          </div>
+        </div>
+  ) : (
+  <>
+  {/* Header section */}
       <div className={floorPlanTokens.spaceCard.content.header}>
         {/* Space badges at top right */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
@@ -118,18 +145,43 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         </div>
       )}
       
-      {/* Push user avatars to bottom */}
-      <div className={floorPlanTokens.spaceCard.content.footer}>
-        {/* User avatars */}
-        <AvatarGroup
-          users={usersInSpace}
-          max={compact ? 4 : 6}
-          size={compact ? 'xs' : 'sm'}
-          onUserClick={onUserClick}
-          emptyText="Empty"
-          className="mt-2"
-        />
+      {/* Occupancy meter for a11y */}
+      <div className="mt-1" aria-hidden="true" id={`occupancy-${space.id}`}>
+        {space.capacity ? (
+          <div className="h-1.5 w-full rounded bg-muted overflow-hidden" aria-hidden>
+            <div
+              className={cn(
+                "h-full transition-base",
+                usersInSpace.length / (space.capacity || 1) < 0.66
+                  ? "bg-success"
+                  : usersInSpace.length / (space.capacity || 1) < 1
+                  ? "bg-warning"
+                  : "bg-status-busy"
+              )}
+              style={{ width: `${Math.min(100, (usersInSpace.length / (space.capacity || 1)) * 100)}%` }}
+            />
+          </div>
+        ) : null}
       </div>
+
+      {/* Push user avatars to bottom */}
+  <div className={floorPlanTokens.spaceCard.content.footer} aria-describedby={space.capacity ? `occupancy-${space.id}` : undefined}>
+        {/* Empty state */}
+        {empty && usersInSpace.length === 0 ? (
+          <div className="mt-2 text-xs text-muted-foreground">Empty</div>
+        ) : (
+          <AvatarGroup
+            users={usersInSpace}
+            max={compact ? 4 : 6}
+            size={compact ? 'xs' : 'sm'}
+            onUserClick={onUserClick}
+            emptyText="Empty"
+            className="mt-2"
+          />
+        )}
+      </div>
+      </>
+      )}
     </div>
   );
 };

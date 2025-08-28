@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 export default {
-    darkMode: ["class"],
+    darkMode: "class",
     content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -49,6 +49,25 @@ export default {
                 '3': 'hsl(var(--chart-3))',
                 '4': 'hsl(var(--chart-4))',
                 '5': 'hsl(var(--chart-5))'
+            },
+            // Presence/status tokens
+            status: {
+                online: 'hsl(var(--status-online))',
+                'online-foreground': 'hsl(var(--status-online-foreground))',
+                away: 'hsl(var(--status-away))',
+                'away-foreground': 'hsl(var(--status-away-foreground))',
+                busy: 'hsl(var(--status-busy))',
+                'busy-foreground': 'hsl(var(--status-busy-foreground))',
+                offline: 'hsl(var(--status-offline))',
+                'offline-foreground': 'hsl(var(--status-offline-foreground))'
+            },
+            success: {
+                DEFAULT: 'hsl(var(--success))',
+                foreground: 'hsl(var(--success-foreground))'
+            },
+            warning: {
+                DEFAULT: 'hsl(var(--warning))',
+                foreground: 'hsl(var(--warning-foreground))'
             }
         },
         borderRadius: {
