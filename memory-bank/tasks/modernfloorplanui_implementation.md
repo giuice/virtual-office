@@ -13,7 +13,7 @@ Rebuild the Modern Floor Plan UI with a DOM-first approach aligned with Tailwind
     Notes: Added `bg-status-*` tokens and Badge variants `online|away|busy|offline`.
   - [x] 1.4: Motion tokens (durations/easings), respect reduced-motion
     Notes: Introduced motion CSS variables and utilities; honors prefers-reduced-motion.
-- [ ] T4_2: SpaceCardComponent_v2 — Implement core card with states
+- [x] T4_2: SpaceCardComponent_v2 — Implement core card with states ✓ DONE
 ## Completion Notes
 - Files changed: `src/app/globals.css`, `tailwind.config.ts`, `src/components/ui/badge.tsx`, `src/components/floor-plan/modern/StatusIndicators.tsx`, `src/components/floor-plan/modern/SpaceCard.tsx`, `src/components/floor-plan/modern/ModernSpaceCard.tsx`, `src/components/floor-plan/modern/AvatarGroup.tsx`, docs + demo page.
 - The design tokens are now available across modern floor plan components.
@@ -23,15 +23,22 @@ Rebuild the Modern Floor Plan UI with a DOM-first approach aligned with Tailwind
   - [x] 2.3: AvatarGroup with presence states + overflow handling
   - [x] 2.4: Interactions (hover, focus, active) with keyboard support
   - [x] 2.5: Loading/empty/error states
-- [ ] T4_3: FloorPlanLayout_v2 — Build container + zones + arrangement
-  - [ ] 3.1: Floor container and sections (zones)
-  - [ ] 3.2: Simple grid/flex layout; container queries for responsiveness
-  - [ ] 3.3: Zone headers and grouping semantics
-  - [ ] 3.4: No Konva; CSS transforms only
-- [ ] T4_4: AnimationsTransitions_v2 — Add motion system and preferences
-  - [ ] 4.1: Entry/exit transitions (opacity/transform)
-  - [ ] 4.2: Staggered appearance for cards; disable when reduced-motion
+- [x] T4_3: FloorPlanLayout_v2 — Build container + zones + arrangement
+  - [x] 3.1: Floor container and sections (zones)
+  - [x] 3.2: Simple grid/flex layout; container queries for responsiveness
+  - [x] 3.3: Zone headers and grouping semantics
+  - [x] 3.4: No Konva; CSS transforms only
+- [~] T4_4: AnimationsTransitions_v2 — Add motion system and preferences ← WORKING ON THIS
+  - [x] 4.1: Entry/exit transitions (opacity/transform) ✓
+  - [x] 4.2: Staggered appearance for cards; disable when reduced-motion ✓
   - [ ] 4.3: Micro-interactions (hover/press) tuned for performance
+
+## Current Focus
+Completed 4.1 and 4.2 (entry/exit + stagger). Proceeding to 4.3 micro-interactions.
+
+## Completion Notes (T4_4 so far)
+- Added entry/exit classes and `animationDelayMs` in `ModernSpaceCard.tsx`.
+- Applied staggered delay per item in `ModernFloorPlan.tsx` with motion-reduce classes honored.
 - [ ] T4_5: ResponsiveAdaptation_v2 — Ensure breakpoints and mobile ergonomics
   - [ ] 5.1: Mobile card condensation and touch targets
   - [ ] 5.2: Tablet/Desktop layout scaling and density

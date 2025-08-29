@@ -1,7 +1,8 @@
 // src/app/api/auth/callback/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Use our server client helper
-import { googleAvatarService } from '@/lib/services/google-avatar-service';
+import { GoogleAvatarService } from '@/lib/services/google-avatar-service';
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 // import { Database } from '@/lib/supabase/database.types'; // Uncomment if using types
 
 export const dynamic = 'force-dynamic'; // Keep dynamic export
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     // Use the server client helper function
-    const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
     try {
       // Exchange the code for a session
@@ -31,10 +32,10 @@ export async function GET(request: NextRequest) {
           if (user.app_metadata?.provider === 'google' && user.user_metadata) {
             try {
               console.log(`[Callback] Processing Google OAuth user avatar for user: ${user.id}`);
-              const avatarResult = await googleAvatarService.extractAndStoreGoogleAvatar(
-                user.id,
-                user.user_metadata
-              );
+              // Use server-side repository bound to this request's server client
+              const userRepo = new SupabaseUserRepository(supabase);
+              const service = new GoogleAvatarService(userRepo);
+              const avatarResult = await service.extractAndStoreGoogleAvatar(user.id, user.user_metadata);
               
               if (avatarResult.success) {
                 console.log(`[Callback] Successfully stored Google avatar for user: ${user.id}`);
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
             const redirectUrl = new URL(redirectPath, requestUrl.origin).toString();
             console.log(`[Callback] Redirecting to: ${redirectUrl}`);
             return NextResponse.redirect(redirectUrl);
-          } catch (profileError: any) {
+          } catch (profileError) {
             console.error('[Callback] Exception during profile check:', profileError);
             // On error checking profile, fallback to login page which has its own checks
             return NextResponse.redirect(new URL('/login', requestUrl.origin));
@@ -86,10 +87,10 @@ export async function GET(request: NextRequest) {
       // If exchange failed, set specific error message
       console.error('[Callback] Error exchanging code for session:', error);
       errorMessage = error.message || 'Failed to exchange code for session.';
-    } catch (e: any) {
+    } catch (e) {
       // Catch any other exceptions during the process
       console.error('[Callback] Exception during code exchange:', e);
-      errorMessage = e.message || 'An unexpected error occurred during authentication.';
+      errorMessage = (e as Error).message || 'An unexpected error occurred during authentication.';
     }
   } else {
     // If code is missing from the start

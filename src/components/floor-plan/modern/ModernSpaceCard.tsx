@@ -21,6 +21,8 @@ interface ModernSpaceCardProps {
   isLoading?: boolean;
   isError?: boolean;
   empty?: boolean;
+  animationDelayMs?: number;
+  exiting?: boolean;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({ 
@@ -37,6 +39,8 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   isLoading = false,
   isError = false,
   empty = false,
+  animationDelayMs = 0,
+  exiting = false,
 }) => {
   const [hovered, setHovered] = useState(false);
   
@@ -63,7 +67,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         floorPlanTokens.spaceCard.shadow.default,
         floorPlanTokens.spaceCard.transition,
         // Respect reduced motion preferences
-        "motion-reduce:transition-none motion-reduce:transform-none",
+        "motion-reduce:transition-none motion-reduce:transform-none motion-reduce:animate-none",
+        // Entry/exit animations
+        exiting
+          ? "animate-out fade-out-0 zoom-out-95"
+          : "animate-in fade-in-50 zoom-in-95",
         // Accessible focus styles
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
         typeClasses,
@@ -77,6 +85,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         compact ? "min-h-[120px]" : "min-h-[160px]",
         className
       )}
+      style={{
+        animationDelay: `${animationDelayMs}ms`,
+        willChange: "transform, opacity",
+      }}
       onClick={handleClick}
       onDoubleClick={() => onSpaceDoubleClick?.(space)}
       onMouseEnter={() => setHovered(true)}

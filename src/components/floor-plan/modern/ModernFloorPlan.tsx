@@ -1,6 +1,6 @@
 // src/components/floor-plan/modern/ModernFloorPlan.tsx
-import React, { useState, useEffect } from 'react';
-import { Space } from '@/types/database';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Space, SpaceType } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import ModernSpaceCard from './ModernSpaceCard';
@@ -26,7 +26,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   onSpaceDoubleClick,
   onUserClick,
   highlightedSpaceId = null,
-  isEditable = false,
+  isEditable: _isEditable = false,
   onOpenChat,
   layout = 'default',
   className = '',
@@ -34,7 +34,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
-  const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
+  // const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Log space and user data for debugging (only in development)
@@ -79,7 +79,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
   
       // Space validation checks
-      if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
+      if (selectedSpace.capacity && ((usersInSpaces.get(spaceId)?.length ?? 0) >= selectedSpace.capacity)) {
         setError('This space is at full capacity');
         return;
       }
@@ -97,15 +97,15 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         return;
       }
   
-      setLastRequestedSpaceId(spaceId);  // Set loading state
+  // setLastRequestedSpaceId(spaceId);  // Set loading state
       setError(null);
       
       try {
         await updateLocation(spaceId);
-        setLastRequestedSpaceId(null);  // Reset after success
+        // setLastRequestedSpaceId(null);  // Reset after success
       } catch (error) {
         console.error('Error updating location:', error);
-        setLastRequestedSpaceId(null);
+        // setLastRequestedSpaceId(null);
         setError('Failed to enter space. Please try again.');
         if (error instanceof Error) {
           throw error;
@@ -128,6 +128,17 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
     }
   };
+
+  // Group spaces by type to create simple "zones" with headers
+  const zones = useMemo(() => {
+    const groups = new Map<SpaceType | 'other', Space[]>();
+    spaces.forEach((s) => {
+      const key = (s.type as SpaceType) || 'other';
+      const arr = groups.get(key);
+      if (arr) arr.push(s); else groups.set(key, [s]);
+    });
+    return Array.from(groups.entries());
+  }, [spaces]);
 
   // Get grid layout based on selected layout type
   const gridLayoutClass = floorPlanTokens.floorPlanLayout.grid[layout];
@@ -154,38 +165,49 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         </div>
       )}
 
-      {/* Grid container for spaces */}
-      <div className={gridLayoutClass}>
-        {spaces.map((space, index) => {
+      {/* Zones with sticky headers and per-zone grids */}
+      {zones.map(([zoneType, zoneSpaces]) => (
+        <section key={String(zoneType)} className={floorPlanTokens.floorPlanLayout.zone.section}>
+          <header className={floorPlanTokens.floorPlanLayout.zone.header}>
+            <span className="uppercase">{String(zoneType).replace('_', ' ')}</span>
+          </header>
+          <div className={gridLayoutClass}>
+        {zoneSpaces.map((space, index) => {
           // Get users in this space from presence system
           const spaceUsers = usersInSpaces.get(space.id) || [];
           
           const isHighlighted = highlightedSpaceId === space.id;
           const userInSpace = isUserInSpace(space);
+          const baseDelay = 40; // ms per item
+          const maxDelay = 400; // cap to avoid excessive delay
+          const animationDelayMs = Math.min(index * baseDelay, maxDelay);
           
           return (
             <ModernSpaceCard
               key={space.id || index}
               space={space}
               usersInSpace={spaceUsers}
-              onEnterSpace={handleEnterSpace}
+              onEnterSpace={(id) => { void handleEnterSpace(id); }}
               onOpenChat={onOpenChat}
               onUserClick={onUserClick}
               onSpaceDoubleClick={onSpaceDoubleClick}
               isHighlighted={isHighlighted}
               isUserInSpace={userInSpace}
               compact={compactCards}
+              animationDelayMs={animationDelayMs}
             />
           );
         })}
-        
-        {/* Empty state */}
-        {spaces.length === 0 && (
-          <div className="col-span-full p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
-            <p className="text-muted-foreground">No spaces available</p>
           </div>
-        )}
-      </div>
+        </section>
+      ))}
+
+      {/* Empty state */}
+      {spaces.length === 0 && (
+        <div className="p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
+          <p className="text-muted-foreground">No spaces available</p>
+        </div>
+      )}
       
       {/* Loading indicator */}
       {isLoading && (

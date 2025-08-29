@@ -133,6 +133,12 @@ export const floorPlanTokens = {
     container: {
       base: "relative w-full h-[calc(100vh-12rem)] p-4 bg-background rounded-lg border border-border overflow-auto",
       scrollBehavior: "scroll-smooth"
+    },
+
+    // Zone section + header
+    zone: {
+      section: "mb-8",
+      header: "sticky top-0 z-10 -mx-1 px-1 py-2 bg-background/80 supports-[backdrop-filter]:bg-background/60 backdrop-blur border-b border-border text-xs font-semibold tracking-wide text-muted-foreground",
     }
   }
 };
