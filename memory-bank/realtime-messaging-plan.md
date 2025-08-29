@@ -27,28 +27,60 @@ This document outlines how to deliver realtime chat messages with Supabase, incl
 - Optionally consider Broadcast + triggers later if scale requires avoiding per-row RLS checks.
 - Subscribe when a chat view becomes active; unsubscribe when the view closes or the conversation switches.
 - Prevent duplicates by correlating optimistic temp IDs vs. server IDs (current code ignores `INSERT` for IDs starting with `temp-`).
+ - Subscribe only to `messages`; attachments and reactions are hydrated in bulk by repository queries (grouped by `message_id`) after fetching base messages or when handling a new insert.
 
 ## Database Work
 
 1. Publications (Postgres Changes):
-   - Ensure `messages` (and optionally `message_reactions`) are in the `supabase_realtime` publication:
+   - Ensure `messages` (and optionally `message_reactions`) are in the existing `supabase_realtime` publication (do NOT drop it in Supabase projects):
      ```sql
-     drop publication if exists supabase_realtime;
-     create publication supabase_realtime;
+     -- Supabase creates `supabase_realtime` by default; just add the tables you need
      alter publication supabase_realtime add table public.messages;
-     alter table public.messages replica identity full; -- if we need old values on UPDATE/DELETE
-     -- Optional
+     -- Optional: include reactions if you plan to subscribe to them directly
      -- alter publication supabase_realtime add table public.message_reactions;
+     -- Only needed if you require OLD values on UPDATE/DELETE events
+     -- alter table public.messages replica identity full;
+     -- Validate current publication membership
+     select * from pg_publication_tables
+     where pubname = 'supabase_realtime' and tablename in ('messages','message_reactions');
      ```
 
 2. RLS Policies (tighten as needed):
-   - `messages`:
-     - SELECT: user is in `conversations.participants` for `messages.conversation_id`.
-     - INSERT: same participant check; `sender_id` must equal current user.
-     - UPDATE: sender can edit message content/status (if allowed); system can update status.
-     - DELETE: optional (e.g., sender can delete within a window or admins only).
-   - `message_attachments` and `message_reactions` with analogous participant checks via joined `messages.conversation_id`.
-   - `conversations` SELECT limited to participants; updates to `last_activity`, `unread_count` safeguarded.
+  - Enable RLS on these tables before relying on policies:
+    ```sql
+    alter table public.conversations enable row level security;
+    alter table public.messages enable row level security;
+    alter table public.message_attachments enable row level security;
+    alter table public.message_reactions enable row level security;
+    ```
+   - Map `auth.uid()` (Supabase Auth user ID) to app users via `users.supabase_uid`, then enforce participation in the conversation.
+   - `messages` (examples):
+     ```sql
+     create policy "read messages in my convos" on public.messages
+       for select using (
+         exists (
+           select 1
+           from public.conversations c
+           join public.users u on u.id = any(c.participants)
+           where c.id = messages.conversation_id
+             and u.supabase_uid = auth.uid()
+         )
+       );
+
+     create policy "send message as self" on public.messages
+       for insert with check (
+         sender_id = (select id from public.users where supabase_uid = auth.uid())
+         and exists (
+           select 1
+           from public.conversations c
+           join public.users u on u.id = any(c.participants)
+           where c.id = messages.conversation_id
+             and u.supabase_uid = auth.uid()
+         )
+       );
+     ```
+   - Apply analogous join-based participant checks for `message_attachments` and `message_reactions` via their `message_id -> messages.conversation_id` relationship.
+   - `conversations` SELECT limited to participants; updates to `last_activity` and `unread_count` should be restricted to trusted paths (API/DB function).
 
 3. Storage (bucket: `attachments`):
    - Path convention: `message-attachments/<conversationId>/<uuid.ext>`; thumbnails under `.../thumbnails/`.
@@ -61,6 +93,7 @@ This document outlines how to deliver realtime chat messages with Supabase, incl
   - Verify user is a participant in the conversation.
   - Insert message (status `sent` initially); update conversation `last_activity` and `unread_count` (server-side function or in-repo update).
   - Return the inserted row; realtime will deliver to other subscribers.
+  - After insert, hydrate attachments/reactions by querying by `message_id` if the client attached any.
 
 - Fetch messages (`GET /api/messages/get`):
   - Support `limit`, `cursor`, `direction` (`older`/`newer`) for windowed loading.
@@ -111,6 +144,14 @@ This document outlines how to deliver realtime chat messages with Supabase, incl
 - Unit tests: repositories for `create/findByConversation/addAttachment/addReaction`.
 - Integration tests: API routes for `messages/create`, `messages/get`, `messages/upload`.
 - E2E path: open room chat, send text and image, receive realtime update in a second client, verify pagination when scrolling up.
+ - Quick publication check:
+   ```sql
+   select * from pg_publication_tables
+   where pubname = 'supabase_realtime' and tablename in ('messages','message_reactions');
+   ```
+ - Run repo tests locally:
+   - Presence: `pnpm test -t realtime-presence`
+   - Messaging repositories and API: `pnpm test -t messaging`
 
 ## Scale & Security Considerations
 
