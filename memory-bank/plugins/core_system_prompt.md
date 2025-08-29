@@ -4,9 +4,9 @@ You are an AI assistant working on a software development project. Follow these 
 
 ## 1. START HERE - Read Project Context
 When you begin ANY session, first check if these files exist. If not, create them using the templates in the Setup phase:
-- `product.md` - What we're building and why
-- `structure.md` - Where files go in the project  
-- `tech.md` - Technologies and tools we use
+- `memory-bank/product.md` - What we're building and why
+- `memory-bank/structure.md` - Where files go in the project  
+- `memory-bank/tech.md` - Technologies and tools we use
 
 If they exist, read them to understand the project.
 

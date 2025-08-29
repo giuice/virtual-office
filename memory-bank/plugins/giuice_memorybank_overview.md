@@ -1,4 +1,4 @@
-# Optimized Project Management System
+# Giuice memory-bank an Optimized Project Management System
 
 A simple, scalable system for managing software projects that ANY AI can follow.
 
@@ -9,22 +9,20 @@ A simple, scalable system for managing software projects that ANY AI can follow.
 - **Scalable structure** = Handles 10 or 1000 tasks
 
 ## File Structure
-
 ```
 project-root/
-├── product.md              # What we're building
-├── structure.md            # Where files go
-├── tech.md                 # How we build
-├── memorybankrules.md      # Current phase tracker
+├── memorybankrules.md        # Current phase tracker
 └── memory-bank/
-    ├── activeContext.md    # Current state
-    ├── dependencytracker.md # File relationships
+    ├── product.md            # What we're building
+    ├── structure.md          # Where files go
+    ├── tech.md               # How we build
+    ├── activeContext.md      # Current state
+    ├── dependencytracker.md  # File relationships
     └── tasks/
-        ├── index.md        # Feature overview
+        ├── index.md          # Feature overview
         ├── auth_implementation.md
         ├── dashboard_setup.md
         └── [feature]_implementation.md
-
 ```
 
 ## Three Simple Phases

@@ -1,18 +1,17 @@
 # Memory Bank Rules
 
-<PHASE_MARKER>
+[STATE_TRACKER]
 CURRENT_PHASE: Execution
 NEXT_PHASE: Strategy
 LAST_ACTION: Completed T4_2_SpaceCardComponent_v2 (core card with states, a11y, demo/docs updated).
 NEXT_ACTION: Implement T4_3_FloorPlanLayout_v2 — container, zones, responsive grid/flex, zone headers; CSS transforms only.
-REQUIRED_BEFORE_TRANSITION: Complete T4_3; then proceed to T4_4_AnimationsTransitions_v2.
-</PHASE_MARKER>
+[TRANSITION_REQUIREMENTS]
+- [ ] Complete T4_3; then proceed to T4_4_AnimationsTransitions_v2.
 
-[
-CODE_DIRECTORIES
-]
-- src
-- __tests__
-- scripts
+[WHEN CREATING ANY NEW FILE]
+- Read `./memory-bank/structure.md`
 
-# Other rules and configurations remain unchanged.
+[LEARNING_LOG]
+- NEVER, EVER, GUESS!. your job is to find answers
+- ALWAYS verify information before presenting it as fact.
+- If you don't know, say "I don't know" or "I need to look that up"—never make assumptions.

@@ -6,7 +6,7 @@ This phase prepares the project structure and tracking files. Follow these steps
 
 Create these files if they don't exist:
 
-### 1.1 Create project documentation files in root -- if not exists:
+### 1.1 Create project documentation files in root `memory-bank/` folder -- if not exists:
 
 **product.md**
 ```markdown
@@ -114,16 +114,6 @@ Look in the project root for folders containing source code:
 - Common names: `src`, `app`, `lib`, `packages`
 - Skip: `.git`, `node_modules`, `venv`, `build`, `dist`
 - Skip: `docs`, `documentation` (these are for documentation)
-
-### 2.2 Update memorybankrules.md
-Add the code directories you found:
-```
-[CODE_DIRECTORIES]
-- src
-- tests
-- utils
-(or whatever you found)
-```
 
 ## Step 3: Create Dependency Tracker
 
