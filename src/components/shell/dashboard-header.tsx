@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
 import Link from 'next/link';
 import { EnhancedUserMenu } from './enhanced-user-menu';
+import { useCompany } from '@/contexts/CompanyContext';
 
 // Feature flag for enhanced user menu
 const USE_ENHANCED_USER_MENU = true;
@@ -26,6 +27,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ heading, description }: DashboardHeaderProps) {
   const { user, signOut } = useAuth();
+  const { currentUserProfile } = useCompany();
   const router = useRouter();
   const pathname = usePathname();
   const { showSuccess } = useNotification();
@@ -93,7 +95,14 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar>
                     <AvatarImage 
-                      src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
+                      src={getAvatarUrl({
+                        // Highest priority: user-set avatar from our DB profile
+                        avatarUrl: currentUserProfile?.avatarUrl,
+                        // Next: social avatar from Supabase auth metadata (Google)
+                        photoURL: (user as any)?.user_metadata?.avatar_url || (user as any)?.photoURL,
+                        // Fallback context for generated avatar
+                        name: getUserDisplayName(),
+                      })}
                       alt="User avatar" 
                     />
                     <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
@@ -105,7 +114,11 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                   <div className="flex items-center gap-4">
                     <Avatar>
                       <AvatarImage 
-                        src={user?.photoURL || getAvatarUrl({ name: getUserDisplayName(), avatar: '' })} 
+                        src={getAvatarUrl({
+                          avatarUrl: currentUserProfile?.avatarUrl,
+                          photoURL: (user as any)?.user_metadata?.avatar_url || (user as any)?.photoURL,
+                          name: getUserDisplayName(),
+                        })}
                         alt="User avatar" 
                       />
                       <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>

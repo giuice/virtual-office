@@ -74,10 +74,15 @@ export function EnhancedAvatar({
       // Retry after a short delay
       setTimeout(() => {
         setImageState('loading');
-        // Add cache-busting parameter
-        const url = new URL(avatarUrl);
-        url.searchParams.set('retry', currentAttempt.toString());
-        setAvatarUrl(url.toString());
+        // Add cache-busting parameter (handle relative and absolute URLs safely)
+        try {
+          const urlObj = new URL(avatarUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+          urlObj.searchParams.set('retry', String(currentAttempt));
+          setAvatarUrl(urlObj.toString());
+        } catch {
+          const sep = avatarUrl.includes('?') ? '&' : '?';
+          setAvatarUrl(`${avatarUrl}${sep}retry=${currentAttempt}`);
+        }
       }, 1000);
     } else {
       setImageState('error');
@@ -130,14 +135,15 @@ export function EnhancedAvatar({
   return (
     <div className="relative">
       <Avatar className={cn(sizeClasses[size], className)}>
-        {!avatarUrl.startsWith('data:') && imageState === 'loaded' ? (
+        {/* Always render the image for real URLs so it can load and fire events */}
+        {!avatarUrl.startsWith('data:') && (
           <AvatarImage
             src={avatarUrl}
             alt={displayName}
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
-        ) : null}
+        )}
         <AvatarFallback className="bg-transparent">
           {renderFallback()}
         </AvatarFallback>

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { debounce } from 'lodash';
 import { supabase } from '@/lib/supabase/client';
 import { UserPresenceData } from '@/types/database';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PRESENCE_QUERY_KEY = ['user-presence'];
 type ConnectionStatus = 'idle' | 'subscribing' | 'subscribed' | 'error' | 'timed_out' | 'closed';
@@ -15,6 +16,9 @@ export function useUserPresence(currentUserId?: string) {
   }
   const queryClient = useQueryClient();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
+  const { user: authUser } = useAuth();
+  // Prefer user_metadata.avatar_url (Google) then direct photoURL
+  const currentUserPhotoUrl = (authUser as any)?.user_metadata?.avatar_url || (authUser as any)?.photoURL || '';
 
   const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
     queryKey: PRESENCE_QUERY_KEY,
@@ -48,6 +52,14 @@ export function useUserPresence(currentUserId?: string) {
           avatarLoading: false,
           avatarError: false
         };
+
+        // If this is the current user and DB avatar is missing, use Google/social photo
+        if (currentUserId && user.id === currentUserId && !processedUser.avatarUrl && currentUserPhotoUrl) {
+          processedUser.avatarUrl = currentUserPhotoUrl;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[Presence] Injected current user Google avatar into presence data');
+          }
+        }
         
         // Log avatar data for debugging
         if (process.env.NODE_ENV === 'development') {
