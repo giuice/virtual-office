@@ -109,7 +109,7 @@ export function useMessages(activeConversationId: string | null) {
     try {
       const messageData = {
         conversationId: activeConversationId,
-        senderId: user.uid,
+        senderId: user.id,
         content: content.trim(),
         replyToId: options?.replyToId,
         attachments: options?.attachments,
@@ -178,7 +178,7 @@ export function useMessages(activeConversationId: string | null) {
     
     try {
       // Call the API to add the reaction
-      await messagingApi.addReaction(messageId, emoji, user.uid);
+      await messagingApi.addReaction(messageId, emoji, user.id);
 
       // Update local state (Optimistic update remains)
       setMessages(prev => 
@@ -186,12 +186,12 @@ export function useMessages(activeConversationId: string | null) {
           if (message.id === messageId) {
             const reactions = [...(message.reactions || [])];
             const existingReaction = reactions.find(
-              r => r.userId === user.uid && r.emoji === emoji
+              r => r.userId === user.id && r.emoji === emoji
             );
             
             if (!existingReaction) {
               reactions.push({
-                userId: user.uid,
+                userId: user.id,
                 emoji,
                 timestamp: new Date(),
               });
@@ -216,14 +216,14 @@ export function useMessages(activeConversationId: string | null) {
     
     try {
       // Call the API to remove the reaction
-      await messagingApi.removeReaction(messageId, emoji, user.uid);
+      await messagingApi.removeReaction(messageId, emoji, user.id);
       
       // Update local state (Optimistic update remains)
       setMessages(prev => 
         prev.map(message => {
           if (message.id === messageId && message.reactions) {
             const reactions = message.reactions.filter(
-              r => !(r.userId === user.uid && r.emoji === emoji)
+              r => !(r.userId === user.id && r.emoji === emoji)
             );
             
             return {

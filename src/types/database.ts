@@ -14,7 +14,7 @@ export type SpaceType = 'workspace' | 'conference' | 'social' | 'breakout' | 'pr
 export type SpaceStatus = 'active' | 'available' | 'maintenance' | 'locked' | 'reserved' | 'in_use';
 
 // Message types
-export type MessageType = 'text' | 'image' | 'file' | 'transcript' | 'system' | 'announcement';
+export type MessageType = 'text' | 'image' | 'file' | 'system' | 'announcement';
 // Conversation types
 export type ConversationType = 'direct' | 'group' | 'room';
 // Announcement priority
@@ -43,7 +43,7 @@ export interface Company {
 // User Collection
 export interface User {
   id: string;
-  companyId: string;
+  companyId: string | null;
   supabase_uid: string; // Now links to Supabase Auth
   email: string;
   displayName: string;
@@ -179,7 +179,8 @@ export interface MeetingNote {
 
 // Invitation Collection
 export interface Invitation {
-  token: string; // Primary Key
+  id: string; // UUID primary key in DB
+  token: string; // Unique token (indexed)
   email: string;
   companyId: string;
   role: UserRole;

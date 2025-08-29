@@ -4,17 +4,31 @@ import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
 import { User, UserRole, UserStatus } from '@/types/database'; // Import necessary types
 
 // Helper function to map DB snake_case to TS camelCase
-function mapToCamelCase(data: any): User {
-  if (!data) return data;
+type UserRow = {
+  id: string;
+  company_id: string | null;
+  supabase_uid: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  status: string;
+  status_message: string | null;
+  preferences: Record<string, unknown> | null;
+  role: string;
+  last_active: string;
+  created_at: string;
+  current_space_id: string | null;
+};
+function mapToCamelCase(data: UserRow): User {
   return {
     id: data.id,
     companyId: data.company_id,
     supabase_uid: data.supabase_uid, // Keep snake_case if type uses it, or map if needed
     email: data.email,
     displayName: data.display_name,
-    avatarUrl: data.avatar_url,
+    avatarUrl: data.avatar_url || undefined,
     status: data.status as UserStatus,
-    statusMessage: data.status_message,
+    statusMessage: data.status_message || undefined,
     preferences: data.preferences || {}, // Ensure object exists
     role: data.role as UserRole,
     lastActive: data.last_active, // Assuming TimeStampType compatibility
@@ -24,7 +38,7 @@ function mapToCamelCase(data: any): User {
 }
 
 // Helper function to map an array
-function mapArrayToCamelCase(dataArray: any[]): User[] {
+function mapArrayToCamelCase(dataArray: UserRow[] | null): User[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapToCamelCase(item));
 }
@@ -126,8 +140,32 @@ export class SupabaseUserRepository implements IUserRepository {
   async update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>): Promise<User | null> {
      // Map camelCase fields from User type to snake_case for DB
      // Exclude fields that shouldn't be updated directly (id, createdAt, lastActive)
-     const { companyId, displayName, avatarUrl, statusMessage, supabase_uid, ...restUpdates } = updates; // email, status, preferences, role
-     const dbUpdates: Record<string, any> = { ...restUpdates };
+    const { companyId, displayName, avatarUrl, statusMessage, supabase_uid, ...restUpdates } = updates; // email, status, preferences, role
+    const dbUpdates: Partial<{
+      email: string;
+      status: UserStatus;
+      preferences: Record<string, unknown>;
+      role: UserRole;
+      company_id: string | null;
+      display_name: string;
+      avatar_url: string | null;
+      status_message: string | null;
+      supabase_uid: string;
+      last_active: string;
+      current_space_id: string | null;
+    }> = { ...restUpdates } as Partial<{
+      email: string;
+      status: UserStatus;
+      preferences: Record<string, unknown>;
+      role: UserRole;
+      company_id: string | null;
+      display_name: string;
+      avatar_url: string | null;
+      status_message: string | null;
+      supabase_uid: string;
+      last_active: string;
+      current_space_id: string | null;
+    }>;
 
      if (companyId !== undefined) dbUpdates.company_id = companyId;
      if (displayName !== undefined) dbUpdates.display_name = displayName;
@@ -170,8 +208,8 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async updateCompanyAssociation(userId: string, companyId: string | null): Promise<User | null> {
-      // Handle null case: pass undefined if companyId is null
-      return this.update(userId, { companyId: companyId === null ? undefined : companyId });
+    // Persist null explicitly to clear association
+    return this.update(userId, { companyId: companyId });
   }
 
   async updateLocation(userId: string, spaceId: string | null): Promise<User | null> {

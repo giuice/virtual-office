@@ -2,13 +2,24 @@
 import { supabase } from '@/lib/supabase/client';
 import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
 import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus } from '@/types/messaging';
-import { PaginationOptions, PaginatedResult } from '@/types/common'; // Assuming common types exist
+import { PaginationOptions } from '@/types/common'; // Assuming common types exist
 
 // --- Helper Functions ---
 
 // Map DB snake_case to Message type (camelCase)
 // Note: attachments and reactions are handled separately or fetched later
-function mapMessageToCamelCase(data: any): Message {
+type MessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  timestamp: string;
+  type: string;
+  status: string;
+  reply_to_id: string | null;
+  is_edited: boolean;
+};
+function mapMessageToCamelCase(data: MessageRow): Message {
   if (!data) return data;
   return {
     id: data.id,
@@ -18,7 +29,7 @@ function mapMessageToCamelCase(data: any): Message {
     timestamp: new Date(data.timestamp), // Convert DB timestamp string/obj to Date
     type: data.type as MessageType,
     status: data.status as MessageStatus,
-    replyToId: data.reply_to_id,
+  replyToId: data.reply_to_id || undefined,
     isEdited: data.is_edited,
     attachments: [], // Placeholder - fetch separately
     reactions: []    // Placeholder - fetch separately
@@ -26,7 +37,7 @@ function mapMessageToCamelCase(data: any): Message {
 }
 
 // Map DB snake_case to FileAttachment type (camelCase)
-function mapAttachmentToCamelCase(data: any): FileAttachment {
+function mapAttachmentToCamelCase(data: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }): FileAttachment {
     if (!data) return data;
     return {
         id: data.id,
@@ -34,12 +45,12 @@ function mapAttachmentToCamelCase(data: any): FileAttachment {
         type: data.type,
         size: data.size,
         url: data.url,
-        thumbnailUrl: data.thumbnail_url
+  thumbnailUrl: data.thumbnail_url || undefined
     };
 }
 
 // Map DB snake_case to MessageReaction type (camelCase)
-function mapReactionToCamelCase(data: any): MessageReaction {
+function mapReactionToCamelCase(data: { emoji: string; user_id: string; timestamp: string }): MessageReaction {
     if (!data) return data;
     return {
         // Assuming reaction table doesn't have its own ID in the type, or map data.id if it does
@@ -50,15 +61,15 @@ function mapReactionToCamelCase(data: any): MessageReaction {
 }
 
 // Map array helpers
-function mapMessageArrayToCamelCase(dataArray: any[]): Message[] {
+function mapMessageArrayToCamelCase(dataArray: MessageRow[]): Message[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapMessageToCamelCase(item));
 }
-function mapAttachmentArrayToCamelCase(dataArray: any[]): FileAttachment[] {
+function mapAttachmentArrayToCamelCase(dataArray: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }[]): FileAttachment[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapAttachmentToCamelCase(item));
 }
-function mapReactionArrayToCamelCase(dataArray: any[]): MessageReaction[] {
+function mapReactionArrayToCamelCase(dataArray: { emoji: string; user_id: string; timestamp: string }[]): MessageReaction[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapReactionToCamelCase(item));
 }
@@ -158,7 +169,14 @@ export class SupabaseMessageRepository implements IMessageRepository {
       console.error(`Error fetching attachments for conversation ${conversationId}:`, attachmentsError);
       // Continue without attachments if error occurs
     }
-    const mappedAttachments = mapAttachmentArrayToCamelCase(attachmentsData || []);
+    // Group attachments by message_id using raw rows, then map
+    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapAttachmentToCamelCase(row));
+      return acc;
+    }, {} as Record<string, FileAttachment[]>);
 
     // Fetch all reactions for these messages in bulk
     const { data: reactionsData, error: reactionsError } = await supabase
@@ -170,27 +188,18 @@ export class SupabaseMessageRepository implements IMessageRepository {
       console.error(`Error fetching reactions for conversation ${conversationId}:`, reactionsError);
       // Continue without reactions if error occurs
     }
-    const mappedReactions = mapReactionArrayToCamelCase(reactionsData || []);
-
-    // Merge attachments and reactions into messages
-    const attachmentsByMessageId = mappedAttachments.reduce((acc, att) => {
-      const msgId = (att as any).message_id; // Need message_id temporarily for grouping
+    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
+      const msgId = row.message_id as string;
       if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(att);
+      acc[msgId].push(mapReactionToCamelCase(row));
       return acc;
-    }, {} as Record<string, FileAttachment[]>);
-
-    const reactionsByMessageId = mappedReactions.reduce((acc, reaction) => {
-       const msgId = (reaction as any).message_id; // Need message_id temporarily for grouping
-       if (!acc[msgId]) acc[msgId] = [];
-       acc[msgId].push(reaction);
-       return acc;
     }, {} as Record<string, MessageReaction[]>);
 
 
     messages.forEach(message => {
-      message.attachments = attachmentsByMessageId[message.id] || [];
-      message.reactions = reactionsByMessageId[message.id] || [];
+  message.attachments = attachmentsByMessageId[message.id] || [];
+  message.reactions = reactionsByMessageId[message.id] || [];
     });
 
     return messages;
@@ -232,7 +241,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   async update(id: string, updates: Partial<Pick<Message, 'content' | 'status' | 'isEdited'>>): Promise<Message | null> {
     // Map updates from camelCase to snake_case
-    const dbUpdates: Record<string, any> = {};
+  const dbUpdates: Partial<{ content: string; status: MessageStatus; is_edited: boolean }> = {};
     if (updates.content !== undefined) dbUpdates.content = updates.content;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.isEdited !== undefined) dbUpdates.is_edited = updates.isEdited;

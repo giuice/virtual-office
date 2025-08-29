@@ -5,9 +5,20 @@ import { Invitation, UserRole } from '@/types/database'; // Import UserRole if n
 
 // Helper function to map DB snake_case to TS camelCase
 // Handles timestamp conversions
-function mapToCamelCase(data: any): Invitation {
-  if (!data) return data;
+type InvitationRow = {
+  id: string;
+  token: string;
+  email: string;
+  company_id: string;
+  role: string;
+  expires_at: string | null;
+  status: 'pending' | 'accepted' | 'expired';
+  created_at: string;
+};
+function mapToCamelCase(data: InvitationRow | null): Invitation | null {
+  if (!data) return null;
   return {
+    id: data.id,
     token: data.token,
     email: data.email,
     companyId: data.company_id,
@@ -42,11 +53,11 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       throw error;
     }
     // Map DB response (snake_case) to Invitation type (camelCase)
-    return data ? mapToCamelCase(data) : null;
+  return data ? mapToCamelCase(data) : null;
   }
 
   // Note: Input type expects expiresAt as number (Unix timestamp)
-  async create(invitationData: Omit<Invitation, 'createdAt' | 'status'>): Promise<Invitation> {
+  async create(invitationData: Omit<Invitation, 'id' | 'createdAt' | 'status'>): Promise<Invitation> {
     // Map Invitation type (camelCase) to DB schema (snake_case)
     // Convert expiresAt (number) to ISO string for Supabase TIMESTAMPTZ
     const dbData = {
@@ -70,7 +81,9 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       throw error || new Error('Failed to create invitation or retrieve created data.');
     }
     // Map DB response back to Invitation type
-    return mapToCamelCase(data);
+    const mapped = mapToCamelCase(data);
+    if (!mapped) throw new Error('Failed to map created invitation');
+    return mapped;
   }
 
   async updateStatus(token: string, status: Invitation['status']): Promise<Invitation | null> {
@@ -87,7 +100,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       throw error;
     }
     // Map DB response back to Invitation type
-    return data ? mapToCamelCase(data) : null;
+  return data ? mapToCamelCase(data) : null;
   }
 
   // Optional: Implement deleteByToken if needed

@@ -2,10 +2,26 @@
 import { supabase } from '@/lib/supabase/client';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Space } from '@/types/database';
-import { PaginationOptions, PaginatedResult } from '@/types/common';
+import { PaginationOptions } from '@/types/common';
 
-function mapToCamelCase(data: any): Space {
-  if (!data) return data;
+type SpaceRow = {
+  id: string;
+  company_id: string;
+  name: string;
+  type: string;
+  status: string;
+  capacity: number;
+  features: string[] | null;
+  position: unknown;
+  description: string | null;
+  access_control: unknown;
+  created_by: string | null;
+  is_template: boolean | null;
+  template_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+function mapToCamelCase(data: SpaceRow): Space {
   
  
   
@@ -29,10 +45,7 @@ function mapToCamelCase(data: any): Space {
   } as Space;
 }
 
-function mapArrayToCamelCase(dataArray: any[]): Space[] {
-  if (!dataArray) return [];
-  return dataArray.map(item => mapToCamelCase(item));
-}
+// Note: helper removed as it was unused
 
 export class SupabaseSpaceRepository implements ISpaceRepository {
   private TABLE_NAME = 'spaces';
@@ -52,7 +65,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
     return data ? mapToCamelCase(data) : null;
   }
 
-  async findByCompany(companyId: string, options?: PaginationOptions): Promise<Space[]> {
+  async findByCompany(companyId: string, _options?: PaginationOptions): Promise<Space[]> {
     console.log(`Fetching spaces for company ID: ${companyId}`);
     
     const { data, error } = await supabase
@@ -75,20 +88,8 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
 
     // Process each space individually to ensure proper data mapping
     const spaces = data.map(spaceData => {
-      // Log each space's user_ids directly from the database
-      console.log(`Space ${spaceData.name} (${spaceData.id}) raw user_ids:`, spaceData.user_ids);
-      
-      
-      
-      // Create a properly mapped space object with clean userIds
-      const mappedSpace = mapToCamelCase({
-        ...spaceData,
-        
-      });
-      
-      // Log the final mapped space object
-      console.log(`Mapped space ${mappedSpace.name} (${mappedSpace.id}) `);
-      
+      // Create a properly mapped space object
+      const mappedSpace = mapToCamelCase(spaceData as unknown as SpaceRow);
       return mappedSpace;
     });
     
@@ -131,7 +132,20 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
   async update(id: string, updates: Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Space | null> {
     // Map Space type (camelCase) to DB schema (snake_case)
     const { companyId, accessControl, createdBy, isTemplate, templateName, ...restUpdates } = updates;
-    const dbUpdates: Record<string, any> = { ...restUpdates };
+    const dbUpdates: Partial<{
+      company_id: string;
+      name: string;
+      type: string;
+      status: string;
+      capacity: number;
+      features: string[] | null;
+      position: unknown;
+      description: string | null;
+      access_control: unknown;
+      created_by: string | null;
+      is_template: boolean | null;
+      template_name: string | null;
+    }> = { ...restUpdates };
     if (companyId !== undefined) dbUpdates.company_id = companyId;
     if (accessControl !== undefined) dbUpdates.access_control = accessControl;
     if (createdBy !== undefined) dbUpdates.created_by = createdBy;

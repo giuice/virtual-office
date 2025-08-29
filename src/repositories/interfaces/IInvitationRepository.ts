@@ -14,7 +14,7 @@ export interface IInvitationRepository {
    * @param invitationData Data for the new invitation, excluding createdAt and status (which are typically managed by the implementation).
    * @returns A promise that resolves to the newly created Invitation object.
    */
-  create(invitationData: Omit<Invitation, 'createdAt' | 'status'>): Promise<Invitation>;
+  create(invitationData: Omit<Invitation, 'id' | 'createdAt' | 'status'>): Promise<Invitation>;
 
   /**
    * Updates the status of an existing invitation.

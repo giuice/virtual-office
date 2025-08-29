@@ -2,30 +2,38 @@
 import { supabase } from '@/lib/supabase/client';
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
 import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging'; 
-import { TimeStampType } from '@/types/database'; 
 import { PaginationOptions, PaginatedResult } from '@/types/common';
-import { vi } from 'vitest';
 
 // Helper function to map DB snake_case to TS camelCase
-function mapToCamelCase(data: any): Conversation {
-  if (!data) return data;
+type ConversationRow = {
+  id: string;
+  type: string;
+  participants: string[] | null;
+  last_activity: string | null;
+  name: string | null;
+  is_archived: boolean | null;
+  unread_count: Record<string, number> | null;
+  room_id: string | null;
+  visibility: string | null;
+};
+function mapToCamelCase(data: ConversationRow): Conversation {
   
   // Ensure we have the correct structure with necessary checks
   return {
     id: data.id,
     type: data.type as ConversationType,
     participants: data.participants || [],
-    lastActivity: data.last_activity || new Date().toISOString(),
-    name: data.name || null,
+    lastActivity: data.last_activity ? new Date(data.last_activity) : new Date(),
+    name: data.name || undefined,
     isArchived: Boolean(data.is_archived),
     unreadCount: data.unread_count || {},
-    roomId: data.room_id || null,
-    visibility: data.visibility as ConversationVisibility || ConversationVisibility.DIRECT,
+    roomId: data.room_id || undefined,
+    visibility: (data.visibility as ConversationVisibility) || ConversationVisibility.PUBLIC,
   };
 }
 
 // Helper function to map an array
-function mapArrayToCamelCase(dataArray: any[]): Conversation[] {
+function mapArrayToCamelCase(dataArray: ConversationRow[]): Conversation[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapToCamelCase(item));
 }
@@ -51,7 +59,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
         throw error;
       }
       
-      return data ? mapToCamelCase(data) : null;
+  return data ? mapToCamelCase(data as ConversationRow) : null;
     } catch (error) {
       console.error(`Repository error in findById(${id}):`, error);
       throw error;
@@ -79,7 +87,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
       }
 
       // Map DB response array
-      const items = mapArrayToCamelCase(data || []);
+  const items = mapArrayToCamelCase((data as ConversationRow[]) || []);
       const nextCursor = items.length === limit ? to + 1 : null;
 
       return {
