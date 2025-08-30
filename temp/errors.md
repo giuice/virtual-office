@@ -1,0 +1,36 @@
+[Middleware] Path: /api/messages/upload, User: 7ca13768-f049-4fab-9979-e37485c687ea, Error: None
+Error: Route "/api/messages/upload" used `cookies().get('sb-vhabpcoyypobgasacsko-auth-token')`. `cookies()` should be awaited before using its value. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at getItemAsync (../../../src/lib/helpers.ts:129:30)
+    at SupabaseAuthClient.__loadSession (../../src/GoTrueClient.ts:1358:46)
+    at SupabaseAuthClient._useSession (../../src/GoTrueClient.ts:1316:32)
+    at SupabaseAuthClient._emitInitialSession (../../src/GoTrueClient.ts:1931:22)
+    at <unknown> (../../src/GoTrueClient.ts:1923:13)
+    at <unknown> (../../src/GoTrueClient.ts:1248:25)
+    at SupabaseAuthClient.lockNoOp [as lock] (../../src/GoTrueClient.ts:135:15)
+    at SupabaseAuthClient._acquireLock (../../src/GoTrueClient.ts:1242:24)
+    at <unknown> (../../src/GoTrueClient.ts:1922:17)
+Failed to parse cookie string: SyntaxError: Unexpected token 'b', "base64-eyJ"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at getItemAsync (../../../src/lib/helpers.ts:129:30)
+    at SupabaseAuthClient.__loadSession (../../src/GoTrueClient.ts:1358:46)
+    at SupabaseAuthClient._useSession (../../src/GoTrueClient.ts:1316:32)
+    at SupabaseAuthClient._emitInitialSession (../../src/GoTrueClient.ts:1931:22)
+    at <unknown> (../../src/GoTrueClient.ts:1923:13)
+    at <unknown> (../../src/GoTrueClient.ts:1248:25)
+    at SupabaseAuthClient.lockNoOp [as lock] (../../src/GoTrueClient.ts:135:15)
+    at SupabaseAuthClient._acquireLock (../../src/GoTrueClient.ts:1242:24)
+    at <unknown> (../../src/GoTrueClient.ts:1922:17)
+Error: Route "/api/messages/upload" used `cookies().get('sb-vhabpcoyypobgasacsko-auth-token')`. `cookies()` should be awaited before using its value. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at getItemAsync (../../../src/lib/helpers.ts:129:30)
+    at SupabaseAuthClient.__loadSession (../../src/GoTrueClient.ts:1358:46)
+    at SupabaseAuthClient._useSession (../../src/GoTrueClient.ts:1316:32)
+    at <unknown> (../../src/GoTrueClient.ts:1204:18)
+    at <unknown> (../../src/GoTrueClient.ts:1226:23)
+Failed to parse cookie string: SyntaxError: Unexpected token 'b', "base64-eyJ"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at getItemAsync (../../../src/lib/helpers.ts:129:30)
+    at SupabaseAuthClient.__loadSession (../../src/GoTrueClient.ts:1358:46)
+    at SupabaseAuthClient._useSession (../../src/GoTrueClient.ts:1316:32)
+    at <unknown> (../../src/GoTrueClient.ts:1204:18)
+    at <unknown> (../../src/GoTrueClient.ts:1226:23)
+ POST /api/messages/upload 401 in 157ms

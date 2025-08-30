@@ -240,16 +240,13 @@ export function useMessages(activeConversationId: string | null) {
   }, [user]);
   
   // Function to upload an attachment
-  const uploadAttachment = useCallback(async (file: File): Promise<FileAttachment> => {
+  const uploadAttachment = useCallback(async (file: File, messageId?: string): Promise<FileAttachment> => {
     if (!activeConversationId) {
       throw new Error('No active conversation');
     }
     
     try {
-      // TODO: Implement uploadMessageAttachment in messagingApi and uncomment
-      // return await messagingApi.uploadMessageAttachment(file, activeConversationId); 
-      console.warn('uploadMessageAttachment API call not implemented yet.');
-      throw new Error('Attachment upload not implemented');
+      return await messagingApi.uploadMessageAttachment(file, activeConversationId, messageId);
     } catch (error) {
       console.error('Error uploading attachment:', error);
       throw error;

@@ -8,14 +8,20 @@ import { Message } from '@/types/messaging';
  * Automatically updates React Query cache when messages are updated
  * 
  * @param conversationId The ID of the conversation to subscribe to message updates for
- * @returns void
+ * @param isActive Whether the conversation is currently active/visible
+ * @returns Object containing connection status and utilities
  */
-export function useMessageRealtime(conversationId: string | null) {
+export function useMessageRealtime(conversationId: string | null, isActive: boolean = true) {
   const queryClient = useQueryClient();
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !isActive) {
+      setConnectionStatus(null);
+      setIsConnected(false);
+      return;
+    }
 
     console.log(`[useMessageRealtime] Setting up subscription for conversation: ${conversationId}`);
 
@@ -46,15 +52,20 @@ export function useMessageRealtime(conversationId: string | null) {
               return;
             }
             
-            // Add message to the local cache if it doesn't exist
+            // Add message to the infinite query cache if it doesn't exist
             queryClient.setQueryData(['messages', conversationId], 
-              (oldData: { messages: Message[], hasMore: boolean, nextCursor?: string } | undefined) => {
-                if (!oldData) {
-                  return { messages: [newMessage], hasMore: false };
+              (oldData: { pages: Array<{ messages: Message[], hasMore: boolean, nextCursor?: string }>, pageParams: any[] } | undefined) => {
+                if (!oldData || !oldData.pages || oldData.pages.length === 0) {
+                  return { 
+                    pages: [{ messages: [newMessage], hasMore: false }], 
+                    pageParams: [0] 
+                  };
                 }
                 
-                // Check if message already exists in the cache
-                const messageExists = oldData.messages.some(msg => msg.id === newMessage.id);
+                // Check if message already exists in any page
+                const messageExists = oldData.pages.some(page => 
+                  page.messages.some(msg => msg.id === newMessage.id)
+                );
                 
                 if (messageExists) {
                   return oldData;
@@ -75,9 +86,18 @@ export function useMessageRealtime(conversationId: string | null) {
                   isEdited: newMessage.is_edited || false,
                 };
                 
+                // Add message to the last (most recent) page
+                const updatedPages = [...oldData.pages];
+                const lastPageIndex = updatedPages.length - 1;
+                
+                updatedPages[lastPageIndex] = {
+                  ...updatedPages[lastPageIndex],
+                  messages: [...updatedPages[lastPageIndex].messages, message]
+                };
+                
                 return {
                   ...oldData,
-                  messages: [...oldData.messages, message]
+                  pages: updatedPages
                 };
               }
             );
@@ -89,12 +109,14 @@ export function useMessageRealtime(conversationId: string | null) {
             
             // Update message in cache if it exists
             queryClient.setQueryData(['messages', conversationId], 
-              (oldData: { messages: Message[], hasMore: boolean, nextCursor?: string } | undefined) => {
-                if (!oldData) return oldData;
+              (oldData: { pages: Array<{ messages: Message[], hasMore: boolean, nextCursor?: string }>, pageParams: any[] } | undefined) => {
+                if (!oldData || !oldData.pages) return oldData;
                 
-                // Update the message in the array
-                const updatedMessages = oldData.messages.map(message => {
-                  if (message.id === updatedMessage.id) {
+                // Update the message in the appropriate page
+                const updatedPages = oldData.pages.map(page => ({
+                  ...page,
+                  messages: page.messages.map(message => {
+                    if (message.id === updatedMessage.id) {
                     return {
                       ...message,
                       content: updatedMessage.content,
@@ -102,13 +124,14 @@ export function useMessageRealtime(conversationId: string | null) {
                       reactions: updatedMessage.reactions || message.reactions,
                       isEdited: updatedMessage.is_edited || message.isEdited,
                     };
-                  }
-                  return message;
-                });
+                    }
+                    return message;
+                  })
+                }));
                 
                 return {
                   ...oldData,
-                  messages: updatedMessages
+                  pages: updatedPages
                 };
               }
             );
@@ -120,12 +143,18 @@ export function useMessageRealtime(conversationId: string | null) {
             
             // Remove message from cache if it exists
             queryClient.setQueryData(['messages', conversationId], 
-              (oldData: { messages: Message[], hasMore: boolean, nextCursor?: string } | undefined) => {
-                if (!oldData) return oldData;
+              (oldData: { pages: Array<{ messages: Message[], hasMore: boolean, nextCursor?: string }>, pageParams: any[] } | undefined) => {
+                if (!oldData || !oldData.pages) return oldData;
+                
+                // Remove message from all pages
+                const updatedPages = oldData.pages.map(page => ({
+                  ...page,
+                  messages: page.messages.filter(message => message.id !== deletedMessage.id)
+                }));
                 
                 return {
                   ...oldData,
-                  messages: oldData.messages.filter(message => message.id !== deletedMessage.id)
+                  pages: updatedPages
                 };
               }
             );
@@ -136,24 +165,34 @@ export function useMessageRealtime(conversationId: string | null) {
       .subscribe((status) => {
         console.log(`[useMessageRealtime] Subscription status: ${status}`);
         setConnectionStatus(status);
+        setIsConnected(status === 'SUBSCRIBED');
         
         if (status === 'SUBSCRIBED') {
           console.log('[useMessageRealtime] Successfully subscribed to message updates');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('[useMessageRealtime] Channel error occurred - will retry connection');
-          // We'll rely on Supabase's built-in retry mechanism
+          setIsConnected(false);
         } else if (status === 'TIMED_OUT') {
           console.error('[useMessageRealtime] Subscription timed out - will retry connection');
-          // We'll rely on Supabase's built-in retry mechanism
+          setIsConnected(false);
+        } else if (status === 'CLOSED') {
+          console.log('[useMessageRealtime] Channel closed');
+          setIsConnected(false);
         }
       });
 
-    // Clean up subscription when component unmounts
+    // Clean up subscription when component unmounts or dependencies change
     return () => {
       console.log(`[useMessageRealtime] Cleaning up subscription for conversation ${conversationId}`);
+      setConnectionStatus(null);
+      setIsConnected(false);
       subscription.unsubscribe();
     };
-  }, [queryClient, conversationId]);
+  }, [queryClient, conversationId, isActive]);
 
-  return { connectionStatus };
+  return { 
+    connectionStatus,
+    isConnected,
+    conversationId: connectionStatus ? conversationId : null
+  };
 }

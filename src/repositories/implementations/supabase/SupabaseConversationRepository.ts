@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client';
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
 import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging'; 
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase
 type ConversationRow = {
@@ -40,11 +41,16 @@ function mapArrayToCamelCase(dataArray: ConversationRow[]): Conversation[] {
 
 
 export class SupabaseConversationRepository implements IConversationRepository {
-  private TABLE_NAME = 'conversations'; 
+  private TABLE_NAME = 'conversations';
+  private supabaseClient: SupabaseClient;
+
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabaseClient = supabaseClient || supabase;
+  } 
 
   async findById(id: string): Promise<Conversation | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .select('*')
         .eq('id', id)
@@ -119,7 +125,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
         unread_count: {} // Initialize empty unread count
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .insert(dbData)
         .select('*')
@@ -144,12 +150,14 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async update(id: string, updates: Partial<Pick<Conversation, 'name'>>): Promise<Conversation | null> {
+  async update(id: string, updates: Partial<Pick<Conversation, 'name' | 'lastActivity'>>): Promise<Conversation | null> {
     try {
-      // Map updates from camelCase to snake_case (only 'name' here)
-      const dbUpdates = { ...updates }; // 'name' matches DB column name
+      // Map updates from camelCase to snake_case
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.lastActivity !== undefined) dbUpdates.last_activity = updates.lastActivity;
 
-      const { data, error } = await supabase
+      const { data, error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .update(dbUpdates)
         .eq('id', id)
@@ -171,7 +179,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
 
   async deleteById(id: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .delete()
         .eq('id', id);
@@ -189,7 +197,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
 
   async setArchiveStatus(id: string, isArchived: boolean): Promise<Conversation | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .update({ is_archived: isArchived })
         .eq('id', id)
@@ -213,7 +221,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
     try {
       // For simplicity, we'll implement it directly without RPC
       // First, get the current conversation to access the unread_count
-      const { data: conversation, error: fetchError } = await supabase
+      const { data: conversation, error: fetchError } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .select('unread_count')
         .eq('id', id)
@@ -233,7 +241,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
       delete unreadCount[userId];
       
       // Update the conversation with the new unread_count
-      const { error: updateError } = await supabase
+      const { error: updateError } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .update({ unread_count: unreadCount })
         .eq('id', id);
@@ -253,7 +261,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
   async updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null> {
     try {
       const activityTimestamp = timestamp || new Date().toISOString();
-      const { data, error } = await supabase
+      const { data, error } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .update({
           last_activity: activityTimestamp
@@ -279,7 +287,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
     try {
       // For simplicity, we'll implement it directly without RPC
       // First, get the current conversation to access the unread_count
-      const { data: conversation, error: fetchError } = await supabase
+      const { data: conversation, error: fetchError } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .select('unread_count')
         .eq('id', id)
@@ -302,7 +310,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
       }
       
       // Update the conversation with the new unread_count
-      const { error: updateError } = await supabase
+      const { error: updateError } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .update({ unread_count: unreadCount })
         .eq('id', id);

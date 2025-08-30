@@ -5,86 +5,72 @@ import { IConversationRepository } from '@/repositories/interfaces';
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; 
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { supabase } from '@/lib/supabase/client';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(request: NextRequest) {
+  let userId = 'unknown';
+  let userDatabaseId = 'unknown';
+  let body = {};
+  
   try {
-    const body = await request.json();
+    body = await request.json();
     
-    // Get the Firebase UID from the Authorization header
-    const authHeader = request.headers.get('Authorization');
-    let userId = '';
+    // Get authenticated user from Supabase session
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Extract the token
-      const token = authHeader.substring(7);
-      // In a real implementation, you would verify this token
-      // For now, we'll assume it's the Firebase UID directly for simplicity
-      userId = token;
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
     }
     
-    // If no Authorization header, try to get userId from the request body
-    if (!userId && body.userId) {
-      userId = body.userId;
-    }
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Missing user ID' }, { status: 401 });
-    }
+    userId = user.id; // This is the Supabase UID
     
     console.log('Creating conversation with user ID:', userId);
     
-    // Create repository instances
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository();
+    // Create repository instances with server client
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
     const userRepository: IUserRepository = new SupabaseUserRepository();
     
-    // Get the database UUID for this user if needed
-    let userDatabaseId = userId;
-    
-    // Check if the ID is a Firebase UID (not a UUID)
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
-      // This is a Firebase UID, get the corresponding database ID
-      const user = await userRepository.findByFirebaseUid(userId);
-      if (!user) {
-        console.error('User not found with Firebase UID:', userId);
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
-      userDatabaseId = user.id;
-      console.log('Found user database ID:', userDatabaseId);
+    // Get the database user record using Supabase UID
+    const userRecord = await userRepository.findBySupabaseUid(userId);
+    if (!userRecord) {
+      console.error('User profile not found for Supabase UID:', userId);
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
+    
+    userDatabaseId = userRecord.id;
+    console.log('Found user database ID:', userDatabaseId);
 
     // Validate required fields
-    if (!body.type || !body.participants || !Array.isArray(body.participants) || body.participants.length === 0) {
+    if (!body.type || !body.participants || !Array.isArray(body.participants)) {
       console.error('Invalid request body:', JSON.stringify(body, null, 2));
       return NextResponse.json(
-        { error: 'Missing or invalid required fields: type (string), participants (non-empty array)' },
+        { error: 'Missing or invalid required fields: type (string), participants (array)' },
         { status: 400 }
       );
     }
 
     // Ensure user is part of the conversation participants
     let participants = [...body.participants];
-    if (!participants.includes(userDatabaseId) && !participants.includes(userId)) {
-      // Add the user to participants automatically
+    if (!participants.includes(userDatabaseId)) {
+      // Add the current user to participants automatically
       participants.push(userDatabaseId);
       console.log('Added current user to participants:', userDatabaseId);
     }
     
-    // Replace any Firebase UIDs with database UUIDs in participants
-    const updatedParticipants = [...participants];
-    for (let i = 0; i < updatedParticipants.length; i++) {
-      const participantId = updatedParticipants[i];
-      // Check if this is a Firebase UID
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participantId)) {
-        // Get the database UUID
-        const user = await userRepository.findByFirebaseUid(participantId);
-        if (user) {
-          updatedParticipants[i] = user.id;
-          console.log(`Replaced Firebase UID ${participantId} with database ID ${user.id}`);
-        } else {
-          console.warn(`No user found for Firebase UID ${participantId} - keeping as is`);
-        }
+    // Validate all participant IDs exist in the database
+    const updatedParticipants = [];
+    for (const participantId of participants) {
+      const participantUser = await userRepository.findById(participantId);
+      if (participantUser) {
+        updatedParticipants.push(participantUser.id);
+      } else {
+        console.warn(`Participant not found: ${participantId} - skipping`);
       }
+    }
+    
+    if (updatedParticipants.length === 0) {
+      return NextResponse.json({ error: 'No valid participants found' }, { status: 400 });
     }
 
     // Prepare data for repository create method
@@ -128,6 +114,9 @@ export async function POST(request: NextRequest) {
     }
     
     console.error('Error details:', errorDetails);
+    console.error('Request body was:', JSON.stringify(body, null, 2));
+    console.error('User ID:', userId);
+    console.error('User database ID:', userDatabaseId);
     
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
@@ -137,7 +126,11 @@ export async function POST(request: NextRequest) {
       { 
         error: 'Failed to create conversation', 
         message: error instanceof Error ? error.message : String(error),
-        details: errorDetails
+        details: errorDetails,
+        debug: {
+          userId,
+          requestBody: body
+        }
       },
       { status: 500 }
     );

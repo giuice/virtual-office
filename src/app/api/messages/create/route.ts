@@ -4,29 +4,49 @@ import { Message, MessageStatus, MessageType } from '@/types/messaging'; // Use 
 // Removed duplicate import line
 import { IMessageRepository, IConversationRepository } from '@/repositories/interfaces';
 import { SupabaseMessageRepository, SupabaseConversationRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const messageRepository: IMessageRepository = new SupabaseMessageRepository();
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository();
+    
+    // Authenticate the user
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
+    }
+    
+    const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
 
     // Validate required fields
-    if (!body.conversationId || !body.senderId || !body.content) {
+    if (!body.conversationId || !body.content) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: conversationId, content' },
         { status: 400 }
       );
+    }
+    
+    // Get the database user record using Supabase UID
+    const { IUserRepository } = await import('@/repositories/interfaces');
+    const { SupabaseUserRepository } = await import('@/repositories/implementations/supabase');
+    const userRepository: IUserRepository = new SupabaseUserRepository();
+    
+    const userRecord = await userRepository.findBySupabaseUid(user.id);
+    if (!userRecord) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
     // Prepare message data for repository using the Message type from messaging.ts
     // Apply Omit based on the structure of messaging.ts#Message
     const messageData: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'attachments' | 'isEdited'> = {
-      conversationId: body.conversationId, // Assuming this exists in messaging.ts#Message
-      senderId: body.senderId,
+      conversationId: body.conversationId,
+      senderId: userRecord.id, // Use the database user ID as sender
       content: body.content,
-      type: body.type || 'TEXT', // Use string literal for type
-      status: body.status || MessageStatus.SENT, // Assuming MessageStatus is an enum/const from messaging.ts
+      type: (body.type || 'text') as MessageType, // Use lowercase enum value
+      status: (body.status || 'sent') as MessageStatus, // Use lowercase enum value
       replyToId: body.replyToId,
       // attachments need separate handling/linking after creation if provided
     };
@@ -35,10 +55,15 @@ export async function POST(request: NextRequest) {
     const createdMessage = await messageRepository.create(messageData);
 
     // Update conversation last activity
-    // TODO: Update IConversationRepository.update or Conversation type to allow updating lastActivity
-    // await conversationRepository.update(body.conversationId, { lastActivity: new Date() });
-    
-    // TODO: In a real implementation, emit Socket.io event for real-time updates
+    try {
+      await conversationRepository.update(body.conversationId, { 
+        lastActivity: new Date(),
+        // Could also update unread_count here if needed
+      });
+    } catch (updateError) {
+      console.warn('Failed to update conversation last activity:', updateError);
+      // Don't fail the request if conversation update fails
+    }
     
     return NextResponse.json({ message: createdMessage }, { status: 201 });
   } catch (error) {

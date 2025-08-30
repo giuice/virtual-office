@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client';
 import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
 import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus } from '@/types/messaging';
 import { PaginationOptions } from '@/types/common'; // Assuming common types exist
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // --- Helper Functions ---
 
@@ -79,9 +80,14 @@ export class SupabaseMessageRepository implements IMessageRepository {
   private MSG_TABLE_NAME = 'messages'; // Ensure this matches your Supabase table name
   private REACTION_TABLE_NAME = 'message_reactions'; // Assuming separate table
   private ATTACHMENT_TABLE_NAME = 'message_attachments'; // Assuming separate table
+  private supabaseClient: SupabaseClient;
+
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabaseClient = supabaseClient || supabase;
+  }
 
   async findById(id: string): Promise<Message | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .select('*') // TODO: Select related reactions/attachments if needed
       .eq('id', id)
@@ -100,7 +106,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     const message = mapMessageToCamelCase(data);
 
     // Fetch related attachments
-    const { data: attachmentsData, error: attachmentsError } = await supabase
+    const { data: attachmentsData, error: attachmentsError } = await this.supabaseClient
       .from(this.ATTACHMENT_TABLE_NAME)
       .select('*')
       .eq('message_id', message.id);
@@ -115,7 +121,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }
 
     // Fetch related reactions
-    const { data: reactionsData, error: reactionsError } = await supabase
+    const { data: reactionsData, error: reactionsError } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .select('*')
       .eq('message_id', message.id);
@@ -139,7 +145,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Query messages for the conversation
     // Ordering by timestamp ascending to get oldest first for display
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .select('*') // TODO: Select related reactions/attachments if needed
       .eq('conversation_id', conversationId) // Assuming snake_case
@@ -160,7 +166,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     const messageIds = messages.map(m => m.id);
 
     // Fetch all attachments for these messages in bulk
-    const { data: attachmentsData, error: attachmentsError } = await supabase
+    const { data: attachmentsData, error: attachmentsError } = await this.supabaseClient
       .from(this.ATTACHMENT_TABLE_NAME)
       .select('*')
       .in('message_id', messageIds);
@@ -179,7 +185,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }, {} as Record<string, FileAttachment[]>);
 
     // Fetch all reactions for these messages in bulk
-    const { data: reactionsData, error: reactionsError } = await supabase
+    const { data: reactionsData, error: reactionsError } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .select('*')
       .in('message_id', messageIds);
@@ -220,7 +226,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         // is_edited defaults to false
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .insert(dbData)
       .select()
@@ -252,7 +258,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         return this.findById(id);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -278,7 +284,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   async deleteById(id: string): Promise<boolean> {
     // Consider deleting related reactions/attachments as well (cascade or manual)
-    const { error, count } = await supabase
+    const { error, count } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .delete()
       .eq('id', id);
@@ -305,7 +311,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         url: attachmentData.url,
         thumbnail_url: attachmentData.thumbnailUrl,
     };
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.ATTACHMENT_TABLE_NAME)
       .insert(dbData)
       .select()
@@ -332,7 +338,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         emoji: reactionData.emoji,
         // timestamp handled by default value
      };
-    const { data, error } = await supabase
+    const { data, error } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .upsert(dbData, { onConflict: 'message_id, user_id, emoji' }) // Specify conflict target
       .select()
@@ -348,7 +354,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   async removeReaction(messageId: string, userId: string, emoji: string): Promise<boolean> {
     // Map camelCase input to snake_case query
-    const { error, count } = await supabase
+    const { error, count } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .delete()
       .eq('message_id', messageId)
@@ -363,7 +369,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   async findReactions(messageId: string): Promise<MessageReaction[]> {
-     const { data, error } = await supabase
+     const { data, error } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .select('*')
       .eq('message_id', messageId);
