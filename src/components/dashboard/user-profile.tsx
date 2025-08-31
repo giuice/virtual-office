@@ -6,7 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -70,7 +70,7 @@ export function UserProfile() {
       <CardContent className="space-y-6">
         {/* Profile Picture & Basic Info */}
         <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-          <EnhancedAvatar
+          <EnhancedAvatarV2
             user={currentUserProfile}
             size="xl"
             showStatus={true}

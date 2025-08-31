@@ -13,7 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import  ModernUserAvatar  from '@/components/floor-plan/modern/ModernUserAvatar';
-import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
+import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 import  AvatarGroup  from '@/components/floor-plan/modern/AvatarGroup';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -316,7 +316,7 @@ export default function AvatarDemoPage() {
             <CardContent>
               <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
                 <div className="flex flex-col items-center space-y-4">
-                  <ProfileAvatar
+                  <UploadableAvatar
                     user={currentUserProfile || {
                       id: 'demo',
                       displayName: 'Demo User',

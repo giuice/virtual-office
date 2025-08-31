@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Users } from 'lucide-react';
 import { UIUser as LocalUser } from '../../types';
-import { StatusAvatar } from '@/components/ui/status-avatar';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { useCompany } from '@/contexts/CompanyContext';
 import { RoomPeopleTabProps } from '../types';
 
@@ -33,7 +33,7 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
             return (
               <div key={user.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <StatusAvatar user={localUser} size="sm" />
+                  <EnhancedAvatarV2 user={user} size="sm" showStatus={true} />
                   <div>
                     <p className="font-medium">{user.displayName}</p>
                     <p className="text-xs text-muted-foreground">{user.statusMessage || user.status}</p>

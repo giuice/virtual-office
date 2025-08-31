@@ -34,23 +34,26 @@ import {
 import { Progress } from '@/components/ui/progress';
 
 interface UploadableAvatarProps {
-  userId: string;
-  displayName: string;
-  currentAvatarUrl?: string | null;
+  user: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    status?: 'online' | 'away' | 'busy' | 'offline';
+  };
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  onAvatarChange?: (url: string) => void;
-  status?: 'online' | 'away' | 'busy' | 'offline';
+  onAvatarChange?: (file: File) => Promise<void>;
+  uploading?: boolean;
+  showUploadButton?: boolean;
 }
 
 export function UploadableAvatar({
-  userId,
-  displayName,
-  currentAvatarUrl,
+  user,
   size = 'md',
   className,
   onAvatarChange,
-  status,
+  uploading = false,
+  showUploadButton = false,
 }: UploadableAvatarProps) {
   const [hovered, setHovered] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -93,20 +96,19 @@ export function UploadableAvatar({
     },
     uploadOptions: {
       formFieldName: 'avatar',
-      additionalData: { userId },
+      additionalData: { userId: user.id },
     },
     onSuccess: (response) => {
-      if (response.avatarUrl && onAvatarChange) {
-        onAvatarChange(response.avatarUrl);
-      }
+      // The component now handles file uploads internally
+      // If onAvatarChange is provided, it's for external handling
     },
   });
   
   // Get active avatar URL (preview or current)
-  const avatarUrl = preview || currentAvatarUrl;
+  const avatarUrl = preview || user.avatarUrl;
   
   // Get initials for fallback
-  const initials = getUserInitials(displayName);
+  const initials = getUserInitials(user.displayName);
   
   // Trigger file input click
   const triggerFileSelect = () => {
@@ -118,7 +120,12 @@ export function UploadableAvatar({
     const file = e.target.files?.[0];
     if (file) {
       try {
-        await upload(file);
+        if (onAvatarChange) {
+          await onAvatarChange(file);
+        } else {
+          // Fallback to internal upload if no callback provided
+          await upload(file);
+        }
       } catch (err) {
         console.error('Avatar upload failed:', err);
       }
@@ -160,7 +167,7 @@ export function UploadableAvatar({
   
   // Get status indicator color
   const getStatusColor = () => {
-    switch (status) {
+    switch (user.status) {
       case 'online': return 'bg-emerald-500';
       case 'away': return 'bg-amber-500';
       case 'busy': return 'bg-rose-500';
@@ -170,10 +177,15 @@ export function UploadableAvatar({
   };
   
   // Determine if avatar is in an active state (uploading, error, etc.)
-  const isActive = state !== 'idle' && state !== 'success';
+  const isActive = state !== 'idle' && state !== 'success' || uploading;
   
   // Get state icon
   const getStateIcon = () => {
+    // Show external uploading state first
+    if (uploading) {
+      return <Loader2 className="h-5 w-5 animate-spin" />;
+    }
+    
     switch (state) {
       case 'validating':
         return <Loader2 className="h-5 w-5 animate-spin" />;

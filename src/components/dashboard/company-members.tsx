@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -240,7 +240,7 @@ export function CompanyMembers() {
           {companyUsers.map((user) => (
             <div key={user.id} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <EnhancedAvatar
+                <EnhancedAvatarV2
                   user={user}
                   size="md"
                   showStatus={true}

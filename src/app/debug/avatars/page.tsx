@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
 import { testSupabaseStorageConfiguration, testAvatarUrl } from '@/lib/supabase-storage-test';
 import { debugAvatarUrl, testSupabaseStorageAccess, logAvatarDebugInfo } from '@/lib/avatar-debug';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { ModernUserAvatar } from '@/components/floor-plan/modern';
 
 export default function AvatarDebugPage() {
   const { user } = useAuth();
@@ -194,13 +195,13 @@ export default function AvatarDebugPage() {
           <CardContent className="space-y-4">
             {currentUserProfile && (
               <div className="flex items-center gap-4 p-4 border rounded-lg">
-                <EnhancedAvatar
+                <EnhancedAvatarV2
                   user={currentUserProfile}
                   size="lg"
                   showStatus={true}
-                  onError={(error, url) => {
-                    addToResults(`\n❌ Avatar load error for current user: ${error.message}`);
-                    addToResults(`URL: ${url}`);
+                  onError={(error) => {
+                    addToResults(`\n❌ Avatar load error for current user: ${error}`);
+                    addToResults(`URL: ${error.url}`);
                   }}
                 />
                 <div>
@@ -215,13 +216,14 @@ export default function AvatarDebugPage() {
             
             {companyUsers.slice(0, 3).map(user => (
               <div key={user.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                <EnhancedAvatar
+                <ModernUserAvatar user={user} size="md" showStatus={true} />
+                <EnhancedAvatarV2
                   user={user}
                   size="md"
                   showStatus={true}
-                  onError={(error, url) => {
-                    addToResults(`\n❌ Avatar load error for ${user.displayName}: ${error.message}`);
-                    addToResults(`URL: ${url}`);
+                  onError={(error) => {
+                    addToResults(`\n❌ Avatar load error for ${user.displayName}: ${error}`);
+                    addToResults(`URL: ${error.url}`);
                   }}
                 />
                 <div>

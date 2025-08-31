@@ -10,7 +10,7 @@ import {
 } from '@/types/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatar } from '@/components/ui/enhanced-avatar';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -208,7 +208,7 @@ export function MessageItem({
       onMouseLeave={() => setShowActions(false)}
     >
       {showAvatar && sender && (
-        <EnhancedAvatar
+        <EnhancedAvatarV2
           user={sender}
           size="sm"
           className="mr-2"

@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserPresenceData } from '@/types/database';
-import { AvatarWithFallback } from '@/components/ui/avatar-with-fallback';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { 
   Tooltip,
   TooltipContent,
@@ -38,17 +38,12 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
             role={onClick ? 'button' : undefined}
             aria-label={onClick ? `User ${user.displayName}` : undefined}
           >
-            <AvatarWithFallback
-              src={user.avatarUrl}
-              alt={user.displayName || 'User'}
+            <EnhancedAvatarV2
+              user={user}
               size="md"
-              onLoad={() => {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[UserAvatarPresence] Avatar loaded for ${user.displayName}`);
-                }
-              }}
-              onError={() => {
-                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}`);
+              showStatus={false}
+              onError={(error) => {
+                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}:`, error.message);
               }}
             />
             <span

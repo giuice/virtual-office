@@ -6,6 +6,8 @@ import { ThemeProvider } from '@/providers/theme-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { Toaster } from 'sonner';
 import { PresenceProvider } from '@/contexts/PresenceContext';
+import { CallingProvider } from '@/contexts/CallingContext';
+import { CallNotifications } from '@/components/messaging/CallNotification';
 import './globals.css';
 
 export default function RootLayout({
@@ -27,8 +29,11 @@ export default function RootLayout({
               <CompanyProvider>
                 <PresenceProvider>
                   <MessagingProvider> {/* Wrap with MessagingProvider */}
+                    <CallingProvider>
                     {children}
+                    <CallNotifications />
                     <Toaster richColors closeButton position="top-right" />
+                    </CallingProvider>
                   </MessagingProvider>
                 </PresenceProvider>
               </CompanyProvider>

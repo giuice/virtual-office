@@ -1,6 +1,6 @@
 // components/floor-plan/user-avatar.tsx
 import { UIUser as User } from './types'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -15,21 +15,32 @@ interface UserAvatarProps {
 }
 
 export function UserAvatar({ user }: UserAvatarProps) {
+  // Convert UIUser to format compatible with EnhancedAvatarV2
+  const avatarUser = {
+    id: user.id.toString(),
+    displayName: user.name,
+    avatarUrl: user.avatar,
+    status: user.status === 'active' ? 'online' : 'offline'
+  };
+
   return (
     <Popover>
       <PopoverTrigger>
-        <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
-          <AvatarImage src={user.avatar} alt={user.name} />
-          <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-        </Avatar>
+        <EnhancedAvatarV2
+          user={avatarUser}
+          size="sm"
+          showStatus={true}
+          className="cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+        />
       </PopoverTrigger>
       <PopoverContent className="w-64">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Avatar>
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-            </Avatar>
+            <EnhancedAvatarV2
+              user={avatarUser}
+              size="md"
+              showStatus={true}
+            />
             <div>
               <h4 className="font-medium">{user.name}</h4>
               <p className="text-sm text-gray-500">{user.activity}</p>

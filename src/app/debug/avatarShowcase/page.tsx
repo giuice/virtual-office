@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
-import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 import { User } from '@/types/database';
 import { UIUser } from '@/types/ui';
 
@@ -34,7 +33,7 @@ const exampleUsers: (User | UIUser)[] = [
     } as User,
 ];
 
-export function AvatarShowcase() {
+export default function AvatarShowcase() {
     const [selectedUser, setSelectedUser] = React.useState<string | null>(null);
 
     const handleAvatarClick = (userId: string) => {
@@ -178,40 +177,6 @@ export function AvatarShowcase() {
                         showStatus
                         className="border-4 border-purple-500 shadow-lg"
                     />
-                </div>
-            </div>
-
-            {/* Uploadable Avatar Demo */}
-            <div>
-                <h3 className="text-lg font-semibold mb-4">Uploadable Avatar</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                    The UploadableAvatar component includes built-in upload functionality with progress tracking.
-                </p>
-                <div className="flex items-center gap-6">
-                    <div className="text-center">
-                        <UploadableAvatar
-                            user={exampleUsers[0]}
-                            size="xl"
-                            onAvatarChange={async (file: File) => {
-                                console.log('Demo upload:', file.name);
-                                // Simulate upload delay
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                            }}
-                        />
-                        <p className="text-sm mt-2">Hover to see upload button</p>
-                    </div>
-                    <div className="text-center">
-                        <UploadableAvatar
-                            user={exampleUsers[3]}
-                            size="xl"
-                            showUploadButton
-                            onAvatarChange={async (file: File) => {
-                                console.log('Demo upload:', file.name);
-                                await new Promise(resolve => setTimeout(resolve, 1500));
-                            }}
-                        />
-                        <p className="text-sm mt-2">Always show upload button</p>
-                    </div>
                 </div>
             </div>
         </div>

@@ -10,7 +10,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
-import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
+import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 
 export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
@@ -94,17 +94,18 @@ export function EnhancedUserMenu() {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-          <ProfileAvatar
+          <UploadableAvatar
             user={combinedUser}
             size="sm"
             className="cursor-pointer"
+            showUploadButton={false}
           />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64" align="end">
         <div className="grid gap-4">
           <div className="flex gap-4 items-start">
-            <ProfileAvatar
+            <UploadableAvatar
               user={combinedUser}
               onAvatarChange={handleAvatarUpload}
               size="sm"

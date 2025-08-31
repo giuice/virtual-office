@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/tooltip'
 import { Users, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { StatusAvatar } from '@/components/ui/status-avatar'
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2'
 import { dbUserToUIUser } from '@/utils/user-type-adapters'
 
 // Type for the content prop
@@ -103,7 +103,7 @@ export function FloorTooltip({ content, position, children }: FloorTooltipProps)
               <div className="flex flex-col gap-2">
               {space.users.map(user => (
                   <div key={user.id} className="flex items-center gap-2">
-                    <StatusAvatar user={user} size="sm" />
+                    <EnhancedAvatarV2 user={user} size="sm" showStatus={true} />
                     <div>
                       <p className="text-xs font-medium">{user.name}</p>
                       <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
@@ -121,7 +121,7 @@ export function FloorTooltip({ content, position, children }: FloorTooltipProps)
       
       return (
         <div className="flex items-center gap-3">
-          <StatusAvatar user={user} size="md" />
+          <EnhancedAvatarV2 user={user} size="md" showStatus={true} />
           <div>
             <p className="font-medium">{user.name}</p>
             <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
