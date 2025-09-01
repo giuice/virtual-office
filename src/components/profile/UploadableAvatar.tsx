@@ -33,13 +33,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 
+import { User } from '@/types/database';
+
+// Use canonical User type for consistency
 interface UploadableAvatarProps {
-  user: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string | null;
-    status?: 'online' | 'away' | 'busy' | 'offline';
-  };
+  user: Pick<User, 'id' | 'displayName' | 'avatarUrl' | 'status'>;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   onAvatarChange?: (file: File) => Promise<void>;
@@ -147,14 +145,13 @@ export function UploadableAvatar({
       const response = await fetch('/api/users/avatar/remove', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId: user.id }),
       });
       
       if (response.ok) {
         reset();
-        if (onAvatarChange) {
-          onAvatarChange('');
-        }
+        // Note: onAvatarChange expects a File, not a string for removal
+        // For removal, we just reset the internal state
       } else {
         throw new Error('Failed to remove avatar');
       }
@@ -230,7 +227,7 @@ export function UploadableAvatar({
           {avatarUrl && (
             <AvatarImage
               src={avatarUrl}
-              alt={displayName}
+              alt={user.displayName}
               className={isActive ? 'opacity-50' : ''}
             />
           )}
@@ -240,7 +237,7 @@ export function UploadableAvatar({
         </Avatar>
         
         {/* Status indicator */}
-        {status && (
+        {user.status && (
           <span
             className={cn(
               'absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background',

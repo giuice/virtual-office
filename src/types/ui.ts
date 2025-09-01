@@ -1,5 +1,5 @@
 // src/types/ui.ts
-import { SpaceType, UIUserStatus } from './database';
+import { SpaceType, UIUserStatus, User } from './database';
 
 
 
@@ -7,18 +7,16 @@ import { SpaceType, UIUserStatus } from './database';
  * UI-specific interfaces and types that don't directly map to database entities
  */
 
-// UI-specific user representation
+// UI-specific user representation (aligned with database User interface)
 export interface UIUser {
-  id: string; // Now using string IDs for consistency with database
-  displayName: string; // Renamed from 'name' to match database User
-  avatarUrl: string; // Renamed from 'avatar' to match database User
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null; // Match database User nullability
   status: UIUserStatus;
-  statusMessage?: string; // Renamed from 'activity' to align with database concepts
-  
-  // Legacy support - these will be deprecated
-  name?: string; // For backward compatibility
-  avatar?: string; // For backward compatibility
-  activity?: string; // For backward compatibility
+  statusMessage?: string;
+  // Optional fields for UI-specific features
+  current_space_id?: string | null;
+  role?: 'admin' | 'member';
 }
 
 // UI-specific announcement format
@@ -79,3 +77,54 @@ export const userStatusColors = {
   viewing: 'hsl(var(--secondary))',     // Secondary color
   default: 'hsl(var(--muted-foreground))' // Muted foreground
 };
+
+// Type utilities for user type consolidation
+
+// Convert database User to UIUser
+export function dbUserToUIUser(user: User): UIUser {
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    status: convertUserStatusToUIStatus(user.status),
+    statusMessage: user.statusMessage,
+    current_space_id: user.current_space_id,
+    role: user.role,
+  };
+}
+
+// Convert UIUser to partial User data (for updates)
+export function uiUserToDbUser(uiUser: UIUser): Partial<User> {
+  return {
+    id: uiUser.id,
+    displayName: uiUser.displayName,
+    avatarUrl: uiUser.avatarUrl,
+    statusMessage: uiUser.statusMessage,
+    current_space_id: uiUser.current_space_id,
+    role: uiUser.role,
+  };
+}
+
+// Convert database UserStatus to UIUserStatus
+function convertUserStatusToUIStatus(status: 'online' | 'away' | 'busy' | 'offline'): UIUserStatus {
+  switch (status) {
+    case 'online': return 'active';
+    case 'away': return 'away';
+    case 'busy': return 'presenting'; // Map busy to presenting for UI
+    case 'offline': return 'viewing'; // Map offline to viewing for UI
+    default: return 'active';
+  }
+}
+
+// Legacy support functions (for backward compatibility during transition)
+export function legacyUserToUIUser(legacyUser: any): UIUser {
+  return {
+    id: legacyUser.id,
+    displayName: legacyUser.displayName || legacyUser.name,
+    avatarUrl: legacyUser.avatarUrl || legacyUser.avatar,
+    status: 'active', // Default status
+    statusMessage: legacyUser.statusMessage || legacyUser.activity,
+    current_space_id: legacyUser.current_space_id,
+    role: legacyUser.role,
+  };
+}

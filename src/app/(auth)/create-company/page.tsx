@@ -57,7 +57,7 @@ export default function CreateCompanyPage() {
       
       // Force reload company data to ensure state is updated
       if (user) {
-        await loadCompanyData(user.uid);
+        await loadCompanyData(user.id);
       }
       
       // Use window.location for a hard navigation instead of router.push

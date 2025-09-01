@@ -6,32 +6,32 @@ import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 import { User } from '@/types/database';
 import { UIUser } from '@/types/ui';
 
-// Example users for demonstration
-const exampleUsers: (User | UIUser)[] = [
+// Example users for demonstration - using Pick from User type for consistency
+const exampleUsers: Pick<User, 'id' | 'displayName' | 'avatarUrl' | 'status'>[] = [
     {
         id: 'user-1',
         displayName: 'John Doe',
         avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
         status: 'online',
-    } as User,
+    },
     {
         id: 'user-2',
         displayName: 'Jane Smith',
         avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
         status: 'away',
-    } as User,
+    },
     {
         id: 'user-3',
         displayName: 'Bob Wilson',
         avatarUrl: 'https://invalid-url-to-test-fallback.com/avatar.jpg', // This will fail and show fallback
         status: 'busy',
-    } as User,
+    },
     {
         id: 'user-4',
         displayName: 'Alice Johnson',
         avatarUrl: undefined, // No avatar URL - will show initials
         status: 'offline',
-    } as User,
+    },
 ];
 
 export function AvatarShowcase() {

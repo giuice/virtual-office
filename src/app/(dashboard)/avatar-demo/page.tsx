@@ -17,37 +17,45 @@ import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 import  AvatarGroup  from '@/components/floor-plan/modern/AvatarGroup';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { UserPresenceData } from '@/types/database';
+import { AvatarUser } from '@/lib/avatar-utils';
 
-// Sample users for demonstration
-const sampleUsers = [
+// Sample users for demonstration - compatible with ModernUserAvatar requirements
+const sampleUsers: (UserPresenceData & AvatarUser)[] = [
   {
     id: '1',
     displayName: 'Alice Johnson',
     status: 'online',
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Alice',
+    current_space_id: null,
   },
   {
     id: '2',
     displayName: 'Bob Smith',
     status: 'away',
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Bob',
+    current_space_id: null,
   },
   {
     id: '3',
     displayName: 'Charlie Davis',
     status: 'busy',
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Charlie',
+    current_space_id: null,
   },
   {
     id: '4',
     displayName: 'Diana Miller',
     status: 'offline',
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Diana',
+    current_space_id: null,
   },
   {
     id: '5',
     displayName: 'Edward Wilson',
     status: 'online',
+    avatarUrl: undefined,
+    current_space_id: null,
     // No avatar URL - will use initials
   },
 ];
@@ -99,7 +107,7 @@ export default function AvatarDemoPage() {
                     <div className="flex flex-col items-center gap-2">
                       <ModernUserAvatar 
                         user={sampleUsers[0]} 
-                        size="xs" 
+                        size="sm" 
                       />
                       <span className="text-xs text-muted-foreground">xs</span>
                     </div>
@@ -321,7 +329,7 @@ export default function AvatarDemoPage() {
                       id: 'demo',
                       displayName: 'Demo User',
                       status: 'online',
-                      avatarUrl: user?.photoURL || '',
+                      avatarUrl: user?.user_metadata?.avatar_url || '',
                     }}
                     onAvatarChange={handleDemoAvatarChange}
                     size="xl"

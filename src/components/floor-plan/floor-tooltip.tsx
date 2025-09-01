@@ -2,7 +2,7 @@
 'use client'
 
 import { User as DBUser } from '@/types/database'
-import { UIUser } from '@/types/ui'
+import { UIUser, dbUserToUIUser } from '@/types/ui'
 import { Space as LocalSpace } from './types'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -14,7 +14,6 @@ import {
 import { Users, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2'
-import { dbUserToUIUser } from '@/utils/user-type-adapters'
 
 // Type for the content prop
 type TooltipContent = {
