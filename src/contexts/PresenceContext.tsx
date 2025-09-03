@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useUserPresence } from '@/hooks/useUserPresence';
+import { useAutoRoomConversation } from '@/hooks/useAutoRoomConversation';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { UserPresenceData } from '@/types/database';
 
@@ -10,6 +11,7 @@ interface PresenceContextType {
   isLoading: boolean;
   error: unknown;
   updateLocation: (spaceId: string | null) => Promise<void>;
+  currentUserSpaceId: string | null;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -28,9 +30,16 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => {
     updateLocation,
   } = useUserPresence(currentUserId);
 
+  // Get current user's space ID for messaging integration
+  const currentUserSpaceId = users?.find(u => u.id === currentUserId)?.currentSpaceId || null;
+
+  // Auto-manage room conversations based on presence
+  useAutoRoomConversation(currentUserSpaceId);
+
   // Log for debugging purposes
   if (process.env.NODE_ENV === 'development') {
     console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set'}`);
+    console.log(`[PresenceContext] Current user space ID: ${currentUserSpaceId || 'not in space'}`);
   }
 
   return (
@@ -41,6 +50,7 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         error,
         updateLocation,
+        currentUserSpaceId,
       }}
     >
       {children}

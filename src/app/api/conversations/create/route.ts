@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 export async function POST(request: NextRequest) {
   let userId = 'unknown';
   let userDatabaseId = 'unknown';
-  let body = {};
+  let body: any = {};
   
   try {
     body = await request.json();

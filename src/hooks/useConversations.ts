@@ -18,7 +18,7 @@ export function useConversations() {
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
   
   // Use the existing real-time conversation hook to handle Supabase subscriptions
-  useConversationRealtime(user?.uid);
+  useConversationRealtime(user?.id);
   
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
@@ -27,8 +27,8 @@ export function useConversations() {
     try {
       setLoadingConversations(true);
       setErrorConversations(null);
-      
-      const result = await messagingApi.getConversations(user.uid); // Use messagingApi.getConversations
+
+      const result = await messagingApi.getConversations(user.id); // Use messagingApi.getConversations
       setConversations(result.conversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -57,10 +57,10 @@ export function useConversations() {
       // Create new room conversation
       const newConversation = await messagingApi.createConversation({ 
         type: ConversationType.ROOM,
-        participants: [user.uid], // Start with just the current user
+        participants: [user.id], // Start with just the current user
         name: roomName,
         roomId,
-        userId: user.uid, // Add the user ID as a separate property
+        userId: user.id, // Add the user ID as a separate property
       });
       
       // Add to conversations list
@@ -79,7 +79,7 @@ export function useConversations() {
       throw new Error('User not authenticated');
     }
     
-    if (user.uid === otherUserId) {
+    if (user.id === otherUserId) {
       throw new Error('Cannot create conversation with yourself');
     }
     
@@ -87,7 +87,7 @@ export function useConversations() {
       // Check if conversation already exists
       const existingConversation = conversations.find(
         c => c.type === ConversationType.DIRECT && 
-             c.participants.includes(user.uid) && 
+             c.participants.includes(user.id) && 
              c.participants.includes(otherUserId) &&
              c.participants.length === 2
       );
@@ -104,8 +104,8 @@ export function useConversations() {
       console.warn("getOrCreateDirectConversation not found in API, using createConversation as placeholder");
       const newConversation = await messagingApi.createConversation({ 
          type: ConversationType.DIRECT,
-         participants: [user.uid, otherUserId],
-         userId: user.uid, // Add the user ID as a separate property
+         participants: [user.id, otherUserId],
+         userId: user.id, // Add the user ID as a separate property
          // Name might be handled differently for direct messages
       });
       
@@ -123,7 +123,7 @@ export function useConversations() {
   const archiveConversation = useCallback(async (conversationId: string) => {
     try {
       // Call the API to archive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, user!.uid, true);
+      await messagingApi.setConversationArchiveStatus(conversationId, user!.id, true);
       // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -149,7 +149,7 @@ export function useConversations() {
   const unarchiveConversation = useCallback(async (conversationId: string) => {
     try {
       // Call the API to unarchive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, user!.uid, false);
+      await messagingApi.setConversationArchiveStatus(conversationId, user!.id, false);
       // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -171,7 +171,7 @@ export function useConversations() {
     
     try {
       // Call the API to mark the conversation as read
-      await messagingApi.markConversationAsRead(conversationId, user.uid);
+      await messagingApi.markConversationAsRead(conversationId, user.id);
       // console.warn("markConversationAsRead API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -179,7 +179,7 @@ export function useConversations() {
         prev.map(conversation => {
           if (conversation.id === conversationId && conversation.unreadCount) {
             const updatedUnreadCount = { ...conversation.unreadCount };
-            delete updatedUnreadCount[user.uid];
+            delete updatedUnreadCount[user.id];
             
             return {
               ...conversation,
@@ -196,8 +196,8 @@ export function useConversations() {
   
   // Calculate total unread count
   const totalUnreadCount = conversations.reduce((count, conversation) => {
-    if (user && conversation.unreadCount && conversation.unreadCount[user.uid]) {
-      return count + conversation.unreadCount[user.uid];
+    if (user && conversation.unreadCount && conversation.unreadCount[user.id]) {
+      return count + conversation.unreadCount[user.id];
     }
     return count;
   }, 0);
@@ -218,12 +218,12 @@ export function useConversations() {
         // Update unread count if not the active conversation
         if (
           (!activeConversation || activeConversation.id !== conversation.id) && 
-          senderId !== user?.uid
+          senderId !== user?.id
         ) {
           if (!conversation.unreadCount) {
             conversation.unreadCount = {};
           }
-          conversation.unreadCount[user?.uid || ''] = (conversation.unreadCount[user?.uid || ''] || 0) + 1;
+          conversation.unreadCount[user?.id || ''] = (conversation.unreadCount[user?.id || ''] || 0) + 1;
         }
         
         // Move conversation to top of list

@@ -23,11 +23,11 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
 
             // Adapt LocalUser structure for StatusAvatar/MessageDialog if needed
             const localUser: LocalUser = {
-              id: 0, // LocalUser expects number ID, use placeholder or refactor components
-              name: user.displayName,
-              avatar: user.avatarUrl || '',
+              id: '0', // LocalUser expects number ID, use placeholder or refactor components
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl || '',
               status: 'active', // LocalUser has different status types, map or use placeholder
-              activity: user.statusMessage || user.status || ''
+              statusMessage: user.statusMessage || user.status || ''
             };
 
             return (

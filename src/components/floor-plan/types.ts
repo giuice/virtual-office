@@ -17,6 +17,7 @@ export interface RoomTemplate {
   defaultWidth: number;
   defaultHeight: number;
   isPublic: boolean;
+  createdBy?: string; // User ID
 }
 
 // We keep a local Space interface for backward compatibility

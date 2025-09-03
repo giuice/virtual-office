@@ -111,7 +111,11 @@ export async function POST(req: NextRequest) {
         quality -= 10;
       }
       // If we still can't get it under 1MB, use the smallest version
-      buffer = processedBuffer || buffer;
+      if (processedBuffer) {
+        buffer = new Uint8Array(processedBuffer);
+      } else if (!(buffer instanceof Uint8Array)) {
+        buffer = new Uint8Array(buffer);
+      }
 
       // Log the file size reduction
       console.log(`Avatar image processed: Original size: ${(arrayBuffer.byteLength / 1024).toFixed(2)} KB, Processed size: ${(buffer.length / 1024).toFixed(2)} KB`);

@@ -18,8 +18,8 @@ export function UserAvatar({ user }: UserAvatarProps) {
   // Convert UIUser to format compatible with EnhancedAvatarV2
   const avatarUser = {
     id: user.id.toString(),
-    displayName: user.name,
-    avatarUrl: user.avatar,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl || undefined,
     status: user.status === 'active' ? 'online' : 'offline'
   };
 
@@ -42,8 +42,8 @@ export function UserAvatar({ user }: UserAvatarProps) {
               showStatus={true}
             />
             <div>
-              <h4 className="font-medium">{user.name}</h4>
-              <p className="text-sm text-gray-500">{user.activity}</p>
+              <h4 className="font-medium">{user.displayName}</h4>
+              <p className="text-sm text-gray-500">{user.statusMessage}</p>
             </div>
           </div>
           <Separator />

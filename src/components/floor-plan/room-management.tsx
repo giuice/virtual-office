@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { usePresence } from '@/contexts/PresenceContext';
 
 export interface RoomManagementProps {
   spaces: Space[]; // Expect global Space[]
@@ -48,6 +49,8 @@ export function RoomManagement({
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   
+  const { usersInSpaces } = usePresence();
+
   // Filter spaces based on type and search query
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
@@ -198,11 +201,11 @@ export function RoomManagement({
                           <span>{space.capacity} capacity</span>
                           <span>•</span>
                           <span>{getRoomStatusLabel(space.status)}</span>
-                          {/* Use userIds.length */}
-                          {space.userIds?.length > 0 && ( 
+                          
+                          {usersInSpaces.get(space.id)?.length || 0 > 0 && ( 
                             <>
                               <span>•</span>
-                              <span>{space.userIds?.length} users</span>
+                              <span>{usersInSpaces.get(space.id)?.length} users</span>
                             </>
                           )}
                         </div>

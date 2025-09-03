@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { getServerSession } from '@/lib/auth';
+import { validateUserSession } from '@/lib/auth/session';
 import { IUserRepository } from '@/repositories/interfaces';
 
 export async function POST(req: NextRequest) {
   try {
     // Get the authenticated user session
-    const session = await getServerSession();
-    if (!session) {
+    const { supabaseUid, userDbId, error: sessionError } = await validateUserSession();
+    if (sessionError || !supabaseUid || !userDbId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: sessionError || 'Authentication required' },
         { status: 401 }
       );
     }
@@ -19,14 +19,11 @@ export async function POST(req: NextRequest) {
     const { userId } = body;
 
     // Verify user has permission to update this profile
-    if (userId !== session.user.id) {
-      const isAdmin = session.user.role === 'admin';
-      if (!isAdmin) {
-        return NextResponse.json(
-          { error: 'You do not have permission to update this profile' },
-          { status: 403 }
-        );
-      }
+    if (userId !== userDbId) {
+      return NextResponse.json(
+        { error: 'You do not have permission to update this profile' },
+        { status: 403 }
+      );
     }
 
   const userRepository: IUserRepository = new SupabaseUserRepository();

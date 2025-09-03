@@ -58,7 +58,7 @@ export interface User {
   role: UserRole;
   lastActive: TimeStampType;
   createdAt: TimeStampType;
-  current_space_id?: string | null; // Reference to Space.id, nullable
+  currentSpaceId?: string | null; // Reference to Space.id, nullable
 }
 
 export interface UserPresenceData {
@@ -66,7 +66,7 @@ export interface UserPresenceData {
   displayName: string;
   avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
-  current_space_id?: string | null;
+  currentSpaceId?: string | null;
   // Added flag to track avatar loading state
   avatarLoading?: boolean;
   // Added flag to track avatar error state

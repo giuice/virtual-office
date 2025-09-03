@@ -2,7 +2,8 @@
 'use client'
 
 import { useState } from 'react'
-import { RoomTemplate, SpaceType } from './types'
+import { SpaceType } from './types'
+import { RoomTemplate } from '@/types/database'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -144,11 +145,11 @@ export function RoomTemplates({
       type: newTemplate.type as SpaceType || 'workspace',
       capacity: newTemplate.capacity || 4,
       features: newTemplate.features || [],
-      description: newTemplate.description,
+      description: newTemplate.description || '',
       defaultWidth: newTemplate.defaultWidth || 200,
       defaultHeight: newTemplate.defaultHeight || 150,
       isPublic: newTemplate.isPublic !== undefined ? newTemplate.isPublic : true,
-      createdBy: 1 // Mock user ID
+      createdBy: '1' // Mock user ID
     };
     
     setTemplates([...templates, template]);
@@ -178,10 +179,11 @@ export function RoomTemplates({
       type: newTemplate.type as SpaceType || selectedTemplate.type,
       capacity: newTemplate.capacity || selectedTemplate.capacity,
       features: newTemplate.features || selectedTemplate.features,
-      description: newTemplate.description,
+      description: newTemplate.description || '',
       defaultWidth: newTemplate.defaultWidth || selectedTemplate.defaultWidth,
       defaultHeight: newTemplate.defaultHeight || selectedTemplate.defaultHeight,
-      isPublic: newTemplate.isPublic !== undefined ? newTemplate.isPublic : selectedTemplate.isPublic
+      isPublic: newTemplate.isPublic !== undefined ? newTemplate.isPublic : selectedTemplate.isPublic,
+      createdBy: selectedTemplate.createdBy
     };
     
     setTemplates(templates.map(t => t.id === selectedTemplate.id ? updatedTemplate : t));
@@ -202,7 +204,7 @@ export function RoomTemplates({
       ...template,
       id: `template-${Date.now()}`,
       name: `${template.name} (Copy)`,
-      createdBy: 1 // Mock user ID
+      createdBy: '1' // Mock user ID
     };
     
     setTemplates([...templates, duplicatedTemplate]);
@@ -216,7 +218,7 @@ export function RoomTemplates({
   };
   
   // Helper function to get room type label
-  const getRoomTypeLabel = (type: SpaceType) => {
+  const getRoomTypeLabel = (type: SpaceType): string => {
     switch (type) {
       case 'workspace': return 'Workspace';
       case 'conference': return 'Conference Room';
@@ -226,8 +228,10 @@ export function RoomTemplates({
       case 'open_space': return 'Open Space';
       case 'lounge': return 'Lounge';
       case 'lab': return 'Lab';
-      default: return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
     }
+    // Exhaustiveness check - will cause compile error if new SpaceType values are added
+    const _exhaustiveCheck: never = type;
+    return _exhaustiveCheck;
   };
   
   return (
@@ -287,7 +291,7 @@ export function RoomTemplates({
         <TabsContent value="my" className="mt-4">
           <ScrollArea className="h-[400px]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.filter(t => t.createdBy === 1).map(template => (
+              {templates.filter(t => t.createdBy === '1').map(template => (
                 <TemplateCard 
                   key={template.id} 
                   template={template} 
@@ -297,7 +301,7 @@ export function RoomTemplates({
                   onDelete={handleDeleteTemplate}
                 />
               ))}
-              {templates.filter(t => t.createdBy === 1).length === 0 && (
+              {templates.filter(t => t.createdBy === '1').length === 0 && (
                 <div className="col-span-full flex flex-col items-center justify-center p-8 text-center">
                   <p className="text-muted-foreground mb-4">You haven't created any templates yet</p>
                   <Button 
@@ -657,7 +661,7 @@ interface TemplateCardProps {
 
 function TemplateCard({ template, onSelect, onEdit, onDuplicate, onDelete }: TemplateCardProps) {
   // Helper function to get room type label
-  const getRoomTypeLabel = (type: SpaceType) => {
+  const getRoomTypeLabel = (type: SpaceType): string => {
     switch (type) {
       case 'workspace': return 'Workspace';
       case 'conference': return 'Conference Room';
@@ -667,8 +671,10 @@ function TemplateCard({ template, onSelect, onEdit, onDuplicate, onDelete }: Tem
       case 'open_space': return 'Open Space';
       case 'lounge': return 'Lounge';
       case 'lab': return 'Lab';
-      default: return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
     }
+    // Exhaustiveness check - will cause compile error if new SpaceType values are added
+    const _exhaustiveCheck: never = type;
+    return _exhaustiveCheck;
   };
   
   // Helper function to get badge variant based on room type

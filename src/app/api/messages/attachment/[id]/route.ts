@@ -10,8 +10,9 @@ import { validateUserSession } from '@/lib/auth/session';
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     // Validate user session
     const { userDbId, error: sessionError } = await validateUserSession();
@@ -20,7 +21,7 @@ export async function DELETE(
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
     
-    const attachmentId = params.id;
+    const attachmentId = id;
     if (!attachmentId) {
       return NextResponse.json({ error: 'Attachment ID is required' }, { status: 400 });
     }

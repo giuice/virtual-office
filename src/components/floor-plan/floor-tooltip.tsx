@@ -104,7 +104,7 @@ export function FloorTooltip({ content, position, children }: FloorTooltipProps)
                   <div key={user.id} className="flex items-center gap-2">
                     <EnhancedAvatarV2 user={user} size="sm" showStatus={true} />
                     <div>
-                      <p className="text-xs font-medium">{user.name}</p>
+                      <p className="text-xs font-medium">{user.displayName}</p>
                       <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
                     </div>
                   </div>
@@ -122,10 +122,10 @@ export function FloorTooltip({ content, position, children }: FloorTooltipProps)
         <div className="flex items-center gap-3">
           <EnhancedAvatarV2 user={user} size="md" showStatus={true} />
           <div>
-            <p className="font-medium">{user.name}</p>
+            <p className="font-medium">{user.displayName}</p>
             <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
-            {user.activity && (
-              <p className="text-xs italic mt-1">{user.activity}</p>
+            {user.statusMessage && (
+              <p className="text-xs italic mt-1">{user.statusMessage}</p>
             )}
           </div>
         </div>

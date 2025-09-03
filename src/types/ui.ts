@@ -88,7 +88,7 @@ export function dbUserToUIUser(user: User): UIUser {
     avatarUrl: user.avatarUrl,
     status: convertUserStatusToUIStatus(user.status),
     statusMessage: user.statusMessage,
-    current_space_id: user.current_space_id,
+    current_space_id: user.currentSpaceId,
     role: user.role,
   };
 }
@@ -98,9 +98,9 @@ export function uiUserToDbUser(uiUser: UIUser): Partial<User> {
   return {
     id: uiUser.id,
     displayName: uiUser.displayName,
-    avatarUrl: uiUser.avatarUrl,
+    avatarUrl: uiUser.avatarUrl || null || undefined,
     statusMessage: uiUser.statusMessage,
-    current_space_id: uiUser.current_space_id,
+    currentSpaceId: uiUser.current_space_id,
     role: uiUser.role,
   };
 }

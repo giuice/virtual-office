@@ -15,7 +15,7 @@ import { floorPlanTokens } from './designTokens';
 interface AvatarGroupProps {
   users: UserPresenceData[];
   max?: number;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' ;
   className?: string;
   onUserClick?: (userId: string) => void;
   showEmpty?: boolean;
@@ -85,10 +85,10 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
                 variant="outline" 
                 className={cn(
                   "ml-2 cursor-default rounded-full", // Increased margin
-                  size === 'xs' && "h-5 text-[10px] px-1.5",
-                  size === 'sm' && "h-6 text-xs px-2",
-                  size === 'md' && "h-8 text-sm px-2",
-                  size === 'lg' && "h-10 text-base px-3",
+                  size === 'sm' && "h-5 text-[10px] px-1.5",
+                  size === 'md' && "h-6 text-xs px-2",
+                  size === 'lg' && "h-8 text-sm px-2",
+                  size === 'xl' && "h-10 text-base px-3",
                 )}
               >
                 +{remainingCount}

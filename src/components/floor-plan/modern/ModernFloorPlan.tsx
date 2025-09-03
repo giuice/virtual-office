@@ -60,7 +60,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     // Primary method: Check if user's current_space_id matches this space
     const currentUser = users?.find(u => u.id === currentUserProfile.id);
     
-    if (currentUser?.current_space_id === space.id) {
+    if (currentUser?.currentSpaceId === space.id) {
       return true;
     }
     
@@ -79,7 +79,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
   
       // Space validation checks
-      if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
+      if (selectedSpace.capacity && (usersInSpaces.get(spaceId)?.length || 0) >= selectedSpace.capacity) {
         setError('This space is at full capacity');
         return;
       }
@@ -90,7 +90,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
   
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
-      if (currentUser && currentUser.current_space_id === spaceId) {
+      if (currentUser && currentUser.currentSpaceId === spaceId) {
         if (process.env.NODE_ENV === 'development') {
           console.log(`User already in space ${spaceId}`);
         }

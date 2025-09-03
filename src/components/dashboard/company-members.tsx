@@ -245,8 +245,8 @@ export function CompanyMembers() {
                   size="md"
                   showStatus={true}
                   status={user.status}
-                  onError={(error, url) => {
-                    console.warn(`Avatar load failed for user ${user.displayName}:`, error.message);
+                  onError={(error) => {
+                    console.warn(`Avatar load failed for user ${user.displayName}:`, error.additionalInfo.message);
                   }}
                 />
                 <div>

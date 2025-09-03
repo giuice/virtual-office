@@ -17,12 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RoomChatIntegration } from './room-chat-integration';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDeleteSpace, useUpdateSpace } from '@/hooks/mutations/useSpaceMutations';
+import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
 import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
+import { usePresence } from '@/contexts/PresenceContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -34,7 +35,7 @@ export function FloorPlan() {
   // Get data from context
   const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
   const router = useRouter(); // Add router for navigation
-
+  const { usersInSpaces, updateLocation, users } = usePresence(); // Presence context for real-time user data
   // State for UI interactions
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
@@ -92,7 +93,7 @@ export function FloorPlan() {
   // Room creation is now handled by the mutation hooks in the RoomDialog component
   // Room updates are now handled by the mutation hooks in the RoomDialog component
   const deleteSpaceMutation = useDeleteSpace();
-  const updateSpaceMutation = useUpdateSpace();
+  // Note: updateSpaceMutation removed - now using presence system via updateLocation()
 
   const { toast } = useToast();
 
@@ -166,89 +167,6 @@ export function FloorPlan() {
     // Users should now be explicitly added to spaces through a dedicated UI action
   };
 
-  // Add a new explicit function for users to join a space
-  const handleJoinSpace = (space: Space) => {
-    if (!space || !space.id || !currentUserProfile?.id) {
-      toast({
-        title: "Error",
-        description: "Cannot join space: Missing data.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Only add the user if they're not already in the space
-    const updatedUserIds = [...(space.userIds || [])];
-    if (!updatedUserIds.includes(currentUserProfile.id)) {
-      updatedUserIds.push(currentUserProfile.id);
-
-      // Update the space with the new userIds using the mutation hook
-      updateSpaceMutation.mutate({
-        id: space.id,
-        updates: { userIds: updatedUserIds }
-      }, {
-        onSuccess: () => {
-          toast({
-            title: "Success",
-            description: `You joined ${space.name}`
-          });
-          setSelectedSpace(prev => prev?.id === space.id ?
-            { ...prev, userIds: updatedUserIds } : prev);
-        },
-        onError: (error: Error) => {
-          toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "Failed to join space",
-            variant: "destructive"
-          });
-        }
-      });
-    } else {
-      toast({
-        description: `You are already in ${space.name}`
-      });
-    }
-  };
-
-  // Handle leaving a space
-  const handleLeaveSpace = (space: Space) => {
-    if (!space || !space.id || !currentUserProfile) {
-      return;
-    }
-
-    // Remove the user from the space's userIds
-    const updatedUserIds = (space.userIds || []).filter(id => id !== currentUserProfile.id);
-
-    updateSpaceMutation.mutate({
-      id: space.id,
-      updates: { userIds: updatedUserIds }
-    }, {
-      onSuccess: () => {
-        toast({
-          title: "Left Space",
-          description: `You have left ${space.name}`
-        });
-
-        // Clear the saved space if it's the one we're leaving
-        if (lastSpaceId === space.id) {
-          clearLastSpace();
-        }
-
-        // If this was the selected space, deselect it
-        if (selectedSpace?.id === space.id) {
-          setSelectedSpace(null);
-          setChatRoom(null);
-        }
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: `Failed to leave space: ${error.message}`,
-          variant: "destructive"
-        });
-      }
-    });
-  };
 
   // Handle opening chat for a room
   const handleOpenChat = (room: Space) => {
@@ -302,7 +220,7 @@ export function FloorPlan() {
                 <Users className="h-4 w-4 text-blue-500" />
                 <span className="text-sm font-medium">Online Users</span>
               </div>
-              <span className="text-2xl font-bold">24</span>
+              <span className="text-2xl font-bold">{users?.length || 0}</span>
             </div>
           </CardContent>
         </Card>
@@ -314,7 +232,7 @@ export function FloorPlan() {
                 <Video className="h-4 w-4 text-green-500" />
                 <span className="text-sm font-medium">Active Meetings</span>
               </div>
-              <span className="text-2xl font-bold">3</span>
+              <span className="text-2xl font-bold">{Array.from(usersInSpaces.values()).filter(spaceUsers => spaceUsers.length > 0).length}</span>
             </div>
           </CardContent>
         </Card>
@@ -326,7 +244,7 @@ export function FloorPlan() {
                 <MessageSquare className="h-4 w-4 text-purple-500" />
                 <span className="text-sm font-medium">Messages</span>
               </div>
-              <span className="text-2xl font-bold">5</span>
+              <span className="text-2xl font-bold">--</span>
             </div>
           </CardContent>
         </Card>

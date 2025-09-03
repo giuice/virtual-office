@@ -17,7 +17,7 @@ import { MessageSquare } from 'lucide-react'; // Removed Send icon
 import { ChatWindow } from '@/components/messaging/ChatWindow'; // Import ChatWindow
 import { useMessaging } from '@/contexts/messaging/MessagingContext'; // Import useMessaging with correct path
 import { useCompany } from '@/contexts/CompanyContext'; // Import useCompany
-import { Message, MessageType, MessageStatus } from '@/types/messaging'; // Import messaging types
+import { MessageType } from '@/types/messaging'; // Import messaging types
 
 interface MessageDialogProps {
   user: User | null; // User being messaged
@@ -25,41 +25,40 @@ interface MessageDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Helper function to generate a consistent conversation ID for DMs
-const generateDMConversationId = (userId1: string, userId2: string): string => {
-  const ids = [userId1, userId2].sort();
-  return `dm-${ids[0]}-${ids[1]}`;
-};
 
 export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) {
   const { currentUserProfile } = useCompany();
-  const { messages: allMessages, sendMessage, loadingMessages } = useMessaging();
-  const [directMessages, setDirectMessages] = useState<Message[]>([]);
+  const { sendMessage, getOrCreateUserConversation, setActiveConversation } = useMessaging();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  // No need for local isLoading state, use loadingMessages from context
 
   useEffect(() => {
-    if (user && currentUserProfile) {
-      // Ensure both IDs are strings before generating the conversation ID
-      const newConversationId = generateDMConversationId(currentUserProfile.id, String(user.id)); 
-      setConversationId(newConversationId);
-      // Filter messages for this specific DM conversation
-      // TODO: Implement more robust filtering/fetching logic
-      setDirectMessages(allMessages.filter(msg => msg.conversationId === newConversationId));
+    if (user && currentUserProfile && open) {
+      // Create or get existing conversation with the target user
+      const initializeConversation = async () => {
+        try {
+          const conversation = await getOrCreateUserConversation(String(user.id));
+          setActiveConversation(conversation);
+          setConversationId(conversation.id);
+        } catch (error) {
+          console.error('Failed to initialize conversation:', error);
+        }
+      };
+      
+      initializeConversation();
     } else {
       setConversationId(null);
-      setDirectMessages([]);
     }
-  }, [user, currentUserProfile, allMessages]);
+  }, [user, currentUserProfile, open, getOrCreateUserConversation, setActiveConversation]);
 
   if (!user || !currentUserProfile || !conversationId) return null;
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = (content: string, replyToId?: string) => {
     if (!content.trim()) return;
     
-    // Use the updated sendMessage API signature
+    // Use the updated sendMessage API signature  
     sendMessage(content, {
-      type: MessageType.TEXT
+      type: MessageType.TEXT,
+      replyToId
     });
   };
 
@@ -71,9 +70,8 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
         {/* Render ChatWindow instead of manual list/input */}
         <ChatWindow
           conversationId={conversationId} // Pass the generated DM conversation ID
-          messages={directMessages}
           onSendMessage={handleSendMessage}
-          isLoading={loadingMessages}
+          title={`Chat with ${user.displayName || user.displayName|| 'User'}`}
           // TODO: Pass user.name or other details to ChatWindow header
         />
       </DialogContent>

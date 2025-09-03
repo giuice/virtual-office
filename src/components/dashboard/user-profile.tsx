@@ -75,8 +75,8 @@ export function UserProfile() {
             size="xl"
             showStatus={true}
             status={currentUserProfile.status}
-            onError={(error, url) => {
-              console.warn(`Avatar load failed for current user:`, error.message);
+            onError={(error) => {
+              console.warn(`Avatar load failed for current user:`, error.additionalInfo.message);
             }}
           />
           

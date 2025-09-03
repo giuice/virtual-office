@@ -138,9 +138,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           {/* Connection status indicator */}
           <div className="flex items-center gap-1">
             {isConnected ? (
-              <Wifi className="h-4 w-4 text-green-500" title="Connected to realtime" />
+              <span title="Connected to realtime" aria-label="Connected to realtime">
+                <Wifi className="h-4 w-4 text-green-500" />
+              </span>
             ) : (
-              <WifiOff className="h-4 w-4 text-gray-400" title="Not connected to realtime" />
+              <span title="Not connected to realtime" aria-label="Not connected to realtime">
+                <WifiOff className="h-4 w-4 text-gray-400" />
+              </span>
             )}
           </div>
         </div>

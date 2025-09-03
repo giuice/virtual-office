@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { messagingApi } from '@/lib/messaging-api';
-import { ConversationType } from '@/types/messaging';
+import { ConversationType, MessageStatus, MessageType } from '@/types/messaging';
 import { Loader2, MessageSquare, Users, Upload, Check, X } from 'lucide-react';
 
 export default function MessagingTestPage() {
@@ -74,8 +74,8 @@ export default function MessagingTestPage() {
         senderId: user.id, // This will be validated server-side
         content,
         replyToId,
-        type: 'text',
-        status: 'sent',
+        type: MessageType.TEXT,
+        status: MessageStatus.SENT,
       });
       addTestMessage('✅ Message sent successfully');
     } catch (error) {
@@ -107,8 +107,8 @@ export default function MessagingTestPage() {
             conversationId: activeConversationId,
             senderId: user!.id,
             content: `Test message sent at ${new Date().toISOString()}`,
-            type: 'text',
-            status: 'sent',
+            type: MessageType.TEXT,
+            status: MessageStatus.SENT,
           });
         }
       },

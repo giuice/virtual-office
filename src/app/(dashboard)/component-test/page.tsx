@@ -18,43 +18,59 @@ import {
   SpaceTypeIndicator,
   CapacityIndicator
 } from '@/components/floor-plan/modern';
+import type { Space } from '@/types/database';
 
-// Sample users for testing avatar groups
+// Sample users for testing avatar groups  
 const sampleUsers = [
   {
     id: '1',
     displayName: 'John Doe',
-    status: 'online',
+    status: 'online' as const,
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=John',
+    currentSpaceId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
-    id: '2',
+    id: '2', 
     displayName: 'Jane Smith',
-    status: 'away',
+    status: 'away' as const,
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Jane',
+    currentSpaceId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: '3',
-    displayName: 'Bob Johnson',
-    status: 'busy',
+    displayName: 'Bob Johnson', 
+    status: 'busy' as const,
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Bob',
+    currentSpaceId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: '4',
     displayName: 'Alice Williams',
-    status: 'offline',
+    status: 'offline' as const,
     avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Alice',
+    currentSpaceId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: '5',
     displayName: 'Sam Taylor',
-    status: 'online',
+    status: 'online' as const,
+    currentSpaceId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
     // No avatar URL - will use initials
   },
 ];
 
 // Sample space for testing space card
-const sampleSpace = {
+const sampleSpace: Space = {
   id: 'space-1',
   companyId: 'company-1',
   name: 'Meeting Room A',
@@ -63,10 +79,13 @@ const sampleSpace = {
   capacity: 8,
   features: ['video', 'whiteboard'],
   position: { x: 100, y: 100, width: 200, height: 200 },
-  userIds: [],
   description: 'A spacious meeting room for team discussions and presentations.',
   accessControl: { isPublic: true },
+  createdBy: 'user-1',
+  isTemplate: false,
+  templateName: undefined,
   createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
 };
 
 export default function ComponentTestPage() {

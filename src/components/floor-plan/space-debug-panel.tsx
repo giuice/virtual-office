@@ -11,9 +11,9 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useCompany } from '@/contexts/CompanyContext';
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { usePresence } from '@/contexts/PresenceContext';
 
 interface SpaceDebugPanelProps {
   spaces: Space[];
@@ -31,6 +31,7 @@ export function SpaceDebugPanel({
   const toggleExpand = (spaceId: string) => {
     setExpandedSpaceId(expandedSpaceId === spaceId ? null : spaceId);
   };
+  const { usersInSpaces } = usePresence();
 
   return (
     <Card className="w-full max-w-lg fixed right-4 top-4 z-50 shadow-lg bg-white/80 backdrop-blur-sm">
@@ -92,7 +93,7 @@ export function SpaceDebugPanel({
                       <div>{space.status}</div>
                       
                       <div className="font-medium">Users:</div>
-                      <div>{space.userIds?.length || 0}</div>
+                      <div>{usersInSpaces.get(space.id)?.length || 0}</div>
                     </div>
                     
                     <pre className="mt-2 p-2 bg-muted rounded-sm text-[10px] overflow-x-auto">

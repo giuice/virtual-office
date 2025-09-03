@@ -27,15 +27,15 @@ export default function RootLayout({
           <QueryProvider>
             <AuthProvider>
               <CompanyProvider>
-                <PresenceProvider>
-                  <MessagingProvider> {/* Wrap with MessagingProvider */}
+                <MessagingProvider> {/* Move MessagingProvider above PresenceProvider */}
+                  <PresenceProvider>
                     <CallingProvider>
                     {children}
                     <CallNotifications />
                     <Toaster richColors closeButton position="top-right" />
                     </CallingProvider>
-                  </MessagingProvider>
-                </PresenceProvider>
+                  </PresenceProvider>
+                </MessagingProvider>
               </CompanyProvider>
             </AuthProvider>
           </QueryProvider>

@@ -77,7 +77,7 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
                 {user.status}
               </p>
             )}
-            {user.current_space_id && (
+            {user.currentSpaceId && (
               <p className="text-xs text-muted-foreground mt-1">
                 In a space
               </p>

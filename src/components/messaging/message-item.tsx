@@ -9,8 +9,9 @@ import {
   MessageType 
 } from '@/types/messaging';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { Avatar } from '@/components/ui/avatar';
-import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -41,9 +42,13 @@ export function MessageItem({
   onReaction
 }: MessageItemProps) {
   const { user } = useAuth();
+  const { users } = usePresence();
   const [showActions, setShowActions] = useState(false);
   
-  const isCurrentUser = message.senderId === user?.uid;
+  // Get sender presence information
+  const senderPresence = users?.find(u => u.id === message.senderId);
+  
+  const isCurrentUser = message.senderId === user?.id;
   const showAvatar = !isCurrentUser;
   
   // Format message timestamp
@@ -208,11 +213,15 @@ export function MessageItem({
       onMouseLeave={() => setShowActions(false)}
     >
       {showAvatar && sender && (
-        <EnhancedAvatarV2
-          user={sender}
+        <InteractiveUserAvatar
+          user={{
+            ...sender,
+            status: senderPresence?.status || 'offline',
+            currentSpaceId: senderPresence?.currentSpaceId || null
+          }}
           size="sm"
           className="mr-2"
-          fallbackName={sender.displayName}
+          showStatus={true}
         />
       )}
       

@@ -43,7 +43,7 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
               size="md"
               showStatus={false}
               onError={(error) => {
-                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}:`, error.message);
+                console.warn(`[UserAvatarPresence] Failed to load avatar for ${user.displayName}:`, error.additionalInfo.message);
               }}
             />
             <span

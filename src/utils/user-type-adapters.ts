@@ -58,10 +58,6 @@ export function dbUserToUIUser(user: User): UIUser {
     status: mapUserStatusToUIStatus(user.status),
     statusMessage: user.statusMessage || '',
     
-    // Legacy support properties
-    name: user.displayName,
-    avatar: user.avatarUrl || '',
-    activity: user.statusMessage || ''
   };
 }
 
@@ -75,11 +71,6 @@ export function presenceDataToUIUser(presenceData: UserPresenceData): UIUser {
     avatarUrl: presenceData.avatarUrl || '',
     status: presenceData.status ? mapUserStatusToUIStatus(presenceData.status) : 'viewing',
     statusMessage: '',
-    
-    // Legacy support properties
-    name: presenceData.displayName,
-    avatar: presenceData.avatarUrl || '',
-    activity: ''
   };
 }
 
@@ -89,9 +80,9 @@ export function presenceDataToUIUser(presenceData: UserPresenceData): UIUser {
  */
 export function uiUserToPartialDbUser(uiUser: UIUser): Partial<User> {
   return {
-    displayName: uiUser.displayName || uiUser.name,
-    avatarUrl: uiUser.avatarUrl || uiUser.avatar,
+    displayName: uiUser.displayName || uiUser.displayName,
+    avatarUrl: uiUser.avatarUrl || uiUser.avatarUrl || null || undefined,
     status: mapUIStatusToUserStatus(uiUser.status),
-    statusMessage: uiUser.statusMessage || uiUser.activity
+    statusMessage: uiUser.statusMessage || uiUser.statusMessage
   };
 }

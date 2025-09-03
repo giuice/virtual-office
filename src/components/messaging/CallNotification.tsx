@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getUserInitials, getAvatarUrl } from '@/lib/avatar-utils';
 import { useCalling } from '@/contexts/CallingContext';
+import { UIUser } from '@/types/ui';
 
 interface CallNotificationProps {
   callId: string;
@@ -121,10 +122,12 @@ export function CallNotification({
   };
 
   // Mock user data - in real implementation, you'd fetch this
-  const mockUser = {
+  const mockUser: UIUser = {
     id: callerId,
     displayName: callerName,
-    avatarUrl: null, // You'd fetch this from user data
+    avatarUrl: null, 
+    status: 'active',
+    statusMessage: ''
   };
 
   const avatarSrc = getAvatarUrl(mockUser);

@@ -33,7 +33,7 @@ function mapToCamelCase(data: UserRow): User {
     role: data.role as UserRole,
     lastActive: data.last_active, // Assuming TimeStampType compatibility
     createdAt: data.created_at,   // Assuming TimeStampType compatibility
-    current_space_id: data.current_space_id // Added for user location tracking
+    currentSpaceId: data.current_space_id // Added for user location tracking
   };
 }
 

@@ -325,7 +325,7 @@ function fixSupabaseStorageUrl(url: string): string {
  * 3. Legacy avatar field (backward compatibility)
  * 4. Generate default avatar with initials (lowest priority)
  */
-export function getAvatarUrl(user: User | UIUser | AvatarUser | null | undefined): string {
+export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefined): string {
   const startTime = performance.now();
   
   // Handle null or undefined user

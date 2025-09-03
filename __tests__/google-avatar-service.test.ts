@@ -509,7 +509,7 @@ describe('GoogleAvatarService', () => {
             const unchangedAvatarUrl = mockUser.avatarUrl;
 
             vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser);
-            vi.mocked(avatarUtils.extractGoogleAvatarUrl).mockReturnValue(unchangedAvatarUrl);
+            vi.mocked(avatarUtils.extractGoogleAvatarUrl).mockReturnValue(unchangedAvatarUrl || null);
 
             // Act
             const result = await service.syncGoogleAvatar(userId, mockGoogleOAuthUser);
@@ -631,7 +631,7 @@ describe('GoogleAvatarService', () => {
             const updatedUser = { ...userWithGoogleAvatar, avatarUrl: null };
 
             vi.mocked(mockUserRepository.findById).mockResolvedValue(userWithGoogleAvatar);
-            vi.mocked(mockUserRepository.update).mockResolvedValue(updatedUser);
+            vi.mocked(mockUserRepository.update).mockResolvedValue(updatedUser.avatarUrl);
             vi.mocked(service.isValidGoogleAvatarUrl).mockReturnValue(true);
 
             // Act

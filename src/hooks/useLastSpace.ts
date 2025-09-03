@@ -66,7 +66,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
     // Only proceed if we have a user, spaces are loaded, and we have a stored space ID
     if (!currentUser || !spaces.length || !lastSpaceId) {
       // If there's a user but no lastSpaceId, ensure their location is null if it isn't already
-      if (currentUser && currentUser.current_space_id !== null) {
+      if (currentUser && currentUser.currentSpaceId !== null) {
          // This might be too aggressive, consider if needed.
          // updateUserLocation(currentUser.id, null); 
       }
@@ -79,7 +79,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
     // If the space exists, attempt to set the user's location to it
     if (spaceToRejoin) {
       // Check if user's current_space_id already matches
-      if (currentUser.current_space_id !== spaceToRejoin.id) {
+      if (currentUser.currentSpaceId !== spaceToRejoin.id) {
         console.log(`[useLastSpace] Attempting to rejoin user ${currentUser.id} to space ${spaceToRejoin.id} (${spaceToRejoin.name})`);
         updateUserLocation(currentUser.id, spaceToRejoin.id, spaceToRejoin.name);
       } else {
@@ -89,12 +89,12 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
       // If the space no longer exists, clear the stored space ID and ensure user location is null
       console.log(`[useLastSpace] Last space ${lastSpaceId} not found. Clearing stored ID.`);
       setLastSpaceId(null);
-      if (currentUser.current_space_id !== null) {
+      if (currentUser.currentSpaceId !== null) {
         updateUserLocation(currentUser.id, null);
       }
     }
   // Depend on currentUser.id and currentUser.current_space_id for accurate checks
-  }, [currentUser?.id, currentUser?.current_space_id, spaces, lastSpaceId, updateUserLocation, setLastSpaceId]); 
+  }, [currentUser?.id, currentUser?.currentSpaceId, spaces, lastSpaceId, updateUserLocation, setLastSpaceId]); 
 
   /**
    * Save the current space ID when a user enters a space

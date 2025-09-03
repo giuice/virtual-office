@@ -1,6 +1,6 @@
 // src/components/floor-plan/DomFloorPlan.tsx
 import React, { useState, useEffect } from 'react';
-import { Space } from '@/types/database';
+import { Space, UserPresenceData } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import SpaceElement from './SpaceElement';
@@ -38,9 +38,9 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
       // For reference, also log legacy userIds arrays (being phased out)
       spaces.forEach(space => {
         // Check if userIds is actually an array (important!)
-        const userIdsArray = Array.isArray(space.userIds) ? space.userIds : [];
-        console.log(`Space "${space.name}" (${space.id}) legacy userIds array has ${userIdsArray.length} entries:`, 
-          userIdsArray.length > 0 ? userIdsArray : 'NONE');
+        const userIdsArray =  usersInSpaces.get(space.id); //Array.isArray(space.userIds) ? space.userIds : [];
+        console.log(`Space "${space.name}" (${space.id}) legacy userIds array has ${userIdsArray?.length || 0} entries:`, 
+          userIdsArray?.length || 0 > 0 ? userIdsArray : 'NONE');
       });
     }
   }, [spaces, users, usersInSpaces]);
@@ -60,21 +60,21 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
           {
             spaceId: space.id,
             spaceName: space.name,
-            userCurrentSpaceId: currentUser?.current_space_id,
-            match: currentUser?.current_space_id === space.id,
-            inLegacyArray: space.userIds && Array.isArray(space.userIds) ? 
-              space.userIds.includes(currentUserProfile.id) : false
+            userCurrentSpaceId: currentUser?.currentSpaceId,
+            match: currentUser?.currentSpaceId === space.id,
+           
           });
       }
     }
     
-    if (currentUser?.current_space_id === space.id) {
+    if (currentUser?.currentSpaceId === space.id) {
       return true;
     }
     
     // Fallback method: Check legacy space.userIds (being phased out)
-    if (space.userIds && Array.isArray(space.userIds)) {
-      return space.userIds.includes(currentUserProfile.id);
+    if (usersInSpaces.get(space.id)?.length || 0 > 0) {
+      const user = users?.find(u => u.id === currentUserProfile.id);
+      return user?.currentSpaceId === space.id;
     }
     
     return false;
@@ -93,7 +93,7 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
   
       // Add space validation checks
       if (selectedSpace) {
-        if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length >= selectedSpace.capacity) {
+        if (selectedSpace.capacity && usersInSpaces.get(spaceId)?.length || 0 >= selectedSpace.capacity) {
           throw new Error('[FloorPlan] Space is at capacity');
         }
   
@@ -105,7 +105,7 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
       }
   
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
-      if (currentUser && currentUser.current_space_id === spaceId) {
+      if (currentUser && currentUser.currentSpaceId === spaceId) {
         if (process.env.NODE_ENV === 'development') {
           console.log(`User already in space ${spaceId}`);
         }
@@ -147,16 +147,9 @@ export default function DomFloorPlan(props: DomFloorPlanProps) {
       <div className="grid grid-cols-3 gap-4 auto-rows-min">
         {spaces.map((space, index) => {
           // Ensure space.userIds is always treated as an array
-          let spaceUserIds: string[] = [];
-          
-          if (space.userIds === null || space.userIds === undefined) {
-            spaceUserIds = [];
-          } else if (Array.isArray(space.userIds)) {
-            spaceUserIds = space.userIds;
-          } else {
-            console.error(`Space ${space.name} has invalid userIds format:`, space.userIds);
-            spaceUserIds = [];
-          }
+          let spaceUserIds: UserPresenceData[] = [];
+          let usersInThisSpace = usersInSpaces.get(space.id) || [];
+          spaceUserIds = usersInThisSpace;
           
           if (process.env.NODE_ENV === 'development') {
             console.log(`Rendering space ${space.name} (${space.id}) with user IDs:`, 

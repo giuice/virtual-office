@@ -48,7 +48,7 @@ export function useUserPresence(currentUserId?: string) {
           displayName: user.displayName || 'Unknown User',
           avatarUrl: user.avatarUrl || '',
           status: user.status || 'offline',
-          current_space_id: user.current_space_id || null,
+          currentSpaceId: user.current_space_id || null,
           avatarLoading: false,
           avatarError: false
         };
@@ -87,13 +87,13 @@ export function useUserPresence(currentUserId?: string) {
     debouncedUpdateLocation.cancel();
     
     // If user is already in this space, log and skip unless it's null (leaving all spaces)
-    if (currentUser && currentUser.current_space_id === spaceId && spaceId !== null) {
+    if (currentUser && currentUser.currentSpaceId === spaceId && spaceId !== null) {
       console.log('[Presence] User already in this space, skipping update');
       return;
     }
     
     // Log the attempted change
-    console.log(`[Presence] Requesting location change: ${currentUser?.current_space_id || 'null'} -> ${spaceId || 'null'}`);
+    console.log(`[Presence] Requesting location change: ${currentUser?.currentSpaceId || 'null'} -> ${spaceId || 'null'}`);
     
     // Update immediately (apply debounce internally)
     await debouncedUpdateLocation(spaceId);
@@ -103,7 +103,7 @@ export function useUserPresence(currentUserId?: string) {
     if (currentUser) {
       queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
         if (!old) return old;
-        return old.map(u => u.id === currentUserId ? {...u, current_space_id: spaceId} : u);
+        return old.map(u => u.id === currentUserId ? {...u, currentSpaceId: spaceId} : u);
       });
     }
   };
@@ -173,7 +173,7 @@ export function useUserPresence(currentUserId?: string) {
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
     (users ?? []).forEach((user) => {
-      const key = user.current_space_id ?? null;
+      const key = user.currentSpaceId ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(user);
     });
@@ -193,7 +193,7 @@ export function useUserPresence(currentUserId?: string) {
             const existing = old.find((u) => u.id === newUser.id);
             if (
               existing &&
-              existing.current_space_id === newUser.current_space_id &&
+              existing.currentSpaceId === newUser.currentSpaceId &&
               existing.status === newUser.status
             ) {
               // No meaningful change, skip update
