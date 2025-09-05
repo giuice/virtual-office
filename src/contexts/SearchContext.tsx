@@ -2,11 +2,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef } from 'react';
-import { User } from '@/components/floor-plan/types';
+import { UserPresenceData as User } from '@/types/database';
+import { usePresence } from './PresenceContext'; 
 
 interface SearchContextType {
   searchQuery: string;
-  searchResults: User[];
+  searchResults: User[] | undefined;
   isSearching: boolean;
   setSearchQuery: (query: string) => void;
   setSearchResults: (results: User[]) => void;
@@ -15,69 +16,11 @@ interface SearchContextType {
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
-// Mock users data - in a real app, this would come from a database
-const mockUsers: User[] = [
-  {
-    id: 1,
-    name: 'John Developer',
-    avatar: '/api/placeholder/32/32',
-    status: 'active',
-    activity: 'Coding in Development Team'
-  },
-  {
-    id: 2,
-    name: 'Sarah Coder',
-    avatar: '/api/placeholder/32/32',
-    status: 'active',
-    activity: 'Code review in Development Team'
-  },
-  {
-    id: 3,
-    name: 'Mike Engineer',
-    avatar: '/api/placeholder/32/32',
-    status: 'away',
-    activity: 'In meeting in Break Room'
-  },
-  {
-    id: 4,
-    name: 'Alice Manager',
-    avatar: '/api/placeholder/32/32',
-    status: 'presenting',
-    activity: 'Sprint review in Main Conference Room'
-  },
-  {
-    id: 5,
-    name: 'Bob Analyst',
-    avatar: '/api/placeholder/32/32',
-    status: 'viewing',
-    activity: 'Taking notes in Main Conference Room'
-  },
-  {
-    id: 6,
-    name: 'Carol Designer',
-    avatar: '/api/placeholder/32/32',
-    status: 'away',
-    activity: 'Coffee break in Break Room'
-  },
-  {
-    id: 7,
-    name: 'Dave Marketing',
-    avatar: '/api/placeholder/32/32',
-    status: 'active',
-    activity: 'Campaign planning in Marketing Team'
-  },
-  {
-    id: 8,
-    name: 'Ellen Content',
-    avatar: '/api/placeholder/32/32',
-    status: 'away',
-    activity: 'Meeting with client in Marketing Team'
-  }
-];
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
+  const { users } = usePresence(); // To get real-time user presence data
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<User[] | undefined>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Function to handle search
@@ -97,9 +40,9 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         return;
       }
   
-      const filteredUsers = mockUsers.filter(user => 
-        user.name.toLowerCase().includes(trimmedQuery.toLowerCase()) ||
-        user.activity.toLowerCase().includes(trimmedQuery.toLowerCase())
+      const filteredUsers = users?.filter(user => 
+        user.displayName.toLowerCase().includes(trimmedQuery.toLowerCase()) ||
+        user.status?.toLowerCase().includes(trimmedQuery.toLowerCase())
       );
   
       setSearchResults(filteredUsers);

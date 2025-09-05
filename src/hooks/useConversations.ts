@@ -45,10 +45,18 @@ export function useConversations() {
     }
     
     try {
-      // Check if conversation already exists
-      const existingConversation = conversations.find(
-        c => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
-      );
+      // Use a functional state update to get current conversations and check if one exists
+      let existingConversation: Conversation | null = null;
+      
+      setConversations(prev => {
+        // Check if conversation already exists
+        existingConversation = prev.find(
+          c => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
+        ) || null;
+        
+        // Return previous state without modification for now
+        return prev;
+      });
       
       if (existingConversation) {
         return existingConversation;
@@ -63,15 +71,26 @@ export function useConversations() {
         userId: user.id, // Add the user ID as a separate property
       });
       
-      // Add to conversations list
-      setConversations(prev => [newConversation, ...prev]);
+      // Add to conversations list using functional update
+      setConversations(prev => {
+        // Double-check that the conversation doesn't exist (in case of race condition)
+        const stillExists = prev.find(
+          c => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
+        );
+        
+        if (stillExists) {
+          return prev; // Don't add duplicate
+        }
+        
+        return [newConversation, ...prev];
+      });
       
       return newConversation;
     } catch (error) {
       console.error('Error creating room conversation:', error);
       throw error;
     }
-  }, [user, conversations]);
+  }, [user]); // Removed conversations dependency
   
   // Function to get or create a direct conversation with another user
   const getOrCreateUserConversation = useCallback(async (otherUserId: string): Promise<Conversation> => {
@@ -84,13 +103,21 @@ export function useConversations() {
     }
     
     try {
-      // Check if conversation already exists
-      const existingConversation = conversations.find(
-        c => c.type === ConversationType.DIRECT && 
-             c.participants.includes(user.id) && 
-             c.participants.includes(otherUserId) &&
-             c.participants.length === 2
-      );
+      // Use functional state update to check for existing conversation
+      let existingConversation: Conversation | null = null;
+      
+      setConversations(prev => {
+        // Check if conversation already exists
+        existingConversation = prev.find(
+          c => c.type === ConversationType.DIRECT && 
+               c.participants.includes(user.id) && 
+               c.participants.includes(otherUserId) &&
+               c.participants.length === 2
+        ) || null;
+        
+        // Return previous state without modification
+        return prev;
+      });
       
       if (existingConversation) {
         return existingConversation;
@@ -109,15 +136,29 @@ export function useConversations() {
          // Name might be handled differently for direct messages
       });
       
-      // Add to conversations list
-      setConversations(prev => [newConversation, ...prev]);
+      // Add to conversations list using functional update
+      setConversations(prev => {
+        // Double-check for race conditions
+        const stillExists = prev.find(
+          c => c.type === ConversationType.DIRECT && 
+               c.participants.includes(user.id) && 
+               c.participants.includes(otherUserId) &&
+               c.participants.length === 2
+        );
+        
+        if (stillExists) {
+          return prev; // Don't add duplicate
+        }
+        
+        return [newConversation, ...prev];
+      });
       
       return newConversation;
     } catch (error) {
       console.error('Error creating direct conversation:', error);
       throw error;
     }
-  }, [user, conversations]);
+  }, [user]); // Removed conversations dependency
   
   // Function to archive a conversation
   const archiveConversation = useCallback(async (conversationId: string) => {
