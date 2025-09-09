@@ -1,21 +1,21 @@
 // src/app/api/messages/status/route.ts
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { validateUserSession } from '@/lib/auth/session';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { MessageStatus } from '@/types/messaging';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function PATCH(request: Request) {
   try {
     // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
-    const { supabaseUid: userId, userDbId, error: sessionError } = await validateUserSession();
+  const { userDbId, error: sessionError } = await validateUserSession();
 
-    if (sessionError || !userId || !userDbId) {
+    if (sessionError || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
 
-    const { messageRepository } = await getSupabaseRepositories();
+  const serverSupabase = await createSupabaseServerClient();
+  const { messageRepository } = await getSupabaseRepositories(serverSupabase);
     const { messageId, status } = await request.json();
 
     // Basic validation
@@ -44,7 +44,7 @@ export async function PATCH(request: Request) {
     // For system/sender actions, user must be the sender
     if (status === MessageStatus.DELIVERED || status === MessageStatus.READ) {
       // Check if user is a participant in the conversation
-      const supabase = createRouteHandlerClient({ cookies });
+      const supabase = await createSupabaseServerClient();
       const { data, error } = await supabase
         .from('conversations')
         .select('participants')
@@ -55,9 +55,8 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
       }
       
-      // Check if the user is a participant in the conversation
-      // participants field likely contains Firebase UIDs, so compare with userId (not userDbId)
-      if (!data.participants.includes(userId)) {
+      // Check if the user is a participant in the conversation (DB ID)
+      if (!data.participants.includes(userDbId)) {
         return NextResponse.json({ error: 'Unauthorized: Not a participant in this conversation' }, { status: 403 });
       }
     } else if (status === MessageStatus.SENT || status === MessageStatus.FAILED) {

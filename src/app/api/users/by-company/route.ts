@@ -1,13 +1,14 @@
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { NextResponse } from 'next/server';
-
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
 

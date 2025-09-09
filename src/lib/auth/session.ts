@@ -1,6 +1,5 @@
 // src/lib/auth/session.ts
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 type SessionResult = {
   supabaseUid?: string; // Supabase Auth UID
@@ -16,9 +15,9 @@ type SessionResult = {
  */
 export async function validateUserSession(): Promise<SessionResult> {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseServerClient();
     
-    const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
       console.error('Session error:', error.message);

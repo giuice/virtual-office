@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { validateUserSession } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 /**
  * GET handler to retrieve all attachments for a specific message
@@ -11,14 +12,17 @@ import { validateUserSession } from '@/lib/auth/session';
 export async function GET(request: NextRequest) {
   try {
     // Validate user session
-    const { supabaseUid: userId, error: sessionError } = await validateUserSession();
+  const session = await validateUserSession();
+  const userId = (session as any).supabaseUid || (session as any).userId;
+  const sessionError = (session as any).error;
     
     if (sessionError || !userId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
     
-    // Get repositories
-    const { messageRepository } = await getSupabaseRepositories();
+  // Get repositories with request-scoped client
+  const serverSupabase = await createSupabaseServerClient();
+  const { messageRepository } = await getSupabaseRepositories(serverSupabase);
     
     // Get messageId from query params
     const searchParams = request.nextUrl.searchParams;

@@ -123,7 +123,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         <AvatarGroup
           users={usersInSpace}
           max={compact ? 4 : 6}
-          size={compact ? 'xs' : 'sm'}
+          size={'sm'}
           onUserClick={onUserClick}
           emptyText="Empty"
           className="mt-2"

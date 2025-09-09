@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { User } from '@/types/database';
-
-const userRepository: IUserRepository = new SupabaseUserRepository();
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    // Create server client and repository instance
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    
     const users: User[] = await userRepository.findAll();
 
     return NextResponse.json({

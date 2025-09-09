@@ -3,7 +3,7 @@ import { debugLogger } from '@/utils/debug-logger';
 import { avatarCacheManager } from '@/lib/avatar-utils';
 import { GoogleAvatarService, GoogleOAuthUser, GoogleAvatarStorageResult } from './google-avatar-service';
 import { IUserRepository } from '@/repositories/interfaces';
-import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import type { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
 import { User } from '@/types/database';
 
 // Interface for avatar sync result
@@ -42,7 +42,7 @@ export class AvatarSyncService {
     userRepository?: IUserRepository,
     googleAvatarService?: GoogleAvatarService
   ) {
-    this.userRepository = userRepository || new SupabaseUserRepository();
+    this.userRepository = userRepository || ({} as unknown as IUserRepository);
     this.googleAvatarService = googleAvatarService || new GoogleAvatarService(this.userRepository);
   }
 

@@ -1,7 +1,7 @@
 // src/repositories/implementations/supabase/SupabaseUserRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
-import { User, UserRole, UserStatus } from '@/types/database'; // Import necessary types
+import { User, UserRole, UserStatus } from '@/types/database';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase
 type UserRow = {
@@ -45,10 +45,15 @@ function mapArrayToCamelCase(dataArray: UserRow[] | null): User[] {
 
 
 export class SupabaseUserRepository implements IUserRepository {
-  private TABLE_NAME = 'users'; // Ensure this matches your Supabase table name
+  private TABLE_NAME = 'users';
+  private supabase: SupabaseClient;
+
+  constructor(supabaseClient: SupabaseClient) {
+    this.supabase = supabaseClient;
+  }
 
   async findById(id: string): Promise<User | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('id', id)
@@ -63,10 +68,10 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async findBySupabaseUid(supabaseUid: string): Promise<User | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
-      .eq('supabase_uid', supabaseUid) 
+      .eq('supabase_uid', supabaseUid)
       .single(); // .single() returns one object or null
 
     if (error && error.code !== 'PGRST116') { // PGRST116: Row not found
@@ -78,7 +83,7 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('email', email)
@@ -94,7 +99,7 @@ export class SupabaseUserRepository implements IUserRepository {
 
   async findByCompany(companyId: string): Promise<User[]> {
     // Ensure your 'users' table has a 'company_id' column
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('company_id', companyId);
@@ -119,11 +124,11 @@ export class SupabaseUserRepository implements IUserRepository {
         status_message: userData.statusMessage,
         preferences: userData.preferences || {}, // Ensure object exists
         role: userData.role,
-        supabase_uid: userData.supabase_uid, // Assuming type has supabase_uid
+        supabase_uid: userData.supabase_uid, // Assuming type has this.supabase_uid
         // last_active and created_at handled by Supabase defaults
      };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -171,12 +176,12 @@ export class SupabaseUserRepository implements IUserRepository {
      if (displayName !== undefined) dbUpdates.display_name = displayName;
      if (avatarUrl !== undefined) dbUpdates.avatar_url = avatarUrl;
      if (statusMessage !== undefined) dbUpdates.status_message = statusMessage;
-     if (supabase_uid !== undefined) dbUpdates.supabase_uid = supabase_uid; // Allow updating supabase_uid if needed
+     if (supabase_uid !== undefined) dbUpdates.supabase_uid = supabase_uid; // Allow updating this.supabase_uid if needed
      // Update last_active automatically on any update
      dbUpdates.last_active = new Date().toISOString();
 
 
-     const { data, error } = await supabase
+     const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -194,7 +199,7 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async deleteById(id: string): Promise<boolean> {
-    const { error, count } = await supabase
+    const { error, count } = await this.supabase
       .from(this.TABLE_NAME)
       .delete()
       .eq('id', id);
@@ -217,7 +222,7 @@ export class SupabaseUserRepository implements IUserRepository {
 
     // 1. Call RPC 'remove_user_from_all_spaces'
     try {
-        const { error: removeError } = await supabase
+        const { error: removeError } = await this.supabase
           .rpc('remove_user_from_all_spaces', { user_id_param: userId });
         if (removeError) {
           console.error('[updateLocation] Error from RPC remove_user_from_all_spaces:', removeError);
@@ -236,7 +241,7 @@ export class SupabaseUserRepository implements IUserRepository {
     // 4. Update user's current_space_id
     try {
         console.log(`[updateLocation] Updating user ${userId} current_space_id to ${spaceId}`);
-        const { data, error } = await supabase
+        const { data, error } = await this.supabase
           .from(this.TABLE_NAME)
           .update({
             current_space_id: spaceId,
@@ -267,7 +272,7 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async updateCurrentSpace(userId: string, spaceId: string | null): Promise<User | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .update({ current_space_id: spaceId })
       .eq('id', userId)
@@ -283,7 +288,7 @@ export class SupabaseUserRepository implements IUserRepository {
 
   async findAll(): Promise<User[]> {
     console.log('[UserRepository] Fetching all users with avatar data');
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*');
 

@@ -55,7 +55,7 @@ export function dbUserToUIUser(user: User): UIUser {
     id: user.id,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl || '',
-    status: mapUserStatusToUIStatus(user.status),
+    status: user.status,
     statusMessage: user.statusMessage || '',
     
   };
@@ -69,7 +69,7 @@ export function presenceDataToUIUser(presenceData: UserPresenceData): UIUser {
     id: presenceData.id,
     displayName: presenceData.displayName,
     avatarUrl: presenceData.avatarUrl || '',
-    status: presenceData.status ? mapUserStatusToUIStatus(presenceData.status) : 'viewing',
+    status: presenceData.status || 'offline',
     statusMessage: '',
   };
 }
@@ -82,7 +82,7 @@ export function uiUserToPartialDbUser(uiUser: UIUser): Partial<User> {
   return {
     displayName: uiUser.displayName || uiUser.displayName,
     avatarUrl: uiUser.avatarUrl || uiUser.avatarUrl || null || undefined,
-    status: mapUIStatusToUserStatus(uiUser.status),
+    status: uiUser.status || undefined,
     statusMessage: uiUser.statusMessage || uiUser.statusMessage
   };
 }

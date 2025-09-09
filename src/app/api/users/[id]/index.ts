@@ -3,13 +3,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { IUserRepository } from '@/repositories/interfaces'; // Import interface
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
 import { User } from '@/types/database'; // Import User type
-
-// Instantiate the repository
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const supabase = await createSupabaseServerClient();
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {

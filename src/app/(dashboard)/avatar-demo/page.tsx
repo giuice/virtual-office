@@ -162,7 +162,8 @@ export default function AvatarDemoPage() {
                         user={{
                           id: 'f1',
                           displayName: 'With Avatar',
-                          avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=WithAvatar'
+                          avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=WithAvatar',
+                          currentSpaceId: null
                         }} 
                         size="md" 
                       />
@@ -174,6 +175,7 @@ export default function AvatarDemoPage() {
                         user={{
                           id: 'f2',
                           displayName: 'No Avatar',
+                          currentSpaceId: null
                         }} 
                         size="md" 
                       />
@@ -185,7 +187,8 @@ export default function AvatarDemoPage() {
                         user={{
                           id: 'f3',
                           displayName: 'John Doe',
-                          avatarUrl: 'https://invalid-url-that-will-fail.com/avatar.png'
+                          avatarUrl: 'https://invalid-url-that-will-fail.com/avatar.png',
+                          currentSpaceId: null
                         }} 
                         size="md" 
                       />

@@ -14,11 +14,11 @@ export function SearchBar() {
         className="border p-2 rounded-md w-full"
       />
       {isSearching && <p className="mt-2 text-sm text-gray-600">Searching...</p>}
-      {searchResults.length > 0 && (
+      {(!!searchResults && searchResults?.length > 0) && (
         <ul className="mt-2 border rounded-md">
           {searchResults.map(user => (
             <li key={user.id} className="p-2 border-b last:border-0">
-              {user.name} - <span className="text-xs text-gray-500">{user.activity}</span>
+              {user.displayName} - <span className="text-xs text-gray-500">{user.statusMessage}</span>
             </li>
           ))}
         </ul>

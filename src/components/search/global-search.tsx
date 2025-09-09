@@ -8,9 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { userStatusColors, User } from '@/components/floor-plan/types';
+import { userStatusColors, UIUser } from '@/types/ui';
 import { useSearch } from '@/contexts/SearchContext';
 import { MessageDialog } from '@/components/floor-plan/message-dialog';
+import { presenceDataToUIUser } from '@/utils/user-type-adapters';
 
 export function GlobalSearch() {
   const { 
@@ -22,7 +23,7 @@ export function GlobalSearch() {
   } = useSearch();
   
   const [showResults, setShowResults] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UIUser | null>(null);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -65,27 +66,30 @@ export function GlobalSearch() {
     setShowResults(false);
   };
 
-  const handleMessageUser = (user: User) => {
+  const handleMessageUser = (user: UIUser) => {
     setSelectedUser(user);
     setIsMessageDialogOpen(true);
     setShowResults(false);
   };
 
   // Helper function to get status label
-  const getStatusLabel = (status: User['status']) => {
+  const getStatusLabel = (status: UIUser['status'] | 'offline') => {
     switch (status) {
-      case 'active': return 'Active';
+      case 'online': return 'Active';
       case 'away': return 'Away';
-      case 'presenting': return 'Presenting';
-      case 'viewing': return 'In a meeting';
+      case 'busy': return 'Presenting';
       default: return 'Offline';
     }
   };
 
   // Helper function to get status color
-  const getStatusColor = (status: User['status']) => {
-    return userStatusColors[status] || userStatusColors.default;
+  const getStatusColor = (status: UIUser['status'] | undefined) => {
+    if(!status)
+      return userStatusColors.offline;
+    return userStatusColors[status];
   };
+  
+  const results = searchResults ?? [];
   
   return (
     <div className="relative" ref={searchContainerRef}>
@@ -120,16 +124,16 @@ export function GlobalSearch() {
               <span className="text-sm font-medium">Search Results</span>
               {isSearching && (
                 <span className="text-xs text-muted-foreground">
-                  {searchResults.length} {searchResults.length === 1 ? 'user' : 'users'} found
+                  {results.length} {results.length === 1 ? 'user' : 'users'} found
                 </span>
               )}
             </div>
           </div>
           
-          {searchResults.length > 0 ? (
+          {results.length > 0 ? (
             <ScrollArea className="max-h-80">
               <div className="p-2">
-                {searchResults.map(user => (
+                {results.map(user => (
                   <div 
                     key={user.id}
                     className="flex items-center justify-between p-2 hover:bg-background rounded-md cursor-pointer group"
@@ -137,28 +141,28 @@ export function GlobalSearch() {
                     <div className="flex items-center space-x-3">
                       <div className="relative">
                         <Avatar>
-                          <AvatarImage src={user.avatar} alt={user.name} />
-                          <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                          <AvatarImage src={user.avatarUrl} alt={user.displayName} />
+                          <AvatarFallback>{user.displayName.slice(0, 2)}</AvatarFallback>
                         </Avatar>
                         <div 
                           className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white"
-                          style={{ backgroundColor: getStatusColor(user.status) }}
+                          style={{ backgroundColor: getStatusColor(user.status || 'offline') }}
                         />
                       </div>
                       <div>
-                        <div className="font-medium">{user.name}</div>
+                        <div className="font-medium">{user.displayName}</div>
                         <div className="text-xs text-gray-500 flex items-center">
                           <Badge 
                             variant="outline" 
                             className="mr-2 h-5 text-xs px-1"
                             style={{ 
-                              borderColor: getStatusColor(user.status),
-                              color: getStatusColor(user.status)
+                              borderColor: getStatusColor(user.status || 'offline'),
+                              color: getStatusColor(user.status || 'offline')
                             }}
                           >
-                            {getStatusLabel(user.status)}
+                            {getStatusLabel(user.status ?? 'offline')}
                           </Badge>
-                          {user.activity}
+                          {user.statusMessage}
                         </div>
                       </div>
                     </div>
@@ -166,7 +170,7 @@ export function GlobalSearch() {
                       variant="ghost" 
                       size="icon" 
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleMessageUser(user)}
+                      onClick={() => handleMessageUser(presenceDataToUIUser(user))}
                     >
                       <MessageSquare className="h-4 w-4" />
                     </Button>

@@ -1,14 +1,19 @@
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { User } from '@/types/database';
 import { NextResponse } from 'next/server';
 
 // Instantiate the repository
-const userRepository: IUserRepository = new SupabaseUserRepository();
+let userRepository: IUserRepository | null = null;
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  if (!userRepository) {
+    const supabase = await createSupabaseServerClient();
+    userRepository = new SupabaseUserRepository(supabase);
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

@@ -38,7 +38,6 @@ function isValidGoogleAvatarUrl(url: string): boolean {
 }
 
 
-const userRepository: IUserRepository = new SupabaseUserRepository();
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +45,8 @@ export async function POST(request: Request) {
   try {
     // Get Supabase client using the server helper
     const supabase = await createSupabaseServerClient(); // Use the async helper
+
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
 
     // First verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -128,7 +129,8 @@ export async function POST(request: Request) {
       companyId: userData.companyId,
       role: userData.role || 'member',
       preferences: {},
-      avatarUrl: userData.googleAvatarUrl || undefined // Store Google avatar URL if provided
+      avatarUrl: userData.googleAvatarUrl || undefined, // Store Google avatar URL if provided
+      currentSpaceId: null
     });
 
     console.log('Created new user profile with Google avatar:', {

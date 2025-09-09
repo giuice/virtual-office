@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Get the database user record using Supabase UID
-    const userRepository: IUserRepository = new SupabaseUserRepository();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     
     const userRecord = await userRepository.findBySupabaseUid(user.id);
     if (!userRecord) {

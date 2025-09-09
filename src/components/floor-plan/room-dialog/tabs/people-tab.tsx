@@ -26,7 +26,7 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
               id: '0', // LocalUser expects number ID, use placeholder or refactor components
               displayName: user.displayName,
               avatarUrl: user.avatarUrl || '',
-              status: 'active', // LocalUser has different status types, map or use placeholder
+              status: 'online', // LocalUser has different status types, map or use placeholder
               statusMessage: user.statusMessage || user.status || ''
             };
 

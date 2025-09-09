@@ -22,9 +22,9 @@ export default function ComponentsTestPage() {
   };
   
   const sampleUsers : UserPresenceData[] = [
-    { id: 'user-1', displayName: 'John Doe', status: 'online' },
-    { id: 'user-2', displayName: 'Jane Smith', status: 'away' },
-    { id: 'user-3', displayName: 'Bob Johnson', status: 'busy' },
+    { id: 'user-1', displayName: 'John Doe', status: 'online', currentSpaceId: null },
+    { id: 'user-2', displayName: 'Jane Smith', status: 'away', currentSpaceId: null },
+    { id: 'user-3', displayName: 'Bob Johnson', status: 'busy', currentSpaceId: null },
   ];
   
   return (

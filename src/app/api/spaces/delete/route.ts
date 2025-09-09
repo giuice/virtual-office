@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 // TODO: Implement proper authentication
 const getUserIdFromRequest = (): string | null => {
@@ -33,7 +34,8 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+  const supabase = await createSupabaseServerClient();
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
 
   try {
     // Authorization check

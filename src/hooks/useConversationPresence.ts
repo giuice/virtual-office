@@ -17,6 +17,7 @@ export function useConversationPresence(conversationId: string | null) {
     if (!conversationId || !user) return;
 
     const channel = supabase.channel(`conversation:${conversationId}`);
+    const userDisplayName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || user.email?.split('@')[0] || 'User';
     
     if (isTyping) {
       channel.send({
@@ -24,7 +25,7 @@ export function useConversationPresence(conversationId: string | null) {
         event: 'typing',
         payload: { 
           userId: user.id, 
-          userDisplayName: user.displayName,
+          userDisplayName,
           isTyping: true 
         }
       });
@@ -34,7 +35,7 @@ export function useConversationPresence(conversationId: string | null) {
         event: 'typing',
         payload: { 
           userId: user.id, 
-          userDisplayName: user.displayName,
+          userDisplayName,
           isTyping: false 
         }
       });
@@ -100,10 +101,11 @@ export function useConversationPresence(conversationId: string | null) {
         console.log(`[useConversationPresence] Subscription status: ${status}`);
         
         if (status === 'SUBSCRIBED') {
+          const userDisplayName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || user.email?.split('@')[0] || 'User';
           // Track presence in this conversation
           await channel.track({
             userId: user.id,
-            userDisplayName: user.displayName,
+            userDisplayName,
             joinedAt: new Date().toISOString()
           });
         }

@@ -19,9 +19,9 @@ interface UserHoverCardProps {
 export function UserHoverCard({ user }: UserHoverCardProps) {
   const getStatusIcon = () => {
     switch (user.status) {
-      case 'active':
+      case 'online':
         return <Mic className="h-3 w-3 mr-1 text-success" />;
-      case 'presenting':
+      case 'busy':
         return <Monitor className="h-3 w-3 mr-1 text-primary" />;
       case 'away':
         return user.statusMessage?.toLowerCase().includes('break') 

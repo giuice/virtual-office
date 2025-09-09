@@ -1,68 +1,116 @@
-<!------------------------------------------------------------------------------------
-   Add Rules to this file or a short description and have Kiro refine them for you:   
--------------------------------------------------------------------------------------> 
-- Follow TypeScript best practices and strict type safety when developing with Next.js
-  - Enable strict mode in tsconfig.json
-  - Use proper type annotations for props, state, and function parameters
-  - Leverage Next.js TypeScript features like GetServerSideProps, GetStaticProps with proper typing
-  - Prefer interfaces over types for object definitions
-  - Use generic types where appropriate to maintain type safety
+# Virtual Office — Reference (Tech, Rules, Structure)
 
-- Maintain code modularity by keeping files under 500 lines
-  - Break down large components into smaller, focused components
-  - Extract custom hooks when logic becomes complex
-  - Separate business logic into utility functions or services
-  - Use composition patterns to avoid monolithic components
+## Product Context
+Virtual Office is a digital workspace with floor plans, rooms, presence, messaging, and company management. Built with Next.js 15.3.0, React 19.1.0, Supabase, and TypeScript.
 
-- Implement componentization strategy for files exceeding 500 lines
-  - Split large components into logical sub-components
-  - Create reusable UI components in a shared components directory
-  - Extract form logic into separate form components
-  - Move data fetching logic to custom hooks or API utilities
-  - Consider using compound component patterns for complex UI elements
+## Immutable Rules
+- Do not guess. Verify. If unknown, say “I don’t know.”
+- Do not assume code behavior. Ask for or provide tests.
+- Prefer edits to existing code over new files.
+- Run the Anti-Duplication Protocol before proposing changes.
 
-- Always verify if functionality already exists before implementing new features
-  - Check existing components, hooks, and utilities before creating duplicates
-  - Search the codebase for similar patterns or implementations
-  - Review shared component libraries and utility functions
-  - Consult team documentation or component catalogs
-  - Use existing APIs and services rather than creating new ones
-  - Extend or modify existing functionality when appropriate instead of rebuilding
-  - Document new functionality to prevent future duplication
+## Architecture Snapshot (single source)
+- Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
+- Runtime: React 19.1.0 / React DOM 19.1.0
+- Lang: TypeScript 5, strict mode
+- Data: Supabase Postgres + Realtime, RLS enabled
+- Auth: Supabase Auth with SSR (@supabase/ssr v0.6.1)
+- UI: TailwindCSS 4.1.3, shadcn/ui, Radix
+- State: TanStack Query v5 + React Context
+- Tests: Vitest 3, Playwright, Testing Library
 
------
+## Supabase & RLS (critical)
+- Never use the browser Supabase client in API routes.
+- Use `src/lib/supabase/server-client.ts` in server code and API routes.
+- Use `src/lib/supabase/browser-client.ts` only in Client Components.
+- In API routes call `createSupabaseServerClient()` and pass that instance to repositories.
+- Reason: `auth.uid()` requires server context; otherwise RLS fails.
 
-## Development Guidelines
+## Type Registry & Change Control
+- Canonical types live in `src/types/`. Examples: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`.
+- **Do not create new types** if a semantic equivalent exists. Extend existing ones.
+- Allowed user roles: `type UserRole = 'admin' | 'member'`. Do not add roles.
+- To change a type, edit the existing file and include a brief “Change Note” in the PR description:
+  - Why the existing type was insufficient
+  - What fields changed
+  - Impacted modules
 
-### Development Philosophy
+## Anti-Duplication Protocol (execute before coding)
+1. Search the codebase for existing components/hooks/types that match the intent.
+2. If found, reuse or extend. Do not create a new file.
+3. If extending, specify the exact file and exported name you will modify.
+4. Output must include:
+   - **Paths touched** (exact)
+   - **Exports used** (exact names)
+   - **Reasoning** (“reuse/extend” and why)
+   - **Deprecations** if replacing prior duplicates
+5. Creating new files is allowed only when no suitable target exists.
 
-  - Write clean, maintainable, and scalable code
-  - Follow SOLID principles
-  - Prefer functional and declarative programming patterns over imperative
-  - Emphasize type safety and static analysis
-  - Practice component-driven development
+## Code Rules
+- Strict TypeScript. Provide explicit types for props, state, params, and returns.
+- Prefer interfaces for object shapes; `type` for unions and function signatures.
+- Keep files under ~500 lines. Split with cohesive subcomponents or hooks.
+- Business logic in utilities/services. UI in components. Data access via repositories.
+- Use composition over monoliths. Extract hooks for complex effects or data flows.
+- Verify if functionality exists before implementing. Reuse shared libs and APIs.
 
------
+## Naming Conventions
+- PascalCase: exported React components and their filenames.
+- kebab-case: directories and non-component filenames.
+- camelCase: variables, functions, methods, hooks.
+- Hooks filenames: `use-*.ts`.
+- UPPER_SNAKE_CASE: env vars and global constants.
+- Prefix patterns: `handle*` for handlers; `is/has/can` for booleans; `use*` for hooks.
+- Prefer full words; allowed abbrev: `err`, `req`, `res`, `props`, `ref`.
 
-### Naming Conventions
+## Repository & Data Access
+- Repository pattern in `src/repositories/`. Keep interfaces and implementations separate.
+- In API routes, construct repositories with the **server** Supabase client instance.
+- Query hooks in `src/hooks/queries/`. Mutation hooks in `src/hooks/mutations/`. Realtime in `src/hooks/realtime/`.
 
-#### General Rules
+## Features — Status (concise)
+- Auth: Implemented, pending verification. `src/contexts/AuthContext.tsx`, `src/lib/auth/`
+- Company Mgmt: Partial. `src/contexts/CompanyContext.tsx`, `src/repositories/`
+- Dashboard: Partial. `src/app/(dashboard)/dashboard/`
+- Messaging: Partial realtime integration. `src/components/messaging/`, `src/hooks/realtime/`
+- Presence: Implemented, verify. `src/contexts/PresenceContext.tsx`, `src/hooks/useUserPresence.ts`
+- Invitations: Strong architecture. Acceptance flow needs restoration. `src/components/invitation/`, `src/app/admin/invitations/`
+- Floor Plan: Base structure. `src/components/floor-plan/`
 
-  - **PascalCase for**: Components, Type definitions, Interfaces
-  - **kebab-case for**: Directory names (e.g., `components/auth-wizard`), File names (e.g., `user-profile.tsx`)
-  - **camelCase for**: Variables, Functions, Methods, Hooks, Properties, Props
-  - **UPPERCASE for**: Environment variables, Constants, Global configurations
+## Avatars — Canonical & Deprecations
+- Canonical display: `EnhancedAvatarV2`
+- Canonical upload: `UploadableAvatar`
+- All other avatar components are **deprecated**. Replace calls with the canonical components as you touch files.
 
-#### Specific Naming Patterns
+## Workflows (concise)
+- Auth & Onboarding: Register → Email/Google → Profile → Company. `src/app/(auth)/`
+- Dashboard: Login → Dashboard → Quick links. `src/app/(dashboard)/dashboard/`
+- Messaging: Join room → Send → Realtime updates → Presence.
+- Invitations (admin): Create → Send → Accept (restore flow).
 
-  - Prefix event handlers with `handle`: `handleClick`, `handleSubmit`
-  - Prefix boolean variables with verbs: `isLoading`, `hasError`, `canSubmit`
-  - Prefix custom hooks with `use`: `useAuth`, `useForm`
-  - Use complete words over abbreviations except for:
-      - `err` (error)
-      - `req` (request)
-      - `res` (response)
-      - `props` (properties)
-      - `ref` (reference)
+## Project Structure (scoped)
+- `src/app/`: App Router routes and layouts  
+- `src/components/`: UI by feature (auth, dashboard, floor-plan, invitation, messaging, profile, ui)  
+- `src/contexts/`: global state (Auth, Company, Presence)  
+- `src/hooks/`: queries, mutations, realtime, shared hooks  
+- `src/lib/`: auth, services, supabase, uploads, utilities  
+- `src/providers/`: app-level providers  
+- `src/repositories/`: interfaces, implementations, factory  
+- `src/types/`: **canonical types**  
+- `migrations/`, `middleware.ts`, `__tests__/`
 
------
+**New files must live in the existing feature folders. Do not add new top-level directories.**
+
+## Build & Lint
+- Dev: `npm run dev`, Build: `npm run build`, Start: `npm run start`
+- Lint: `npm run lint`
+- Find errors: `npm run type-check`
+
+## Response Format (required)
+When proposing changes, output only:
+1. **Duplication Check:** summary of what you reused or extended.
+2. **Patch Plan:** list of files to touch with exact paths.
+3. **Type Usage:** existing types and exports referenced.
+4. **Diffs or code blocks** limited to changed sections only.
+5. **Deprecations:** if you remove or replace a duplicate, list it.
+

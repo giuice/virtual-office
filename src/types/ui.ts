@@ -1,5 +1,5 @@
 // src/types/ui.ts
-import { SpaceType, UIUserStatus, User } from './database';
+import { SpaceType, UIUserStatus, User, UserStatus } from './database';
 
 
 
@@ -12,7 +12,7 @@ export interface UIUser {
   id: string;
   displayName: string;
   avatarUrl?: string | null; // Match database User nullability
-  status: UIUserStatus;
+  status: UserStatus;
   statusMessage?: string;
   // Optional fields for UI-specific features
   current_space_id?: string | null;
@@ -71,11 +71,11 @@ export const spaceColors = {
 
 // Theme-aware user status colors
 export const userStatusColors = {
-  presenting: 'hsl(var(--primary))',    // Primary color
-  active: 'hsl(var(--success))',        // Success/green
+  viewing: 'hsl(var(--primary))',    // Primary color
+  online: 'hsl(var(--success))',        // Success/green
   away: 'hsl(var(--warning))',          // Warning/amber
-  viewing: 'hsl(var(--secondary))',     // Secondary color
-  default: 'hsl(var(--muted-foreground))' // Muted foreground
+  busy: 'hsl(var(--secondary))',     // Secondary color
+  offline: 'hsl(var(--muted-foreground))' // Muted foreground
 };
 
 // Type utilities for user type consolidation
@@ -86,7 +86,7 @@ export function dbUserToUIUser(user: User): UIUser {
     id: user.id,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
-    status: convertUserStatusToUIStatus(user.status),
+    status: user.status,
     statusMessage: user.statusMessage,
     current_space_id: user.currentSpaceId,
     role: user.role,
@@ -122,7 +122,7 @@ export function legacyUserToUIUser(legacyUser: any): UIUser {
     id: legacyUser.id,
     displayName: legacyUser.displayName || legacyUser.name,
     avatarUrl: legacyUser.avatarUrl || legacyUser.avatar,
-    status: 'active', // Default status
+    status: 'online', // Default status
     statusMessage: legacyUser.statusMessage || legacyUser.activity,
     current_space_id: legacyUser.current_space_id,
     role: legacyUser.role,

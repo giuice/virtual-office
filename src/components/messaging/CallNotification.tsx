@@ -126,7 +126,7 @@ export function CallNotification({
     id: callerId,
     displayName: callerName,
     avatarUrl: null, 
-    status: 'active',
+    status: 'online',
     statusMessage: ''
   };
 

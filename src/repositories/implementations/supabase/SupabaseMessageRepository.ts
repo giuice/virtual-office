@@ -1,5 +1,4 @@
 // src/repositories/implementations/supabase/SupabaseMessageRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
 import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus } from '@/types/messaging';
 import { PaginationOptions } from '@/types/common'; // Assuming common types exist
@@ -82,8 +81,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
   private ATTACHMENT_TABLE_NAME = 'message_attachments'; // Assuming separate table
   private supabaseClient: SupabaseClient;
 
-  constructor(supabaseClient?: SupabaseClient) {
-    this.supabaseClient = supabaseClient || supabase;
+  constructor(supabaseClient: SupabaseClient) {
+    this.supabaseClient = supabaseClient;
   }
 
   async findById(id: string): Promise<Message | null> {

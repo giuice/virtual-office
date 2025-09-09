@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Space } from '@/types/database';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase/SupabaseSpaceRepository'; // Assuming Supabase implementation
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 // TODO: Replace with proper dependency injection or service locator pattern
 // For now, we instantiate it directly. Consider moving instantiation
 // to a central place or using a context if needed elsewhere.
-const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(createSupabaseBrowserClient());
 
 /**
  * Fetches all spaces for a given company.

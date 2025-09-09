@@ -40,7 +40,8 @@ const mockUser: User = {
   preferences: {},
   role: 'member',
   lastActive: '2024-01-01T00:00:00Z',
-  createdAt: '2024-01-01T00:00:00Z'
+  createdAt: '2024-01-01T00:00:00Z',
+  currentSpaceId: null
 };
 
 const mockGoogleOAuthUser: GoogleOAuthUser = {

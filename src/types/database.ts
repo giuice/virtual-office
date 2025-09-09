@@ -4,7 +4,7 @@
 export type UserRole = 'admin' | 'member';
 
 // User status types
-export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
+export type UserStatus = 'online' | 'away' | 'busy' | 'offline' ;
 
 // UI-specific user status (different from database status)
 export type UIUserStatus = 'active' | 'away' | 'presenting' | 'viewing';
@@ -58,7 +58,7 @@ export interface User {
   role: UserRole;
   lastActive: TimeStampType;
   createdAt: TimeStampType;
-  currentSpaceId?: string | null; // Reference to Space.id, nullable
+  currentSpaceId: string | null; // Reference to Space.id, nullable
 }
 
 export interface UserPresenceData {
@@ -66,7 +66,8 @@ export interface UserPresenceData {
   displayName: string;
   avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
-  currentSpaceId?: string | null;
+  statusMessage?: string;
+  currentSpaceId: string | null;
   // Added flag to track avatar loading state
   avatarLoading?: boolean;
   // Added flag to track avatar error state

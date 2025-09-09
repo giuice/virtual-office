@@ -1,0 +1,207 @@
+# Messaging ID Unification + Avatar Menu — Junior Dev Plan
+
+Owner: Platform
+Status: In progress — hooks migrated to DB ID
+Scope: Messaging (hooks, APIs, repos), Floor-plan avatar interactions, Realtime/UI wiring
+
+## Goals
+- Fix identity mismatches by standardizing on Database User ID (`users.id`) across messaging domain (participants, `sender_id`, `user_id`).
+- Ensure Realtime updates are reflected in the UI (React Query vs local state alignment).
+- Restore “Send Message” interaction on floor-plan avatars using existing canonical components.
+- Keep Supabase UID (`auth.users.id`) at authentication boundaries only; map to DB ID server-side for RLS.
+
+## Canonical Identity Decision
+- Canonical domain ID: Database User ID (`users.id`).
+- Supabase UID usage: Auth only and RLS mapping via `users.supabase_uid`.
+- Naming convention: `userDbId` for DB UUID, `supabaseUid` for auth UID.
+
+## What You’ll Change (High-Level)
+1) Hooks to use DB IDs:
+   - `src/hooks/realtime/useConversationRealtime.ts`
+   - `src/hooks/useConversations.ts`
+2) API routes to validate DB IDs and use server Supabase client:
+   - `src/app/api/messages/typing/route.ts`
+   - `src/app/api/messages/status/route.ts`
+   - `src/app/api/messages/upload/route.ts`
+3) Realtime/UI alignment for messages:
+   - `src/hooks/useMessages.ts` (consume React Query OR have realtime write into rendered state)
+   - `src/hooks/realtime/useMessageRealtime.ts` (verify cache keys used by UI)
+4) Floor-plan avatar interactions:
+   - Integrate `InteractiveUserAvatar` or menu wrapper where `ModernUserAvatar` is rendered.
+5) Repositories remain DB-ID centric (verify):
+   - `src/repositories/*` (no functional change if already DB IDs; just confirm)
+6) RLS presence policy correction (migration):
+   - Ensure policies map `auth.uid()` → `users.supabase_uid`, not `users.id` direct.
+
+## File-by-File Checklist (Exact Paths + Expected Edits)
+
+### 1) useConversationRealtime (DB ID)
+File: `src/hooks/realtime/useConversationRealtime.ts`
+- Current: Hook receives `userId?: string` (coming from `useAuth().user?.id`, a Supabase UID) and does `participants.includes(userId)`.
+- Change: Pass the DB ID instead. Source DB ID from caller (see `useConversations.ts`). No functional logic changes beyond comparing DB IDs.
+- Acceptance: Conversation list invalidates/updates when any participant (by DB ID) receives INSERT/UPDATE/DELETE events.
+
+### 2) useConversations (DB ID everywhere)
+File: `src/hooks/useConversations.ts`
+- Current:
+  - Calls `useConversationRealtime(user?.id)` (Supabase UID).
+  - Uses `user.id` in `participants` arrays and comparisons.
+- Change:
+  - Retrieve DB ID from `CompanyContext.currentUserProfile?.id`.
+  - Pass DB ID into `useConversationRealtime` and use it for `participants` and comparisons.
+  - When creating conversations: `participants: [currentUserDbId, otherUserDbId]`.
+- Acceptance: Direct and room conversations include DB IDs; no mixed-ID comparisons remain.
+
+### 3) messages/typing API (DB ID + server-client)
+File: `src/app/api/messages/typing/route.ts`
+- Current:
+  - Uses `validateUserSession()` but compares `conversation.participants.includes(userId)` (Supabase UID) and writes `typing_indicators.user_id` with Supabase UID.
+  - Uses `createRouteHandlerClient` (browser helper) in API route.
+- Change:
+  - Compare with `userDbId` and write `typing_indicators.user_id = userDbId`.
+  - Use `createSupabaseServerClient()` (SSR server client) per repo rules.
+- Acceptance: Non-participants (by DB ID) rejected; typing indicator rows written with DB ID.
+
+### 4) messages/status API (participant validation with DB ID)
+File: `src/app/api/messages/status/route.ts`
+- Current: For READ/DELIVERED compares participants with Supabase UID; sender checks use DB ID already.
+- Change: Compare conversation participants with `userDbId` instead of Supabase UID. Use server client consistently where needed.
+- Acceptance: Only participants (DB ID) can mark messages delivered/read; sender DB ID remains for SENT/FAILED checks.
+
+### 5) messages/upload API (DB ID validation)
+File: `src/app/api/messages/upload/route.ts`
+- Current: Validates `conversation.participants.includes(userId)` (Supabase UID).
+- Change: Validate with `userDbId`. Continue storage logic unchanged.
+- Acceptance: Only participants by DB ID can upload; behavior unchanged otherwise.
+
+### 6) Realtime/UI alignment for messages
+Files:
+- `src/hooks/realtime/useMessageRealtime.ts`
+- `src/hooks/useMessages.ts`
+- Current: Realtime writes to React Query cache key `['messages', conversationId]` but UI hook renders local state, so realtime updates don’t show.
+- Options (pick one and apply consistently):
+  A) Render from React Query (preferred): Update `useMessages` to use `useInfiniteQuery` keyed by `['messages', conversationId]` and let the realtime hook mutate that cache.
+  B) Keep local state: Update `useMessageRealtime` to call an injected setter from `useMessages` (avoid duplicate caches).
+- Acceptance: When a new message arrives via Realtime, it appears in the active chat without manual refresh.
+
+### 7) Floor-plan avatar interaction menu
+Files:
+- `src/components/floor-plan/modern/ModernUserAvatar.tsx` (render site)
+- Integration points where floor plan lists/users are rendered.
+- Change: Wrap avatar with the existing `InteractiveUserAvatar` or render `UserInteractionMenu` on click.
+  - Reuse canonical components: `src/components/messaging/InteractiveUserAvatar.tsx` and `UserInteractionMenu.tsx`.
+  - Ensure the click/trigger surfaces are accessible and don’t break tooltips.
+- Acceptance: Clicking another user shows a menu with “Send Message” (opens/creates conversation) and other actions.
+
+### 8) Repositories verification (DB IDs)
+Files: `src/repositories/*`
+- Action: Confirm interfaces and implementations accept and store DB IDs for participants/senders. Keep `findBySupabaseUid()` only as boundary helper.
+- Acceptance: No repository APIs require Supabase UID for domain relations.
+
+### 9) Presence RLS correction (migration)
+Files: `src/migrations/*` and new migration file
+- Action: Ensure RLS policies use `auth.uid()` mapped via `users.supabase_uid`; do not compare `users.id = auth.uid()`.
+- Deliver: Add a new migration that fixes the presence/messaging-related policies if any mismatch remains.
+- Acceptance: Policies compile; tests confirm authorized access with correct mapping.
+
+## Coding Notes
+- Server code and API routes: use `createSupabaseServerClient()` from `src/lib/supabase/server-client.ts` (never the browser client). SSR cookie adapter updated to `getAll`/`setAll` per `@supabase/ssr`.
+- `validateUserSession()` now uses the SSR server client; it returns `{ supabaseUid, userDbId }` and should be the sole source for identity in API routes.
+- Get current IDs in APIs: use `validateUserSession()` to obtain `{ supabaseUid, userDbId }`.
+- Types: Reuse `src/types/messaging.ts` and `src/types/database.ts`. Do not invent parallel types.
+- Naming: Use `userDbId` and `supabaseUid` in code; avoid ambiguous `userId`.
+
+## Step-by-Step Implementation Order (Suggested)
+1) Decide canonical ID (already done here: DB ID).
+2) Hooks: `useConversations` and `useConversationRealtime` to DB ID.
+3) APIs: fix `typing`, `status`, `upload` to DB ID + server client.
+4) Realtime/UI: align `useMessages` with `useMessageRealtime` cache.
+5) Avatar menu: integrate `InteractiveUserAvatar` on floor plan.
+6) Repos audit: confirm DB ID usage.
+7) Migration: presence RLS fix if needed.
+8) Tests: unit + Playwright, then manual verification.
+
+## Quick Status Summary (2025-09-08)
+- Done:
+  - Hooks migrated to DB ID: `useConversations` now uses `CompanyContext.currentUserProfile.id`; `useConversationRealtime` treats `userId` as DB ID and invalidates `['conversations', userDbId]` and `['conversation', id]` on INSERT/UPDATE/DELETE.
+  - Cache keys standardized to DB ID. No Supabase UID usage remains in these hooks.
+  - Type-check on modified files passed; repositories already DB-ID centric.
+  - Supabase SSR client aligned with latest API: `src/lib/supabase/server-client.ts` now uses `cookies.getAll/setAll`.
+  - `validateUserSession()` migrated to use the SSR server client (no `createRouteHandlerClient`), keeps return `{ supabaseUid, userDbId }`.
+  - API routes updated to DB ID + server client:
+    - Typing: `src/app/api/messages/typing/route.ts` validates participants via `userDbId` and writes `typing_indicators.user_id = userDbId` using SSR client.
+    - Status: `src/app/api/messages/status/route.ts` validates participants via `userDbId` and uses SSR client for conversation checks.
+- Next:
+  - Realtime/UI: align `useMessages` with React Query (use `useInfiniteQuery`) so realtime updates render immediately.
+  - Align `useMessages` with React Query (use `useInfiniteQuery`) so realtime updates render immediately.
+  - Integrate `InteractiveUserAvatar` / `UserInteractionMenu` at floor-plan avatar call sites.
+  - Run tests; only if needed, add RLS migration to enforce `auth.uid()` → `users.supabase_uid` mapping.
+
+## Pending Work
+- API routes migrated: typing, status, and upload now validate with `userDbId` and use the server Supabase client.
+- Realtime/UI mismatch: move `useMessages` to `useInfiniteQuery` keyed by `['messages', conversationId]`.
+- Components ready: integrate `InteractiveUserAvatar` and `UserInteractionMenu` at `ModernUserAvatar` sites.
+- RLS mapping appears correct; add migration only if issues surface in tests.
+
+## Acceptance Criteria
+- Direct and room conversations store and compare DB IDs only.
+- Sending a message in a space is received by other users in that space.
+- Realtime message appears in the UI without refresh.
+- Floor-plan avatar click shows user interaction menu; “Send Message” opens/creates a DM.
+- API routes reject non-participants based on DB IDs and operate with server client.
+- All tests pass: unit, integration, E2E.
+
+## Testing Guide
+Commands:
+```bash
+npm run type-check
+npm run lint
+npm run test
+npm run test:e2e  # if configured, otherwise use Playwright UI
+```
+
+Unit/Integration (Vitest):
+- Add/adjust tests to assert DB ID usage in `participants`, `senderId`, and API validation.
+- Verify `useConversationRealtime` updates caches when conversations change.
+- Verify `useMessages` renders from React Query or correctly receives realtime pushes.
+
+Playwright (E2E):
+- Scenario 1: User A and User B in same space — A sends a space message; B sees it live.
+- Scenario 2: A clicks B’s avatar on floor plan → “Send Message” → DM opens; both can exchange messages live.
+- Scenario 3: Unauthorized user cannot send typing indicators or upload attachments to a conversation they’re not in.
+
+Manual Checks:
+- Inspect network calls to ensure API routes are hit and return 2xx.
+- Verify Supabase Realtime subscriptions connect and receive payloads.
+
+## Rollback Plan
+- Changes are mostly client and API logic; keep commits small and feature-scoped.
+- If migration alters RLS, deploy in a separate step with verification. Keep a revert migration ready.
+
+## Time Estimates (per junior dev)
+- Hooks (useConversations/useConversationRealtime): 0.5 day
+- APIs (typing/status/upload): 0.5–1 day
+- Realtime/UI alignment: 0.5 day
+- Avatar menu integration: 0.5 day
+- Repos audit + small fixes: 0.5 day
+- Tests + stabilization: 0.5–1 day
+
+## Gotchas
+- Don’t use browser Supabase client in API routes; use server client.
+- Ensure presence/messaging RLS compares via `users.supabase_uid` mapping.
+- Keep cache keys consistent between realtime and UI.
+- Avoid mixing Supabase UID and DB ID in the same array.
+
+## References
+- Architecture snapshot and rules: `./.github/copilot-instructions.md`
+- Supabase server client: `src/lib/supabase/server-client.ts`
+- Auth session mapping: `src/lib/auth/session.ts`
+- Canonical avatar components: `EnhancedAvatarV2`, `UploadableAvatar`
+- Messaging components: `InteractiveUserAvatar`, `UserInteractionMenu`
+
+# [LESSONS LEARNED]
+- Centralize identity: Use Database User ID end-to-end in the domain; restrict Supabase UID to auth/RLS boundaries via a single mapping helper (`validateUserSession`).
+- Single source of truth for lists: Drive UI from React Query caches that realtime updates; avoid parallel local state for the same dataset.
+- API route hygiene: Never use browser clients in server routes; always use the SSR Supabase client to satisfy RLS and session context.
+- Consistent cache keys: Align hooks and realtime on shared keys (e.g., `['conversations', userDbId]`, `['messages', conversationId]`) to ensure invalidations work predictably.
+- Incremental refactors: Start with hooks (client identity), then APIs (server validation), then realtime/UI wiring; this isolates risk and keeps behavior verifiable.

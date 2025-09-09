@@ -1,16 +1,14 @@
 // src/app/api/messages/typing/route.ts
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { validateUserSession } from '@/lib/auth/session';
-import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(request: Request) {
   try {
     // Use the validateUserSession helper to handle Firebase UID vs Database UUID mismatch
-    const { supabaseUid: userId, error: sessionError } = await validateUserSession();
+  const { userDbId, error: sessionError } = await validateUserSession();
     
-    if (sessionError || !userId) {
+    if (sessionError || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
     
@@ -21,8 +19,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields: conversationId, isTyping (boolean)' }, { status: 400 });
     }
     
-    // Create Supabase client with context
-    const supabase = createRouteHandlerClient({ cookies });
+  // Create Supabase server client (SSR)
+  const supabase = await createSupabaseServerClient();
     
     // Check if user has access to the conversation
     const { data: conversation, error: convError } = await supabase
@@ -36,13 +34,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
     
-    // Verify user is a participant in the conversation
-    // participants field likely contains Firebase UIDs, so compare with userId
-    if (!conversation.participants.includes(userId)) {
+    // Verify user is a participant in the conversation (DB IDs)
+    if (!conversation.participants.includes(userDbId)) {
       return NextResponse.json({ error: 'Not authorized to send typing indicators in this conversation' }, { status: 403 });
     }
     
-    console.log(`API: User ${userId} is ${isTyping ? 'typing' : 'stopped typing'} in conversation ${conversationId}`);
+  console.log(`API: User ${userDbId} is ${isTyping ? 'typing' : 'stopped typing'} in conversation ${conversationId}`);
     
     // Send real-time typing indicator via Supabase Realtime
     // This approach broadcasts the typing status to all participants in the conversation
@@ -51,11 +48,11 @@ export async function POST(request: Request) {
       .upsert(
         {
           conversation_id: conversationId,
-          user_id: userId,
+          user_id: userDbId,
           is_typing: isTyping,
           timestamp: new Date().toISOString()
         },
-        { onConflict: 'conversation_id,user_id' } // Assuming there's a composite key
+        { onConflict: 'conversation_id,user_id' }
       );
       
     if (broadcastError) {

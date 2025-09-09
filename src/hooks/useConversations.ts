@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 
 export function useConversations() {
   const { user } = useAuth();
-  const { company } = useCompany();
+  const { company, currentUserProfile } = useCompany();
   
   // State for conversations
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -17,18 +17,19 @@ export function useConversations() {
   const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
   
-  // Use the existing real-time conversation hook to handle Supabase subscriptions
-  useConversationRealtime(user?.id);
+  // Subscribe to realtime updates using the Database User ID (canonical)
+  useConversationRealtime(currentUserProfile?.id);
   
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
-    if (!user) return;
+  if (!currentUserProfile?.id) return;
     
     try {
       setLoadingConversations(true);
       setErrorConversations(null);
 
-      const result = await messagingApi.getConversations(user.id); // Use messagingApi.getConversations
+  // Query conversations by Database User ID
+  const result = await messagingApi.getConversations(currentUserProfile.id); // DB ID
       setConversations(result.conversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -36,11 +37,11 @@ export function useConversations() {
     } finally {
       setLoadingConversations(false);
     }
-  }, [user]);
+  }, [currentUserProfile?.id]);
   
   // Function to get or create a room conversation
   const getOrCreateRoomConversation = useCallback(async (roomId: string, roomName: string): Promise<Conversation> => {
-    if (!user) {
+    if (!currentUserProfile?.id) {
       throw new Error('User not authenticated');
     }
     
@@ -65,10 +66,11 @@ export function useConversations() {
       // Create new room conversation
       const newConversation = await messagingApi.createConversation({ 
         type: ConversationType.ROOM,
-        participants: [user.id], // Start with just the current user
+        // Participants are Database User IDs
+        participants: [currentUserProfile.id],
         name: roomName,
         roomId,
-        userId: user.id, // Add the user ID as a separate property
+        userId: currentUserProfile.id, // Optional; server derives from session
       });
       
       // Add to conversations list using functional update
@@ -90,15 +92,15 @@ export function useConversations() {
       console.error('Error creating room conversation:', error);
       throw error;
     }
-  }, [user]); // Removed conversations dependency
+  }, [currentUserProfile?.id]); // Removed conversations dependency
   
   // Function to get or create a direct conversation with another user
   const getOrCreateUserConversation = useCallback(async (otherUserId: string): Promise<Conversation> => {
-    if (!user) {
+    if (!currentUserProfile?.id) {
       throw new Error('User not authenticated');
     }
-    
-    if (user.id === otherUserId) {
+    // Compare Database User IDs to prevent self-DM
+    if (currentUserProfile.id === otherUserId) {
       throw new Error('Cannot create conversation with yourself');
     }
     
@@ -110,7 +112,7 @@ export function useConversations() {
         // Check if conversation already exists
         existingConversation = prev.find(
           c => c.type === ConversationType.DIRECT && 
-               c.participants.includes(user.id) && 
+               c.participants.includes(currentUserProfile.id) && 
                c.participants.includes(otherUserId) &&
                c.participants.length === 2
         ) || null;
@@ -129,10 +131,11 @@ export function useConversations() {
       // For now, let's assume we need to call createConversation.
       // This might need further refinement based on backend capabilities.
       console.warn("getOrCreateDirectConversation not found in API, using createConversation as placeholder");
-      const newConversation = await messagingApi.createConversation({ 
+    const newConversation = await messagingApi.createConversation({ 
          type: ConversationType.DIRECT,
-         participants: [user.id, otherUserId],
-         userId: user.id, // Add the user ID as a separate property
+      // Participants are Database User IDs
+      participants: [currentUserProfile.id, otherUserId],
+      userId: currentUserProfile.id,
          // Name might be handled differently for direct messages
       });
       
@@ -141,7 +144,7 @@ export function useConversations() {
         // Double-check for race conditions
         const stillExists = prev.find(
           c => c.type === ConversationType.DIRECT && 
-               c.participants.includes(user.id) && 
+               c.participants.includes(currentUserProfile.id) && 
                c.participants.includes(otherUserId) &&
                c.participants.length === 2
         );
@@ -158,13 +161,13 @@ export function useConversations() {
       console.error('Error creating direct conversation:', error);
       throw error;
     }
-  }, [user]); // Removed conversations dependency
+  }, [currentUserProfile?.id]); // Removed conversations dependency
   
   // Function to archive a conversation
   const archiveConversation = useCallback(async (conversationId: string) => {
     try {
       // Call the API to archive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, user!.id, true);
+  await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, true);
       // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -184,13 +187,13 @@ export function useConversations() {
       console.error('Error archiving conversation:', error);
       throw error;
     }
-  }, [activeConversation]);
+  }, [activeConversation, currentUserProfile?.id]);
   
   // Function to unarchive a conversation
   const unarchiveConversation = useCallback(async (conversationId: string) => {
     try {
       // Call the API to unarchive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, user!.id, false);
+  await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, false);
       // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -204,15 +207,15 @@ export function useConversations() {
     } catch (error) {
       console.error('Error unarchiving conversation:', error);
     }
-  }, []);
+  }, [currentUserProfile?.id]);
   
   // Function to mark a conversation as read
   const markConversationAsRead = useCallback(async (conversationId: string) => {
-    if (!user) return;
+  if (!currentUserProfile?.id) return;
     
     try {
       // Call the API to mark the conversation as read
-      await messagingApi.markConversationAsRead(conversationId, user.id);
+  await messagingApi.markConversationAsRead(conversationId, currentUserProfile.id);
       // console.warn("markConversationAsRead API call not implemented yet."); // Remove warning
 
       // Update local state (Optimistic update remains)
@@ -220,7 +223,7 @@ export function useConversations() {
         prev.map(conversation => {
           if (conversation.id === conversationId && conversation.unreadCount) {
             const updatedUnreadCount = { ...conversation.unreadCount };
-            delete updatedUnreadCount[user.id];
+            delete updatedUnreadCount[currentUserProfile.id];
             
             return {
               ...conversation,
@@ -233,12 +236,12 @@ export function useConversations() {
     } catch (error) {
       console.error('Error marking conversation as read:', error);
     }
-  }, [user]);
+  }, [currentUserProfile?.id]);
   
   // Calculate total unread count
   const totalUnreadCount = conversations.reduce((count, conversation) => {
-    if (user && conversation.unreadCount && conversation.unreadCount[user.id]) {
-      return count + conversation.unreadCount[user.id];
+    if (currentUserProfile?.id && conversation.unreadCount && conversation.unreadCount[currentUserProfile.id]) {
+      return count + conversation.unreadCount[currentUserProfile.id];
     }
     return count;
   }, 0);
@@ -259,12 +262,15 @@ export function useConversations() {
         // Update unread count if not the active conversation
         if (
           (!activeConversation || activeConversation.id !== conversation.id) && 
-          senderId !== user?.id
+          senderId !== currentUserProfile?.id
         ) {
           if (!conversation.unreadCount) {
             conversation.unreadCount = {};
           }
-          conversation.unreadCount[user?.id || ''] = (conversation.unreadCount[user?.id || ''] || 0) + 1;
+          if (currentUserProfile?.id) {
+            const key = currentUserProfile.id;
+            conversation.unreadCount[key] = (conversation.unreadCount[key] || 0) + 1;
+          }
         }
         
         // Move conversation to top of list
@@ -274,7 +280,7 @@ export function useConversations() {
       
       return updatedConversations;
     });
-  }, [activeConversation, user]);
+  }, [activeConversation, currentUserProfile?.id]);
   
   return {
     conversations,

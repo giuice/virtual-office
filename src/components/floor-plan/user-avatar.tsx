@@ -1,6 +1,7 @@
 // components/floor-plan/user-avatar.tsx
 import { UIUser as User } from './types'
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2'
+import { UserStatus } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -20,7 +21,7 @@ export function UserAvatar({ user }: UserAvatarProps) {
     id: user.id.toString(),
     displayName: user.displayName,
     avatarUrl: user.avatarUrl || undefined,
-    status: user.status === 'active' ? 'online' : 'offline'
+    status: (user.status as UserStatus) || 'offline'
   };
 
   return (

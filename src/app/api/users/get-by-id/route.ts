@@ -2,13 +2,14 @@
 import { NextResponse } from 'next/server';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     const { searchParams } = new URL(request.url);
     const supabaseUid = searchParams.get('supabase_uid');
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const user = await userRepository.findBySupabaseUid(supabaseUid);
+  const user = await userRepository.findBySupabaseUid(supabaseUid);
 
     if (!user) {
       return NextResponse.json(

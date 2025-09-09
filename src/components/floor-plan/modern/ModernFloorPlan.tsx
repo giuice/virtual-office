@@ -34,8 +34,10 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
+  const [joiningSpaces, setJoiningSpaces] = useState<Set<string>>(new Set());
   const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Log space and user data for debugging (only in development)
   useEffect(() => {
@@ -46,12 +48,13 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       
       // Log presence data by space
       usersInSpaces.forEach((usersInSpace, spaceId) => {
-        const spaceName = spaces.find(s => s.id === spaceId)?.name || 'Unknown';
+        const spaceName = spaceId ? (spaces.find(s => s.id === spaceId)?.name || 'Unknown') : 'Unknown';
         console.log(`Space "${spaceName}" (${spaceId}) has ${usersInSpace.length} users via presence system:`,
           usersInSpace.map(u => u.displayName).join(', '));
       });
     }
-  }, [spaces, users, usersInSpaces]);
+  // avoid over-logging: no need to re-log when user list changes but spaces unchanged
+  }, [spaces.length, usersInSpaces]);
   
   // Check if current user is in space
   const isUserInSpace = (space: Space) => {

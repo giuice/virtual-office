@@ -4,6 +4,7 @@ import { ICompanyRepository } from '@/repositories/interfaces/ICompanyRepository
 import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Company } from '@/types/database'; // Assuming Company type has createdAt
 
 /**
@@ -19,8 +20,9 @@ export default async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
-  const userRepository: IUserRepository = new SupabaseUserRepository();
+  const supabase = await createSupabaseServerClient();
+  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
 
   try {
     const { userId } = req.body;

@@ -1,7 +1,8 @@
 // src/app/api/auth/callback/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Use our server client helper
-import { googleAvatarService } from '@/lib/services/google-avatar-service';
+import { GoogleAvatarService } from '@/lib/services/google-avatar-service';
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
 // import { Database } from '@/lib/supabase/database.types'; // Uncomment if using types
 
 export const dynamic = 'force-dynamic'; // Keep dynamic export
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
           if (user.app_metadata?.provider === 'google' && user.user_metadata) {
             try {
               console.log(`[Callback] Processing Google OAuth user avatar for user: ${user.id}`);
+              const userRepository = new SupabaseUserRepository(supabase);
+              const googleAvatarService = new GoogleAvatarService(userRepository);
               const avatarResult = await googleAvatarService.extractAndStoreGoogleAvatar(
                 user.id,
                 user.user_metadata

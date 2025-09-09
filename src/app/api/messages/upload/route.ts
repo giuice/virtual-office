@@ -1,10 +1,10 @@
 // src/app/api/messages/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+// Removed deprecated auth-helpers client in favor of SSR client
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { validateUserSession } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 /**
  * Handle file upload for message attachments
@@ -12,15 +12,15 @@ import { validateUserSession } from '@/lib/auth/session';
 export async function POST(request: NextRequest) {
   try {
     // Validate user session
-    const { supabaseUid:userId, userDbId, error: sessionError } = await validateUserSession();
+  const { userDbId, error: sessionError } = await validateUserSession();
 
-    if (sessionError || !userId || !userDbId) {
+    if (sessionError || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
 
     // Create Supabase client with context
-    const supabase = createRouteHandlerClient({ cookies });
-    const { messageRepository } = await getSupabaseRepositories();
+  const supabase = await createSupabaseServerClient();
+  const { messageRepository } = await getSupabaseRepositories(supabase);
     
     const formData = await request.formData();
     
@@ -49,9 +49,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
     
-    // Verify user is a participant in the conversation
-    // participants field likely contains Firebase UIDs, so compare with userId (not userDbId)
-    if (!conversation.participants.includes(userId)) {
+    // Verify user is a participant in the conversation (DB IDs)
+    if (!conversation.participants.includes(userDbId)) {
       return NextResponse.json({ error: 'Not authorized to upload to this conversation' }, { status: 403 });
     }
     

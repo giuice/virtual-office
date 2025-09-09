@@ -1,7 +1,7 @@
 // src/repositories/implementations/supabase/SupabaseCompanyRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { ICompanyRepository } from '@/repositories/interfaces/ICompanyRepository';
 import { Company, TimeStampType } from '@/types/database'; // Import TimeStampType if needed
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase
 function mapToCamelCase(data: any): Company {
@@ -24,9 +24,14 @@ function mapArrayToCamelCase(dataArray: any[]): Company[] {
 
 export class SupabaseCompanyRepository implements ICompanyRepository {
   private TABLE_NAME = 'companies'; // Ensure this matches your Supabase table name
+  private supabase: SupabaseClient;
+
+  constructor(supabaseClient: SupabaseClient) {
+    this.supabase = supabaseClient;
+  }
 
   async findById(id: string): Promise<Company | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('id', id)
@@ -49,7 +54,7 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
         // created_at is handled by Supabase default value
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -70,7 +75,7 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
     if (adminIds !== undefined) dbUpdates.admin_ids = adminIds;
     if (settings !== undefined) dbUpdates.settings = settings;
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -87,7 +92,7 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
   }
 
   async deleteById(id: string): Promise<boolean> {
-    const { error, count } = await supabase
+    const { error, count } = await this.supabase
       .from(this.TABLE_NAME)
       .delete()
       .eq('id', id);
@@ -100,7 +105,7 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
   }
 
   async findByUserId(userId: string): Promise<Company | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .contains('admin_ids', [userId]) // Check if admin_ids array contains the userId
@@ -118,7 +123,7 @@ export class SupabaseCompanyRepository implements ICompanyRepository {
   }
 
   async findAllByUserId(userId: string): Promise<Company[]> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .contains('admin_ids', [userId]); // Find all companies where admin_ids array contains the userId

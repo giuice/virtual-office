@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
 
-    const { userRepository } = await getSupabaseRepositories();
+  const { userRepository } = await getSupabaseRepositories(supabase);
     const userDbId = await userRepository.findBySupabaseUid(user.id).then(user => user?.id) as string;
     console.log('userDbId', userDbId);
     // Parse the multipart form data

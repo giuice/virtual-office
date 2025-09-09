@@ -3,13 +3,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { IUserRepository } from '@/repositories/interfaces'; // Import interface
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase'; // Import implementation
 import { User, UserStatus } from '@/types/database'; // Import User and UserStatus types
-
-// Instantiate the repository
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const supabase = await createSupabaseServerClient();
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
   // Only allow PUT requests
   if (req.method !== 'PUT') {
     return res.status(405).json({ error: 'Method not allowed' });

@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useCallback } from 'react'; // Added useCallback
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Space, User } from '@/types/database';
-// Removed useUpdateSpace import
 import { useToast } from '@/components/ui/use-toast';
 
 /**
@@ -18,10 +17,29 @@ import { useToast } from '@/components/ui/use-toast';
 export function useLastSpace(currentUser: User | null, spaces: Space[]) {
   const { toast } = useToast();
   const [lastSpaceId, setLastSpaceId] = useLocalStorage<string | null>('lastSpaceId', null);
-  // Removed updateSpaceMutation
+  const [isRejoinInProgress, setIsRejoinInProgress] = useState(false);
+  const [rejoinAttempts, setRejoinAttempts] = useState(0);
+  const isUpdatingRef = useRef(false);
+  const lastUpdateRef = useRef<string | null>(null);
 
-  // Define the function to call the correct API endpoint
+  // Define the function to call the correct API endpoint with race condition protection
   const updateUserLocation = useCallback(async (userId: string, spaceId: string | null, spaceName?: string) => {
+    // Prevent multiple simultaneous updates
+    if (isUpdatingRef.current) {
+      console.log(`[useLastSpace] Update already in progress, skipping duplicate request`);
+      return;
+    }
+
+    // Check if this is the same update we just made
+    const updateKey = `${userId}-${spaceId}`;
+    if (lastUpdateRef.current === updateKey) {
+      console.log(`[useLastSpace] Same update already processed, skipping: ${updateKey}`);
+      return;
+    }
+
+    isUpdatingRef.current = true;
+    setIsRejoinInProgress(true);
+    
     try {
       const response = await fetch('/api/users/location', {
         method: 'PUT',
@@ -32,41 +50,81 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
         console.error(`[useLastSpace] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
-        // Clear the stored space ID if we can't rejoin
-        setLastSpaceId(null);
-        toast({
-          title: "Rejoin Failed",
-          description: `Could not rejoin ${spaceName || 'last space'}. Error: ${errorData.message || response.statusText}`,
-          variant: "destructive",
-        });
+        
+        // Implement exponential backoff for retries
+        const newAttempts = rejoinAttempts + 1;
+        setRejoinAttempts(newAttempts);
+        
+        if (newAttempts < 3) {
+          const backoffDelay = Math.pow(2, newAttempts) * 1000;
+          console.log(`[useLastSpace] Retrying in ${backoffDelay}ms (attempt ${newAttempts})`);
+          setTimeout(() => {
+            updateUserLocation(userId, spaceId, spaceName);
+          }, backoffDelay);
+          return;
+        } else {
+          // Clear the stored space ID if we can't rejoin after retries
+          setLastSpaceId(null);
+          setRejoinAttempts(0);
+          toast({
+            title: "Rejoin Failed",
+            description: `Could not rejoin ${spaceName || 'last space'} after multiple attempts. Error: ${errorData.message || response.statusText}`,
+            variant: "destructive",
+          });
+        }
       } else {
+        // Success - mark this update as completed
+        lastUpdateRef.current = updateKey;
+        setRejoinAttempts(0);
+        
         if (spaceId && spaceName) {
           toast({
             title: "Rejoined Space",
             description: `You have rejoined ${spaceName}`
           });
         }
-        // No need to manually update userIds, rely on presence updates
       }
     } catch (error) {
       console.error(`[useLastSpace] Network error updating location to space ${spaceId}:`, error);
-      setLastSpaceId(null); // Clear on network error too
-      toast({
-        title: "Rejoin Failed",
-        description: `Network error trying to rejoin ${spaceName || 'last space'}.`,
-        variant: "destructive",
-      });
+      
+      const newAttempts = rejoinAttempts + 1;
+      setRejoinAttempts(newAttempts);
+      
+      if (newAttempts < 3) {
+        const backoffDelay = Math.pow(2, newAttempts) * 1000;
+        setTimeout(() => {
+          updateUserLocation(userId, spaceId, spaceName);
+        }, backoffDelay);
+        return;
+      } else {
+        setLastSpaceId(null);
+        setRejoinAttempts(0);
+        toast({
+          title: "Rejoin Failed",
+          description: `Network error trying to rejoin ${spaceName || 'last space'} after multiple attempts.`,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      isUpdatingRef.current = false;
+      setIsRejoinInProgress(false);
     }
-  }, [setLastSpaceId, toast]);
+  }, [setLastSpaceId, toast, rejoinAttempts]);
 
 
   // When user logs in and spaces are loaded, check if they were in a space
   // and rejoin it if it still exists by updating the user's location
   useEffect(() => {
+    // Prevent execution if already updating or during a rejoin process
+    if (isUpdatingRef.current || isRejoinInProgress) {
+      console.log(`[useLastSpace] Update in progress, skipping useEffect execution`);
+      return;
+    }
+
     // Only proceed if we have a user, spaces are loaded, and we have a stored space ID
     if (!currentUser || !spaces.length || !lastSpaceId) {
       // If there's a user but no lastSpaceId, ensure their location is null if it isn't already
-      if (currentUser && currentUser.currentSpaceId !== null) {
+      if (currentUser && currentUser.currentSpaceId !== null && !isUpdatingRef.current) {
          // This might be too aggressive, consider if needed.
          // updateUserLocation(currentUser.id, null); 
       }
@@ -84,6 +142,8 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
         updateUserLocation(currentUser.id, spaceToRejoin.id, spaceToRejoin.name);
       } else {
         console.log(`[useLastSpace] User ${currentUser.id} already in last space ${spaceToRejoin.id}. No action needed.`);
+        // Mark this as processed to prevent re-execution
+        lastUpdateRef.current = `${currentUser.id}-${spaceToRejoin.id}`;
       }
     } else {
       // If the space no longer exists, clear the stored space ID and ensure user location is null
@@ -93,8 +153,8 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
         updateUserLocation(currentUser.id, null);
       }
     }
-  // Depend on currentUser.id and currentUser.current_space_id for accurate checks
-  }, [currentUser?.id, currentUser?.currentSpaceId, spaces, lastSpaceId, updateUserLocation, setLastSpaceId]); 
+  // Use stable dependencies and add the new state variables
+  }, [currentUser?.id, currentUser?.currentSpaceId, spaces.length, lastSpaceId, updateUserLocation, setLastSpaceId, isRejoinInProgress]); 
 
   /**
    * Save the current space ID when a user enters a space
@@ -114,6 +174,8 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
   return {
     lastSpaceId,
     saveLastSpace,
-    clearLastSpace
+    clearLastSpace,
+    isRejoinInProgress,
+    rejoinAttempts
   };
 }

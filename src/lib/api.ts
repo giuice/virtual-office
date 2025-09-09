@@ -2,7 +2,6 @@
 // Client-side API functions for interacting with server-side endpoints
 
 import { Company, User, UserRole, Space, UserStatus } from '@/types/database'; // Added Space
-import { C } from 'vitest/dist/chunks/reporters.d.CfRkRKN2.js';
 
 /**
  * Ensures a user profile exists in the database for the authenticated user,

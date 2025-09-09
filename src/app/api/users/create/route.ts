@@ -2,14 +2,14 @@ import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { User } from '@/types/database';
 import { NextResponse } from 'next/server';
-
-// Instantiate the repository
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     const userData: Partial<User> = await req.json();
 
     // Validate required fields - supabase_uid and email are crucial!

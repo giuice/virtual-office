@@ -216,6 +216,13 @@ export function MessageItem({
         <InteractiveUserAvatar
           user={{
             ...sender,
+            companyId: null,
+            supabase_uid: '',
+            email: '',
+            preferences: {},
+            role: 'member',
+            lastActive: '2024-01-01T00:00:00Z',
+            createdAt: '2024-01-01T00:00:00Z',
             status: senderPresence?.status || 'offline',
             currentSpaceId: senderPresence?.currentSpaceId || null
           }}

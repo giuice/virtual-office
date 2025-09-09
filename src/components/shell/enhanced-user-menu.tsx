@@ -87,7 +87,7 @@ export function EnhancedUserMenu() {
   // Combine Supabase user data with our database user profile
   const combinedUser = {
     ...currentUserProfile,
-    photoURL: user?.user_metadata?.avatar_url || currentUserProfile.avatarUrl || user?.photoURL,
+    photoURL: user?.user_metadata?.avatar_url || currentUserProfile.avatarUrl || user?.user_metadata.photoURL,
   };
 
   return (

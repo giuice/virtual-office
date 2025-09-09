@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, User, UserRole, Space } from '@/types/database';
+import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
 // Using API client instead of direct DynamoDB access
 import {
   getUserById,
@@ -61,11 +62,21 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       let userProfile: User | null = null;
       try {
+        // Try to extract Google avatar (if applicable) to persist in DB for cross-user visibility
+        const googleAvatarUrl = (() => {
+          try {
+            return extractGoogleAvatarUrl(user.user_metadata) || undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+
         // Call syncUserProfile to get or create the profile
         userProfile = await syncUserProfile({
           supabase_uid: authUserId, // Use correct parameter name
           email: user.email || '',
           displayName: user.user_metadata?.name || user.email || 'New User',
+          googleAvatarUrl,
         });
         console.log(`[CompanyContext] User profile synced/retrieved for ${authUserId}, DB ID: ${userProfile.id}`);
         setCurrentUserProfile(userProfile);
@@ -148,10 +159,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       // 1. Ensure user profile exists (get or create)
+      const googleAvatarUrl = (() => {
+        try {
+          return extractGoogleAvatarUrl(user.user_metadata) || undefined;
+        } catch {
+          return undefined;
+        }
+      })();
+
       let userProfile = await syncUserProfile({
-          supabase_uid: authUserId,
-          email: user.email,
-          displayName: user.user_metadata?.name || user.email || 'Admin User',
+        supabase_uid: authUserId,
+        email: user.email,
+        displayName: user.user_metadata?.name || user.email || 'Admin User',
+        googleAvatarUrl,
       });
       setCurrentUserProfile(userProfile); // Set profile state immediately
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Conversation, ConversationType } from '@/types/messaging';
 import { IConversationRepository } from '@/repositories/interfaces'; // Import interface
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; // Import implementation
+import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Import server client
 import { PaginationOptions, PaginatedResult } from '@/types/common'; // Import common types
 // import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
 
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized or userId missing' }, { status: 401 });
   }
 
-  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(); // Instantiate repository
+  const supabase = await createSupabaseServerClient(); // Create Supabase server client
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase); // Instantiate repository with client
 
   try {
     // Get query parameters for filtering and pagination

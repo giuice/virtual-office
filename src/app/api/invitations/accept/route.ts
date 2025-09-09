@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { IInvitationRepository, IUserRepository } from '@/repositories/interfaces';
 import { SupabaseInvitationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { User } from '@/types/database';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(req: NextRequest) {
+  const supabase = await createSupabaseServerClient();
   const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository();
-  const userRepository: IUserRepository = new SupabaseUserRepository();
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
 
   try {
     // Use supabaseUid instead of firebaseUid
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
         companyId: invitation.companyId,
         role: invitation.role,
         displayName: 'New User', // Placeholder
+        currentSpaceId: null,
         status: 'online', // Initial status
         preferences: { theme: 'light', notifications: true } // Default preferences
       };

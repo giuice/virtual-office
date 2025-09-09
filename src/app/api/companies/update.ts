@@ -2,13 +2,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { ICompanyRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Company } from '@/types/database';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
+  const supabase = await createSupabaseServerClient();
+  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
   // Only allow PUT or PATCH method
   if (req.method !== 'PUT' && req.method !== 'PATCH') {
     return res.status(405).json({ error: 'Method not allowed' });

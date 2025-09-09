@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { validateUserSession } from '@/lib/auth/session';
 import { IUserRepository } from '@/repositories/interfaces';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(req: NextRequest) {
+  
   try {
     // Get the authenticated user session
     const { supabaseUid, userDbId, error: sessionError } = await validateUserSession();
@@ -13,6 +15,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+      const supabase = await createSupabaseServerClient();
 
     // Parse request body
     const body = await req.json();
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-  const userRepository: IUserRepository = new SupabaseUserRepository();
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
 
     // Update user profile to remove avatar URL
     const updateOk = userRepository.update(userId, {

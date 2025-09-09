@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { validateUserSession } from '@/lib/auth/session';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function PATCH(request: Request) {
   try {
@@ -22,7 +23,8 @@ export async function PATCH(request: Request) {
     }
     
     // Get repositories
-    const { conversationRepository } = await getSupabaseRepositories();
+  const serverSupabase = await createSupabaseServerClient();
+  const { conversationRepository } = await getSupabaseRepositories(serverSupabase);
     
     // Check if the conversation exists and if the user is a participant
     const supabase = createRouteHandlerClient({ cookies });

@@ -50,7 +50,7 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
     }
   }, [user, currentUserProfile, open, getOrCreateUserConversation, setActiveConversation]);
 
-  if (!user || !currentUserProfile || !conversationId) return null;
+  if (!user || !currentUserProfile) return null;
 
   const handleSendMessage = (content: string, replyToId?: string) => {
     if (!content.trim()) return;
@@ -65,15 +65,21 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Adjust DialogContent size if needed */}
-      <DialogContent className="sm:max-w-[500px] h-[70vh] flex flex-col p-0"> 
-        {/* Removed original header, ChatWindow will have its own */}
-        {/* Render ChatWindow instead of manual list/input */}
-        <ChatWindow
-          conversationId={conversationId} // Pass the generated DM conversation ID
-          onSendMessage={handleSendMessage}
-          title={`Chat with ${user.displayName || user.displayName|| 'User'}`}
-          // TODO: Pass user.name or other details to ChatWindow header
-        />
+      <DialogContent className="sm:max-w-[500px] h-[70vh] flex flex-col p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{`Direct message with ${user.displayName || 'User'}`}</DialogTitle>
+        </DialogHeader>
+        {conversationId ? (
+          <ChatWindow
+            conversationId={conversationId}
+            onSendMessage={handleSendMessage}
+            title={`Chat with ${user.displayName || 'User'}`}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+            Initializing conversation...
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

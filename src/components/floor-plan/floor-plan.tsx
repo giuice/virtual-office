@@ -2,8 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Space, User } from '@/types/database';
-import { RoomTemplate } from './types';
+import { Space, User, RoomTemplate } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";

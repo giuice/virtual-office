@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     
     // Create repository instances with server client
     const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
-    const userRepository: IUserRepository = new SupabaseUserRepository();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     
     // Get the database user record using Supabase UID
     const userRecord = await userRepository.findBySupabaseUid(userId);

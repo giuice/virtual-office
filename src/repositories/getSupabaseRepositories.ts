@@ -1,42 +1,43 @@
 // src/repositories/getSupabaseRepositories.ts
-import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
-import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
-import { SupabaseUserRepository, SupabaseMessageRepository, SupabaseConversationRepository, SupabaseSpaceRepository, SupabaseCompanyRepository, SupabaseAnnouncementRepository, SupabaseInvitationRepository, SupabaseMeetingNoteRepository } from './implementations/supabase';
-import { IAnnouncementRepository, ICompanyRepository, IInvitationRepository, IMeetingNoteRepository, ISpaceRepository, IUserRepository } from './interfaces';
-import { SupabaseMeetingNoteActionItemRepository } from './implementations/supabase/SupabaseMeetingNoteActionItemRepository';
+import type { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
+import type { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
+import type { ICompanyRepository, ISpaceRepository, IUserRepository } from './interfaces';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Factory to create and return repository instances
-export async function getSupabaseRepositories(): Promise<{
+// Factory to create and return repository instances (only those needed by API routes)
+export async function getSupabaseRepositories(supabase: SupabaseClient): Promise<{
   messageRepository: IMessageRepository;
   conversationRepository: IConversationRepository;
   userRepository: IUserRepository;
   spaceRepository: ISpaceRepository;
   companyRepository: ICompanyRepository;
-  announcementRepository: IAnnouncementRepository;
-  meetingNoteRepository: IMeetingNoteRepository;
-  invitationRepository: IInvitationRepository;
-  meetingNoteActionItemRepository: SupabaseMeetingNoteActionItemRepository;
 }> {
-  // Create instances of the repositories
-  const messageRepository = new SupabaseMessageRepository();
-  const conversationRepository = new SupabaseConversationRepository();
-  const userRepository = new SupabaseUserRepository();
-  const spaceRepository = new SupabaseSpaceRepository();
-  const companyRepository = new SupabaseCompanyRepository();
-  const announcementRepository = new SupabaseAnnouncementRepository();
-  const meetingNoteRepository = new SupabaseMeetingNoteRepository();
-  const invitationRepository = new SupabaseInvitationRepository();
-  const meetingNoteActionItemRepository = new SupabaseMeetingNoteActionItemRepository();
-  
+  // Lazy-load ONLY the implementations needed to avoid test-time side effects
+  const [
+    { SupabaseMessageRepository },
+    { SupabaseConversationRepository },
+    { SupabaseUserRepository },
+    { SupabaseSpaceRepository },
+    { SupabaseCompanyRepository }
+  ] = await Promise.all([
+    import('./implementations/supabase/SupabaseMessageRepository'),
+    import('./implementations/supabase/SupabaseConversationRepository'),
+    import('./implementations/supabase/SupabaseUserRepository'),
+    import('./implementations/supabase/SupabaseSpaceRepository'),
+    import('./implementations/supabase/SupabaseCompanyRepository'),
+  ]);
+
+  const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
+  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
+
   return {
     messageRepository,
     conversationRepository,
     userRepository,
     spaceRepository,
     companyRepository,
-    announcementRepository,
-    meetingNoteRepository,
-    invitationRepository,
-    meetingNoteActionItemRepository,
   };
 }

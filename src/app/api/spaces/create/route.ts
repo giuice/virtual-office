@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     
     const currentSupabaseUserId =  user.id;
     console.log('Space data request:', spaceDataFromRequest);
-    const userRepository: IUserRepository = new SupabaseUserRepository();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     const currentUserId = await userRepository.findBySupabaseUid(currentSupabaseUserId).then(user => user?.id) as string;
     const dataToCreate = {
       ...spaceDataFromRequest,
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     const spaceToCreateRepoInput = dataToCreate as Omit<Space, 'id' | 'createdAt' | 'updatedAt'>; 
 
-    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
 
     const newSpace = await spaceRepository.create(spaceToCreateRepoInput);
 

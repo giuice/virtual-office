@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Space } from '@/types/database';
 
 export async function GET(request: Request) {
@@ -12,7 +13,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Company ID is required' }, { status: 400 });
   }
 
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+  const supabase = await createSupabaseServerClient();
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
 
   try {
     // Use the repository method to fetch spaces

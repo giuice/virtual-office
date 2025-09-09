@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Message } from '@/types/messaging'; // Use Message type consistent with other routes
 import { IMessageRepository } from '@/repositories/interfaces';
 import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 // Assuming MessageReaction structure is { userId: string, emoji: string } or similar based on repo methods
 // TODO: Import and use actual authentication logic (e.g., verifyFirebaseAuth)
 // import { verifyFirebaseAuth } from '@/lib/firebase/firebaseAdmin'; // Example import
 
 export async function POST(request: NextRequest) {
-  const messageRepository: IMessageRepository = new SupabaseMessageRepository();
+  const supabase = await createSupabaseServerClient();
+  const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
   try {
     // --- Authentication ---
     // Replace this placeholder with actual authentication

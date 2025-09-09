@@ -4,15 +4,17 @@ import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase/SupabaseSpaceRepository';
 import { Space } from '@/types/database';
 import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
-// Instantiate repositories
-const userRepository: IUserRepository = new SupabaseUserRepository();
-const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository();
+// Instantiate repositories per-request inside handler
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase as any);
     const { userId, companyId } = await request.json();
 
     if (!userId || !companyId) {

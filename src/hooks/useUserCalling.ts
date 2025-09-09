@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import { MessageType } from '@/types/messaging';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface CallInvitation {
   id: string;
@@ -49,6 +50,7 @@ export function useUserCalling(): UseUserCallingReturn {
   const { user } = useAuth();
   const { getOrCreateUserConversation, sendMessage } = useMessaging();
   const { updateLocation } = usePresence();
+  const { currentUserProfile } = useCompany();
   
   // State for managing calls
   const [incomingCalls, setIncomingCalls] = useState<CallInvitation[]>([]);
@@ -59,6 +61,16 @@ export function useUserCalling(): UseUserCallingReturn {
   const generateCallId = useCallback(() => {
     return `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }, []);
+
+  // Resolve a human-friendly display name for the current user
+  const getDisplayName = useCallback((): string => {
+    if (currentUserProfile?.displayName) return currentUserProfile.displayName;
+    const meta = (user?.user_metadata || {}) as Record<string, any>;
+    const fromMeta = meta.displayName || meta.full_name || meta.name;
+    if (fromMeta) return String(fromMeta);
+    if (user?.email) return user.email.split('@')[0];
+    return 'Unknown';
+  }, [currentUserProfile, user]);
 
   /**
    * Send a voice or video call invitation to another user
@@ -71,7 +83,7 @@ export function useUserCalling(): UseUserCallingReturn {
       const invitation: CallInvitation = {
         id: callId,
         callerId: user.id,
-        callerName: user.displayName || 'Unknown',
+        callerName: getDisplayName(),
         targetUserId,
         type,
         timestamp: new Date(),
@@ -88,7 +100,7 @@ export function useUserCalling(): UseUserCallingReturn {
         // Send system message about the call invitation
         const callTypeText = type === 'voice' ? 'voice call' : 'video call';
         await sendMessage(
-          `📞 ${user.displayName} is calling you (${callTypeText})`,
+          `📞 ${getDisplayName()} is calling you (${callTypeText})`,
           {
             type: MessageType.SYSTEM,
             // We'll extend this later to include call invitation metadata
@@ -124,7 +136,7 @@ export function useUserCalling(): UseUserCallingReturn {
       const invitation: CallInvitation = {
         id: callId,
         callerId: user.id,
-        callerName: user.displayName || 'Unknown',
+        callerName: getDisplayName(),
         targetUserId,
         spaceId,
         type: 'teleport',
@@ -141,7 +153,7 @@ export function useUserCalling(): UseUserCallingReturn {
       if (conversation) {
         // Send system message about the teleport invitation
         await sendMessage(
-          `✨ ${user.displayName} invites you to join them in their space`,
+          `✨ ${getDisplayName()} invites you to join them in their space`,
           {
             type: MessageType.SYSTEM,
           }
@@ -192,7 +204,7 @@ export function useUserCalling(): UseUserCallingReturn {
         const conversation = await getOrCreateUserConversation(call.callerId);
         if (conversation) {
           await sendMessage(
-            `✅ ${user.displayName} accepted your invitation and joined the space`,
+            `✅ ${getDisplayName()} accepted your invitation and joined the space`,
             { type: MessageType.SYSTEM }
           );
         }
@@ -205,7 +217,7 @@ export function useUserCalling(): UseUserCallingReturn {
         if (conversation) {
           const callType = call.type === 'voice' ? 'voice call' : 'video call';
           await sendMessage(
-            `✅ ${user.displayName} accepted your ${callType}`,
+            `✅ ${getDisplayName()} accepted your ${callType}`,
             { type: MessageType.SYSTEM }
           );
         }
@@ -244,7 +256,7 @@ export function useUserCalling(): UseUserCallingReturn {
       if (conversation) {
         const actionType = call.type === 'teleport' ? 'invitation' : `${call.type} call`;
         await sendMessage(
-          `❌ ${user.displayName} declined your ${actionType}`,
+          `❌ ${getDisplayName()} declined your ${actionType}`,
           { type: MessageType.SYSTEM }
         );
       }

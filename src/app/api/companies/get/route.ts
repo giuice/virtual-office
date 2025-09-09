@@ -1,8 +1,7 @@
 import { ICompanyRepository } from '@/repositories/interfaces';
-import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase';
+import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
 import { NextResponse } from 'next/server';
-
-const companyRepository: ICompanyRepository = new SupabaseCompanyRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +14,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
+  const supabase = await createSupabaseServerClient();
+  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
     const company = await companyRepository.findById(id);
     
     if (!company) {

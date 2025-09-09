@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { User } from '@/types/database';
-
-const userRepository: IUserRepository = new SupabaseUserRepository();
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +10,8 @@ export async function PATCH(
   request: Request,
 ) {
   try {
+    const supabase = await createSupabaseServerClient();
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     // Get ID from query parameters
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

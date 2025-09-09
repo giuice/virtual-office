@@ -48,7 +48,7 @@ export function ViewRoomTabs({
     // Fields to compare
     const fieldsToCompare: (keyof Space)[] = [
       'name', 'type', 'capacity', 'features', 'description',
-      'accessControl', 'position', 'userIds'
+      'accessControl', 'position'
     ];
     
     // Check each field for changes
@@ -77,17 +77,14 @@ export function ViewRoomTabs({
     <div className="mt-4">
       <Tabs defaultValue="people">
         <TabsList className="grid grid-cols-4">
-          <TabsTrigger value="people">People ({roomData.userIds?.length || 0})</TabsTrigger>
+          <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="controls">Room Controls</TabsTrigger>
           <TabsTrigger value="reservations">Reservations</TabsTrigger>
           <TabsTrigger value="info">Room Info</TabsTrigger>
         </TabsList>
 
         <TabsContent value="people" className="mt-4">
-          <PeopleTab
-            userIds={roomData.userIds}
-            handleMessageUser={handleMessageUser}
-          />
+          <PeopleTab userIds={[]} handleMessageUser={handleMessageUser} />
         </TabsContent>
 
         <TabsContent value="controls" className="mt-4">
@@ -119,9 +116,7 @@ export function ViewRoomTabs({
 
       <DialogFooter className="mt-6 justify-between"> {/* Use justify-between */}
         {/* Left side: Info */}
-        <div className="text-sm text-muted-foreground">
-          <span>{roomData.userIds?.length || 0}/{roomData.capacity || 4} people</span>
-        </div>
+        <div className="text-sm text-muted-foreground" />
         {/* Right side: Buttons */}
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleJoinRoom}> {/* Keep Join Room */}

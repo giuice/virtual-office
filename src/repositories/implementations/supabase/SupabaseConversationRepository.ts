@@ -1,5 +1,4 @@
 // src/repositories/implementations/supabase/SupabaseConversationRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
 import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging'; 
 import { PaginationOptions, PaginatedResult } from '@/types/common';
@@ -44,8 +43,8 @@ export class SupabaseConversationRepository implements IConversationRepository {
   private TABLE_NAME = 'conversations';
   private supabaseClient: SupabaseClient;
 
-  constructor(supabaseClient?: SupabaseClient) {
-    this.supabaseClient = supabaseClient || supabase;
+  constructor(supabaseClient: SupabaseClient) {
+    this.supabaseClient = supabaseClient;
   } 
 
   async findById(id: string): Promise<Conversation | null> {
@@ -80,7 +79,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
       const to = from + limit - 1;
 
       // Query conversations where the user is a participant
-      const { data, error, count } = await supabase
+      const { data, error, count } = await this.supabaseClient
         .from(this.TABLE_NAME)
         .select('*', { count: 'exact' })
         .contains('participants', [userId])

@@ -1,8 +1,8 @@
 // src/repositories/implementations/supabase/SupabaseSpaceRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Space } from '@/types/database';
 import { PaginationOptions } from '@/types/common';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type SpaceRow = {
   id: string;
@@ -49,9 +49,14 @@ function mapToCamelCase(data: SpaceRow): Space {
 
 export class SupabaseSpaceRepository implements ISpaceRepository {
   private TABLE_NAME = 'spaces';
+  private supabase: SupabaseClient;
+
+  constructor(supabaseClient: SupabaseClient) {
+    this.supabase = supabaseClient;
+  }
 
   async findById(id: string): Promise<Space | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('id', id)
@@ -68,7 +73,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
   async findByCompany(companyId: string, _options?: PaginationOptions): Promise<Space[]> {
     console.log(`Fetching spaces for company ID: ${companyId}`);
     
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
       .eq('company_id', companyId);
@@ -115,7 +120,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
         // created_at and updated_at handled by Supabase default value/triggers
     };
     
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -152,7 +157,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
     if (isTemplate !== undefined) dbUpdates.is_template = isTemplate;
     if (templateName !== undefined) dbUpdates.template_name = templateName;
 
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -170,7 +175,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
 
   
   async deleteById(id: string): Promise<boolean> {
-    const { error, count } = await supabase
+    const { error, count } = await this.supabase
       .from(this.TABLE_NAME)
       .delete()
       .eq('id', id);
