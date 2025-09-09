@@ -1,258 +1,291 @@
-// src/contexts/messaging/useMessages.ts
-import { useState, useCallback, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase/client';
-import { 
-  Message, 
-  MessageStatus, 
-  MessageType, 
+// src/hooks/useMessages.ts
+import { useCallback, useMemo } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useCompany } from '@/contexts/CompanyContext';
+import {
+  Message,
+  MessageStatus,
+  MessageType,
   FileAttachment,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useMessageRealtime } from '@/hooks/realtime/useMessageRealtime';
 
 export function useMessages(activeConversationId: string | null) {
-  const { user } = useAuth();
-  
-  // State for messages
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState<boolean>(false);
-  const [errorMessages, setErrorMessages] = useState<string | null>(null);
-  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
-  const [messagePagination, setMessagePagination] = useState<{
-    limit: number;
-    direction: 'older' | 'newer';
-    cursor?: string;
-  }>({
-    limit: 20,
-    direction: 'older',
+  const queryClient = useQueryClient();
+  const { currentUserProfile } = useCompany();
+
+  // Subscribe to realtime updates that write into the cache
+  useMessageRealtime(activeConversationId);
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isRefetching,
+    error,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['messages', activeConversationId],
+    enabled: !!activeConversationId,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      if (!activeConversationId) {
+        return { messages: [], hasMore: false, nextCursor: undefined };
+      }
+      const res = await messagingApi.getMessages(activeConversationId, {
+        limit: 20,
+        direction: 'older',
+        cursor: pageParam,
+      });
+      return res; // { messages, hasMore, nextCursor }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 
-  // Use the existing real-time message hook to handle Supabase subscriptions
-  useMessageRealtime(activeConversationId);
-  
-  // Function to refresh messages
+  const messages: Message[] = useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flatMap((p) => p.messages);
+  }, [data]);
+
+  const loadingMessages = isLoading || isFetching;
+  const errorMessages = error ? (error as Error).message : null;
+  const hasMoreMessages = !!hasNextPage;
+
   const refreshMessages = useCallback(async () => {
-    if (!activeConversationId) return;
-    
-    try {
-      setLoadingMessages(true);
-      setErrorMessages(null);
-      
-      // Pass pagination options directly
-      const result = await messagingApi.getMessages(activeConversationId, { 
-        limit: 20,
-        direction: 'older',
-      });
-      
-      setMessages(result.messages);
-      setHasMoreMessages(result.hasMore);
-      setMessagePagination({
-        limit: 20,
-        direction: 'older',
-        cursor: result.nextCursor,
-      });
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      setErrorMessages('Failed to load messages');
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, [activeConversationId]);
-  
-  // Reset messages when active conversation changes
-  useEffect(() => {
-    if (activeConversationId) {
-      refreshMessages();
-    } else {
-      setMessages([]);
-      setHasMoreMessages(false);
-      setMessagePagination({
-        limit: 20,
-        direction: 'older',
-      });
-    }
-  }, [activeConversationId, refreshMessages]);
-  
-  // Function to load more messages
+    await refetch();
+  }, [refetch]);
+
   const loadMoreMessages = useCallback(async () => {
-    if (!activeConversationId || !hasMoreMessages || !messagePagination.cursor) return;
-    
-    try {
-      setLoadingMessages(true);
-      
-      // Pass pagination options directly
-      const result = await messagingApi.getMessages(activeConversationId, messagePagination); 
-      
-      setMessages(prev => [...result.messages, ...prev]);
-      setHasMoreMessages(result.hasMore);
-      setMessagePagination({
-        ...messagePagination,
-        cursor: result.nextCursor,
-      });
-    } catch (error) {
-      console.error('Error loading more messages:', error);
-      setErrorMessages('Failed to load more messages');
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, [activeConversationId, hasMoreMessages, messagePagination]);
-  
-  // Function to send a message
-  const sendMessage = useCallback(async (content: string, options?: {
-    replyToId?: string;
-    attachments?: FileAttachment[];
-    type?: MessageType;
-  }) => {
-    if (!user || !activeConversationId || !content.trim()) return;
-    
-    try {
-      const messageData = {
-        conversationId: activeConversationId,
-        senderId: user.id,
-        content: content.trim(),
-        replyToId: options?.replyToId,
-        attachments: options?.attachments,
-        type: options?.type || MessageType.TEXT,
-      };
-      
-      // Optimistically add message to UI
+    if (!hasNextPage) return;
+    await fetchNextPage();
+  }, [fetchNextPage, hasNextPage]);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      options?: {
+        replyToId?: string;
+        attachments?: FileAttachment[];
+        type?: MessageType;
+      }
+    ) => {
+      if (!currentUserProfile?.id || !activeConversationId || !content.trim()) return;
+
+      const now = new Date();
       const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
-        ...messageData,
-        timestamp: new Date(),
+        id: `temp-${now.getTime()}`,
+        conversationId: activeConversationId,
+        senderId: currentUserProfile.id, // DB ID for UI representation
+        content: content.trim(),
+        timestamp: now,
         status: MessageStatus.SENDING,
         type: options?.type || MessageType.TEXT,
+        replyToId: options?.replyToId,
+        attachments: options?.attachments,
         reactions: [],
         isEdited: false,
       };
-      
-      setMessages(prev => [...prev, optimisticMessage]);
-      
-      // Send message to server - Use sendMessage
-      const savedMessage = await messagingApi.sendMessage(messageData); 
-      
-      // Replace optimistic message with saved message
-      setMessages(prev => 
-        prev.map(message => 
-          message.id === optimisticMessage.id ? savedMessage : message
-        )
-      );
-      
-      return savedMessage;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Mark optimistic message as failed
-      setMessages(prev => 
-        prev.map(message => 
-          message.id.startsWith('temp-') 
-            ? { ...message, status: MessageStatus.FAILED } 
-            : message
-        )
-      );
-      
-      throw error;
-    }
-  }, [user, activeConversationId]);
-  
-  // Function to update message status
-  const updateMessageStatusLocal = useCallback((messageId: string, status: MessageStatus) => {
-    setMessages(prev => 
-      prev.map(message => 
-        message.id === messageId 
-          ? { ...message, status } 
-          : message
-      )
-    );
-  }, []);
-  
-  // Function to add message
-  const addMessage = useCallback((message: Message) => {
-    setMessages(prev => [...prev, message]);
-  }, []);
-  
-  // Function to add a reaction to a message
-  const addReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
-    
-    try {
-      // Call the API to add the reaction
-      await messagingApi.addReaction(messageId, emoji, user.id);
 
-      // Update local state (Optimistic update remains)
-      setMessages(prev => 
-        prev.map(message => {
-          if (message.id === messageId) {
-            const reactions = [...(message.reactions || [])];
-            const existingReaction = reactions.find(
-              r => r.userId === user.id && r.emoji === emoji
-            );
-            
-            if (!existingReaction) {
-              reactions.push({
-                userId: user.id,
-                emoji,
-                timestamp: new Date(),
-              });
-            }
-            
-            return {
-              ...message,
-              reactions,
-            };
+      // Optimistically add to the last page in cache
+      queryClient.setQueryData(
+        ['messages', activeConversationId],
+        (oldData:
+          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+          | undefined) => {
+          if (!oldData || !oldData.pages) {
+            return { pages: [{ messages: [optimisticMessage], hasMore: false }], pageParams: [undefined] };
           }
-          return message;
-        })
+          const updatedPages = [...oldData.pages];
+          const lastIdx = updatedPages.length - 1;
+          updatedPages[lastIdx] = {
+            ...updatedPages[lastIdx],
+            messages: [...updatedPages[lastIdx].messages, optimisticMessage],
+          };
+          return { ...oldData, pages: updatedPages };
+        }
       );
-    } catch (error) {
-      console.error('Error adding reaction:', error);
-    }
-  }, [user]);
-  
-  // Function to remove a reaction from a message
-  const removeReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
-    
-    try {
-      // Call the API to remove the reaction
-      await messagingApi.removeReaction(messageId, emoji, user.id);
-      
-      // Update local state (Optimistic update remains)
-      setMessages(prev => 
-        prev.map(message => {
-          if (message.id === messageId && message.reactions) {
-            const reactions = message.reactions.filter(
-              r => !(r.userId === user.id && r.emoji === emoji)
-            );
-            
-            return {
-              ...message,
-              reactions,
-            };
+
+      try {
+        // Server derives sender from session; do not send senderId
+        const savedMessage = await messagingApi.sendMessage({
+          conversationId: activeConversationId,
+          content: content.trim(),
+          replyToId: options?.replyToId,
+          attachments: options?.attachments,
+          type: options?.type || MessageType.TEXT,
+        });
+
+        // Replace optimistic with saved
+        queryClient.setQueryData(
+          ['messages', activeConversationId],
+          (oldData:
+            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+            | undefined) => {
+            if (!oldData || !oldData.pages) return oldData;
+            const updatedPages = oldData.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((m) => (m.id === optimisticMessage.id ? savedMessage : m)),
+            }));
+            return { ...oldData, pages: updatedPages };
           }
-          return message;
-        })
+        );
+        return savedMessage;
+      } catch (err) {
+        // Mark optimistic as failed
+        queryClient.setQueryData(
+          ['messages', activeConversationId],
+          (oldData:
+            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+            | undefined) => {
+            if (!oldData || !oldData.pages) return oldData;
+            const updatedPages = oldData.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((m) =>
+                m.id === optimisticMessage.id ? { ...m, status: MessageStatus.FAILED } : m
+              ),
+            }));
+            return { ...oldData, pages: updatedPages };
+          }
+        );
+        throw err;
+      }
+    },
+    [activeConversationId, currentUserProfile?.id, queryClient]
+  );
+
+  const updateMessageStatusLocal = useCallback(
+    (messageId: string, status: MessageStatus) => {
+      if (!activeConversationId) return;
+      queryClient.setQueryData(
+        ['messages', activeConversationId],
+        (oldData:
+          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+          | undefined) => {
+          if (!oldData || !oldData.pages) return oldData;
+          const updatedPages = oldData.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((m) => (m.id === messageId ? { ...m, status } : m)),
+          }));
+          return { ...oldData, pages: updatedPages };
+        }
       );
-    } catch (error) {
-      console.error('Error removing reaction:', error);
-    }
-  }, [user]);
-  
-  // Function to upload an attachment
-  const uploadAttachment = useCallback(async (file: File, messageId?: string): Promise<FileAttachment> => {
-    if (!activeConversationId) {
-      throw new Error('No active conversation');
-    }
-    
-    try {
-      return await messagingApi.uploadMessageAttachment(file, activeConversationId, messageId);
-    } catch (error) {
-      console.error('Error uploading attachment:', error);
-      throw error;
-    }
-  }, [activeConversationId]);
-  
+    },
+    [activeConversationId, queryClient]
+  );
+
+  const addMessage = useCallback(
+    (message: Message) => {
+      if (!activeConversationId) return;
+      queryClient.setQueryData(
+        ['messages', activeConversationId],
+        (oldData:
+          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+          | undefined) => {
+          if (!oldData || !oldData.pages) {
+            return { pages: [{ messages: [message], hasMore: false }], pageParams: [undefined] };
+          }
+          const updatedPages = [...oldData.pages];
+          const lastIdx = updatedPages.length - 1;
+          updatedPages[lastIdx] = {
+            ...updatedPages[lastIdx],
+            messages: [...updatedPages[lastIdx].messages, message],
+          };
+          return { ...oldData, pages: updatedPages };
+        }
+      );
+    },
+    [activeConversationId, queryClient]
+  );
+
+  const addReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!currentUserProfile?.id || !activeConversationId) return;
+      try {
+        // Optimistic add
+        queryClient.setQueryData(
+          ['messages', activeConversationId],
+          (oldData:
+            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+            | undefined) => {
+            if (!oldData || !oldData.pages) return oldData;
+            const updatedPages = oldData.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((m) => {
+                if (m.id !== messageId) return m;
+                const reactions = [...(m.reactions || [])];
+                const exists = reactions.find(
+                  (r) => r.userId === currentUserProfile.id && r.emoji === emoji
+                );
+                if (!exists) {
+                  reactions.push({ userId: currentUserProfile.id, emoji, timestamp: new Date() });
+                }
+                return { ...m, reactions };
+              }),
+            }));
+            return { ...oldData, pages: updatedPages };
+          }
+        );
+
+        await messagingApi.addReaction(messageId, emoji, currentUserProfile.id);
+      } catch (error) {
+        // On error, we could revert, but for now just log
+        console.error('Error adding reaction:', error);
+      }
+    },
+    [activeConversationId, currentUserProfile?.id, queryClient]
+  );
+
+  const removeReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!currentUserProfile?.id || !activeConversationId) return;
+      try {
+        // Optimistic remove
+        queryClient.setQueryData(
+          ['messages', activeConversationId],
+          (oldData:
+            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
+            | undefined) => {
+            if (!oldData || !oldData.pages) return oldData;
+            const updatedPages = oldData.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((m) => {
+                if (m.id !== messageId) return m;
+                const reactions = (m.reactions || []).filter(
+                  (r) => !(r.userId === currentUserProfile.id && r.emoji === emoji)
+                );
+                return { ...m, reactions };
+              }),
+            }));
+            return { ...oldData, pages: updatedPages };
+          }
+        );
+
+        await messagingApi.removeReaction(messageId, emoji, currentUserProfile.id);
+      } catch (error) {
+        console.error('Error removing reaction:', error);
+      }
+    },
+    [activeConversationId, currentUserProfile?.id, queryClient]
+  );
+
+  const uploadAttachment = useCallback(
+    async (file: File, messageId?: string): Promise<FileAttachment> => {
+      if (!activeConversationId) {
+        throw new Error('No active conversation');
+      }
+      try {
+        return await messagingApi.uploadMessageAttachment(file, activeConversationId, messageId);
+      } catch (error) {
+        console.error('Error uploading attachment:', error);
+        throw error as Error;
+      }
+    },
+    [activeConversationId]
+  );
+
   return {
     messages,
     loadingMessages,
@@ -265,6 +298,6 @@ export function useMessages(activeConversationId: string | null) {
     addMessage,
     addReaction,
     removeReaction,
-    uploadAttachment
+    uploadAttachment,
   };
 }

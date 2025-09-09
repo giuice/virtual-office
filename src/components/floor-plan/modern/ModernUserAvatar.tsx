@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 // Import the AvatarUser type
@@ -40,47 +41,74 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
     }
   };
 
+  const avatarCore = (
+    <div
+      className={cn(
+        "relative inline-block",
+        isOverlapping && "ring-2 ring-background",
+        className
+      )}
+      onClick={handleClick}
+      role={onClick ? 'button' : undefined}
+      aria-label={onClick ? `User ${user.displayName}` : undefined}
+    >
+      {onClick ? (
+        <EnhancedAvatarV2
+          user={user}
+          size={size}
+          showStatus={showStatus}
+          onClick={() => onClick(user.id)}
+          className={cn(
+            "transition-all duration-200 border border-border",
+            "hover:ring-2 hover:ring-primary/50 cursor-pointer"
+          )}
+          onError={(error) => {
+            const message = (error as any)?.additionalInfo?.message || String(error);
+            console.warn(
+              `[ModernUserAvatar] Failed to load avatar for ${user.displayName}:`,
+              message
+            );
+          }}
+        />
+      ) : (
+        <InteractiveUserAvatar
+          user={{
+            // The InteractiveUserAvatar expects a `User` shape
+            id: user.id,
+            companyId: null,
+            supabase_uid: '',
+            email: '',
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+            status: (user.status as any) || 'offline',
+            statusMessage: user.statusMessage,
+            preferences: {},
+            role: 'member',
+            lastActive: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            currentSpaceId: user.currentSpaceId,
+          }}
+          size={size}
+          showStatus={showStatus}
+          showInteractionMenu={true}
+          className={cn("transition-all duration-200 border border-border")}
+        />
+      )}
+    </div>
+  );
+
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={cn(
-              "relative inline-block",
-              isOverlapping && "ring-2 ring-background",
-              className
-            )}
-            onClick={handleClick}
-            role={onClick ? 'button' : undefined}
-            aria-label={onClick ? `User ${user.displayName}` : undefined}
-          >
-            <EnhancedAvatarV2
-              user={user}
-              size={size}
-              showStatus={showStatus}
-              onClick={onClick ? () => onClick(user.id) : undefined}
-              className={cn(
-                "transition-all duration-200 border border-border",
-                onClick && "hover:ring-2 hover:ring-primary/50 cursor-pointer"
-              )}
-              onError={(error) => {
-                console.warn(`[ModernUserAvatar] Failed to load avatar for ${user.displayName}:`, error.additionalInfo.message);
-              }}
-            />
-          </div>
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{avatarCore}</TooltipTrigger>
         <TooltipContent side={tooltipPlacement} className="p-2 max-w-[200px]">
           <div className="text-center">
             <p className="font-medium">{user.displayName}</p>
             {user.status && (
-              <p className="text-xs text-muted-foreground capitalize">
-                {user.status}
-              </p>
+              <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
             )}
             {user.currentSpaceId && (
-              <p className="text-xs text-muted-foreground mt-1">
-                In a space
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">In a space</p>
             )}
             {process.env.NODE_ENV === 'development' && (
               <p className="text-[10px] text-muted-foreground mt-1">ID: {user.id}</p>

@@ -1,7 +1,7 @@
 # Messaging ID Unification + Avatar Menu — Junior Dev Plan
 
 Owner: Platform
-Status: In progress — hooks migrated to DB ID
+Status: In progress — core hooks refactored; UI/menu wired
 Scope: Messaging (hooks, APIs, repos), Floor-plan avatar interactions, Realtime/UI wiring
 
 ## Goals
@@ -24,8 +24,8 @@ Scope: Messaging (hooks, APIs, repos), Floor-plan avatar interactions, Realtime/
    - `src/app/api/messages/status/route.ts`
    - `src/app/api/messages/upload/route.ts`
 3) Realtime/UI alignment for messages:
-   - `src/hooks/useMessages.ts` (consume React Query OR have realtime write into rendered state)
-   - `src/hooks/realtime/useMessageRealtime.ts` (verify cache keys used by UI)
+  - `src/hooks/useMessages.ts` (consume React Query via `useInfiniteQuery`)
+  - `src/hooks/realtime/useMessageRealtime.ts` (verify cache keys used by UI)
 4) Floor-plan avatar interactions:
    - Integrate `InteractiveUserAvatar` or menu wrapper where `ModernUserAvatar` is rendered.
 5) Repositories remain DB-ID centric (verify):
@@ -35,13 +35,15 @@ Scope: Messaging (hooks, APIs, repos), Floor-plan avatar interactions, Realtime/
 
 ## File-by-File Checklist (Exact Paths + Expected Edits)
 
-### 1) useConversationRealtime (DB ID)
+Legend: [x] done, [ ] pending
+
+### 1) useConversationRealtime (DB ID) — [x]
 File: `src/hooks/realtime/useConversationRealtime.ts`
 - Current: Hook receives `userId?: string` (coming from `useAuth().user?.id`, a Supabase UID) and does `participants.includes(userId)`.
 - Change: Pass the DB ID instead. Source DB ID from caller (see `useConversations.ts`). No functional logic changes beyond comparing DB IDs.
 - Acceptance: Conversation list invalidates/updates when any participant (by DB ID) receives INSERT/UPDATE/DELETE events.
 
-### 2) useConversations (DB ID everywhere)
+### 2) useConversations (DB ID everywhere) — [x]
 File: `src/hooks/useConversations.ts`
 - Current:
   - Calls `useConversationRealtime(user?.id)` (Supabase UID).
@@ -52,7 +54,7 @@ File: `src/hooks/useConversations.ts`
   - When creating conversations: `participants: [currentUserDbId, otherUserDbId]`.
 - Acceptance: Direct and room conversations include DB IDs; no mixed-ID comparisons remain.
 
-### 3) messages/typing API (DB ID + server-client)
+### 3) messages/typing API (DB ID + server-client) — [x]
 File: `src/app/api/messages/typing/route.ts`
 - Current:
   - Uses `validateUserSession()` but compares `conversation.participants.includes(userId)` (Supabase UID) and writes `typing_indicators.user_id` with Supabase UID.
@@ -62,19 +64,19 @@ File: `src/app/api/messages/typing/route.ts`
   - Use `createSupabaseServerClient()` (SSR server client) per repo rules.
 - Acceptance: Non-participants (by DB ID) rejected; typing indicator rows written with DB ID.
 
-### 4) messages/status API (participant validation with DB ID)
+### 4) messages/status API (participant validation with DB ID) — [x]
 File: `src/app/api/messages/status/route.ts`
 - Current: For READ/DELIVERED compares participants with Supabase UID; sender checks use DB ID already.
 - Change: Compare conversation participants with `userDbId` instead of Supabase UID. Use server client consistently where needed.
 - Acceptance: Only participants (DB ID) can mark messages delivered/read; sender DB ID remains for SENT/FAILED checks.
 
-### 5) messages/upload API (DB ID validation)
+### 5) messages/upload API (DB ID validation) — [ ]
 File: `src/app/api/messages/upload/route.ts`
 - Current: Validates `conversation.participants.includes(userId)` (Supabase UID).
 - Change: Validate with `userDbId`. Continue storage logic unchanged.
 - Acceptance: Only participants by DB ID can upload; behavior unchanged otherwise.
 
-### 6) Realtime/UI alignment for messages
+### 6) Realtime/UI alignment for messages — [x]
 Files:
 - `src/hooks/realtime/useMessageRealtime.ts`
 - `src/hooks/useMessages.ts`
@@ -84,7 +86,7 @@ Files:
   B) Keep local state: Update `useMessageRealtime` to call an injected setter from `useMessages` (avoid duplicate caches).
 - Acceptance: When a new message arrives via Realtime, it appears in the active chat without manual refresh.
 
-### 7) Floor-plan avatar interaction menu
+### 7) Floor-plan avatar interaction menu — [x]
 Files:
 - `src/components/floor-plan/modern/ModernUserAvatar.tsx` (render site)
 - Integration points where floor plan lists/users are rendered.
@@ -93,12 +95,12 @@ Files:
   - Ensure the click/trigger surfaces are accessible and don’t break tooltips.
 - Acceptance: Clicking another user shows a menu with “Send Message” (opens/creates conversation) and other actions.
 
-### 8) Repositories verification (DB IDs)
+### 8) Repositories verification (DB IDs) — [x]
 Files: `src/repositories/*`
 - Action: Confirm interfaces and implementations accept and store DB IDs for participants/senders. Keep `findBySupabaseUid()` only as boundary helper.
 - Acceptance: No repository APIs require Supabase UID for domain relations.
 
-### 9) Presence RLS correction (migration)
+### 9) Presence RLS correction (migration) — [ ] as-needed
 Files: `src/migrations/*` and new migration file
 - Action: Ensure RLS policies use `auth.uid()` mapped via `users.supabase_uid`; do not compare `users.id = auth.uid()`.
 - Deliver: Add a new migration that fixes the presence/messaging-related policies if any mismatch remains.
@@ -121,7 +123,7 @@ Files: `src/migrations/*` and new migration file
 7) Migration: presence RLS fix if needed.
 8) Tests: unit + Playwright, then manual verification.
 
-## Quick Status Summary (2025-09-08)
+## Quick Status Summary (2025-09-09)
 - Done:
   - Hooks migrated to DB ID: `useConversations` now uses `CompanyContext.currentUserProfile.id`; `useConversationRealtime` treats `userId` as DB ID and invalidates `['conversations', userDbId]` and `['conversation', id]` on INSERT/UPDATE/DELETE.
   - Cache keys standardized to DB ID. No Supabase UID usage remains in these hooks.
@@ -132,16 +134,60 @@ Files: `src/migrations/*` and new migration file
     - Typing: `src/app/api/messages/typing/route.ts` validates participants via `userDbId` and writes `typing_indicators.user_id = userDbId` using SSR client.
     - Status: `src/app/api/messages/status/route.ts` validates participants via `userDbId` and uses SSR client for conversation checks.
 - Next:
-  - Realtime/UI: align `useMessages` with React Query (use `useInfiniteQuery`) so realtime updates render immediately.
-  - Align `useMessages` with React Query (use `useInfiniteQuery`) so realtime updates render immediately.
-  - Integrate `InteractiveUserAvatar` / `UserInteractionMenu` at floor-plan avatar call sites.
-  - Run tests; only if needed, add RLS migration to enforce `auth.uid()` → `users.supabase_uid` mapping.
+  - Finish messages/upload API DB-ID validation.
+  - Resolve event propagation so menu opens even inside clickable space cards.
+  - Remove duplicate components (see Anti-Duplication below).
+  - Add a global DM drawer surface to show DMs after `setActiveConversation`.
+  - Add unload/heartbeat presence cleanup.
 
 ## Pending Work
-- API routes migrated: typing, status, and upload now validate with `userDbId` and use the server Supabase client.
-- Realtime/UI mismatch: move `useMessages` to `useInfiniteQuery` keyed by `['messages', conversationId]`.
-- Components ready: integrate `InteractiveUserAvatar` and `UserInteractionMenu` at `ModernUserAvatar` sites.
-- RLS mapping appears correct; add migration only if issues surface in tests.
+– API: complete `messages/upload` DB-ID validation.
+– Floor-plan: stop event propagation on avatar/menu triggers; guard space-card `onClick`.
+– Messaging UI: add `MessagingDrawer` mounted in `src/app/layout.tsx` to render DMs when `activeConversation` is direct.
+– Presence: add `sendBeacon` on unload/pagehide and heartbeat.
+– RLS: add migration only if tests surface policy gaps.
+
+## Anti-Duplication (Remove Duplicates)
+- Keep canonical:
+  - `src/components/messaging/message-feed.tsx` + `RoomMessaging` for room chat
+  - `src/components/messaging/MessageList.tsx` and `message-item.tsx`
+  - `src/components/messaging/message-composer.tsx` (keep; fold enhancements as needed)
+  - `src/components/messaging/conversation-list.tsx` (feature-rich, context-aware)
+- Duplicates to remove/deprecate:
+  - `src/components/messaging/ConversationList.tsx` (older placeholder) → remove; replace imports with `conversation-list.tsx`.
+  - Nested `MessagingProvider` in `src/components/floor-plan/room-chat-integration.tsx` → remove; use root provider only.
+  - Prefer one composer: if both `EnhancedMessageComposer.tsx` and `message-composer.tsx` overlap, standardize on `message-composer.tsx` for now.
+
+Action items (junior-friendly):
+1) Search references to `ConversationList` (PascalCase file) and replace with lowercase `conversation-list.tsx` export.
+2) Delete `src/components/messaging/ConversationList.tsx` after refs updated.
+3) Edit `room-chat-integration.tsx` to remove its `MessagingProvider` wrapper.
+4) Ensure only one composer is used by message UIs; remove dead imports of the other.
+
+## Next Steps (Follow Up)
+1) Event handling on avatars
+  - Files: `src/components/messaging/InteractiveUserAvatar.tsx`, `src/components/floor-plan/modern/AvatarGroup.tsx`, `src/components/floor-plan/modern/ModernSpaceCard.tsx`
+  - Do: Add `onMouseDown/onPointerDownCapture/onClick` handlers that call `e.stopPropagation()` on the avatar/menu trigger; in `ModernSpaceCard`, ignore clicks when `event.target.closest('[data-avatar-interactive]')` returns a node.
+  - Accept: Clicking an avatar opens the menu and does NOT enter the space.
+
+2) Complete upload API DB-ID validation
+  - File: `src/app/api/messages/upload/route.ts`
+  - Do: Use `createSupabaseServerClient()`; map auth → DB via repository; validate `participants.includes(userDbId)`.
+  - Accept: Only conversation participants can upload.
+
+3) DM drawer surface
+  - Files: new `src/components/messaging/MessagingDrawer.tsx`; mount in `src/app/layout.tsx` beneath `CallNotifications`.
+  - Do: If `useMessaging().activeConversation?.type === DIRECT`, render `ChatWindow` and a close control.
+  - Accept: After “Send Message”, the DM drawer appears without navigating.
+
+4) Presence cleanup
+  - File: `src/hooks/useUserPresence.ts`
+  - Do: Add `beforeunload/pagehide` handlers to send a `navigator.sendBeacon` to `/api/users/location` with `{ userId, spaceId: null }`. Add a 60s heartbeat to update `lastActive`.
+  - Accept: Closing the tab clears presence within a short grace window.
+
+5) Tests
+  - Vitest: unit tests for `useMessages` cache updates, `useConversations` DB-ID comparisons.
+  - Playwright: avatar menu opens without navigating; DM drawer opens and sends a message; room chat loads and posts; presence clears after closing.
 
 ## Acceptance Criteria
 - Direct and room conversations store and compare DB IDs only.
