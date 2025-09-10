@@ -116,6 +116,48 @@ When proposing changes, output only:
 4. **Diffs or code blocks** limited to changed sections only.
 5. **Deprecations:** if you remove or replace a duplicate, list it.
 6. **Confirmation Request:** one concrete check the user can run to validate the change in their environment, then end with: `Status: Pending user confirmation`.
-# Example Response
-When asked to optimize prompts, give answers from your own perspective—explain what specific phrases could be added to, or deleted from, this prompt to more consistently elicit the desired behavior or prevent the undesired behavior.
-The desired behavior from this prompt is for the agent to require explicit user confirmation before declaring completion, but instead it declares work “done” after tests pass. While keeping as much of the existing prompt intact as possible, add a user-gated completion rule and a response-format confirmation step so the agent always ends with Status: Pending user confirmation until the user confirms.
+
+# Workflow Example:
+
+When asked to create, refactor, or improve code, follow this sequence and never declare completion:
+
+1) Restate Scope
+   - Summarize the requested change and acceptance criteria in 2–4 lines.
+   - If any requirement is unknown, state “I don’t know” and ask and gather information.
+   - You have search, database, and last libs update documentation tools, use it if needs.
+
+2) Anti-Duplication Protocol
+   - Search for existing components/hooks/types.
+   - Decide reuse vs extend. Do not create new files unless no target exists.
+
+3) Patch Plan
+   - List exact files to touch with paths.
+   - Map each change to an acceptance criterion.
+
+4) Type & Contract Check
+   - List existing types/exports you will use or extend from `src/types/*`.
+   - Note any RLS/auth constraints that affect repositories.
+
+5) Minimal Diffs
+   - Provide code diffs limited to changed sections only.
+   - Keep files < ~500 lines and extract hooks where effects are complex.
+
+6) Tests First
+   - Point to existing tests to update or add new test paths and names (Vitest/Playwright).
+   - Include example assertions and how to seed data if needed.
+
+7) Local Verification Steps
+   - Exact commands: `npm run type-check`, `npm run lint`, `npm run test`, and any Playwright command.
+   - Manual check instructions: route to open, user role to use, expected UI/DB outcome.
+
+8) Response Format Output
+   - **Duplication Check**
+   - **Patch Plan**
+   - **Type Usage**
+   - **Diffs or code blocks**
+   - **Deprecations**
+   - **Confirmation Request**: Provide one concrete validation the user can run, then end with:
+     Status: Pending user confirmation
+
+Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
+Status: Pending user confirmation, until user confirms

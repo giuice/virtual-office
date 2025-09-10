@@ -8,6 +8,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Do not assume code behavior. Ask for or provide tests.
 - Prefer edits to existing code over new files.
 - Run the Anti-Duplication Protocol before proposing changes.
+- Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
 
 ## Architecture Snapshot (single source)
 - Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
@@ -53,6 +54,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Business logic in utilities/services. UI in components. Data access via repositories.
 - Use composition over monoliths. Extract hooks for complex effects or data flows.
 - Verify if functionality exists before implementing. Reuse shared libs and APIs.
+- Even if all tests pass, keep **Status: Pending user confirmation**.
 
 ## Naming Conventions
 - PascalCase: exported React components and their filenames.
@@ -104,6 +106,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 ## Build & Lint
 - Dev: `npm run dev`, Build: `npm run build`, Start: `npm run start`
 - Lint: `npm run lint`
+- Find errors: `npm run type-check`
 
 ## Response Format (required)
 When proposing changes, output only:
@@ -112,4 +115,49 @@ When proposing changes, output only:
 3. **Type Usage:** existing types and exports referenced.
 4. **Diffs or code blocks** limited to changed sections only.
 5. **Deprecations:** if you remove or replace a duplicate, list it.
+6. **Confirmation Request:** one concrete check the user can run to validate the change in their environment, then end with: `Status: Pending user confirmation`.
 
+# Workflow Example:
+
+When asked to create, refactor, or improve code, follow this sequence and never declare completion:
+
+1) Restate Scope
+   - Summarize the requested change and acceptance criteria in 2–4 lines.
+   - If any requirement is unknown, state “I don’t know” and ask and gather information.
+   - You have search, database, and last libs update documentation tools, use it if needs.
+
+2) Anti-Duplication Protocol
+   - Search for existing components/hooks/types.
+   - Decide reuse vs extend. Do not create new files unless no target exists.
+
+3) Patch Plan
+   - List exact files to touch with paths.
+   - Map each change to an acceptance criterion.
+
+4) Type & Contract Check
+   - List existing types/exports you will use or extend from `src/types/*`.
+   - Note any RLS/auth constraints that affect repositories.
+
+5) Minimal Diffs
+   - Provide code diffs limited to changed sections only.
+   - Keep files < ~500 lines and extract hooks where effects are complex.
+
+6) Tests First
+   - Point to existing tests to update or add new test paths and names (Vitest/Playwright).
+   - Include example assertions and how to seed data if needed.
+
+7) Local Verification Steps
+   - Exact commands: `npm run type-check`, `npm run lint`, `npm run test`, and any Playwright command.
+   - Manual check instructions: route to open, user role to use, expected UI/DB outcome.
+
+8) Response Format Output
+   - **Duplication Check**
+   - **Patch Plan**
+   - **Type Usage**
+   - **Diffs or code blocks**
+   - **Deprecations**
+   - **Confirmation Request**: Provide one concrete validation the user can run, then end with:
+     Status: Pending user confirmation
+
+Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
+Status: Pending user confirmation, until user confirms
