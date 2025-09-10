@@ -7,9 +7,9 @@ import { validateUserSession } from '@/lib/auth/session';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
-// Mock Supabase client
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
+// Mock server Supabase client
+vi.mock('@/lib/supabase/server-client', () => ({
+  createSupabaseServerClient: vi.fn().mockResolvedValue({
     storage: {
       from: vi.fn().mockReturnValue({
         upload: vi.fn().mockResolvedValue({ error: null }),
@@ -19,34 +19,17 @@ vi.mock('@/lib/supabase/client', () => ({
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { participants: ['user-123'] }, error: null }),
+      single: vi.fn().mockResolvedValue({ data: { participants: ['user-db-456'] }, error: null }),
       update: vi.fn().mockReturnThis(),
       match: vi.fn().mockReturnThis(),
     }),
-  },
-  createClient: vi.fn(),
+  })
 }));
 
 // Mock the dependencies
 vi.mock('@/lib/auth/session');
 vi.mock('@/repositories/getSupabaseRepositories');
-vi.mock('@supabase/auth-helpers-nextjs', () => ({
-  createRouteHandlerClient: vi.fn().mockReturnValue({
-    storage: {
-      from: vi.fn().mockReturnValue({
-        upload: vi.fn().mockResolvedValue({ error: null }),
-        getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/test.jpg' } }),
-      }),
-    },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { participants: ['user-123'] }, error: null }),
-      update: vi.fn().mockReturnThis(),
-      match: vi.fn().mockReturnThis(),
-    }),
-  }),
-}));
+// Remove deprecated auth helper client usage
 
 // Mock cookies
 vi.mock('next/headers', () => ({
@@ -97,8 +80,8 @@ describe('Messages API Routes', () => {
     
     // Mock successful user session validation
     (validateUserSession as any).mockResolvedValue({
-      userId: 'user-123',
       userDbId: 'user-db-456',
+      supabaseUid: 'supabase-uid-xyz',
       error: null,
     });
     
@@ -112,6 +95,15 @@ describe('Messages API Routes', () => {
           content: 'Test message',
           attachments: [],
           reactions: [],
+        }),
+        update: vi.fn().mockResolvedValue({
+          id: 'message-123',
+          conversationId: 'conversation-123',
+          senderId: 'user-123',
+          content: 'Test message',
+          attachments: [],
+          reactions: [],
+          status: 'read'
         }),
         addAttachment: vi.fn().mockResolvedValue({
           id: 'attachment-123',
@@ -148,14 +140,14 @@ describe('Messages API Routes', () => {
   describe('File Upload Route', () => {
     test('should upload file and return attachment data', async () => {
       const mockFile = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
+      // Ensure arrayBuffer is defined early (jsdom File sometimes lacks implementation)
+      // @ts-ignore
+      mockFile.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(10));
       const mockRequest = createMockRequest('POST', {
         file: mockFile,
         conversationId: 'conversation-123',
         messageId: 'message-123',
       });
-      
-      // Mock the arrayBuffer method on the File object
-      mockFile.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(10));
       
       const response = await uploadHandler(mockRequest as NextRequest);
       const data = await response.json();

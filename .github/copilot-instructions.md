@@ -8,6 +8,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Do not assume code behavior. Ask for or provide tests.
 - Prefer edits to existing code over new files.
 - Run the Anti-Duplication Protocol before proposing changes.
+- Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
 
 ## Architecture Snapshot (single source)
 - Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
@@ -53,6 +54,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Business logic in utilities/services. UI in components. Data access via repositories.
 - Use composition over monoliths. Extract hooks for complex effects or data flows.
 - Verify if functionality exists before implementing. Reuse shared libs and APIs.
+- Even if all tests pass, keep **Status: Pending user confirmation**.
 
 ## Naming Conventions
 - PascalCase: exported React components and their filenames.
@@ -113,4 +115,7 @@ When proposing changes, output only:
 3. **Type Usage:** existing types and exports referenced.
 4. **Diffs or code blocks** limited to changed sections only.
 5. **Deprecations:** if you remove or replace a duplicate, list it.
-
+6. **Confirmation Request:** one concrete check the user can run to validate the change in their environment, then end with: `Status: Pending user confirmation`.
+# Example Response
+When asked to optimize prompts, give answers from your own perspective—explain what specific phrases could be added to, or deleted from, this prompt to more consistently elicit the desired behavior or prevent the undesired behavior.
+The desired behavior from this prompt is for the agent to require explicit user confirmation before declaring completion, but instead it declares work “done” after tests pass. While keeping as much of the existing prompt intact as possible, add a user-gated completion rule and a response-format confirmation step so the agent always ends with Status: Pending user confirmation until the user confirms.

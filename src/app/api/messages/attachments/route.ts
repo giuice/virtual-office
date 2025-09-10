@@ -1,7 +1,5 @@
 // src/app/api/messages/attachments/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { validateUserSession } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
@@ -12,17 +10,15 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 export async function GET(request: NextRequest) {
   try {
     // Validate user session
-  const session = await validateUserSession();
-  const userId = (session as any).supabaseUid || (session as any).userId;
-  const sessionError = (session as any).error;
+    const { userDbId, error: sessionError } = await validateUserSession();
     
-    if (sessionError || !userId) {
+    if (sessionError || !userDbId) {
       return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
     }
     
   // Get repositories with request-scoped client
-  const serverSupabase = await createSupabaseServerClient();
-  const { messageRepository } = await getSupabaseRepositories(serverSupabase);
+    const serverSupabase = await createSupabaseServerClient();
+    const { messageRepository } = await getSupabaseRepositories(serverSupabase);
     
     // Get messageId from query params
     const searchParams = request.nextUrl.searchParams;
@@ -40,8 +36,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Check if user has access to the conversation
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: conversation, error: convError } = await supabase
+    const { data: conversation, error: convError } = await serverSupabase
       .from('conversations')
       .select('participants')
       .eq('id', message.conversationId)
@@ -52,8 +47,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
     
-    // Verify user is a participant in the conversation
-    if (!conversation.participants.includes(userId)) {
+    // Verify user is a participant in the conversation (DB IDs)
+    if (!conversation.participants.includes(userDbId)) {
       return NextResponse.json({ error: 'Not authorized to access this message' }, { status: 403 });
     }
     

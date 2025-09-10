@@ -4,7 +4,6 @@
 
 import { useState } from 'react';
 import { Space } from '@/types/database'; // Use global Space type
-import { MessagingProvider } from '@/contexts/messaging/MessagingContext';
 import { RoomMessaging } from '@/components/messaging/room-messaging';
 
 interface RoomChatIntegrationProps {
@@ -38,14 +37,12 @@ export function RoomChatIntegration({
   }
   
   return (
-    <MessagingProvider>
-      <RoomMessaging
-        roomId={selectedRoom.id}
-        roomName={selectedRoom.name}
-        isOpen={isMessagingOpen}
-        onClose={handleClose}
-        position={position}
-      />
-    </MessagingProvider>
+    <RoomMessaging
+      roomId={selectedRoom.id}
+      roomName={selectedRoom.name}
+      isOpen={isMessagingOpen}
+      onClose={handleClose}
+      position={position}
+    />
   );
 }

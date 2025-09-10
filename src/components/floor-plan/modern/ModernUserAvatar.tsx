@@ -7,7 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+// EnhancedAvatarV2 is used internally by InteractiveUserAvatar
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
@@ -34,12 +34,11 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   tooltipPlacement = 'top',
   isOverlapping = false
 }) => {
-  const handleClick = (e: React.MouseEvent) => {
-    if (onClick) {
-      e.stopPropagation(); // Prevent triggering parent click handlers
-      onClick(user.id);
-    }
-  };
+  // Only stop click bubbling so space card onClick doesn't fire.
+  // Avoid capture-phase / pointerdown interception which broke Radix Dropdown trigger.
+  const stopPropagationHandlers = {
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+  } as const;
 
   const avatarCore = (
     <div
@@ -48,52 +47,33 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
         isOverlapping && "ring-2 ring-background",
         className
       )}
-      onClick={handleClick}
+      data-avatar-interactive
+      {...stopPropagationHandlers}
       role={onClick ? 'button' : undefined}
       aria-label={onClick ? `User ${user.displayName}` : undefined}
     >
-      {onClick ? (
-        <EnhancedAvatarV2
-          user={user}
-          size={size}
-          showStatus={showStatus}
-          onClick={() => onClick(user.id)}
-          className={cn(
-            "transition-all duration-200 border border-border",
-            "hover:ring-2 hover:ring-primary/50 cursor-pointer"
-          )}
-          onError={(error) => {
-            const message = (error as any)?.additionalInfo?.message || String(error);
-            console.warn(
-              `[ModernUserAvatar] Failed to load avatar for ${user.displayName}:`,
-              message
-            );
-          }}
-        />
-      ) : (
-        <InteractiveUserAvatar
-          user={{
-            // The InteractiveUserAvatar expects a `User` shape
-            id: user.id,
-            companyId: null,
-            supabase_uid: '',
-            email: '',
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-            status: (user.status as any) || 'offline',
-            statusMessage: user.statusMessage,
-            preferences: {},
-            role: 'member',
-            lastActive: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            currentSpaceId: user.currentSpaceId,
-          }}
-          size={size}
-          showStatus={showStatus}
-          showInteractionMenu={true}
-          className={cn("transition-all duration-200 border border-border")}
-        />
-      )}
+      <InteractiveUserAvatar
+        user={{
+          id: user.id,
+          companyId: null,
+          supabase_uid: '',
+          email: '',
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          status: (user.status as any) || 'offline',
+          statusMessage: user.statusMessage,
+          preferences: {},
+          role: 'member',
+          lastActive: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          currentSpaceId: user.currentSpaceId,
+        }}
+        size={size}
+        showStatus={showStatus}
+        showInteractionMenu={true}
+        className={cn("transition-all duration-200 border border-border")}
+        aria-label={`${user.displayName}'s avatar - click for options`}
+      />
     </div>
   );
 

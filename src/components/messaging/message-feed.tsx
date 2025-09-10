@@ -47,26 +47,26 @@ export function MessageFeed({
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Initialize conversation if roomId is provided
+  // Initialize / switch conversation when roomId changes
   useEffect(() => {
-    const initializeConversation = async () => {
-      if (roomId && roomName && !activeConversation) {
-        try {
-          setIsLoading(true);
-          const conversation = await getOrCreateRoomConversation(roomId, roomName);
+    let cancelled = false;
+    const init = async () => {
+      if (!roomId || !roomName) return;
+      try {
+        setIsLoading(true);
+        const conversation = await getOrCreateRoomConversation(roomId, roomName);
+        if (!cancelled) {
           setActiveConversation(conversation);
-        } catch (error) {
-          console.error('Error initializing room conversation:', error);
-        } finally {
-          setIsLoading(false);
         }
-      } else if (conversationId && !activeConversation) {
-        // TODO: Implement loading conversation by ID
+      } catch (error) {
+        console.error('Error initializing room conversation:', error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     };
-    
-    initializeConversation();
-  }, [roomId, roomName, conversationId, activeConversation, getOrCreateRoomConversation, setActiveConversation]);
+    init();
+    return () => { cancelled = true; };
+  }, [roomId, roomName, getOrCreateRoomConversation, setActiveConversation]);
   
   // Scroll to bottom when messages change
   useEffect(() => {

@@ -12,7 +12,7 @@ import { useCompany } from '@/contexts/CompanyContext';
  * @param spaceId The space ID the user is currently in
  */
 export function useAutoRoomConversation(spaceId: string | null) {
-  const { getOrCreateRoomConversation } = useMessaging();
+  const { getOrCreateRoomConversation, setActiveConversation } = useMessaging();
   const { user } = useAuth();
   const { company } = useCompany();
   const { data: spaces } = useSpaces(company?.id);
@@ -32,6 +32,7 @@ export function useAutoRoomConversation(spaceId: string | null) {
       getOrCreateRoomConversation(spaceId, spaceName)
         .then((conversation) => {
           console.log(`[useAutoRoomConversation] Successfully joined room conversation:`, conversation);
+          setActiveConversation(conversation);
         })
         .catch((error) => {
           console.error(`[useAutoRoomConversation] Failed to create room conversation:`, error);
@@ -40,7 +41,7 @@ export function useAutoRoomConversation(spaceId: string | null) {
       // Reset when user leaves all spaces
       lastProcessedSpaceId.current = null;
     }
-  }, [spaceId, user?.id, spaces, getOrCreateRoomConversation]);
+  }, [spaceId, user?.id, spaces, getOrCreateRoomConversation, setActiveConversation]);
 
   return { 
     spaceId,

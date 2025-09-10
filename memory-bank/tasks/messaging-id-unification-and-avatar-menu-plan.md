@@ -164,7 +164,7 @@ Action items (junior-friendly):
 3) Edit `room-chat-integration.tsx` to remove its `MessagingProvider` wrapper.
 4) Ensure only one composer is used by message UIs; remove dead imports of the other.
 
-## Next Steps (Follow Up)
+## Next Steps (Follow Up  )
 1) Event handling on avatars
   - Files: `src/components/messaging/InteractiveUserAvatar.tsx`, `src/components/floor-plan/modern/AvatarGroup.tsx`, `src/components/floor-plan/modern/ModernSpaceCard.tsx`
   - Do: Add `onMouseDown/onPointerDownCapture/onClick` handlers that call `e.stopPropagation()` on the avatar/menu trigger; in `ModernSpaceCard`, ignore clicks when `event.target.closest('[data-avatar-interactive]')` returns a node.
@@ -251,3 +251,62 @@ Manual Checks:
 - API route hygiene: Never use browser clients in server routes; always use the SSR Supabase client to satisfy RLS and session context.
 - Consistent cache keys: Align hooks and realtime on shared keys (e.g., `['conversations', userDbId]`, `['messages', conversationId]`) to ensure invalidations work predictably.
 - Incremental refactors: Start with hooks (client identity), then APIs (server validation), then realtime/UI wiring; this isolates risk and keeps behavior verifiable.
+
+---
+
+## NEWLY DISCOVERED REGRESSIONS (2025-09-10)
+
+### 1. Avatar Interaction Menu Not Displaying
+**Symptoms**: Clicking another user's avatar on the floor plan does nothing (no dropdown / menu). Navigation suppression works (space not entered), but menu trigger absent.
+**Observed State**: `ModernUserAvatar` wraps `InteractiveUserAvatar`; propagation handlers previously blocked `pointerdown` & `mousedown` (now reduced to `click` only). Still no menu.
+**Suspected Causes**:
+- Radix `DropdownMenuTrigger` not receiving pointer events due to wrapping structure or missing focusable element.
+- The child passed into `UserInteractionMenu` may not forward ref / proper trigger semantics (needs `asChild` with a button or interactive element).
+- Identity check in `UserInteractionMenu` (`currentUser?.id === user.id`) may compare Supabase UID vs DB ID mismatch, prematurely bypassing menu wrapper.
+**Impact**: Core UX (messaging initiation) blocked; plan goal unmet.
+**Next Steps (Planned)**:
+1. Inspect `useAuth().user.id` vs `UserInteractionMenu.user.id` to confirm mismatch.
+2. Convert avatar trigger to explicit `button` element with `type="button"` & `data-avatar-interactive`.
+3. Add temporary debug logs inside `UserInteractionMenu` to confirm early return path.
+4. If ID mismatch: inject DB ID into AuthContext or derive current DB ID from `CompanyContext` inside menu.
+
+### 2. Room Chat Not Working / No Realtime Delivery
+**Symptoms**: Room chat panel opens but: (a) messages not created or not visible to others; (b) switching rooms retains old messages; (c) realtime events absent.
+**Observed State**: `MessageFeed` previously only initialized conversation on first mount (fixed to re-run on `roomId` change, but still failing). `useAutoRoomConversation` now sets active conversation yet realtime subscription may not resubscribe.
+**Suspected Causes**:
+- Realtime subscription uses `conversationId` but stale `activeConversation` persists due to race between auto-creation and manual initialization.
+- Conversation creation via `messagingApi.createConversation` may not persist expected `roomId` or participants, leading to authorization failures (RLS drop of messages on insert).
+- Upload / send APIs might still pass mixed IDs causing server rejection silently (unhandled error path in UI).
+- Missing invalidation / `queryClient.removeQueries(['messages', oldId])` when switching rooms causing UI to show stale cache pages.
+**Impact**: Core room messaging unusable; realtime objective unmet.
+**Next Steps (Planned)**:
+1. Add defensive log in `useMessageRealtime` for subscription status + payload counts per room switch.
+2. Force message cache reset on `roomId` change: `queryClient.removeQueries({ queryKey: ['messages', previousId] })` before setting new conversation.
+3. Verify backend conversation record (roomId, participants DB IDs) via temporary diagnostic API call or SQL (if allowed) to ensure correct row shape.
+4. Add explicit error surfaced in UI when `sendMessage` promise rejects.
+5. Add test harness (Vitest) to simulate conversation switch and assert new subscription.
+
+### 3. Identity Consistency Risk Inside Interaction Components
+**Symptoms**: Conditional logic that hides menu for current user may trigger for all users if comparing different ID domains.
+**Suspected Causes**: `useAuth()` returns Supabase auth UID; avatar/menu provided a DB ID. Without mapping, equality false positives.
+**Next Steps**: Centralize `currentUserDbId` retrieval in `UserInteractionMenu` via `CompanyContext` and compare DB IDs explicitly.
+
+### 4. Missing Explicit Loading / Error Feedback in Room Chat
+**Symptoms**: Silent failures leave empty UI with no user guidance.
+**Next Steps**: Add inline state banners (loading, error) & a retry action for conversation init.
+
+### Temporary Mitigation Plan
+- Insert structured debug logs (prefixed `[MessagingDebug]`) for: conversation creation, activeConversation changes, realtime subscription lifecycle, avatar menu suppression path.
+- After capture, remove logs behind feature flag `process.env.NEXT_PUBLIC_DEBUG_MESSAGING`.
+
+### Risk Assessment
+- High risk of continued confusion without test coverage for multi-room switching & avatar menu triggers.
+- Potential RLS misconfiguration still unverified for messaging tables with DB ID participants.
+
+### Proposed Additional Acceptance Criteria
+1. Avatar menu opens within 150ms click on non-self user across at least 3 different floor plan contexts.
+2. Switching between 2 distinct rooms clears prior messages and loads only new room's history within 500ms (network permitting).
+3. Realtime INSERT for a room conversation triggers cache update exactly once (no duplicates) verified by message ID count.
+4. No console errors in happy-path interaction flows.
+
+---

@@ -73,8 +73,35 @@ export async function POST(request: NextRequest) {
     }
     
     // Convert file to arrayBuffer for upload
-    const bytes = await file.arrayBuffer();
-    const buffer = new Uint8Array(bytes);
+    // Support environments (tests) where File.arrayBuffer might not exist
+    let buffer: Uint8Array;
+    if (typeof (file as any).arrayBuffer === 'function') {
+      const bytes = await (file as any).arrayBuffer();
+      buffer = new Uint8Array(bytes);
+    } else {
+      // Fallback: read via stream
+      const reader = (file as any).stream?.().getReader?.();
+      const chunks: Uint8Array[] = [];
+      if (reader) {
+        // Read all chunks
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+            if (done) break;
+            if (value) chunks.push(value);
+        }
+        const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+        buffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const c of chunks) {
+          buffer.set(c, offset);
+          offset += c.length;
+        }
+      } else {
+        // Last resort empty buffer
+        buffer = new Uint8Array();
+      }
+    }
     
     // Upload file to Supabase Storage
     const { error: uploadError } = await supabase

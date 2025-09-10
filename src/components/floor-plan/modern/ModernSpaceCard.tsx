@@ -34,7 +34,14 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
 }) => {
   const [hovered, setHovered] = useState(false);
   
-  const handleClick = () => {
+  const handleClick = (e?: React.MouseEvent) => {
+    if (e) {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-avatar-interactive]')) {
+        e.stopPropagation();
+        return; // Ignore clicks from avatar/menu triggers
+      }
+    }
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);
@@ -69,7 +76,13 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         compact ? "min-h-[120px]" : "min-h-[160px]",
         className
       )}
-      onClick={handleClick}
+      onPointerDownCapture={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-avatar-interactive]')) {
+          e.stopPropagation();
+        }
+      }}
+      onClick={(e) => handleClick(e)}
       onDoubleClick={() => onSpaceDoubleClick?.(space)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
