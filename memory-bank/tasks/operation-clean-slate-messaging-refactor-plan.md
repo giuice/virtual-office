@@ -232,8 +232,22 @@ Notes:
     2.  Create a new, dedicated test hook: `/src/hooks/realtime/useRealtimeTest.ts`.
     3.  In `useRealtimeTest.ts`, write the simplest possible code to connect to Supabase and subscribe to database changes on a specific table (e.g., the `messages` table).
     4.  When an event is received, simply log it to the browser console: `console.log('Realtime event received:', payload)`.
-    5.  In the `realtime-test` page, use this hook and render a simple message like "Testing realtime connection... Check the console."
-    6.  Manually change data in your Supabase table and confirm the event is logged in the browser.
+  5.  In the `realtime-test` page, use this hook and render a simple message like "Testing realtime connection... Check the console."
+  6.  Manually change data in your Supabase table and confirm the event is logged in the browser.
+
+Status: Implemented (hook + page added)
+
+Files added:
+
+- `src/hooks/realtime/useRealtimeTest.ts`
+- `src/app/(dashboard)/realtime-test/page.tsx`
+
+How to verify:
+
+1. Start the dev server and open `/realtime-test`.
+2. Open the browser console.
+3. Insert/Update/Delete a row in the `public.messages` table (e.g., via Supabase SQL editor).
+4. You should see "Realtime event received:" logs reflecting the change.
 
 ### Task 1.4: Hotfix — Show Existing Messages on Open
 
@@ -243,6 +257,13 @@ Notes:
   2.  Update `messagingApi.getMessages` to send `cursorBefore` and normalize timestamps to `Date`.
   3.  Update `useMessages` initial query to reverse the initial page to ascending and wire `getNextPageParam` to `nextCursorBefore` (older paging).
   4.  Verify against a conversation with existing messages — ensure last messages render on open.
+
+Next Steps (in progress plan):
+
+- API: Add `cursorBefore`/`cursorAfter` handling with DESC + reverse behavior in `src/app/api/messages/get/route.ts` while keeping current offset path for backward compatibility during migration.
+- Repository: Extend `SupabaseMessageRepository.findByConversation` to support keyset pagination by `timestamp` when `before`/`after` are provided; fallback to current offset when not provided.
+- Client API: Evolve `messagingApi.getMessages` to accept `{ cursorBefore, cursorAfter }` and normalize `timestamp` to `Date` before returning.
+- Hook: Adjust `useMessages` to use `nextCursorBefore` and prepend older pages; remove realtime usage here (it will move to a dedicated subscription hook).
 
 ### Task 1.3: Solidify the `create-message` API Endpoint
 
@@ -255,6 +276,13 @@ Notes:
         *   It validates that `conversationId` and `content` are present.
         *   It creates the message in the database using the user's **database ID**, not their Supabase Auth UID.
         *   It returns the newly created message object on success.
+
+Status: Verified core flow present.
+
+Follow-ups:
+- Enforce `content.trim().length > 0` validation and return 400 on empty content.
+- Clamp `type` and `status` to `MessageType`/`MessageStatus` enums; fallback to safe defaults.
+- Add a TODO to update conversation `lastActivity` once repository interface supports partial updates.
 
 ---
 
