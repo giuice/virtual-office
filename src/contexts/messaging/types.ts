@@ -13,6 +13,7 @@ export interface MessagingContextType {
   // Conversations
   conversations: Conversation[];
   activeConversation: Conversation | null;
+  lastDirectConversation?: Conversation | null;
   loadingConversations: boolean;
   errorConversations: string | null;
   setActiveConversation: (conversation: Conversation | null) => void;

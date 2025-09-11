@@ -71,25 +71,24 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
       aria-label={onClick ? `User ${user.displayName}` : undefined}
     >
       <InteractiveUserAvatar
-        user={fullUserData ? {
-          ...fullUserData,
-          status: (user.status as any) || fullUserData.status,
-          statusMessage: user.statusMessage || fullUserData.statusMessage,
-          currentSpaceId: user.currentSpaceId,
-        } : {
+        user={{
+          // Start with the most complete user data available
+          ...(fullUserData || {}),
+          // Selectively overwrite with presence data, which is more up-to-date
+          ...user,
+          // Ensure critical fields are not lost
           id: user.id,
-          companyId: null,
-          supabase_uid: '',
-          email: '',
-          displayName: user.displayName,
-          avatarUrl: user.avatarUrl,
-          status: (user.status as any) || 'offline',
-          statusMessage: user.statusMessage,
-          preferences: {},
-          role: 'member',
-          lastActive: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          currentSpaceId: user.currentSpaceId,
+          displayName: user.displayName || fullUserData?.displayName || 'Unknown User',
+          avatarUrl: user.avatarUrl || fullUserData?.avatarUrl,
+          status: user.status || fullUserData?.status || 'offline',
+          // Ensure fields required by the User type are present, falling back as needed
+          companyId: fullUserData?.companyId || (user as any).companyId || null,
+          supabase_uid: (fullUserData as any)?.supabase_uid || (user as any)?.supabase_uid || '',
+          email: (fullUserData as any)?.email || (user as any)?.email || '',
+          preferences: fullUserData?.preferences || (user as any).preferences || {},
+          role: fullUserData?.role || (user as any).role || 'member',
+          lastActive: fullUserData?.lastActive || (user as any).lastActive || new Date().toISOString(),
+          createdAt: fullUserData?.createdAt || (user as any).createdAt || new Date().toISOString(),
         }}
         size={size}
         showStatus={showStatus}

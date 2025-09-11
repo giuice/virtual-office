@@ -21,7 +21,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { 
     activeConversation,
-    setActiveConversation
+    setActiveConversation,
+    lastDirectConversation,
   } = conversationsManager;
   
   // Get message management hooks
@@ -44,6 +45,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     // Conversations (from conversationsManager)
     conversations: conversationsManager.conversations,
     activeConversation: conversationsManager.activeConversation,
+    lastDirectConversation: conversationsManager.lastDirectConversation,
     loadingConversations: conversationsManager.loadingConversations,
     errorConversations: conversationsManager.errorConversations,
     setActiveConversation: conversationsManager.setActiveConversation,

@@ -14,11 +14,18 @@ export function useConversations() {
   // State for conversations
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [lastDirectConversation, setLastDirectConversation] = useState<Conversation | null>(null);
   const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
   
   // Subscribe to realtime updates using the Database User ID (canonical)
   useConversationRealtime(currentUserProfile?.id);
+
+  useEffect(() => {
+    if (activeConversation?.type === ConversationType.DIRECT) {
+      setLastDirectConversation(activeConversation);
+    }
+  }, [activeConversation]);
   
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
@@ -285,6 +292,7 @@ export function useConversations() {
   return {
     conversations,
     activeConversation,
+    lastDirectConversation,
     setActiveConversation,
     loadingConversations,
     errorConversations,

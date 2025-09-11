@@ -88,15 +88,15 @@ export function InteractiveUserAvatar({
       showTeleportActions={showTeleportActions}
       className={className}
     >
-      <button 
+            <button
         type="button"
-        className="cursor-pointer border-none bg-transparent p-0 focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+        className="relative focus:outline-none"
+        data-avatar-interactive="true"
         onClick={(e) => {
-          console.log('[InteractiveUserAvatar] Button clicked for user:', user.displayName);
-          // Temporarily remove stopPropagation to test
-          // e.stopPropagation();
+          console.log('[InteractiveUserAvatar] Button clicked, stopping propagation.');
+          e.preventDefault();
+          e.stopPropagation();
         }}
-        aria-label={ariaLabel || `${user.displayName}'s avatar - click for options`}
       >
         <EnhancedAvatarV2
           user={user}

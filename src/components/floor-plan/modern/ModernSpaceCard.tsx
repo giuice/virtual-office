@@ -34,21 +34,20 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
 }) => {
   const [hovered, setHovered] = useState(false);
   
-  const handleClick = (e?: React.MouseEvent) => {
+  const handleClick = (e?: React.MouseEvent<HTMLDivElement>) => {
     if (e) {
       const target = e.target as HTMLElement;
-      if (target.closest('[data-avatar-interactive]')) {
+      // Prevent clicks on interactive elements within the card from triggering navigation
+      if (target.closest('[data-avatar-interactive="true"]') || target.closest('a, button:not([data-space-action])')) {
         e.stopPropagation();
-        return; // Ignore clicks from avatar/menu triggers
+        return;
       }
     }
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);
     }
-  };
-
-  // Get type and status-based styling
+  };  // Get type and status-based styling
   const typeClasses = floorPlanHelpers.getSpaceTypeClasses(space.type);
   const statusClasses = floorPlanHelpers.getSpaceStatusClasses(
     space.status, 

@@ -20,12 +20,14 @@ interface MessagingDrawerProps {
  * Mounted at the root layout level to persist across page navigation.
  */
 export function MessagingDrawer({ className }: MessagingDrawerProps) {
-  const { activeConversation, setActiveConversation } = useMessaging();
+  const { activeConversation, setActiveConversation, lastDirectConversation } = useMessaging();
   const { currentUserProfile, companyUsers } = useCompany();
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Only show for direct conversations
-  if (!activeConversation || activeConversation.type !== ConversationType.DIRECT) {
+  const conversationToDisplay = activeConversation?.type === ConversationType.DIRECT ? activeConversation : lastDirectConversation;
+
+  // Only show if there's a direct conversation to display
+  if (!conversationToDisplay) {
     return null;
   }
 
@@ -38,12 +40,12 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   };
 
   // Get the other participant's name for display
-  const otherParticipantId = activeConversation.participants.find(
-    participantId => participantId !== currentUserProfile?.id
+  const otherParticipantId = conversationToDisplay.participants.find(
+    (participantId: string) => participantId !== currentUserProfile?.id
   );
   
-  const otherParticipant = companyUsers.find(user => user.id === otherParticipantId);
-  const conversationTitle = otherParticipant?.displayName || activeConversation.name || 'Direct Message';
+  const otherParticipant = companyUsers.find((user: any) => user.id === otherParticipantId);
+  const conversationTitle = otherParticipant?.displayName || conversationToDisplay.name || 'Direct Message';
 
   // Minimized state - just show a small indicator
   if (isMinimized) {
@@ -102,7 +104,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
 
         <CardContent className="flex-1 p-0 overflow-hidden">
           <MessageFeed
-            conversationId={activeConversation.id}
+            conversationId={conversationToDisplay.id}
             maxHeight="calc(100% - 60px)"
           />
         </CardContent>
