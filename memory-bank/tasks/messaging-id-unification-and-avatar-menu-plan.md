@@ -1,7 +1,7 @@
 # Messaging ID Unification + Avatar Menu — Junior Dev Plan
 
 Owner: Platform
-Status: In progress — core hooks refactored; UI/menu wired
+Status: REGRESSION — Critical messaging failures introduced, immediate fixes required
 Scope: Messaging (hooks, APIs, repos), Floor-plan avatar interactions, Realtime/UI wiring
 
 ## Goals
@@ -70,11 +70,12 @@ File: `src/app/api/messages/status/route.ts`
 - Change: Compare conversation participants with `userDbId` instead of Supabase UID. Use server client consistently where needed.
 - Acceptance: Only participants (DB ID) can mark messages delivered/read; sender DB ID remains for SENT/FAILED checks.
 
-### 5) messages/upload API (DB ID validation) — [ ]
+### 5) messages/upload API (DB ID validation) — [ ] BLOCKED BY REGRESSIONS
 File: `src/app/api/messages/upload/route.ts`
 - Current: Validates `conversation.participants.includes(userId)` (Supabase UID).
 - Change: Validate with `userDbId`. Continue storage logic unchanged.
 - Acceptance: Only participants by DB ID can upload; behavior unchanged otherwise.
+- **BLOCKED**: Must fix critical regressions first before completing this task.
 
 ### 6) Realtime/UI alignment for messages — [x]
 Files:
@@ -100,11 +101,12 @@ Files: `src/repositories/*`
 - Action: Confirm interfaces and implementations accept and store DB IDs for participants/senders. Keep `findBySupabaseUid()` only as boundary helper.
 - Acceptance: No repository APIs require Supabase UID for domain relations.
 
-### 9) Presence RLS correction (migration) — [ ] as-needed
+### 9) Presence RLS correction (migration) — [ ] BLOCKED BY REGRESSIONS  
 Files: `src/migrations/*` and new migration file
 - Action: Ensure RLS policies use `auth.uid()` mapped via `users.supabase_uid`; do not compare `users.id = auth.uid()`.
 - Deliver: Add a new migration that fixes the presence/messaging-related policies if any mismatch remains.
 - Acceptance: Policies compile; tests confirm authorized access with correct mapping.
+- **BLOCKED**: Must fix critical regressions first before addressing RLS policies.
 
 ## Coding Notes
 - Server code and API routes: use `createSupabaseServerClient()` from `src/lib/supabase/server-client.ts` (never the browser client). SSR cookie adapter updated to `getAll`/`setAll` per `@supabase/ssr`.
@@ -308,5 +310,66 @@ Manual Checks:
 2. Switching between 2 distinct rooms clears prior messages and loads only new room's history within 500ms (network permitting).
 3. Realtime INSERT for a room conversation triggers cache update exactly once (no duplicates) verified by message ID count.
 4. No console errors in happy-path interaction flows.
+
+---
+
+## CRITICAL REGRESSIONS IDENTIFIED (2025-09-11)
+
+### 1. Google Avatar Display Broken (HIGH PRIORITY)
+**Root Cause**: `ModernUserAvatar.tsx` now passes mock user data to `InteractiveUserAvatar`:
+```typescript
+// Lines 55-66: Creates mock user object with empty critical fields
+supabase_uid: '',
+email: '',
+```
+**Impact**: Google OAuth users' avatars don't display for other users (but show for self).
+**Technical Details**: `getAvatarUrl()` function requires actual `supabase_uid` and `email` from Google profile data, but receives empty strings from the mock user object.
+**Fix Required**: Pass through the actual user data instead of creating mock objects with empty auth fields.
+
+### 2. Chat Disappears on Navigation (HIGH PRIORITY)  
+**Root Cause**: `MessagingDrawer` (lines 28-29) only shows for `ConversationType.DIRECT` conversations. When user navigates to a space, the drawer disappears.
+**Impact**: Direct message conversations are lost when user moves between spaces.
+**Technical Details**: The drawer is correctly mounted in `layout.tsx` but conditional rendering removes it during navigation.
+**Fix Required**: Persist the drawer across navigation or implement proper conversation state management.
+
+### 3. No Realtime Message Delivery (CRITICAL)
+**Root Cause**: Multiple potential issues in the realtime pipeline:
+- Stale `activeConversation` causing subscription mismatches  
+- Message cache not clearing on room switches
+- ID mismatches in conversation creation/participant validation
+- Silent API failures in message sending
+**Impact**: Users in same room don't see each other's messages, no realtime notifications.
+**Technical Details**: 
+- `useMessageRealtime` may subscribe to wrong conversation ID
+- `queryClient.removeQueries` not called on room switches
+- Backend conversation records may have incorrect participant DB IDs
+**Fix Required**: Complete realtime subscription lifecycle management and cache invalidation.
+
+### Status Update (2025-09-11)
+**Current Priority**: CRITICAL - All three issues block core messaging functionality
+**Previous Status**: "In progress — core hooks refactored; UI/menu wired" 
+**New Status**: REGRESSION - Core functionality broken, requires immediate fixes
+
+### Immediate Action Items (Junior-Friendly)
+1. **Fix Google Avatar Display** (0.5 day)
+   - File: `src/components/floor-plan/modern/ModernUserAvatar.tsx:55-66`
+   - Action: Pass through actual user object fields instead of mock data
+   - Test: Verify Google OAuth user avatars show for other users
+
+2. **Fix Chat Disappearing** (0.5 day)  
+   - File: `src/components/messaging/MessagingDrawer.tsx:28-29`
+   - Action: Modify conditional rendering to persist direct conversations
+   - Test: Open DM, navigate to space, verify chat remains open
+
+3. **Fix Realtime Message Delivery** (1-2 days)
+   - Files: `useMessageRealtime.ts`, `useMessages.ts`, message APIs
+   - Action: Debug subscription lifecycle, add cache clearing, verify ID consistency
+   - Test: Send message in room, verify other users receive it immediately
+
+### Updated Risk Assessment  
+- **High Risk**: Complete messaging system unusable
+- **User Impact**: Core product value (virtual office communication) non-functional
+- **Technical Debt**: ID unification work introduced regressions
+- **Rollback Consideration**: May need to revert recent avatar integration changes
 
 ---

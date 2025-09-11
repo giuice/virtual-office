@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/tooltip';
 // EnhancedAvatarV2 is used internally by InteractiveUserAvatar
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
+import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 // Import the AvatarUser type
@@ -34,10 +35,27 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   tooltipPlacement = 'top',
   isOverlapping = false
 }) => {
-  // Only stop click bubbling so space card onClick doesn't fire.
-  // Avoid capture-phase / pointerdown interception which broke Radix Dropdown trigger.
+  const { companyUsers } = useCompany();
+
+  // Find the full user data from company users to get email and supabase_uid for proper avatar display
+  const fullUserData = companyUsers.find(companyUser => companyUser.id === user.id);
+
+  // Temporarily keep debug log for troubleshooting
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[ModernUserAvatar] Debug:', {
+      userId: user.id,
+      userDisplayName: user.displayName,
+      foundFullUser: !!fullUserData,
+      fullUserDisplayName: fullUserData?.displayName,
+      fullUserEmail: fullUserData?.email?.substring(0, 10) + '...',
+      hasFullUserAvatarUrl: !!fullUserData?.avatarUrl,
+      hasPresenceAvatarUrl: !!user.avatarUrl
+    });
+  }
+
+  // Temporarily disable stopPropagation to test menu
   const stopPropagationHandlers = {
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    // onClick: (e: React.MouseEvent) => e.stopPropagation(),
   } as const;
 
   const avatarCore = (
@@ -53,7 +71,12 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
       aria-label={onClick ? `User ${user.displayName}` : undefined}
     >
       <InteractiveUserAvatar
-        user={{
+        user={fullUserData ? {
+          ...fullUserData,
+          status: (user.status as any) || fullUserData.status,
+          statusMessage: user.statusMessage || fullUserData.statusMessage,
+          currentSpaceId: user.currentSpaceId,
+        } : {
           id: user.id,
           companyId: null,
           supabase_uid: '',

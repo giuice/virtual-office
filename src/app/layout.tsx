@@ -8,6 +8,7 @@ import { Toaster } from 'sonner';
 import { PresenceProvider } from '@/contexts/PresenceContext';
 import { CallingProvider } from '@/contexts/CallingContext';
 import { CallNotifications } from '@/components/messaging/CallNotification';
+import { MessagingDrawer } from '@/components/messaging/MessagingDrawer';
 import './globals.css';
 
 export default function RootLayout({
@@ -32,6 +33,7 @@ export default function RootLayout({
                     <CallingProvider>
                     {children}
                     <CallNotifications />
+                    <MessagingDrawer />
                     <Toaster richColors closeButton position="top-right" />
                     </CallingProvider>
                   </PresenceProvider>

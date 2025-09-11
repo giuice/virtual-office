@@ -1,5 +1,5 @@
 // src/hooks/useMessages.ts
-import { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
@@ -17,6 +17,20 @@ export function useMessages(activeConversationId: string | null) {
 
   // Subscribe to realtime updates that write into the cache
   useMessageRealtime(activeConversationId);
+
+  // Clear cache when conversation changes to prevent stale data
+  React.useEffect(() => {
+    if (activeConversationId) {
+      // Optional: Remove queries for all other conversations to save memory
+      queryClient.removeQueries({ 
+        queryKey: ['messages'], 
+        predicate: (query) => {
+          const [, conversationId] = query.queryKey;
+          return conversationId !== activeConversationId;
+        }
+      });
+    }
+  }, [activeConversationId, queryClient]);
 
   const {
     data,

@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getUserInitials, getAvatarUrl } from '@/lib/avatar-utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import { User } from '@/types/database';
@@ -54,11 +55,23 @@ export function UserInteractionMenu({
 }: UserInteractionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { user: currentUser } = useAuth();
+  const { currentUserProfile } = useCompany();
   const { getOrCreateUserConversation, setActiveConversation } = useMessaging();
   const { usersInSpaces } = usePresence();
 
-  // Don't show menu for current user
-  if (currentUser?.id === user.id) {
+  // Debug logging to understand what's happening
+  console.log('[UserInteractionMenu] Debug Info:', {
+    userDisplayName: user.displayName,
+    userId: user.id,
+    currentUserProfileId: currentUserProfile?.id,
+    currentUserProfileDisplayName: currentUserProfile?.displayName,
+    isCurrentUser: currentUserProfile?.id === user.id,
+    componentWillRender: currentUserProfile?.id !== user.id
+  });
+
+  // Don't show menu for current user - compare DB IDs
+  if (currentUserProfile?.id === user.id) {
+    console.log('[UserInteractionMenu] Returning children only - this is current user');
     return <>{children}</>;
   }
 
@@ -129,17 +142,34 @@ export function UserInteractionMenu({
     window.location.href = `mailto:${user.email}`;
   };
 
+  console.log('[UserInteractionMenu] Rendering DropdownMenu for user:', user.displayName);
+
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild className={className}>
+    <DropdownMenu open={isOpen} onOpenChange={(open) => {
+      console.log('[UserInteractionMenu] onOpenChange called with:', open);
+      setIsOpen(open);
+    }}>
+      <DropdownMenuTrigger 
+        asChild 
+        className={className}
+        onClick={(e) => {
+          console.log('[UserInteractionMenu] DropdownMenuTrigger clicked, current isOpen:', isOpen);
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+      >
         {children}
       </DropdownMenuTrigger>
       
       <DropdownMenuContent 
-        className="w-64 p-2" 
+        className="w-64 p-2 z-[1000]" 
         align="start"
         side="bottom"
         sideOffset={8}
+        onOpenAutoFocus={(e) => {
+          console.log('[UserInteractionMenu] DropdownMenuContent opened');
+        }}
       >
         {/* User Info Header */}
         <DropdownMenuLabel className="p-0 mb-2">

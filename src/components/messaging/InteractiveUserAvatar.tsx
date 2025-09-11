@@ -53,7 +53,15 @@ export function InteractiveUserAvatar({
   'aria-label': ariaLabel,
 }: InteractiveUserAvatarProps) {
   
+  console.log('[InteractiveUserAvatar] Debug:', {
+    userDisplayName: user.displayName,
+    userId: user.id,
+    showInteractionMenu,
+    willRenderMenu: showInteractionMenu
+  });
+
   if (!showInteractionMenu) {
+    console.log('[InteractiveUserAvatar] Rendering NON-interactive avatar for:', user.displayName);
     // Render non-interactive avatar
     return (
       <EnhancedAvatarV2
@@ -67,6 +75,8 @@ export function InteractiveUserAvatar({
     );
   }
 
+  console.log('[InteractiveUserAvatar] Rendering INTERACTIVE avatar with menu for:', user.displayName);
+
   // Render interactive avatar with menu
   return (
     <UserInteractionMenu
@@ -78,14 +88,23 @@ export function InteractiveUserAvatar({
       showTeleportActions={showTeleportActions}
       className={className}
     >
-      <EnhancedAvatarV2
-        user={user}
-        size={size}
-        showStatus={showStatus}
-        status={user.status}
-        onClick={() => {}} // Enable click behavior for menu trigger
+      <button 
+        type="button"
+        className="cursor-pointer border-none bg-transparent p-0 focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+        onClick={(e) => {
+          console.log('[InteractiveUserAvatar] Button clicked for user:', user.displayName);
+          // Temporarily remove stopPropagation to test
+          // e.stopPropagation();
+        }}
         aria-label={ariaLabel || `${user.displayName}'s avatar - click for options`}
-      />
+      >
+        <EnhancedAvatarV2
+          user={user}
+          size={size}
+          showStatus={showStatus}
+          status={user.status}
+        />
+      </button>
     </UserInteractionMenu>
   );
 }
