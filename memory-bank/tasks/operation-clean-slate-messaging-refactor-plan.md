@@ -17,6 +17,16 @@
 
 ---
 
+## Data Structure Insights (from existing tables)
+
+*   **Why:** Analyzing the existing database schema helps us understand the original design intent and avoid repeating past mistakes. These insights should guide our new implementation.
+*   **Key Findings:**
+    1.  **User ID Consistency is Critical:** The `messages` table has a `sender_id` (uuid) which links to the `users` table, not the `auth.users` table. This confirms our plan to standardize on using the internal database user ID (`users.id`) for all application logic is the correct approach.
+    2.  **Handle System Messages:** The `sender_id` on the `messages` table is nullable. This is a strong indicator that the system is designed to handle messages without a user sender, such as "User X has joined the room." Our new UI must gracefully handle these `null` sender IDs, likely by rendering a special system message format instead of a user avatar.
+    3.  **Use the `unread_count` Column:** The `conversations` table has an `unread_count` column of type `jsonb`. This is an efficient design that likely stores per-user counts (e.g., `{"user_id_1": 5, "user_id_2": 0}`). We should **not** try to calculate unread counts with expensive queries. Instead, our backend logic should focus on correctly incrementing/decrementing the values within this JSON object when a message is read.
+
+---
+
 ## 3. Phase 1: Research and Foundation (The "Right Way")
 
 *In this phase, we will not touch the existing messaging code. The goal is to prove our core technologies work correctly in isolation.*
@@ -27,7 +37,8 @@
 *   **Action:**
     1.  Use the **Context7** tool to query for the latest Supabase documentation.
     2.  Search for topics like: `Supabase Realtime`, `supabase-js v2 realtime`, `Next.js App Router realtime subscription`.
-    3.  Save the key examples and documentation snippets into a temporary file for reference.
+    3.  Update this document  the key examples and documentation snippets into a section called {## Updated References}
+	4. Check this Task as completed and Updated this document with all info that next dev will get the task can follow with our planning without problems. You can create a Section named {## Findings and Learned }
 
 ### Task 1.2: Isolate and Verify Realtime in a Test Environment
 
