@@ -20,9 +20,10 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
-    const limit = parseInt(searchParams.get('limit') || '20', 10);
-    const cursor = searchParams.get('cursor');
-    const direction = searchParams.get('direction') || 'older';
+  const limit = parseInt(searchParams.get('limit') || '20', 10);
+  const cursor = searchParams.get('cursor');
+  const cursorBefore = searchParams.get('cursorBefore');
+  const cursorAfter = searchParams.get('cursorAfter');
     
     // Validate required parameters
     if (!conversationId) {
@@ -40,28 +41,62 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Prepare pagination options with numeric cursor for offset-based pagination
+    // Keyset pagination flow
+    if (cursorBefore || cursorAfter) {
+      const paginationOptions: PaginationOptions = {
+        limit,
+        cursorBefore: cursorBefore || undefined,
+        cursorAfter: cursorAfter || undefined,
+      };
+
+      const messages: Message[] = await messageRepository.findByConversation(
+        conversationId,
+        paginationOptions
+      );
+
+      // Compute next cursors
+      let nextCursorBefore: string | undefined;
+      let hasMoreOlder = false;
+
+      if (messages.length > 0) {
+        nextCursorBefore = messages[0].timestamp.toISOString(); // oldest in returned window
+        // We cannot know hasMoreOlder without one extra fetch; do a cheap probe
+        if (!cursorAfter) {
+          const probe = await messageRepository.findByConversation(conversationId, {
+            limit: 1,
+            cursorBefore: nextCursorBefore,
+          });
+          hasMoreOlder = probe.length > 0;
+        }
+      }
+
+      return NextResponse.json({
+        messages,
+        nextCursorBefore,
+        hasMoreOlder,
+      });
+    }
+
+    // Backward-compatible offset-based flow, but emulate last-N initial window
+    const offset = cursor ? parseInt(cursor, 10) : 0;
     const paginationOptions: PaginationOptions = {
       limit: limit + 1, // Fetch one extra to determine hasMore
-      cursor: cursor ? parseInt(cursor, 10) : 0,
+      cursor: offset,
     };
 
-    // Fetch messages using repository
     const messages: Message[] = await messageRepository.findByConversation(
       conversationId,
       paginationOptions
     );
 
-    // Determine pagination info
     const hasMore = messages.length > limit;
     const actualMessages = hasMore ? messages.slice(0, limit) : messages;
-    const nextCursor = hasMore ? (paginationOptions.cursor as number) + limit : undefined;
+    const nextCursor = hasMore ? offset + limit : undefined;
 
-    // Return windowed response structure matching useMessages expectations
     return NextResponse.json({
       messages: actualMessages,
       nextCursor: nextCursor?.toString(),
-      hasMore: hasMore,
+      hasMore,
     });
   } catch (error) {
     console.error('Error getting messages:', error);

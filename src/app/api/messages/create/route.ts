@@ -22,9 +22,16 @@ export async function POST(request: NextRequest) {
     const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
 
     // Validate required fields
-    if (!body.conversationId || !body.content) {
+    if (!body.conversationId || typeof body.content !== 'string') {
       return NextResponse.json(
         { error: 'Missing required fields: conversationId, content' },
+        { status: 400 }
+      );
+    }
+    const trimmedContent = body.content.trim();
+    if (trimmedContent.length === 0) {
+      return NextResponse.json(
+        { error: 'Content must not be empty' },
         { status: 400 }
       );
     }
@@ -39,12 +46,20 @@ export async function POST(request: NextRequest) {
 
     // Prepare message data for repository using the Message type from messaging.ts
     // Apply Omit based on the structure of messaging.ts#Message
+    // Clamp enums to valid values; fallback to safe defaults
+    const safeType: MessageType = Object.values(MessageType).includes(body.type)
+      ? body.type
+      : MessageType.TEXT;
+    const safeStatus: MessageStatus = Object.values(MessageStatus).includes(body.status)
+      ? body.status
+      : MessageStatus.SENT;
+
     const messageData: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'attachments' | 'isEdited'> = {
       conversationId: body.conversationId,
       senderId: userRecord.id, // Use the database user ID as sender
-      content: body.content,
-      type: (body.type || 'text') as MessageType, // Use lowercase enum value
-      status: (body.status || 'sent') as MessageStatus, // Use lowercase enum value
+      content: trimmedContent,
+      type: safeType,
+      status: safeStatus,
       replyToId: body.replyToId,
       // attachments need separate handling/linking after creation if provided
     };
@@ -58,6 +73,7 @@ export async function POST(request: NextRequest) {
       // await conversationRepository.update(body.conversationId, { 
       //   lastActivity: new Date(),
       // });
+      // TODO: Update conversation lastActivity when repository supports partial updates
     } catch (updateError) {
       console.warn('Failed to update conversation last activity:', updateError);
       // Don't fail the request if conversation update fails

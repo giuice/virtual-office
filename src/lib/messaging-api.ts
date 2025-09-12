@@ -38,13 +38,16 @@ export const messagingApi = {
     conversationId: string,
     options?: {
       limit?: number;
-      cursor?: string;
-      direction?: 'older' | 'newer';
+      cursor?: string; // legacy offset cursor (kept for compatibility)
+      cursorBefore?: string; // ISO timestamp for older paging
+      cursorAfter?: string; // ISO timestamp for newer paging
     }
   ): Promise<{
     messages: Message[];
-    nextCursor?: string;
-    hasMore: boolean;
+    nextCursorBefore?: string;
+    hasMoreOlder?: boolean;
+    nextCursor?: string; // legacy
+    hasMore?: boolean;   // legacy
   }> {
     try {
       const params = new URLSearchParams();
@@ -54,13 +57,9 @@ export const messagingApi = {
         params.append('limit', options.limit.toString());
       }
       
-      if (options?.cursor) {
-        params.append('cursor', options.cursor);
-      }
-      
-      if (options?.direction) {
-        params.append('direction', options.direction);
-      }
+      if (options?.cursor) params.append('cursor', options.cursor);
+      if (options?.cursorBefore) params.append('cursorBefore', options.cursorBefore);
+      if (options?.cursorAfter) params.append('cursorAfter', options.cursorAfter);
       
       const response = await fetch(`/api/messages/get?${params.toString()}`);
       
@@ -70,6 +69,13 @@ export const messagingApi = {
       }
       
       const data = await response.json();
+      // Normalize timestamps to Date for client cache consistency
+      if (Array.isArray(data.messages)) {
+        data.messages = data.messages.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+      }
       return data;
     } catch (error) {
       console.error('Error fetching messages:', error);

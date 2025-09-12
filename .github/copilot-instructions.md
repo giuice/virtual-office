@@ -84,6 +84,18 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Canonical upload: `UploadableAvatar`
 - All other avatar components are **deprecated**. Replace calls with the canonical components as you touch files.
 
+## UI Interaction — Click-Stop Standard (critical)
+- Mark interactive children: Add `data-avatar-interactive` to any child that opens menus or triggers actions (avatars, dropdown triggers, buttons inside cards).
+- Parent guard: In parent clickable containers (e.g., space cards like `SpaceElement`), the click handler must:
+   - Early-return if `!event.currentTarget.contains(event.target as Node)` to ignore events bubbling from Radix/shadcn portals.
+   - Early-return if the target `closest('[data-avatar-interactive]')` or `closest('a, button, [role="button"], [data-space-action]')` matches.
+- Portal menus (Radix/shadcn): On `DropdownMenuContent`, stop propagation on `onPointerDown`, `onClick`, and `onKeyDown`; on `DropdownMenuItem`, cancel `onSelect` and stop propagation in `onClick`. Also mark the content with `data-avatar-interactive`.
+- Avatars/menus: Wrappers like `UserAvatarPresence` and `UserInteractionMenu` must stop propagation on pointer/click to prevent space navigation when interacting with messaging actions.
+
+## UI Libraries — Migration Note
+- Current: shadcn/ui + Radix.
+- Later: Plan to update/replace shadcn components with DaisyUI equivalents; keep interaction contracts and data attributes stable to simplify the swap.
+
 ## Workflows (concise)
 - Auth & Onboarding: Register → Email/Google → Profile → Company. `src/app/(auth)/`
 - Dashboard: Login → Dashboard → Quick links. `src/app/(dashboard)/dashboard/`

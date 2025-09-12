@@ -32,7 +32,22 @@ const SpaceElement: React.FC<SpaceElementProps> = ({
 }) => {
   const [hovered, setHovered] = useState(false);
   
-  const handleClick = () => {
+  const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    const target = e.target as HTMLElement;
+    // Ignore events coming from React portals (menu overlays) that bubble through React tree
+    if (!(e.currentTarget as HTMLElement).contains(target)) {
+      e.stopPropagation();
+      return;
+    }
+    // Ignore clicks originating from interactive elements
+    if (
+      target.closest('[data-avatar-interactive]') ||
+      target.closest('[data-avatar-interactive="true"]') ||
+      target.closest('a, button, [role="button"], [data-space-action]')
+    ) {
+      e.stopPropagation();
+      return;
+    }
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);

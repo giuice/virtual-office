@@ -9,14 +9,12 @@ import {
   FileAttachment,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
-import { useMessageRealtime } from '@/hooks/realtime/useMessageRealtime';
 
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
 
-  // Subscribe to realtime updates that write into the cache
-  useMessageRealtime(activeConversationId);
+  // Realtime is handled by a dedicated hook: useMessageSubscription
 
   // Clear cache when conversation changes to prevent stale data
   React.useEffect(() => {
@@ -47,20 +45,21 @@ export function useMessages(activeConversationId: string | null) {
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       if (!activeConversationId) {
-        return { messages: [], hasMore: false, nextCursor: undefined };
+        return { messages: [], hasMoreOlder: false, nextCursorBefore: undefined };
       }
+      // When pageParam is provided, it is the oldest visible timestamp (ISO)
       const res = await messagingApi.getMessages(activeConversationId, {
         limit: 20,
-        direction: 'older',
-        cursor: pageParam,
+        cursorBefore: pageParam,
       });
-      return res; // { messages, hasMore, nextCursor }
+      return res; // { messages, hasMoreOlder, nextCursorBefore }
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.nextCursorBefore,
   });
 
   const messages: Message[] = useMemo(() => {
     if (!data?.pages) return [];
+    // Pages represent windows from older->newer already; flatten preserves order
     return data.pages.flatMap((p) => p.messages);
   }, [data]);
 

@@ -13,6 +13,16 @@ export interface PaginationOptions {
    * The exact type (string, number) might depend on the database implementation.
    */
   cursor?: string | number;
+  /**
+   * Keyset pagination: return items strictly older than this ISO timestamp.
+   * When provided, offset-based pagination is ignored.
+   */
+  cursorBefore?: string;
+  /**
+   * Keyset pagination: return items strictly newer than this ISO timestamp.
+   * When provided, offset-based pagination is ignored.
+   */
+  cursorAfter?: string;
   // Add other common options like sorting if needed
   // sortBy?: string;
   // sortDirection?: 'asc' | 'desc';

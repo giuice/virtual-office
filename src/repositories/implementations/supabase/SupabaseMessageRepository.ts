@@ -138,22 +138,60 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   async findByConversation(conversationId: string, options?: PaginationOptions): Promise<Message[]> {
     const limit = options?.limit ?? 50; // Default limit for messages
-    // Supabase range is inclusive [from, to]
-    const from = typeof options?.cursor === 'number' ? options.cursor : 0;
-    const to = from + limit - 1;
 
-    // Query messages for the conversation
-    // Ordering by timestamp ascending to get oldest first for display
-    const { data, error } = await this.supabaseClient
-      .from(this.MSG_TABLE_NAME)
-      .select('*') // TODO: Select related reactions/attachments if needed
-      .eq('conversation_id', conversationId) // Assuming snake_case
-      .order('timestamp', { ascending: true })
-      .range(from, to);
+    // Keyset pagination by timestamp when provided
+    const hasCursorBefore = !!options?.cursorBefore;
+    const hasCursorAfter = !!options?.cursorAfter;
 
-    if (error) {
-      console.error('Error fetching messages by conversation:', error);
-      throw error;
+    let data: any[] | null = null;
+    let error: any | null = null;
+
+    if (hasCursorBefore || hasCursorAfter) {
+      // Use keyset pagination
+      let query = this.supabaseClient
+        .from(this.MSG_TABLE_NAME)
+        .select('*')
+        .eq('conversation_id', conversationId);
+
+      if (hasCursorBefore) {
+        query = query.lt('timestamp', options!.cursorBefore!);
+        // Get older messages relative to cursorBefore, newest-first to apply limit
+        query = query.order('timestamp', { ascending: false }).limit(limit);
+      } else if (hasCursorAfter) {
+        query = query.gt('timestamp', options!.cursorAfter!);
+        // Get newer messages relative to cursorAfter, oldest-first for append
+        query = query.order('timestamp', { ascending: true }).limit(limit);
+      }
+
+      const res = await query;
+      data = res.data as any[] | null;
+      error = res.error;
+      if (error) {
+        console.error('Error fetching messages by conversation (keyset):', error);
+        throw error;
+      }
+      // For cursorBefore branch, data is DESC; reverse to ASC for rendering
+      if (hasCursorBefore && data) {
+        data = [...data].reverse();
+      }
+    } else {
+      // Backward-compatible path: offset-based pagination
+      // Supabase range is inclusive [from, to]
+      const from = typeof options?.cursor === 'number' ? options.cursor : 0;
+      const to = from + limit - 1;
+
+      const res = await this.supabaseClient
+        .from(this.MSG_TABLE_NAME)
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('timestamp', { ascending: true })
+        .range(from, to);
+      data = res.data as any[] | null;
+      error = res.error;
+      if (error) {
+        console.error('Error fetching messages by conversation (offset):', error);
+        throw error;
+      }
     }
 
     if (!data || data.length === 0) {

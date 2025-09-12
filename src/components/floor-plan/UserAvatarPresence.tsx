@@ -22,7 +22,8 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
     offline: 'bg-gray-400',
   }[user.status || 'offline'] || 'bg-gray-400';
 
-  const handleClick = () => {
+  const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    e.stopPropagation();
     if (onClick) {
       onClick(user.id);
     }
@@ -34,6 +35,8 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ user, onClick }
         <TooltipTrigger asChild>
           <div
             className="relative inline-block"
+            data-avatar-interactive
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={handleClick}
             role={onClick ? 'button' : undefined}
             aria-label={onClick ? `User ${user.displayName}` : undefined}

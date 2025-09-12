@@ -152,6 +152,7 @@ export function UserInteractionMenu({
       <DropdownMenuTrigger 
         asChild 
         className={className}
+        data-avatar-interactive
         onClick={(e) => {
           console.log('[UserInteractionMenu] DropdownMenuTrigger clicked, current isOpen:', isOpen);
           e.preventDefault();
@@ -167,9 +168,10 @@ export function UserInteractionMenu({
         align="start"
         side="bottom"
         sideOffset={8}
-        onOpenAutoFocus={(e) => {
-          console.log('[UserInteractionMenu] DropdownMenuContent opened');
-        }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        data-avatar-interactive
       >
         {/* User Info Header */}
         <DropdownMenuLabel className="p-0 mb-2">
@@ -223,7 +225,8 @@ export function UserInteractionMenu({
 
         {/* Primary Actions */}
         <DropdownMenuItem 
-          onClick={handleSendMessage}
+          onClick={(e) => { e.stopPropagation(); handleSendMessage(); }}
+          onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer focus:bg-primary/10"
         >
           <MessageSquare className="h-4 w-4 mr-3 text-primary" />
@@ -237,7 +240,8 @@ export function UserInteractionMenu({
         {showCallActions && user.status !== 'offline' && (
           <>
             <DropdownMenuItem 
-              onClick={handleCall}
+              onClick={(e) => { e.stopPropagation(); handleCall(); }}
+              onSelect={(e) => { e.preventDefault(); }}
               className="cursor-pointer"
               disabled={user.status === 'busy'}
             >
@@ -252,7 +256,8 @@ export function UserInteractionMenu({
 
             {userLocation && showTeleportActions && (
               <DropdownMenuItem 
-                onClick={handleTeleportToUser}
+                onClick={(e) => { e.stopPropagation(); handleTeleportToUser(); }}
+                onSelect={(e) => { e.preventDefault(); }}
                 className="cursor-pointer"
               >
                 <Zap className="h-4 w-4 mr-3 text-purple-600" />
@@ -269,7 +274,8 @@ export function UserInteractionMenu({
 
         {/* Secondary Actions */}
         <DropdownMenuItem 
-          onClick={handleEmailUser}
+          onClick={(e) => { e.stopPropagation(); handleEmailUser(); }}
+          onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer"
         >
           <Mail className="h-4 w-4 mr-3 text-gray-600" />
@@ -277,7 +283,8 @@ export function UserInteractionMenu({
         </DropdownMenuItem>
 
         <DropdownMenuItem 
-          onClick={handleViewProfile}
+          onClick={(e) => { e.stopPropagation(); handleViewProfile(); }}
+          onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer"
         >
           <Info className="h-4 w-4 mr-3 text-gray-600" />
