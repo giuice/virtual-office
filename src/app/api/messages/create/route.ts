@@ -67,13 +67,21 @@ export async function POST(request: NextRequest) {
     // Create message using repository
     const createdMessage = await messageRepository.create(messageData);
 
-    // Update conversation last activity
+    // Update conversation last activity and increment unread counts for other participants
     try {
-      // Update conversation last activity - commented out due to interface mismatch
-      // await conversationRepository.update(body.conversationId, { 
-      //   lastActivity: new Date(),
-      // });
-      // TODO: Update conversation lastActivity when repository supports partial updates
+      await conversationRepository.updateLastActivityTimestamp(body.conversationId);
+
+      try {
+        const convo = await conversationRepository.findById(body.conversationId);
+        if (convo && Array.isArray(convo.participants)) {
+          const recipients = convo.participants.filter((pid) => pid !== userRecord.id);
+          if (recipients.length > 0) {
+            await conversationRepository.incrementUnreadCount(convo.id, recipients);
+          }
+        }
+      } catch (unreadErr) {
+        console.warn('Failed to increment unread counts:', unreadErr);
+      }
     } catch (updateError) {
       console.warn('Failed to update conversation last activity:', updateError);
       // Don't fail the request if conversation update fails

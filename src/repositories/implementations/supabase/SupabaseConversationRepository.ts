@@ -325,4 +325,46 @@ export class SupabaseConversationRepository implements IConversationRepository {
       throw error;
     }
   }
+
+  async addParticipant(id: string, userId: string): Promise<Conversation | null> {
+    try {
+      // Fetch current participants
+      const { data: conversation, error: fetchError } = await this.supabaseClient
+        .from(this.TABLE_NAME)
+        .select('participants')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching conversation for addParticipant:', fetchError);
+        return null;
+      }
+
+      const participants: string[] = Array.isArray(conversation?.participants) ? conversation.participants : [];
+      if (participants.includes(userId)) {
+        // Already a participant; return current conversation state
+        const existing = await this.findById(id);
+        return existing;
+      }
+
+      const updatedParticipants = [...participants, userId];
+
+      const { data: updated, error: updateError } = await this.supabaseClient
+        .from(this.TABLE_NAME)
+        .update({ participants: updatedParticipants })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (updateError) {
+        console.error('Error updating participants in addParticipant:', updateError);
+        return null;
+      }
+
+      return updated ? mapToCamelCase(updated as ConversationRow) : null;
+    } catch (error) {
+      console.error(`Repository error in addParticipant(${id}, ${userId}):`, error);
+      throw error;
+    }
+  }
 }

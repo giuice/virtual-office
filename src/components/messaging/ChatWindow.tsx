@@ -7,7 +7,7 @@ import { MessageInput } from './MessageInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Message } from '@/types/messaging';
-import { useMessageRealtime } from '@/hooks/realtime/useMessageRealtime';
+import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
 import { Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 
 interface ChatWindowProps {
@@ -37,7 +37,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isAtBottom, setIsAtBottom] = useState(true);
 
   // Set up realtime subscription for this conversation
-  const { connectionStatus, isConnected } = useMessageRealtime(conversationId, true);
+  const { status: connectionStatus } = useMessageSubscription(conversationId, { isActive: true });
+  const isConnected = connectionStatus === 'SUBSCRIBED';
 
   // Windowed message loading with infinite query
   const {

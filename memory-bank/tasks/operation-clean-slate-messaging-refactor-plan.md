@@ -80,23 +80,59 @@
 
 ---
 
-## Progress Update — 2025-09-12
+## Findings — 2025-09-13 (Joined from Debugging)
+- Dev noise: 404s for `/_next/src/*` and `/src/*` seen during dev (Next dev overlay/source-maps). Mitigated by excluding these in `middleware` matcher.
+- Presence logs: `useUserPresence` initialized with `userId: undefined` when outside a space. Benign during messaging debug.
+- Join flow: Adding a participant to a conversation can be blocked by RLS. Solution: use server-side Supabase service client for the participant update; keep normal auth for user context.
+- Realtime: Subscription filter stable with `conversation_id=eq.<id>`. Cache writes append to the last page; dedupe by `id`. Timestamps normalized to `Date`.
+- Message create: After insert, update `conversations.lastActivity` and increment `unread_count` for non-senders. These failures are non-fatal and logged.
 
-Completed
-- API `GET /api/messages/get`: added `cursorBefore`/`cursorAfter`, initial last-N via DESC + reverse, legacy offset path preserved.
-- Repository `SupabaseMessageRepository.findByConversation`: keyset-by-timestamp with `lt/gt`; reverse for `cursorBefore`; offset fallback kept.
-- Client API `messagingApi.getMessages`: accepts new cursors; normalizes `timestamp` to `Date`.
-- Hook `useMessages`: uses keyset pagination, `nextCursorBefore`, and removes inline realtime logic.
-- Create-message API: trims content, rejects empty; clamps `type`/`status` to enums; TODO for `lastActivity`.
-- UI Interaction (Click-Stop Standard): implemented guards in `SpaceElement`; marked `UserAvatarPresence` and `UserInteractionMenu` as interactive; stopped propagation for Radix portal content and items. Documented in `/.github/copilot-instructions.md`.
+---
 
-Next
-1) Realtime: implement `src/hooks/realtime/useMessageSubscription.ts` to append/merge events into the cache, dedup by `id`, and handle edits/deletes.
-2) Migrate any remaining consumers to keyset semantics (`nextCursorBefore`/`hasMoreOlder`) and prepend on older loads.
-3) Conversation `lastActivity`: add repository support for partial updates; update on message creation.
-4) Unread counts: update `conversations.unread_count` on insert/read and render badges; wire to notifications.
-5) Tests: unit tests for repository keyset/route; UI tests for paging and click-stop (no teleport on menu actions).
-6) UI Migration (future): plan shadcn → DaisyUI while preserving `data-avatar-interactive` and portal event-stopping contracts.
+## Progress Update — 2025-09-13
+- API `POST /api/messages/create`: now also updates `lastActivity` and increments `unread_count`.
+- API `POST /api/conversations/join`: uses service-role client for RLS-safe participant add; 404 if conversation missing; improved errors.
+- Middleware: matcher excludes `/_next/*`, `__nextjs`, and `/src/*` to reduce dev noise.
+- Hook `useMessageSubscription`: implemented for INSERT; wired into ChatWindow; deprecate legacy `useMessageRealtime` (migration pending).
+- Context wiring: plan to centralize subscription in `MessagingContext` to avoid duplicate per-component subscriptions (pending).
+
+---
+
+## TODO — Next Session (Prioritized)
+1) Realtime cache completeness:
+   - Extend `useMessageSubscription` to handle UPDATE and DELETE: update message fields (`content`, `status`, `isEdited`, `reactions`), and remove on DELETE. Maintain pagination cache shape.
+
+2) Subscription centralization:
+   - Wire `useMessageSubscription` in `MessagingContext` for the active conversation; ensure no duplicate subscriptions exist. Migrate remaining consumers from `useMessageRealtime`.
+
+3) Unread UX:
+   - Conversation list badge: read from `conversations.unread_count[userId]`.
+   - Clear on read: on conversation focus, call API to zero unread for current user; update cache optimistically.
+
+4) Debug join UX:
+   - On `src/app/debug/messaging-test/page.tsx`, add a small "Join by Conversation ID" input + button that calls the join API. Show success/error.
+
+5) Tests (Vitest/Playwright):
+   - Unit: `useMessageSubscription` cache updates (INSERT/UPDATE/DELETE).
+   - API: messages/create updates `lastActivity` and unread; conversations/join respects RLS via service client.
+   - E2E (dev): two-browser realtime delivery smoke test for a shared conversation.
+
+6) Cleanup:
+   - Remove deprecated `useMessageRealtime` after migration.
+   - Verify middleware matcher in prod build; ensure no legit routes are excluded.
+
+7) Docs:
+   - Update any developer README snippets for messaging flow, cache keys, and subscription policy.
+
+---
+
+## Quick Verification Steps
+- Commands:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run dev`
+- Manual:
+  - Open two sessions, join the same conversation via debug tools, send a message. Expect realtime delivery, conversation bump (lastActivity), and unread increase for the non-active user. Dev console noise for `/_next/src/*` should be minimal after middleware matcher change.
 
 # APPENDICE
 ## Updated References

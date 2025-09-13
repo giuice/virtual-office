@@ -197,6 +197,23 @@ export const messagingApi = {
   },
 
   /**
+   * Join an existing conversation by ID (adds current user to participants)
+   */
+  async joinConversation(conversationId: string): Promise<Conversation> {
+    const response = await fetch('/api/conversations/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to join conversation');
+    }
+    const data = await response.json();
+    return data.conversation as Conversation;
+  },
+
+  /**
    * Add a reaction to a message
    */
   async addReaction(messageId: string, reaction: string, userId: string): Promise<void> {

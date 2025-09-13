@@ -16,7 +16,9 @@ export default function MessagingTestPage() {
   const { user } = useAuth();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [testConversationId, setTestConversationId] = useState('');
+  const [joinConversationId, setJoinConversationId] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isJoiningConversation, setIsJoiningConversation] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, 'pending' | 'success' | 'error'>>({});
   const [testMessages, setTestMessages] = useState<string[]>([]);
 
@@ -58,6 +60,28 @@ export default function MessagingTestPage() {
       addTestMessage(`Created test conversation: ${conversation.id}`);
     } finally {
       setIsCreatingConversation(false);
+    }
+  };
+
+  const joinExistingConversation = async () => {
+    if (!user) {
+      addTestMessage('❌ User not authenticated');
+      return;
+    }
+    if (!joinConversationId.trim()) {
+      addTestMessage('❌ Provide a conversation ID to join');
+      return;
+    }
+    setIsJoiningConversation(true);
+    try {
+      const convo = await messagingApi.joinConversation(joinConversationId.trim());
+      setActiveConversationId(convo.id);
+      setTestConversationId(convo.id);
+      addTestMessage(`✅ Joined conversation: ${convo.id}`);
+    } catch (e) {
+      addTestMessage(`❌ Failed to join: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setIsJoiningConversation(false);
     }
   };
 
@@ -207,6 +231,17 @@ export default function MessagingTestPage() {
               )}
               Create Test Conversation
             </Button>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Paste conversation ID"
+                value={joinConversationId}
+                onChange={(e) => setJoinConversationId(e.target.value)}
+                className="w-64"
+              />
+              <Button onClick={joinExistingConversation} disabled={isJoiningConversation} variant="secondary">
+                {isJoiningConversation ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Join Conversation'}
+              </Button>
+            </div>
             
             {testConversationId && (
               <div className="flex items-center gap-2 text-sm">

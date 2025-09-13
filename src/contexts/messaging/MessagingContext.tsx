@@ -10,6 +10,7 @@ import {
 import { MessagingContextType } from './types';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
+import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
@@ -27,6 +28,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
+  // Subscribe to realtime for the active conversation
+  useMessageSubscription(activeConversation?.id || null, { isActive: true });
   
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {

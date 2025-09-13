@@ -78,4 +78,10 @@ export interface IConversationRepository {
   incrementUnreadCount(id: string, userIdsToIncrement: string[]): Promise<boolean>;
 
   // Add other methods as needed, e.g., findByParticipants, addParticipant, removeParticipant
+
+  /**
+   * Adds a participant (by database user ID) to a conversation's participants list.
+   * No-op if the user is already a participant.
+   */
+  addParticipant(id: string, userId: string): Promise<Conversation | null>;
 }

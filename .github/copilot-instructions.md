@@ -173,3 +173,4 @@ When asked to create, refactor, or improve code, follow this sequence and never 
 
 Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
 Status: Pending user confirmation, until user confirms
+

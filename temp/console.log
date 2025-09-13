@@ -1,267 +1,105 @@
-﻿
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useProtectedRoute.ts:41 API may be failing but user is authenticated - allowing access
-CompanyContext.tsx:55 [CompanyContext] Starting data load for Supabase UID: 7ca13768-f049-4fab-9979-e37485c687ea
-debug-logger.ts:21 [Avatar] WARNING: No valid Google avatar URL found in OAuth data 
-{availableFields: Array(5), userId: undefined}
-api.ts:20 Syncing user profile via API: 
-{supabase_uid: '7ca13768-f049-4fab-9979-e37485c687ea', email: 'giuice@yahoo.com', displayName: 'giuice@yahoo.com', googleAvatarUrl: undefined}
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: undefined
-PresenceContext.tsx:41 [PresenceContext] Current user ID: not set
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: not in space
-CompanyContext.tsx:81 [CompanyContext] User profile synced/retrieved for 7ca13768-f049-4fab-9979-e37485c687ea, DB ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-CompanyContext.tsx:98 [CompanyContext] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 belongs to company 7d71f32f-5436-4aad-8bb6-80ffa5d78f97, loading company data...
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:307 [Presence] Supabase subscription status: SUBSCRIBED
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-SupabaseSpaceRepository.ts:74 Fetching spaces for company ID: 7d71f32f-5436-4aad-8bb6-80ffa5d78f97
-SupabaseSpaceRepository.ts:87 Raw Supabase spaces data: [
-  {
-    "id": "ce057c6f-c75c-4f23-bfda-b77165af8325",
-    "company_id": "7d71f32f-5436-4aad-8bb6-80ffa5d78f97",
-    "name": "dev team",
-    "type": "workspace",
-    "status": "available",
-    "capacity": 4,
-    "features": [
-      "video"
-    ],
-    "position": {
-      "x": 100,
-      "y": 100,
-      "width": 200,
-      "height": 150
-    },
-    "description": "",
-    "access_control": {
-      "isPublic": true
-    },
-    "created_by": "5cf7e176-4ac2-441d-8819-f6266cb20429",
-    "created_at": "2025-04-16T00:33:00.280617+00:00",
-    "updated_at": "2025-04-16T00:33:00.280617+00:00",
-    "is_template": false,
-    "template_name": null
-  },
-  {
-    "id": "72681540-6bc7-4e4c-ba4d-0293c5007e65",
-    "company_id": "7d71f32f-5436-4aad-8bb6-80ffa5d78f97",
-    "name": "cozinha",
-    "type": "social",
-    "status": "available",
-    "capacity": 14,
-    "features": [],
-    "position": {
-      "x": 100,
-      "y": 100,
-      "width": 200,
-      "height": 150
-    },
-    "description": "Comidaa!",
-    "access_control": {
-      "isPublic": true
-    },
-    "created_by": "5cf7e176-4ac2-441d-8819-f6266cb20429",
-    "created_at": "2025-04-16T00:35:57.824029+00:00",
-    "updated_at": "2025-04-16T00:35:57.824029+00:00",
-    "is_template": false,
-    "template_name": null
-  },
-  {
-    "id": "8d84bbc5-400e-4b1f-b56c-6ee743ab80a2",
-    "company_id": "7d71f32f-5436-4aad-8bb6-80ffa5d78f97",
-    "name": "Jogos",
-    "type": "breakout",
-    "status": "available",
-    "capacity": 20,
-    "features": [],
-    "position": {
-      "x": 100,
-      "y": 100,
-      "width": 200,
-      "height": 150
-    },
-    "description": "Diversão",
-    "access_control": {
-      "isPublic": true
-    },
-    "created_by": "5cf7e176-4ac2-441d-8819-f6266cb20429",
-    "created_at": "2025-04-16T00:37:20.376389+00:00",
-    "updated_at": "2025-04-16T00:37:20.376389+00:00",
-    "is_template": false,
-    "template_name": null
-  },
-  {
-    "id": "89f884b2-2b23-4647-aa04-61be6e2fb8fb",
-    "company_id": "7d71f32f-5436-4aad-8bb6-80ffa5d78f97",
-    "name": "Salao de Festas",
-    "type": "lounge",
-    "status": "available",
-    "capacity": 30,
-    "features": [
-      "desk",
-      "snacks",
-      "screens"
-    ],
-    "position": {
-      "x": 100,
-      "y": 100,
-      "width": 200,
-      "height": 150
-    },
-    "description": "Esse é pra cachaça",
-    "access_control": {
-      "isPublic": true
-    },
-    "created_by": "5cf7e176-4ac2-441d-8819-f6266cb20429",
-    "created_at": "2025-04-16T00:43:39.634614+00:00",
-    "updated_at": "2025-04-16T00:43:39.634614+00:00",
-    "is_template": false,
-    "template_name": null
-  },
-  {
-    "id": "78169b4f-7200-4555-8c0e-fdbfb235de66",
-    "company_id": "7d71f32f-5436-4aad-8bb6-80ffa5d78f97",
-    "name": "Sala do Prof. Pardal",
-    "type": "lab",
-    "status": "active",
-    "capacity": 4,
-    "features": [
-      "screens",
-      "projector",
-      "natural-light",
-      "quiet",
-      "flexible-seating",
-      "desk",
-      "coffee",
-      "whiteboard"
-    ],
-    "position": {
-      "x": 100,
-      "y": 100,
-      "width": 200,
-      "height": 150
-    },
-    "description": "Onde as descobertas sao maravilhosas!",
-    "access_control": {
-      "isPublic": true
-    },
-    "created_by": "5cf7e176-4ac2-441d-8819-f6266cb20429",
-    "created_at": "2025-04-16T01:24:34.292606+00:00",
-    "updated_at": "2025-04-16T01:24:34.292606+00:00",
-    "is_template": false,
-    "template_name": null
-  }
-]
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useAutoRoomConversation.ts:24 [useAutoRoomConversation] Auto-creating room conversation for space: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useAutoRoomConversation.ts:34 [useAutoRoomConversation] Successfully joined room conversation: 
-{id: '744c644a-1525-4c96-b460-09cc1b2493f0', type: 'room', participants: Array(1), lastActivity: '2025-09-11T13:49:42.761Z', name: 'Salao de Festas', …}
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useMessageRealtime.ts:26 [useMessageRealtime] Setting up subscription for conversation: 744c644a-1525-4c96-b460-09cc1b2493f0
-useMessageRealtime.ts:166 [useMessageRealtime] Subscription status: SUBSCRIBED
-useMessageRealtime.ts:171 [useMessageRealtime] Successfully subscribed to message updates
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-CompanyContext.tsx:106 [CompanyContext] Loaded 2 users and 5 spaces for company 7d71f32f-5436-4aad-8bb6-80ffa5d78f97
-CompanyContext.tsx:130 [CompanyContext] Data loading finished.
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useRealtimeTest.ts:9 Attempting to subscribe to realtime changes on `messages` table...
-useProtectedRoute.ts:47 useProtectedRoute check: 
-{requireCompany: true, hasCompanyId: true, currentUserProfile: {…}, companyLoading: false, redirectAttempted: false}
-useRealtimeTest.ts:37 Unsubscribing from realtime channel...
-useRealtimeTest.ts:31 Realtime channel closed.
-useRealtimeTest.ts:9 Attempting to subscribe to realtime changes on `messages` table...
-useRealtimeTest.ts:22 Successfully subscribed to realtime channel!
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-useUserPresence.ts:15 [useUserPresence] Initialize with userId: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:41 [PresenceContext] Current user ID: a8dfbf32-4c5f-4283-8187-9c568eb6db46
-PresenceContext.tsx:42 [PresenceContext] Current user space ID: 89f884b2-2b23-4647-aa04-61be6e2fb8fb
-﻿
-
+﻿ GET /src/lib/serializer.ts 404 in 489ms
+[Middleware] Path: /_next/src/RealtimeChannel.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /_next/src/RealtimeClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/lib/timer.ts 404 in 508ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/packages/StorageFileApi.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/lib/transformers.ts 404 in 517ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/packages/StorageBucketApi.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/lib/push.ts 404 in 547ms
+[Middleware] Path: /_next/src/StorageClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /_next/src/RealtimePresence.ts 404 in 632ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/lib/SupabaseAuthClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /_next/src/RealtimeChannel.ts 404 in 496ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /_next/src/RealtimeClient.ts 404 in 484ms
+[Middleware] Path: /_next/src/SupabaseClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /src/packages/StorageFileApi.ts 404 in 466ms
+[Middleware] Path: /_next/src/version.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /src/packages/StorageBucketApi.ts 404 in 427ms
+[Middleware] Path: /src/utils/helpers.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/utils/constants.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /_next/src/StorageClient.ts 404 in 486ms
+[Middleware] Path: /src/utils/chunker.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /src/lib/SupabaseAuthClient.ts 404 in 429ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/utils/base64url.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /_next/src/SupabaseClient.ts 404 in 430ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /src/utils/index.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /_next/src/version.ts 404 in 431ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /_next/src/cookies.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/utils/helpers.ts 404 in 430ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /_next/src/createBrowserClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/utils/constants.ts 404 in 425ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+[Middleware] Path: /_next/src/createServerClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+ GET /src/utils/chunker.ts 404 in 475ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /src/utils/base64url.ts 404 in 487ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /src/utils/index.ts 404 in 474ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /_next/src/cookies.ts 404 in 457ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /_next/src/createBrowserClient.ts 404 in 447ms
+[useUserPresence] Initialize with userId: undefined
+[PresenceContext] Current user ID: not set
+[PresenceContext] Current user space ID: not in space
+ GET /_next/src/createServerClient.ts 404 in 385ms
+[Middleware] Path: /api/conversations/join, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
+Error fetching conversation for addParticipant: {
+  code: 'PGRST116',
+  details: 'The result contains 0 rows',
+  hint: null,
+  message: 'JSON object requested, multiple (or no) rows returned'
+}
+ POST /api/conversations/join 500 in 426ms

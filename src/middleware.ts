@@ -68,11 +68,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
+     * - _next/ (all Next.js internal/dev assets)
      * - favicon.ico (favicon file)
      * Feel free to modify this pattern to include more paths.
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Exclude all Next internals and dev overlay frames, and raw /src/* source map fetches
+    '/((?!_next/|__nextjs|favicon.ico|src/).*)',
   ],
 };

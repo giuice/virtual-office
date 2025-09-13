@@ -1,3 +1,9 @@
+/**
+ * DEPRECATION NOTICE
+ * This hook has been superseded by `useMessageSubscription` which aligns with
+ * the keyset-paginated cache contract used by `useMessages`. Prefer migrating
+ * consumers to `useMessageSubscription`.
+ */
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
