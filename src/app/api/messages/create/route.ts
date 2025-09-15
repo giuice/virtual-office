@@ -18,8 +18,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
     }
     
-    const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
+  // Use service role client for DB operations to work around RLS mismatches
+  // but perform explicit authorization checks before mutating.
+  const serviceClient = await createSupabaseServerClient('service_role');
+  const messageRepository: IMessageRepository = new SupabaseMessageRepository(serviceClient);
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(serviceClient);
 
     // Validate required fields
     if (!body.conversationId || typeof body.content !== 'string') {
@@ -64,16 +67,26 @@ export async function POST(request: NextRequest) {
       // attachments need separate handling/linking after creation if provided
     };
 
-    // Create message using repository
+    // Authorization: ensure the user is allowed to post in the conversation
+    const targetConversation = await conversationRepository.findById(body.conversationId);
+    if (!targetConversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+    // Must be a participant to send (for now we require participant membership for all types)
+    if (!Array.isArray(targetConversation.participants) || !targetConversation.participants.includes(userRecord.id)) {
+      return NextResponse.json({ error: 'Forbidden: You are not a participant of this conversation' }, { status: 403 });
+    }
+
+    // Create message using repository (service-role client ensures insert succeeds post-check)
     const createdMessage = await messageRepository.create(messageData);
 
     // Update conversation last activity and increment unread counts for other participants
     try {
-      await conversationRepository.updateLastActivityTimestamp(body.conversationId);
+  await conversationRepository.updateLastActivityTimestamp(body.conversationId);
 
       try {
-        const convo = await conversationRepository.findById(body.conversationId);
-        if (convo && Array.isArray(convo.participants)) {
+        const convo = targetConversation; // already fetched above
+        if (Array.isArray(convo.participants)) {
           const recipients = convo.participants.filter((pid) => pid !== userRecord.id);
           if (recipients.length > 0) {
             await conversationRepository.incrementUnreadCount(convo.id, recipients);

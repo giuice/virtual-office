@@ -28,8 +28,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
-  // Subscribe to realtime for the active conversation
-  useMessageSubscription(activeConversation?.id || null, { isActive: true });
+  // Subscribe to realtime for the active conversation and expose status
+  const { status: connectionStatus } = useMessageSubscription(
+    activeConversation?.id || null,
+    { isActive: true }
+  );
   
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
@@ -71,6 +74,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     addReaction: messagesManager.addReaction,
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
+    // Realtime
+    connectionStatus,
   };
   
   return (

@@ -1,105 +1,67 @@
-﻿ GET /src/lib/serializer.ts 404 in 489ms
-[Middleware] Path: /_next/src/RealtimeChannel.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /_next/src/RealtimeClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/lib/timer.ts 404 in 508ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/packages/StorageFileApi.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/lib/transformers.ts 404 in 517ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/packages/StorageBucketApi.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/lib/push.ts 404 in 547ms
-[Middleware] Path: /_next/src/StorageClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /_next/src/RealtimePresence.ts 404 in 632ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/lib/SupabaseAuthClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /_next/src/RealtimeChannel.ts 404 in 496ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /_next/src/RealtimeClient.ts 404 in 484ms
-[Middleware] Path: /_next/src/SupabaseClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /src/packages/StorageFileApi.ts 404 in 466ms
-[Middleware] Path: /_next/src/version.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /src/packages/StorageBucketApi.ts 404 in 427ms
-[Middleware] Path: /src/utils/helpers.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/utils/constants.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /_next/src/StorageClient.ts 404 in 486ms
-[Middleware] Path: /src/utils/chunker.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /src/lib/SupabaseAuthClient.ts 404 in 429ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/utils/base64url.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /_next/src/SupabaseClient.ts 404 in 430ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /src/utils/index.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /_next/src/version.ts 404 in 431ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /_next/src/cookies.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/utils/helpers.ts 404 in 430ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /_next/src/createBrowserClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/utils/constants.ts 404 in 425ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
-[Middleware] Path: /_next/src/createServerClient.ts, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
- GET /src/utils/chunker.ts 404 in 475ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /src/utils/base64url.ts 404 in 487ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /src/utils/index.ts 404 in 474ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /_next/src/cookies.ts 404 in 457ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /_next/src/createBrowserClient.ts 404 in 447ms
-[useUserPresence] Initialize with userId: undefined
-[PresenceContext] Current user ID: not set
-[PresenceContext] Current user space ID: not in space
- GET /_next/src/createServerClient.ts 404 in 385ms
-[Middleware] Path: /api/conversations/join, User: c8983e7c-9e9b-46e0-baa1-e7bf3d363da4, Error: None
-Error fetching conversation for addParticipant: {
-  code: 'PGRST116',
-  details: 'The result contains 0 rows',
-  hint: null,
-  message: 'JSON object requested, multiple (or no) rows returned'
-}
- POST /api/conversations/join 500 in 426ms
+﻿debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.30000001192092896ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.4000000059604645ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.29999998211860657ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.4000000059604645ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.5999999940395355ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
+debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.9000000059604645ms {source: 'avatarUrl'}
+debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
+UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
+UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
+UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
+debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
+debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
+debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
+debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution

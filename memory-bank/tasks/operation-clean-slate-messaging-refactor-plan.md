@@ -16,6 +16,11 @@
 - System messages: `sender_id` nullable → render special style, no avatar.
 - Unread: Use `conversations.unread_count` (jsonb) for per-user counts.
 
+### Conversation ID Invariants (Critical)
+- DM uniqueness: Exactly one `DIRECT` conversation per unordered user pair {A, B}. Enforce via a server-side resolver and DB uniqueness. See `memory-bank/tasks/conversation-id-invariants-and-resolver-plan.md`.
+- Room uniqueness: Exactly one `ROOM` conversation per `room_id` reused everywhere.
+- Resolver-only creation: All UI entry points (floor-plan, chat, debug) must resolve via a single API endpoint; no ad-hoc creation in components.
+
 ---
 
 ## 3. Phase 1 — Foundation (Condensed)
@@ -58,6 +63,8 @@
 - Task 2.3: Sending: `useMutation` + optimistic add; replace by `id` on confirm.
 - Task 2.4: Notifications/unread: toast on unread increments for non-active convo; desktop notifications optional; badges from `unread_count`.
 
+Note: Hook behavior assumes a single canonical conversation id per DM/room. This is guaranteed by the Conversation Resolver described below.
+
 ---
 
 ## 5. Phase 3 — UI Interaction (Condensed)
@@ -99,6 +106,12 @@
 ---
 
 ## TODO — Next Session (Prioritized)
+0) Conversation resolver and uniqueness (Top priority):
+  - Implement `POST /api/conversations/resolve` (transactional, idempotent). DIRECT: resolve by participants fingerprint; ROOM: resolve by `room_id`. Authorize with SSR; if RLS blocks inserts, validate then use service-role for creation.
+  - Wire all entry points (floor-plan avatar menu, room panels, debug page, ChatWindow openers) to call `messagingApi.resolveConversation` and then `setActiveConversation`.
+  - Add DB uniqueness: unique index on `room_id` for `type='ROOM'`; participants fingerprint unique partial index for `type='DIRECT'` (or computed in resolver). Prepare one-off data repair script to consolidate duplicates before enabling indexes.
+  - Reference: `memory-bank/tasks/conversation-id-invariants-and-resolver-plan.md`.
+
 1) Realtime cache completeness:
    - Extend `useMessageSubscription` to handle UPDATE and DELETE: update message fields (`content`, `status`, `isEdited`, `reactions`), and remove on DELETE. Maintain pagination cache shape.
 
@@ -113,9 +126,9 @@
    - On `src/app/debug/messaging-test/page.tsx`, add a small "Join by Conversation ID" input + button that calls the join API. Show success/error.
 
 5) Tests (Vitest/Playwright):
-   - Unit: `useMessageSubscription` cache updates (INSERT/UPDATE/DELETE).
-   - API: messages/create updates `lastActivity` and unread; conversations/join respects RLS via service client.
-   - E2E (dev): two-browser realtime delivery smoke test for a shared conversation.
+  - Unit: `useMessageSubscription` cache updates (INSERT/UPDATE/DELETE). Resolver idempotency under concurrency.
+  - API: messages/create updates `lastActivity` and unread; conversations/join respects RLS via service client; conversations/resolve enforces uniqueness and authorization.
+  - E2E (dev): two-browser realtime delivery for DM and room via resolved conversation ids; repeated opens reuse same id.
 
 6) Cleanup:
    - Remove deprecated `useMessageRealtime` after migration.
@@ -132,7 +145,7 @@
   - `npm run lint`
   - `npm run dev`
 - Manual:
-  - Open two sessions, join the same conversation via debug tools, send a message. Expect realtime delivery, conversation bump (lastActivity), and unread increase for the non-active user. Dev console noise for `/_next/src/*` should be minimal after middleware matcher change.
+  - Open two sessions. For DM: use avatar menu to “Send Message” → verify the same conversation id is reused across attempts and messages deliver in realtime. For room: enter the same room in both sessions, verify a single room conversation id is used and realtime delivery works. Confirm lastActivity bumps and unread increments for non-active users.
 
 # APPENDICE
 ## Updated References

@@ -8,12 +8,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { messagingApi } from '@/lib/messaging-api';
 import { ConversationType, MessageStatus, MessageType } from '@/types/messaging';
 import { Loader2, MessageSquare, Users, Upload, Check, X } from 'lucide-react';
 
 export default function MessagingTestPage() {
   const { user } = useAuth();
+  const { setActiveConversation, sendMessage: sendViaContext } = useMessaging();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [testConversationId, setTestConversationId] = useState('');
   const [joinConversationId, setJoinConversationId] = useState('');
@@ -55,8 +57,10 @@ export default function MessagingTestPage() {
         unreadCount: {},
       });
       
-      setTestConversationId(conversation.id);
-      setActiveConversationId(conversation.id);
+  setTestConversationId(conversation.id);
+  setActiveConversationId(conversation.id);
+  // Ensure global active conversation is set for centralized subscription
+  setActiveConversation(conversation);
       addTestMessage(`Created test conversation: ${conversation.id}`);
     } finally {
       setIsCreatingConversation(false);
@@ -74,9 +78,10 @@ export default function MessagingTestPage() {
     }
     setIsJoiningConversation(true);
     try {
-      const convo = await messagingApi.joinConversation(joinConversationId.trim());
-      setActiveConversationId(convo.id);
-      setTestConversationId(convo.id);
+  const convo = await messagingApi.joinConversation(joinConversationId.trim());
+  setActiveConversationId(convo.id);
+  setTestConversationId(convo.id);
+  setActiveConversation(convo);
       addTestMessage(`✅ Joined conversation: ${convo.id}`);
     } catch (e) {
       addTestMessage(`❌ Failed to join: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -127,13 +132,7 @@ export default function MessagingTestPage() {
       {
         name: 'Send Test Message',
         fn: async () => {
-          await messagingApi.sendMessage({
-            conversationId: activeConversationId,
-            senderId: user!.id,
-            content: `Test message sent at ${new Date().toISOString()}`,
-            type: MessageType.TEXT,
-            status: MessageStatus.SENT,
-          });
+          await sendViaContext(`Test message sent at ${new Date().toISOString()}`, { type: MessageType.TEXT });
         }
       },
       {

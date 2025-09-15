@@ -41,5 +41,6 @@ export interface MessagingContextType {
   removeReaction: (messageId: string, emoji: string) => Promise<void>;
   uploadAttachment: (file: File) => Promise<FileAttachment>;
 
-  // Removed typingUsers and sendTypingIndicator properties
+  // Realtime connection
+  connectionStatus?: string | null;
 }

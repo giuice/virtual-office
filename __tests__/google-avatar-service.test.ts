@@ -493,7 +493,9 @@ describe('GoogleAvatarService', () => {
         it('should handle failed avatar extraction', async () => {
             // Arrange
             const userId = 'user-123';
-            vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser);
+            // Simulate existing non-null avatar so extraction failure is not considered unchanged
+            const userWithExistingAvatar = { ...mockUser, avatarUrl: 'https://example.com/custom-avatar.jpg' };
+            vi.mocked(mockUserRepository.findById).mockResolvedValue(userWithExistingAvatar);
             vi.mocked(avatarUtils.extractGoogleAvatarUrl).mockReturnValue(null);
 
             // Act
@@ -629,10 +631,10 @@ describe('GoogleAvatarService', () => {
                 ...mockUser,
                 avatarUrl: 'https://lh3.googleusercontent.com/a/test-avatar=s96-c'
             };
-            const updatedUser = { ...userWithGoogleAvatar, avatarUrl: null };
+            const updatedUser = { ...userWithGoogleAvatar, avatarUrl: null } as any;
 
             vi.mocked(mockUserRepository.findById).mockResolvedValue(userWithGoogleAvatar);
-            vi.mocked(mockUserRepository.update).mockResolvedValue(updatedUser.avatarUrl);
+            vi.mocked(mockUserRepository.update).mockResolvedValue(updatedUser);
             vi.mocked(service.isValidGoogleAvatarUrl).mockReturnValue(true);
 
             // Act

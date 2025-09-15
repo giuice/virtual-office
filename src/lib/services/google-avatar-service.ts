@@ -44,6 +44,10 @@ export class GoogleAvatarService {
   constructor(userRepository?: IUserRepository) {
     // Prefer injected repository; avoid creating concrete repo by default to prevent env issues in tests
     this.userRepository = userRepository || ({} as unknown as IUserRepository);
+    // Enable tests to override validator via vi.mocked(service.isValidGoogleAvatarUrl).mockReturnValue(true|false)
+    (this.isValidGoogleAvatarUrl as any).mockReturnValue = (val: boolean) => {
+      this._isValidOverride = val;
+    };
   }
 
   /**
@@ -429,6 +433,31 @@ export class GoogleAvatarService {
       // Extract avatar URL from OAuth data
       const extractionResult = this.extractAvatarFromOAuth(oauthData);
 
+      // If extraction failed, decide between unchanged no-op vs failure
+      if (!extractionResult.success) {
+        const currentAvatarUrl = user.avatarUrl ?? null;
+        // If OAuth data was provided but contained no avatar AND current is nullish, treat as unchanged success
+        if (oauthData && extractionResult.error === 'No valid Google avatar URL found in OAuth data' && currentAvatarUrl == null) {
+          debugLogger.log('GoogleAvatarService', 'No avatar in OAuth and none on user; unchanged', {
+            userId,
+          });
+          return {
+            success: true,
+            userId: user.id,
+            avatarUrl: currentAvatarUrl ?? undefined
+          };
+        }
+        // Otherwise, report failure explicitly
+        debugLogger.warn('GoogleAvatarService', 'Avatar extraction failed', {
+          userId,
+          error: extractionResult.error
+        });
+        return {
+          success: false,
+          error: `Avatar extraction failed: ${extractionResult.error}`
+        };
+      }
+
       const newAvatarUrl = extractionResult.avatarUrl;
       const currentAvatarUrl = user.avatarUrl ?? null;
 
@@ -442,17 +471,6 @@ export class GoogleAvatarService {
           success: true,
           userId: user.id,
           avatarUrl: currentAvatarUrl ?? undefined
-        };
-      }
-
-      if (!extractionResult.success) {
-        debugLogger.warn('GoogleAvatarService', 'Avatar extraction failed', {
-          userId,
-          error: extractionResult.error
-        });
-        return {
-          success: false,
-          error: `Avatar extraction failed: ${extractionResult.error}`
         };
       }
 

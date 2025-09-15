@@ -52,11 +52,9 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
 
   if (!user || !currentUserProfile) return null;
 
-  const handleSendMessage = (content: string, replyToId?: string) => {
+  const handleSendMessage = async (content: string, replyToId?: string) => {
     if (!content.trim()) return;
-    
-    // Use the updated sendMessage API signature  
-    sendMessage(content, {
+    await sendMessage(content, {
       type: MessageType.TEXT,
       replyToId
     });
