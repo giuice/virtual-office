@@ -124,37 +124,14 @@ Note: Hook behavior assumes a single canonical conversation id per DM/room. This
 
 ---
 
-## TODO — Next Session (Prioritized)
-0) Conversation resolver and uniqueness (Top priority):
-  - Implement `POST /api/conversations/resolve` (transactional, idempotent). DIRECT: resolve by participants fingerprint; ROOM: resolve by `room_id`. Authorize with SSR; if RLS blocks inserts, validate then use service-role for creation.
-  - Wire all entry points (floor-plan avatar menu, room panels, debug page, ChatWindow openers) to call `messagingApi.resolveConversation` and then `setActiveConversation`.
-  - Add DB uniqueness: unique index on `room_id` for `type='ROOM'`; participants fingerprint unique partial index for `type='DIRECT'` (or computed in resolver). Prepare one-off data repair script to consolidate duplicates before enabling indexes.
-  - Reference: `memory-bank/tasks/conversation-id-invariants-and-resolver-plan.md`.
-
-1) Realtime cache completeness:
-   - Extend `useMessageSubscription` to handle UPDATE and DELETE: update message fields (`content`, `status`, `isEdited`, `reactions`), and remove on DELETE. Maintain pagination cache shape.
-
-2) Subscription centralization:
-   - Wire `useMessageSubscription` in `MessagingContext` for the active conversation; ensure no duplicate subscriptions exist. Migrate remaining consumers from `useMessageRealtime`.
-
-3) Unread UX:
-   - Conversation list badge: read from `conversations.unread_count[userId]`.
-   - Clear on read: on conversation focus, call API to zero unread for current user; update cache optimistically.
-
-4) Debug join UX:
-   - On `src/app/debug/messaging-test/page.tsx`, add a small "Join by Conversation ID" input + button that calls the join API. Show success/error.
-
-5) Tests (Vitest/Playwright):
-  - Unit: `useMessageSubscription` cache updates (INSERT/UPDATE/DELETE). Resolver idempotency under concurrency.
-  - API: messages/create updates `lastActivity` and unread; conversations/join respects RLS via service client; conversations/resolve enforces uniqueness and authorization.
-  - E2E (dev): two-browser realtime delivery for DM and room via resolved conversation ids; repeated opens reuse same id.
-
-6) Cleanup:
-   - Remove deprecated `useMessageRealtime` after migration.
-   - Verify middleware matcher in prod build; ensure no legit routes are excluded.
-
-7) Docs:
-   - Update any developer README snippets for messaging flow, cache keys, and subscription policy.
+## Implementation — Messaging Resolver & Realtime
+- `POST /api/conversations/resolve` (`src/app/api/conversations/resolve/route.ts`) authenticates with the SSR client, validates payloads, and dispatches to `ConversationResolverService` with a service-role repository for writes. The resolver covers DIRECT fingerprints and ROOM lookups, retries on `23505`, and enforces company/ACL rules (`src/lib/services/ConversationResolverService.ts`).
+- Entry points now funnel through `messagingApi.resolveConversation`: conversation hooks (`src/hooks/useConversations.ts`) power `UserInteractionMenu`, the floor-plan message dialog, ChatWindow openers, and the auto room binding hook (`src/hooks/useAutoRoomConversation.ts`). The debug harness creates sessions with resolver-backed calls (`src/app/debug/messaging-test/page.tsx`).
+- Database uniqueness is enforced via trigger + indexes in `src/migrations/20250427_conversation_uniqueness.sql`, with repository writes supplying `participantsFingerprint` (`SupabaseConversationRepository`).
+- `useMessageSubscription` processes INSERT/UPDATE/DELETE into the paginated cache (`src/hooks/realtime/useMessageSubscription.ts`), and `MessagingContext` mounts a single subscription for the active conversation (`src/contexts/messaging/MessagingContext.tsx`), keeping legacy `useMessageRealtime` flagged for removal.
+- Unread UX pulls from `conversation.unreadCount`: optimistic mark-as-read + total badge in `useConversations` and rendered counters in `src/components/messaging/conversation-list.tsx`.
+- Debug join UX offers a explicit join-by-id control that hits the join API and syncs the global active conversation (`src/app/debug/messaging-test/page.tsx`).
+- Tests cover resolver idempotency and conflict handling in `__tests__/conversation-resolver.test.ts`; realtime subscription cache specs remain a future addition.
 
 ---
 

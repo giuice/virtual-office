@@ -15,6 +15,7 @@ import {
   Image,
   Smile 
 } from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface EnhancedMessageComposerProps {
   conversationId: string | null;
@@ -46,6 +47,7 @@ export function EnhancedMessageComposer({
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { companyUsers, currentUserProfile } = useCompany();
 
   // Typing indicator hook
   const {
@@ -137,11 +139,17 @@ export function EnhancedMessageComposer({
   const renderReplyPreview = () => {
     if (!replyToMessage) return null;
 
+    const replySender = replyToMessage?.senderId
+      ? (replyToMessage.senderId === currentUserProfile?.id
+          ? currentUserProfile
+          : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
+      : null;
+
     return (
       <div className="flex items-start gap-2 p-3 bg-muted/50 border-l-2 border-primary">
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-muted-foreground mb-1">
-            Replying to {replyToMessage.senderId}
+            Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
           </div>
           <div className="text-sm truncate">
             {replyToMessage.content}

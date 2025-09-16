@@ -1,21 +1,18 @@
 // src/components/messaging/message-item.tsx
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { 
-  Message, 
-  MessageStatus, 
-  MessageType 
+import {
+  Message,
+  MessageStatus,
+  MessageType
 } from '@/types/messaging';
-import { useAuth } from '@/contexts/AuthContext';
 import { usePresence } from '@/contexts/PresenceContext';
-import { Avatar } from '@/components/ui/avatar';
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { Button } from '@/components/ui/button';
-import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { 
+import {
   CheckCheck, 
   AlertCircle, 
   File,
@@ -23,34 +20,72 @@ import {
   Smile,
   MoreHorizontal
 } from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { AvatarUser } from '@/lib/avatar-utils';
+import type { User } from '@/types/database';
+
+const isDatabaseUser = (value: User | AvatarUser | null | undefined): value is User => {
+  return !!value && typeof value === 'object' && 'supabase_uid' in value;
+};
 
 interface MessageItemProps {
   message: Message;
-  sender?: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  sender?: User | AvatarUser | null;
   onReply?: (message: Message) => void;
   onReaction?: (messageId: string, emoji: string) => void;
 }
 
-export function MessageItem({ 
-  message, 
+export function MessageItem({
+  message,
   sender,
   onReply,
   onReaction
 }: MessageItemProps) {
-  const { user } = useAuth();
   const { users } = usePresence();
+  const { companyUsers, currentUserProfile } = useCompany();
   const [showActions, setShowActions] = useState(false);
-  
+
   // Get sender presence information
   const senderPresence = users?.find(u => u.id === message.senderId);
-  
-  const isCurrentUser = message.senderId === user?.id;
+  const resolvedUser = useMemo(() => {
+    if (isDatabaseUser(sender)) {
+      return sender;
+    }
+    if (message.senderId === currentUserProfile?.id && currentUserProfile) {
+      return currentUserProfile;
+    }
+    return companyUsers.find(companyUser => companyUser.id === message.senderId) || null;
+  }, [companyUsers, currentUserProfile, message.senderId, sender]);
+
+  const fallbackAvatarUser: AvatarUser | null = useMemo(() => {
+    if (resolvedUser) {
+      return null;
+    }
+    if (sender && !isDatabaseUser(sender) && sender.displayName) {
+      return sender;
+    }
+    if (!message.senderId) {
+      return null;
+    }
+    return { id: message.senderId, displayName: `User ${message.senderId.slice(0, 4)}` };
+  }, [message.senderId, resolvedUser, sender]);
+
+  const isCurrentUser = message.senderId === currentUserProfile?.id;
   const showAvatar = !isCurrentUser;
-  
+  const fallbackDisplayName = fallbackAvatarUser?.displayName || (message.senderId ? `User ${message.senderId.slice(0, 4)}` : 'System');
+
+  const interactiveUser = useMemo(() => {
+    if (!resolvedUser) {
+      return null;
+    }
+    return {
+      ...resolvedUser,
+      status: senderPresence?.status || resolvedUser.status,
+      currentSpaceId: senderPresence?.currentSpaceId ?? resolvedUser.currentSpaceId,
+    } as User;
+  }, [resolvedUser, senderPresence]);
+
   // Format message timestamp
   const formatMessageTime = (timestamp: Date) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -212,26 +247,25 @@ export function MessageItem({
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      {showAvatar && sender && (
-        <InteractiveUserAvatar
-          user={{
-            ...sender,
-            companyId: null,
-            supabase_uid: '',
-            email: '',
-            preferences: {},
-            role: 'member',
-            lastActive: '2024-01-01T00:00:00Z',
-            createdAt: '2024-01-01T00:00:00Z',
-            status: senderPresence?.status || 'offline',
-            currentSpaceId: senderPresence?.currentSpaceId || null
-          }}
-          size="sm"
-          className="mr-2"
-          showStatus={true}
-        />
+      {showAvatar && (
+        interactiveUser ? (
+          <InteractiveUserAvatar
+            user={interactiveUser}
+            size="sm"
+            className="mr-2"
+            showStatus
+          />
+        ) : fallbackAvatarUser ? (
+          <EnhancedAvatarV2
+            user={fallbackAvatarUser}
+            size="sm"
+            className="mr-2"
+            showStatus={!!senderPresence?.status}
+            status={senderPresence?.status}
+          />
+        ) : null
       )}
-      
+
       <div
         className={cn(
           "max-w-[80%]",
@@ -240,7 +274,7 @@ export function MessageItem({
       >
         {!isCurrentUser && (
           <div className="text-xs text-muted-foreground mb-1">
-            {sender?.displayName || message.senderId}
+            {resolvedUser?.displayName || fallbackDisplayName}
           </div>
         )}
         

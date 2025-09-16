@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Message } from '@/types/messaging';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils'; // Assuming these utils exist
-import { useCompany } from '@/contexts/CompanyContext'; // To get current user ID
+import { useCompany } from '@/contexts/CompanyContext';
 import { Button } from '@/components/ui/button';
 import { SmilePlus, MessageSquareReply } from 'lucide-react'; // Import reply icon
 import {
@@ -13,6 +11,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"; // Import Popover components
 import { useMessaging } from '@/contexts/messaging/MessagingContext'; // Import useMessaging
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { AvatarUser } from '@/lib/avatar-utils';
+import type { User } from '@/types/database';
 
 interface MessageListProps {
   messages: Message[];
@@ -20,9 +21,18 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply }) => {
-  const { currentUserProfile, companyUsers } = useCompany(); // Get current user and company users list
+  const { currentUserProfile, companyUsers } = useCompany();
   const { addReaction } = useMessaging(); // Get addReaction function from context
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const participantsById = useMemo(() => {
+    const pairs: Array<[string, User]> = [];
+    companyUsers.forEach(user => pairs.push([user.id, user]));
+    if (currentUserProfile) {
+      pairs.push([currentUserProfile.id, currentUserProfile]);
+    }
+    return new Map(pairs);
+  }, [companyUsers, currentUserProfile]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -52,10 +62,18 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply
       ) : (
         messages.map((message) => {
           const isCurrentUser = message.senderId === currentUserProfile?.id;
-          // Find sender details from companyUsers list
-          const sender = !isCurrentUser ? companyUsers.find(u => u.id === message.senderId) : null;
-          const senderName = sender?.displayName || `User ${message.senderId.substring(0, 4)}`; // Fallback name
-          const senderAvatarUrl = sender?.avatarUrl; // May be undefined
+
+          const senderUser = isCurrentUser
+            ? currentUserProfile
+            : (participantsById.get(message.senderId) ?? null);
+
+          const fallbackAvatar: AvatarUser | null = senderUser
+            ? null
+            : message.senderId
+              ? { id: message.senderId, displayName: `User ${message.senderId.substring(0, 4)}` }
+              : null;
+
+          const senderName = senderUser?.displayName || fallbackAvatar?.displayName || 'Unknown User';
 
           // Find the original message if this is a reply
           const originalMessage = message.replyToId
@@ -74,11 +92,12 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply
               className={`group flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} // Added 'group' class
             >
               {!isCurrentUser && (
-                <Avatar className="h-8 w-8">
-                  {/* Pass sender details to avatar utils */}
-                  <AvatarImage src={getAvatarUrl({ name: senderName, avatar: senderAvatarUrl })} alt={senderName} />
-                  <AvatarFallback>{getUserInitials(senderName)}</AvatarFallback>
-                </Avatar>
+                <EnhancedAvatarV2
+                  user={senderUser || fallbackAvatar}
+                  size="sm"
+                  showStatus
+                  status={senderUser?.status}
+                />
               )}
               <div className={`max-w-[70%]`}>
                 <div
@@ -145,14 +164,13 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply
               </Button>
 
               {isCurrentUser && currentUserProfile && (
-                 <Avatar className="h-8 w-8">
-                  {/* Construct the object expected by getAvatarUrl */}
-                  <AvatarImage 
-                    src={getAvatarUrl({ name: currentUserProfile.displayName || '', avatar: currentUserProfile.avatarUrl })} 
-                    alt={currentUserProfile.displayName || 'You'} 
-                  />
-                  <AvatarFallback>{getUserInitials(currentUserProfile.displayName || 'You')}</AvatarFallback>
-                </Avatar>
+                <EnhancedAvatarV2
+                  user={currentUserProfile}
+                  size="sm"
+                  showStatus
+                  status={currentUserProfile.status}
+                  fallbackName="You"
+                />
               )}
             </div>
           );

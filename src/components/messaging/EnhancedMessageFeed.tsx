@@ -1,7 +1,7 @@
 // src/components/messaging/EnhancedMessageFeed.tsx
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Message } from '@/types/messaging';
 import { MessageItem } from './message-item';
 import { TypingIndicator } from './TypingIndicator';
@@ -10,6 +10,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCompany } from '@/contexts/CompanyContext';
+import type { User } from '@/types/database';
 
 interface EnhancedMessageFeedProps {
   messages: Message[];
@@ -34,6 +36,7 @@ export function EnhancedMessageFeed({
 }: EnhancedMessageFeedProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { companyUsers, currentUserProfile } = useCompany();
   
   // Use conversation presence for typing indicators
   const { typingUsers, presentUsers } = useConversationPresence(conversationId);
@@ -43,15 +46,13 @@ export function EnhancedMessageFeed({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  // Helper to get sender info (you might want to fetch this from a users context)
-  const getSenderInfo = (senderId: string) => {
-    // This should ideally come from a users context or prop
-    return {
-      id: senderId,
-      displayName: `User ${senderId}`,
-      avatarUrl: undefined
-    };
-  };
+  const participantsById = useMemo(() => {
+    const entries: Array<[string, User]> = companyUsers.map((user) => [user.id, user]);
+    if (currentUserProfile) {
+      entries.push([currentUserProfile.id, currentUserProfile]);
+    }
+    return new Map<string, User>(entries);
+  }, [companyUsers, currentUserProfile]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,19 +87,15 @@ export function EnhancedMessageFeed({
           )}
 
           {/* Messages list */}
-          {messages.map((message, index) => {
-            const sender = getSenderInfo(message.senderId);
-            
-            return (
-              <MessageItem
-                key={message.id}
-                message={message}
-                sender={sender}
-                onReply={onReply}
-                onReaction={onReaction}
-              />
-            );
-          })}
+          {messages.map((message) => (
+            <MessageItem
+              key={message.id}
+              message={message}
+              sender={participantsById.get(message.senderId) ?? null}
+              onReply={onReply}
+              onReaction={onReaction}
+            />
+          ))}
 
           {/* Typing indicator */}
           <TypingIndicator typingUsers={typingUsers} />

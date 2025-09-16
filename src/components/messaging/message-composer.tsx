@@ -6,6 +6,7 @@ import { Message } from '@/types/messaging';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Paperclip, Send, Smile, Image, X } from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface MessageComposerProps {
   onSendMessage: (content: string) => Promise<void>;
@@ -29,6 +30,7 @@ export function MessageComposer({
   const [content, setContent] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { companyUsers, currentUserProfile } = useCompany();
   
   // Update content when initialValue changes
   useEffect(() => {
@@ -83,12 +85,18 @@ export function MessageComposer({
   // Render reply preview
   const renderReplyPreview = () => {
     if (!replyToMessage) return null;
-    
+
+    const replySender = replyToMessage.senderId
+      ? (replyToMessage.senderId === currentUserProfile?.id
+          ? currentUserProfile
+          : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
+      : null;
+
     return (
       <div className="flex items-start p-2 rounded-md bg-secondary mb-2">
         <div className="flex-1 text-sm">
           <div className="font-semibold">
-            Replying to {replyToMessage.senderId}
+            Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
           </div>
           <div className="truncate text-muted-foreground">{replyToMessage.content}</div>
         </div>
