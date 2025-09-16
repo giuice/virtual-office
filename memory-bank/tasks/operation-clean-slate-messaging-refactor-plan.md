@@ -5,6 +5,18 @@
 - Goal: Simple, reliable, real-time messaging with clear separation of concerns.
 - Audience: Junior-friendly plan with rationale, now compressed for token efficiency.
 
+### Progress Update — 2025-04-27
+- ✅ Conversation resolver (DM + room) is live and resolving canonical ids through the API gateway.
+- ✅ Database uniqueness hardened via migration `20250427_conversation_uniqueness.sql`, which adds the participants fingerprint trigger and reenables the `DIRECT`/`ROOM` partial indexes.
+- ✅ First cross-user DM flow verified end to end (resolver → message CRUD → realtime subscription).
+- ⚠️ Remaining UX polish surfaced during testing:
+  - DM message lists still render raw sender ids outside the debug page; align with production avatar/name presentation.
+  - Floor plan status header lacks unread/badge indicators, so outgoing DMs are invisible to recipients.
+  - Closing the direct-message drawer or popover keeps the conversation mounted with blank content; introduce a true close/teardown path.
+  - Popup lifecycle should clear view state but retain the selected participant for quick reopen.
+
+These feed into the Phase 3 and Outstanding Tasks sections below.
+
 ## 2. Guiding Principles
 - Simplicity: Prefer clear, minimal solutions.
 - Separation: History fetch vs realtime subscribe vs UI are distinct.
@@ -20,6 +32,7 @@
 - DM uniqueness: Exactly one `DIRECT` conversation per unordered user pair {A, B}. Enforce via a server-side resolver and DB uniqueness. See `memory-bank/tasks/conversation-id-invariants-and-resolver-plan.md`.
 - Room uniqueness: Exactly one `ROOM` conversation per `room_id` reused everywhere.
 - Resolver-only creation: All UI entry points (floor-plan, chat, debug) must resolve via a single API endpoint; no ad-hoc creation in components.
+- ✅ Implemented via resolver service + DB trigger/index combo in `20250427_conversation_uniqueness.sql`; treat these constraints as production baseline.
 
 ---
 
@@ -49,19 +62,19 @@
 - Behavior: Last N visible on open; older pages prepend; sending uses optimistic update.
 
 ### Task 1.2 — Realtime Sanity Test
-- Status: Implemented (minimal test hook + page); used to verify subscriptions.
+- Status: Implemented (minimal test hook + page); used to verify subscriptions. ✅
 
 ### Task 1.3 — Create-Message Endpoint
-- Status: Using server client, validates `conversationId` + non-empty `content.trim()`; clamps `type`/`status` to enums.
+- Status: Using server client, validates `conversationId` + non-empty `content.trim()`; clamps `type`/`status` to enums. ✅
 - TODO: Update conversation `lastActivity` once partial updates are supported.
 
 ---
 
 ## 4. Phase 2 — Core Hooks (Active)
-- Task 2.1: Build `useMessageSubscription(conversationId)` to write INSERTs into cache, dedupe by `id`; plan for UPDATE/DELETE.
-- Task 2.2: `useMessages` focuses on history (already refactored); in UI call both `useMessages` and `useMessageSubscription`.
-- Task 2.3: Sending: `useMutation` + optimistic add; replace by `id` on confirm.
-- Task 2.4: Notifications/unread: toast on unread increments for non-active convo; desktop notifications optional; badges from `unread_count`.
+- Task 2.1 — `useMessageSubscription(conversationId)` mirrors INSERT/UPDATE/DELETE into the cache with idempotent writes. ✅ Validate UPDATE/DELETE rendering once edit UI lands.
+- Task 2.2 — `useMessages` supplies historical windows and clears stale caches on conversation switch. ✅ Continue to watch memory pressure with many rooms.
+- Task 2.3 — `sendMessage` mutation performs optimistic add + reconciliation. ✅ Review failure UX (status badges) after notification work.
+- Task 2.4 — Notifications/unread: pending (no toast/badge yet). Needs integration with floor-plan header + DM drawer badges.
 
 Note: Hook behavior assumes a single canonical conversation id per DM/room. This is guaranteed by the Conversation Resolver described below.
 
@@ -70,6 +83,12 @@ Note: Hook behavior assumes a single canonical conversation id per DM/room. This
 ## 5. Phase 3 — UI Interaction (Condensed)
 - Implemented Click-Stop Standard (see `/.github/copilot-instructions.md`).
 - Touched: `SpaceElement`, `UserAvatarPresence`, `UserInteractionMenu` — portal guards + `data-avatar-interactive` + propagation stops.
+- Outstanding UI Tasks (2025-04-27):
+  1. Message rendering parity — reuse shared avatar/name utilities in DM/room views (floor plan drawer, MessagingDrawer) to replace raw ids.
+  2. Floor plan awareness — surface unread counts or badges in the status header when new DMs arrive.
+  3. Drawer teardown — implement a close handler that clears `activeConversation`/`lastDirectConversation` so the drawer fully collapses when users click “×”.
+  4. Popup lifecycle — closing the DM dialog should clear UI state but keep the resolved participant handy for quick reopen.
+  5. Recipient alerting — wire unread counts + toast/badge notifications once Phase 2 Task 2.4 is complete.
 
 ---
 
@@ -82,7 +101,7 @@ Note: Hook behavior assumes a single canonical conversation id per DM/room. This
 ## 7. Final Verification (Concise)
 - No teleport when interacting with messaging actions inside spaces.
 - Send shows instantly (optimistic); recipient sees realtime arrival.
-- Toast/desktop notification on unread (when not active); clicking opens and clears.
+- Toast/desktop notification on unread (when not active); clicking opens and clears. ⚠️ Pending Task 2.4 / Outstanding UI Task 5.
 - Project passes `npm run lint` and `npm run type-check`.
 
 ---
@@ -219,4 +238,3 @@ export async function middleware(req: NextRequest) {
   return res
 }
 ```
-
