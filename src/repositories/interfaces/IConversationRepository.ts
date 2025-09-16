@@ -23,7 +23,9 @@ export interface IConversationRepository {
    * @param conversationData Data for the new conversation, typically participants. Excludes managed fields like id, timestamps, unreadCount.
    * @returns A promise that resolves to the newly created Conversation object.
    */
-  create(conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'>): Promise<Conversation>;
+  create(conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'> & {
+    participantsFingerprint?: string;
+  }): Promise<Conversation>;
 
   /**
    * Updates general properties of an existing conversation (e.g., title).
@@ -84,4 +86,14 @@ export interface IConversationRepository {
    * No-op if the user is already a participant.
    */
   addParticipant(id: string, userId: string): Promise<Conversation | null>;
+
+  /**
+   * Finds a direct conversation by the sorted participant fingerprint.
+   */
+  findDirectByFingerprint(fingerprint: string): Promise<Conversation | null>;
+
+  /**
+   * Finds a room conversation by the associated room identifier.
+   */
+  findRoomByRoomId(roomId: string): Promise<Conversation | null>;
 }

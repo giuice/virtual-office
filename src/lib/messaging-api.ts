@@ -1,6 +1,22 @@
 // src/lib/messaging-api.ts
 import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment } from '@/types/messaging';
 
+function normalizeConversation(raw: any): Conversation {
+  return {
+    id: raw?.id,
+    type: raw?.type,
+    participants: Array.isArray(raw?.participants) ? raw.participants : [],
+    lastActivity: raw?.lastActivity instanceof Date
+      ? raw.lastActivity
+      : new Date(raw?.lastActivity ?? Date.now()),
+    name: raw?.name ?? undefined,
+    isArchived: Boolean(raw?.isArchived),
+    unreadCount: raw?.unreadCount ?? {},
+    roomId: raw?.roomId ?? undefined,
+    visibility: raw?.visibility,
+  } as Conversation;
+}
+
 /**
  * API client for messaging system
  */
@@ -87,24 +103,56 @@ export const messagingApi = {
    * Create a new conversation
    */
   async createConversation(conversation: Partial<Conversation> & { userId?: string }): Promise<Conversation> {
+    if (!conversation.type) {
+      throw new Error('Conversation type is required');
+    }
+
+    if (conversation.type === ConversationType.DIRECT) {
+      const participants = Array.isArray(conversation.participants) ? conversation.participants : [];
+      const requesterId = conversation.userId || participants[0];
+      const targetUserId = participants.find(id => id !== requesterId);
+
+      if (!requesterId || !targetUserId) {
+        throw new Error('Direct conversations require requester and target user ids');
+      }
+
+      return this.resolveConversation({ type: ConversationType.DIRECT, userId: targetUserId });
+    }
+
+    if (conversation.type === ConversationType.ROOM) {
+      if (!conversation.roomId) {
+        throw new Error('Room conversations require a roomId');
+      }
+
+      return this.resolveConversation({ type: ConversationType.ROOM, roomId: conversation.roomId });
+    }
+
+    throw new Error(`Unsupported conversation type: ${conversation.type}`);
+  },
+
+  async resolveConversation(
+    params:
+      | { type: ConversationType.DIRECT; userId: string }
+      | { type: ConversationType.ROOM; roomId: string }
+  ): Promise<Conversation> {
     try {
-      const response = await fetch('/api/conversations/create', {
+      const response = await fetch('/api/conversations/resolve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(conversation),
+        body: JSON.stringify(params),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create conversation');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to resolve conversation');
       }
 
       const data = await response.json();
-      return data.conversation;
+      return normalizeConversation(data.conversation);
     } catch (error) {
-      console.error('Error creating conversation:', error);
+      console.error('Error resolving conversation:', error);
       throw error;
     }
   },
@@ -182,13 +230,9 @@ export const messagingApi = {
       }
       
       // Create a new room conversation if one doesn't exist
-      return await this.createConversation({
+      return await this.resolveConversation({
         type: ConversationType.ROOM,
-        participants,
-        name: roomName,
         roomId,
-        isArchived: false,
-        unreadCount: {}
       });
     } catch (error) {
       console.error('Error getting or creating room conversation:', error);

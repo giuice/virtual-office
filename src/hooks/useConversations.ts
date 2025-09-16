@@ -70,31 +70,22 @@ export function useConversations() {
         return existingConversation;
       }
       
-      // Create new room conversation
-      const newConversation = await messagingApi.createConversation({ 
+      const resolvedConversation = await messagingApi.resolveConversation({
         type: ConversationType.ROOM,
-        // Participants are Database User IDs
-        participants: [currentUserProfile.id],
-        name: roomName,
         roomId,
-        userId: currentUserProfile.id, // Optional; server derives from session
       });
-      
-      // Add to conversations list using functional update
+
       setConversations(prev => {
-        // Double-check that the conversation doesn't exist (in case of race condition)
-        const stillExists = prev.find(
-          c => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
-        );
-        
-        if (stillExists) {
-          return prev; // Don't add duplicate
+        const existingIndex = prev.findIndex(c => c.id === resolvedConversation.id);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = resolvedConversation;
+          return updated;
         }
-        
-        return [newConversation, ...prev];
+        return [resolvedConversation, ...prev];
       });
-      
-      return newConversation;
+
+      return resolvedConversation;
     } catch (error) {
       console.error('Error creating room conversation:', error);
       throw error;
@@ -132,38 +123,22 @@ export function useConversations() {
         return existingConversation;
       }
       
-      // Create new direct conversation
-      // NOTE: getOrCreateDirectConversation is NOT in messaging-api.ts! 
-      // We need to use messagingApi.createConversation or adjust logic.
-      // For now, let's assume we need to call createConversation.
-      // This might need further refinement based on backend capabilities.
-      console.warn("getOrCreateDirectConversation not found in API, using createConversation as placeholder");
-    const newConversation = await messagingApi.createConversation({ 
-         type: ConversationType.DIRECT,
-      // Participants are Database User IDs
-      participants: [currentUserProfile.id, otherUserId],
-      userId: currentUserProfile.id,
-         // Name might be handled differently for direct messages
+      const resolvedConversation = await messagingApi.resolveConversation({
+        type: ConversationType.DIRECT,
+        userId: otherUserId,
       });
-      
-      // Add to conversations list using functional update
+
       setConversations(prev => {
-        // Double-check for race conditions
-        const stillExists = prev.find(
-          c => c.type === ConversationType.DIRECT && 
-               c.participants.includes(currentUserProfile.id) && 
-               c.participants.includes(otherUserId) &&
-               c.participants.length === 2
-        );
-        
-        if (stillExists) {
-          return prev; // Don't add duplicate
+        const existingIndex = prev.findIndex(c => c.id === resolvedConversation.id);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = resolvedConversation;
+          return updated;
         }
-        
-        return [newConversation, ...prev];
+        return [resolvedConversation, ...prev];
       });
-      
-      return newConversation;
+
+      return resolvedConversation;
     } catch (error) {
       console.error('Error creating direct conversation:', error);
       throw error;

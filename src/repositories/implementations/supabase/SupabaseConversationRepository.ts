@@ -15,6 +15,7 @@ type ConversationRow = {
   unread_count: Record<string, number> | null;
   room_id: string | null;
   visibility: string | null;
+  participants_fingerprint: string | null;
 };
 function mapToCamelCase(data: ConversationRow): Conversation {
   
@@ -107,7 +108,11 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async create(conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'>): Promise<Conversation> {
+  async create(
+    conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'> & {
+      participantsFingerprint?: string;
+    }
+  ): Promise<Conversation> {
     try {
       console.log('Repository creating conversation with data:', JSON.stringify(conversationData, null, 2));
       
@@ -120,8 +125,11 @@ export class SupabaseConversationRepository implements IConversationRepository {
         room_id: conversationData.roomId || null,
         visibility: conversationData.visibility || ConversationVisibility.PUBLIC,
         // last_activity needs to be set explicitly to ensure consistency
-        last_activity: conversationData.lastActivity || new Date().toISOString(),
-        unread_count: {} // Initialize empty unread count
+        last_activity: conversationData.lastActivity instanceof Date
+          ? conversationData.lastActivity.toISOString()
+          : (conversationData.lastActivity || new Date().toISOString()),
+        unread_count: {}, // Initialize empty unread count
+        participants_fingerprint: conversationData.participantsFingerprint || null,
       };
 
       const { data, error } = await this.supabaseClient
@@ -364,6 +372,54 @@ export class SupabaseConversationRepository implements IConversationRepository {
       return updated ? mapToCamelCase(updated as ConversationRow) : null;
     } catch (error) {
       console.error(`Repository error in addParticipant(${id}, ${userId}):`, error);
+      throw error;
+    }
+  }
+
+  async findDirectByFingerprint(fingerprint: string): Promise<Conversation | null> {
+    try {
+      const { data, error } = await this.supabaseClient
+        .from(this.TABLE_NAME)
+        .select('*')
+        .eq('type', ConversationType.DIRECT)
+        .eq('participants_fingerprint', fingerprint)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Error fetching direct conversation by fingerprint:', error);
+        throw error;
+      }
+
+      return data ? mapToCamelCase(data as ConversationRow) : null;
+    } catch (error) {
+      console.error(`Repository error in findDirectByFingerprint(${fingerprint}):`, error);
+      throw error;
+    }
+  }
+
+  async findRoomByRoomId(roomId: string): Promise<Conversation | null> {
+    try {
+      const { data, error } = await this.supabaseClient
+        .from(this.TABLE_NAME)
+        .select('*')
+        .eq('type', ConversationType.ROOM)
+        .eq('room_id', roomId)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Error fetching room conversation by roomId:', error);
+        throw error;
+      }
+
+      return data ? mapToCamelCase(data as ConversationRow) : null;
+    } catch (error) {
+      console.error(`Repository error in findRoomByRoomId(${roomId}):`, error);
       throw error;
     }
   }

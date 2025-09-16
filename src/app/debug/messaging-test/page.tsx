@@ -49,12 +49,14 @@ export default function MessagingTestPage() {
 
     setIsCreatingConversation(true);
     try {
-      const conversation = await messagingApi.createConversation({
+      const targetUserId = window.prompt('Enter the database user id to start a DM with');
+      if (!targetUserId) {
+        throw new Error('A target user id is required to start a direct message');
+      }
+
+      const conversation = await messagingApi.resolveConversation({
         type: ConversationType.DIRECT,
-        participants: [], // Server will add the current user automatically
-        name: `Test Conversation - ${new Date().toLocaleTimeString()}`,
-        isArchived: false,
-        unreadCount: {},
+        userId: targetUserId,
       });
       
   setTestConversationId(conversation.id);
