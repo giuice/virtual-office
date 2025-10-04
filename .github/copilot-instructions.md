@@ -120,6 +120,59 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Lint: `npm run lint`
 - Find errors: `npm run type-check`
 
+## Planning mode
+**Trigger**
+- Activate when the user asks for a plan, roadmap, implementation strategy, refactor plan, or debugging plan.
+
+**Audience**
+- Junior developers. Prescriptive and step-by-step. No assumed context.
+
+**Overrides**
+- When active, ignore “Response Format (required)” and “Workflow Example”. Output the planning report only.
+
+**Hard constraints**
+- Produce one GitHub-flavored Markdown report titled `# {VARIABLE}_IMPLEMENTATION_PLAN` where `VARIABLE = UPPER_SNAKE_CASE summary of the task` (e.g., `GOOGLE_OAUTH_NEXTJS`).
+- File name: `IMPLEMENTATION_PLAN.md`.
+- Planning only. No source code, no diffs, no command lines, no config values.
+- No code fences that contain code or commands. ASCII file trees allowed.
+- Use checkboxes `[ ]` for tasks.
+- End with: `Status: Pending user confirmation`.
+
+**Required sections**
+1. **Executive Summary**
+2. **Research Findings**  
+   - Cite titles and URLs when tools allow.  
+   - If tools unavailable, prefix with `Further Research:` and include a short query.
+3. **Implementation Strategy**
+4. **Repository and File Structure**  
+   - ASCII tree of relevant folders/files.  
+   - Existing files to modify: exact paths, role, owner, risks.  
+   - New files to create: exact paths, purpose.  
+   - Change-impact table: file → symbols to add/modify/remove (names only), dependencies, tests impacted.  
+   - Place new files under existing feature folders. Do not add top-level directories.
+5. **Detailed Action Plan** (checkboxes `[ ]`)  
+   For each task include:
+   - Paths to edit or create.  
+   - Symbols to add/modify (function/class/interface names only).  
+   - Rationale and expected behavior change.  
+   - Dependencies and ordering.  
+   - Testing procedures as cases and pass/fail criteria.  
+   - Validation checkpoints and rollback notes.
+6. **Risk Mitigation**
+7. **Success Criteria**
+8. **Open Questions and Assumptions**
+
+**Research protocol**
+- Analyze current project structure and implementations first. Apply the Anti-Duplication Protocol inside the plan.
+- When tools are available, research best practices, pitfalls, libraries, and recent changes; cite sources by title and URL.
+- When tools are unavailable, infer from first principles and mark items `Further Research:` with a proposed query.
+
+**Granularity standard**
+- Reference exact file paths for every change.  
+- Name functions, classes, interfaces, environment keys, and config keys, but do not include bodies or values.  
+- Every checklist item maps to specific files or artifacts.  
+- Respect RLS/auth constraints and the Type Registry. Expand acronyms on first use.
+
 ## Response Format (required)
 When proposing changes, output only:
 1. **Duplication Check:** summary of what you reused or extended.

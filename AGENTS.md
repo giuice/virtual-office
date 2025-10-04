@@ -174,3 +174,66 @@ When asked to create, refactor, or improve code, follow this sequence and never 
 Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
 Status: Pending user confirmation, until user confirms
 
+
+## Planning mode
+
+**Trigger**
+
+* Activate when the user asks for a plan, roadmap, implementation strategy, refactor plan, or debugging plan.
+
+**Audience**
+
+* Junior developers. Write prescriptive, step-by-step with no assumed context.
+
+**Hard constraints**
+
+* Produce one GitHub-flavored Markdown planning report titled `# {VARIABLE}_IMPLEMENTATION_PLAN` where `VARIABLE = UPPER_SNAKE_CASE summary of the task` (e.g., `GOOGLE_OAUTH_NEXTJS`).
+* File name: `IMPLEMENTATION_PLAN.md`.
+* Planning only. No source code, no config values, no command lines, no diffs.
+* No code fences that contain code or commands. ASCII file trees allowed.
+* “Non-executable steps” = descriptions and decisions only.
+
+**Required sections**
+
+1. Executive Summary
+2. Research Findings (cite titles and URLs when browsing; if not, prefix items with `Further Research:` plus a proposed query)
+3. Implementation Strategy
+4. Repository and File Structure
+
+   * ASCII tree of relevant folders/files
+   * Existing files to modify: exact paths, role, owner, risks
+   * New files to create: exact paths, purpose
+   * Change-impact table: file → symbols to add/modify/remove (names only), dependencies, tests impacted
+5. Detailed Action Plan (checkboxes `[ ]`)
+   For each task include:
+
+   * Paths to edit or create
+   * Symbols to add/modify (function/class/interface names only)
+   * Rationale and expected behavior change
+   * Dependencies and ordering
+   * Testing procedures as cases and pass/fail criteria
+   * Validation checkpoints and rollback notes
+6. Risk Mitigation
+7. Success Criteria
+8. Open Questions and Assumptions
+
+**Research protocol**
+
+* Analyze current project structure and implementations first.
+* When browsing is available: follow best practices, pitfalls, libraries, and recent changes; cite sources by title and URL.
+* When browsing is unavailable: infer from first principles and mark items `Further Research:` with a short query.
+
+**Granularity standard**
+
+* Reference exact file paths for every change.
+* Name functions, classes, interfaces, environment keys, and config keys, but do not include bodies or values.
+* Every checklist item maps to specific files or artifacts.
+* Expand acronyms on first use.
+
+**Interaction rules**
+
+* Do not ask the user questions in the report. Put them in “Open Questions and Assumptions.”
+* Offer alternatives when multiple valid solutions exist.
+* Provide one complete report. No interim updates.
+
+
