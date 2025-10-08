@@ -1,67 +1,23 @@
-﻿debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.30000001192092896ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.4000000059604645ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.29999998211860657ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.4000000059604645ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.5999999940395355ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
-debug-logger.ts:129 ✅ SELECTED avatarUrl: https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/p...
-debug-logger.ts:141 🖼️ [AVATAR:a8dfbf32] 🚀 getAvatarUrl took 0.9000000059604645ms {source: 'avatarUrl'}
-debug-logger.ts:61 🖼️ [AVATAR:a8dfbf32] ✅ Loaded from custom upload {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v1/object/public/user-uploads/a...', source: 'custom upload'}
-UserInteractionMenu.tsx:145 [UserInteractionMenu] Rendering DropdownMenu for user: giuice@yahoo.com
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@gmail.com', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: true, …}
-UserInteractionMenu.tsx:74 [UserInteractionMenu] Returning children only - this is current user
-UserInteractionMenu.tsx:63 [UserInteractionMenu] Debug Info: {userDisplayName: 'giuice@yahoo.com', userId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46', currentUserProfileId: '5cf7e176-4ac2-441d-8819-f6266cb20429', currentUserProfileDisplayName: 'giuice@gmail.com', isCurrentUser: false, …}
-debug-logger.ts:39 [TRACE:Avatar] Resolving avatar for user a8dfbf32-4c5f-4283-8187-9c568eb6db46 
-debug-logger.ts:39 [TRACE:Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Checking avatarUrl: Found 
-debug-logger.ts:12 [Avatar] User a8dfbf32-4c5f-4283-8187-9c568eb6db46 - Using avatarUrl {url: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…ject/public/user-uploads/avatars/avatar-a8dfbf...', fullUrl: 'https://vhabpcoyypobgasacsko.supabase.co/storage/v…f32-4c5f-4283-8187-9c568eb6db46-1756497750250.jpg'}
-debug-logger.ts:126 🖼️ [AVATAR:a8dfbf32] 🔍 URL Resolution
+﻿[MSG:useConversations.direct] start {traceId: 'b7471bcb-7ecf-413a-8210-9a1d7ce6d2a6', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', otherUserId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:60 [MSG:messagingApi.resolveConversation] request:start {requestId: '59dd4c4e-1bb9-4352-962f-9d065bf4266a', type: 'direct', target: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:60 [MSG:useConversations.direct] start {traceId: 'd84b074a-44ce-4fba-991c-27d4a628793c', userId: '5cf7e176-4ac2-441d-8819-f6266cb20429', otherUserId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:60 [MSG:messagingApi.resolveConversation] request:start {requestId: 'a41760ab-3aaf-41d5-a560-105d479454b6', type: 'direct', target: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:73 [MSG:messagingApi.resolveConversation] ⏱️ fetch: 575.10ms {requestId: '59dd4c4e-1bb9-4352-962f-9d065bf4266a', status: 200}
+debug-logger.ts:60 [MSG:messagingApi.resolveConversation] fetch:success {requestId: '59dd4c4e-1bb9-4352-962f-9d065bf4266a', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', type: 'direct'}
+debug-logger.ts:60 [MSG:useConversations.direct] created {traceId: 'b7471bcb-7ecf-413a-8210-9a1d7ce6d2a6', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', otherUserId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:60 [MSG:useConversations.effect:trace] set-last-direct {conversationId: 'd180822e-33f4-45cd-a077-33a669454f98'}
+debug-logger.ts:60 [MSG:useMessages.cache:trace] conversation-change {conversationId: 'd180822e-33f4-45cd-a077-33a669454f98'}
+debug-logger.ts:60 [MSG:messagingApi.getMessages] fetch:start {requestId: 'c2d9e545-0a95-4389-b496-0f39c3e1af99', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', limit: 20, cursor: undefined, cursorBefore: undefined, …}
+debug-logger.ts:73 [MSG:messagingApi.resolveConversation] ⏱️ fetch: 702.30ms {requestId: 'a41760ab-3aaf-41d5-a560-105d479454b6', status: 200}
+debug-logger.ts:60 [MSG:messagingApi.resolveConversation] fetch:success {requestId: 'a41760ab-3aaf-41d5-a560-105d479454b6', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', type: 'direct'}
+debug-logger.ts:60 [MSG:useConversations.direct] created {traceId: 'd84b074a-44ce-4fba-991c-27d4a628793c', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', otherUserId: 'a8dfbf32-4c5f-4283-8187-9c568eb6db46'}
+debug-logger.ts:60 [MSG:useConversations.effect:trace] set-last-direct {conversationId: 'd180822e-33f4-45cd-a077-33a669454f98'}
+debug-logger.ts:73 [MSG:messagingApi.getMessages] ⏱️ fetch: 607.00ms {requestId: 'c2d9e545-0a95-4389-b496-0f39c3e1af99', status: 200}
+debug-logger.ts:60 [MSG:messagingApi.getMessages] fetch:success {requestId: 'c2d9e545-0a95-4389-b496-0f39c3e1af99', total: 18, hasMoreOlder: undefined}
+debug-logger.ts:60 [MSG:useMessages.sendMessage] optimistic:start {traceId: '16a0b3da-c6f6-4a0d-882a-a79d8ed8f008', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', contentLength: 21, type: 'text', attachments: 0}
+debug-logger.ts:60 [MSG:useMessages.sendMessage] optimistic:applied {traceId: '16a0b3da-c6f6-4a0d-882a-a79d8ed8f008', optimisticId: 'temp-1759868814365', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98'}
+debug-logger.ts:60 [MSG:messagingApi.sendMessage] fetch:start {requestId: 'cc83c5a5-2323-4664-b4b8-4d8a4889a66b', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', hasAttachments: false, type: 'text'}
+debug-logger.ts:73 [MSG:messagingApi.sendMessage] ⏱️ fetch: 989.50ms {requestId: 'cc83c5a5-2323-4664-b4b8-4d8a4889a66b', status: 201}
+debug-logger.ts:60 [MSG:messagingApi.sendMessage] fetch:success {requestId: 'cc83c5a5-2323-4664-b4b8-4d8a4889a66b', messageId: 'd2212f07-6a04-4d74-9569-84900b84d159', status: 'sent'}
+debug-logger.ts:73 [MSG:useMessages.sendMessage] ⏱️ roundtrip: 991.20ms {traceId: '16a0b3da-c6f6-4a0d-882a-a79d8ed8f008', conversationId: 'd180822e-33f4-45cd-a077-33a669454f98', messageId: 'd2212f07-6a04-4d74-9569-84900b84d159'}
+debug-logger.ts:60 [MSG:useMessages.sendMessage] api:success {traceId: '16a0b3da-c6f6-4a0d-882a-a79d8ed8f008', messageId: 'd2212f07-6a04-4d74-9569-84900b84d159', status: 'sent'}

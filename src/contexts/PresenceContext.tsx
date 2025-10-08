@@ -38,8 +38,8 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => {
 
   // Log for debugging purposes
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set'}`);
-    console.log(`[PresenceContext] Current user space ID: ${currentUserSpaceId || 'not in space'}`);
+    // console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set'}`);
+    // console.log(`[PresenceContext] Current user space ID: ${currentUserSpaceId || 'not in space'}`);
   }
 
   return (

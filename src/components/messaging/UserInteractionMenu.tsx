@@ -59,19 +59,9 @@ export function UserInteractionMenu({
   const { getOrCreateUserConversation, setActiveConversation } = useMessaging();
   const { usersInSpaces } = usePresence();
 
-  // Debug logging to understand what's happening
-  console.log('[UserInteractionMenu] Debug Info:', {
-    userDisplayName: user.displayName,
-    userId: user.id,
-    currentUserProfileId: currentUserProfile?.id,
-    currentUserProfileDisplayName: currentUserProfile?.displayName,
-    isCurrentUser: currentUserProfile?.id === user.id,
-    componentWillRender: currentUserProfile?.id !== user.id
-  });
 
   // Don't show menu for current user - compare DB IDs
   if (currentUserProfile?.id === user.id) {
-    console.log('[UserInteractionMenu] Returning children only - this is current user');
     return <>{children}</>;
   }
 
@@ -142,11 +132,8 @@ export function UserInteractionMenu({
     window.location.href = `mailto:${user.email}`;
   };
 
-  console.log('[UserInteractionMenu] Rendering DropdownMenu for user:', user.displayName);
-
   return (
     <DropdownMenu open={isOpen} onOpenChange={(open) => {
-      console.log('[UserInteractionMenu] onOpenChange called with:', open);
       setIsOpen(open);
     }}>
       <DropdownMenuTrigger 
@@ -154,7 +141,6 @@ export function UserInteractionMenu({
         className={className}
         data-avatar-interactive
         onClick={(e) => {
-          console.log('[UserInteractionMenu] DropdownMenuTrigger clicked, current isOpen:', isOpen);
           e.preventDefault();
           e.stopPropagation();
           setIsOpen(!isOpen);

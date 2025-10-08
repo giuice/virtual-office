@@ -9,6 +9,25 @@ import {
   FileAttachment,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
+import { debugLogger } from '@/utils/debug-logger';
+
+const getTimestamp = (): number => {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+};
+
+const createTraceId = (prefix: string): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch (error) {
+    // Ignore and fallback to timestamp-based identifier
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
 
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
@@ -19,6 +38,11 @@ export function useMessages(activeConversationId: string | null) {
   // Clear cache when conversation changes to prevent stale data
   React.useEffect(() => {
     if (activeConversationId) {
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('useMessages.cache', 'conversation-change', {
+          conversationId: activeConversationId,
+        });
+      }
       // Optional: Remove queries for all other conversations to save memory
       queryClient.removeQueries({ 
         queryKey: ['messages'], 
@@ -68,13 +92,45 @@ export function useMessages(activeConversationId: string | null) {
   const hasMoreMessages = !!hasNextPage;
 
   const refreshMessages = useCallback(async () => {
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('useMessages.refreshMessages', 'start', {
+        conversationId: activeConversationId,
+      });
+    }
+
     await refetch();
-  }, [refetch]);
+
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('useMessages.refreshMessages', 'finish', {
+        conversationId: activeConversationId,
+      });
+    }
+  }, [activeConversationId, refetch]);
 
   const loadMoreMessages = useCallback(async () => {
-    if (!hasNextPage) return;
+    if (!hasNextPage) {
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('useMessages.loadMoreMessages', 'skip:no-more-pages', {
+          conversationId: activeConversationId,
+        });
+      }
+      return;
+    }
+
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('useMessages.loadMoreMessages', 'start', {
+        conversationId: activeConversationId,
+      });
+    }
+
     await fetchNextPage();
-  }, [fetchNextPage, hasNextPage]);
+
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('useMessages.loadMoreMessages', 'finish', {
+        conversationId: activeConversationId,
+      });
+    }
+  }, [activeConversationId, fetchNextPage, hasNextPage]);
 
   const sendMessage = useCallback(
     async (
@@ -85,14 +141,39 @@ export function useMessages(activeConversationId: string | null) {
         type?: MessageType;
       }
     ) => {
-      if (!currentUserProfile?.id || !activeConversationId || !content.trim()) return;
+      const trimmedContent = content.trim();
+      const instrumentationEnabled = debugLogger.messaging.enabled();
+      const traceId = instrumentationEnabled ? createTraceId('hook-send') : '';
+
+      if (!currentUserProfile?.id || !activeConversationId || !trimmedContent) {
+        if (instrumentationEnabled) {
+          debugLogger.messaging.trace('useMessages.sendMessage', 'skip:missing-context', {
+            traceId,
+            hasProfile: Boolean(currentUserProfile?.id),
+            conversationId: activeConversationId,
+            hasContent: Boolean(trimmedContent),
+          });
+        }
+        return;
+      }
+
+      const start = instrumentationEnabled ? getTimestamp() : 0;
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useMessages.sendMessage', 'optimistic:start', {
+          traceId,
+          conversationId: activeConversationId,
+          contentLength: trimmedContent.length,
+          type: options?.type || MessageType.TEXT,
+          attachments: options?.attachments?.length || 0,
+        });
+      }
 
       const now = new Date();
       const optimisticMessage: Message = {
         id: `temp-${now.getTime()}`,
         conversationId: activeConversationId,
         senderId: currentUserProfile.id, // DB ID for UI representation
-        content: content.trim(),
+        content: trimmedContent,
         timestamp: now,
         status: MessageStatus.SENDING,
         type: options?.type || MessageType.TEXT,
@@ -121,15 +202,39 @@ export function useMessages(activeConversationId: string | null) {
         }
       );
 
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useMessages.sendMessage', 'optimistic:applied', {
+          traceId,
+          optimisticId: optimisticMessage.id,
+          conversationId: activeConversationId,
+        });
+      }
+
       try {
         // Server derives sender from session; do not send senderId
         const savedMessage = await messagingApi.sendMessage({
           conversationId: activeConversationId,
-          content: content.trim(),
+          content: trimmedContent,
           replyToId: options?.replyToId,
           attachments: options?.attachments,
           type: options?.type || MessageType.TEXT,
         });
+
+        if (instrumentationEnabled) {
+          const duration = start ? getTimestamp() - start : 0;
+          if (start) {
+            debugLogger.messaging.metric('useMessages.sendMessage', 'roundtrip', duration, {
+              traceId,
+              conversationId: activeConversationId,
+              messageId: savedMessage.id,
+            });
+          }
+          debugLogger.messaging.event('useMessages.sendMessage', 'api:success', {
+            traceId,
+            messageId: savedMessage.id,
+            status: savedMessage.status,
+          });
+        }
 
         // Replace optimistic with saved
         queryClient.setQueryData(
@@ -147,6 +252,15 @@ export function useMessages(activeConversationId: string | null) {
         );
         return savedMessage;
       } catch (err) {
+        if (instrumentationEnabled) {
+          const duration = start ? getTimestamp() - start : 0;
+          debugLogger.messaging.error('useMessages.sendMessage', 'api:error', {
+            traceId,
+            conversationId: activeConversationId,
+            duration,
+            error: err instanceof Error ? err.message : err,
+          });
+        }
         // Mark optimistic as failed
         queryClient.setQueryData(
           ['messages', activeConversationId],
@@ -171,7 +285,23 @@ export function useMessages(activeConversationId: string | null) {
 
   const updateMessageStatusLocal = useCallback(
     (messageId: string, status: MessageStatus) => {
-      if (!activeConversationId) return;
+      if (!activeConversationId) {
+        if (debugLogger.messaging.enabled()) {
+          debugLogger.messaging.trace('useMessages.updateMessageStatusLocal', 'skip:no-active-conversation', {
+            messageId,
+            status,
+          });
+        }
+        return;
+      }
+
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('useMessages.updateMessageStatusLocal', 'apply', {
+          conversationId: activeConversationId,
+          messageId,
+          status,
+        });
+      }
       queryClient.setQueryData(
         ['messages', activeConversationId],
         (oldData:
@@ -191,7 +321,24 @@ export function useMessages(activeConversationId: string | null) {
 
   const addMessage = useCallback(
     (message: Message) => {
-      if (!activeConversationId) return;
+      if (!activeConversationId) {
+        if (debugLogger.messaging.enabled()) {
+          debugLogger.messaging.trace('useMessages.addMessage', 'skip:no-active-conversation', {
+            messageId: message.id,
+            incomingConversationId: message.conversationId,
+          });
+        }
+        return;
+      }
+
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.event('useMessages.addMessage', 'incoming', {
+          conversationId: activeConversationId,
+          messageId: message.id,
+          status: message.status,
+          senderId: message.senderId,
+        });
+      }
       queryClient.setQueryData(
         ['messages', activeConversationId],
         (oldData:

@@ -1,5 +1,5 @@
 // src/repositories/interfaces/IConversationRepository.ts
-import { Conversation } from '@/types/messaging';
+import { Conversation, ConversationType } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 export interface IConversationRepository {
@@ -16,7 +16,10 @@ export interface IConversationRepository {
    * @param options Optional pagination parameters.
    * @returns A promise that resolves to a paginated list of Conversation objects.
    */
-  findByUser(userId: string, options?: PaginationOptions): Promise<PaginatedResult<Conversation>>;
+  findByUser(
+    userId: string,
+    options?: PaginationOptions & { type?: ConversationType; includeArchived?: boolean }
+  ): Promise<PaginatedResult<Conversation>>;
 
   /**
    * Creates a new conversation.

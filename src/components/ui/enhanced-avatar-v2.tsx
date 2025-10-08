@@ -142,7 +142,7 @@ export function EnhancedAvatarV2({
     setCurrentAttempt(0);
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[EnhancedAvatarV2] Successfully loaded avatar for ${displayName}`);
+      // console.log(`[EnhancedAvatarV2] Successfully loaded avatar for ${displayName}`);
     }
   }, [displayName]);
 
@@ -198,7 +198,7 @@ export function EnhancedAvatarV2({
       }
       
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`[EnhancedAvatarV2] Failed to load avatar for ${displayName} after ${currentAttempt + 1} attempts`);
+        // console.warn(`[EnhancedAvatarV2] Failed to load avatar for ${displayName} after ${currentAttempt + 1} attempts`);
       }
     }
   }, [

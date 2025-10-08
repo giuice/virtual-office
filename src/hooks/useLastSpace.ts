@@ -26,14 +26,14 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
   const updateUserLocation = useCallback(async (userId: string, spaceId: string | null, spaceName?: string) => {
     // Prevent multiple simultaneous updates
     if (isUpdatingRef.current) {
-      console.log(`[useLastSpace] Update already in progress, skipping duplicate request`);
+      // console.log(`[useLastSpace] Update already in progress, skipping duplicate request`);
       return;
     }
 
     // Check if this is the same update we just made
     const updateKey = `${userId}-${spaceId}`;
     if (lastUpdateRef.current === updateKey) {
-      console.log(`[useLastSpace] Same update already processed, skipping: ${updateKey}`);
+      // console.log(`[useLastSpace] Same update already processed, skipping: ${updateKey}`);
       return;
     }
 
@@ -49,7 +49,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
-        console.error(`[useLastSpace] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
+        // console.error(`[useLastSpace] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
         
         // Implement exponential backoff for retries
         const newAttempts = rejoinAttempts + 1;
@@ -57,7 +57,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
         
         if (newAttempts < 3) {
           const backoffDelay = Math.pow(2, newAttempts) * 1000;
-          console.log(`[useLastSpace] Retrying in ${backoffDelay}ms (attempt ${newAttempts})`);
+          // console.log(`[useLastSpace] Retrying in ${backoffDelay}ms (attempt ${newAttempts})`);
           setTimeout(() => {
             updateUserLocation(userId, spaceId, spaceName);
           }, backoffDelay);
@@ -85,7 +85,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
         }
       }
     } catch (error) {
-      console.error(`[useLastSpace] Network error updating location to space ${spaceId}:`, error);
+      // console.error(`[useLastSpace] Network error updating location to space ${spaceId}:`, error);
       
       const newAttempts = rejoinAttempts + 1;
       setRejoinAttempts(newAttempts);
@@ -117,7 +117,7 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
   useEffect(() => {
     // Prevent execution if already updating or during a rejoin process
     if (isUpdatingRef.current || isRejoinInProgress) {
-      console.log(`[useLastSpace] Update in progress, skipping useEffect execution`);
+      // console.log(`[useLastSpace] Update in progress, skipping useEffect execution`);
       return;
     }
 
@@ -138,16 +138,16 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
     if (spaceToRejoin) {
       // Check if user's current_space_id already matches
       if (currentUser.currentSpaceId !== spaceToRejoin.id) {
-        console.log(`[useLastSpace] Attempting to rejoin user ${currentUser.id} to space ${spaceToRejoin.id} (${spaceToRejoin.name})`);
+        // console.log(`[useLastSpace] Attempting to rejoin user ${currentUser.id} to space ${spaceToRejoin.id} (${spaceToRejoin.name})`);
         updateUserLocation(currentUser.id, spaceToRejoin.id, spaceToRejoin.name);
       } else {
-        console.log(`[useLastSpace] User ${currentUser.id} already in last space ${spaceToRejoin.id}. No action needed.`);
+        // console.log(`[useLastSpace] User ${currentUser.id} already in last space ${spaceToRejoin.id}. No action needed.`);
         // Mark this as processed to prevent re-execution
         lastUpdateRef.current = `${currentUser.id}-${spaceToRejoin.id}`;
       }
     } else {
       // If the space no longer exists, clear the stored space ID and ensure user location is null
-      console.log(`[useLastSpace] Last space ${lastSpaceId} not found. Clearing stored ID.`);
+      // console.log(`[useLastSpace] Last space ${lastSpaceId} not found. Clearing stored ID.`);
       setLastSpaceId(null);
       if (currentUser.currentSpaceId !== null) {
         updateUserLocation(currentUser.id, null);

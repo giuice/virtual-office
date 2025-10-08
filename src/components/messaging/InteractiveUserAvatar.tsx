@@ -53,15 +53,15 @@ export function InteractiveUserAvatar({
   'aria-label': ariaLabel,
 }: InteractiveUserAvatarProps) {
   
-  console.log('[InteractiveUserAvatar] Debug:', {
-    userDisplayName: user.displayName,
-    userId: user.id,
-    showInteractionMenu,
-    willRenderMenu: showInteractionMenu
-  });
+  // console.log('[InteractiveUserAvatar] Debug:', {
+  //   userDisplayName: user.displayName,
+  //   userId: user.id,
+  //   showInteractionMenu,
+  //   willRenderMenu: showInteractionMenu
+  // });
 
   if (!showInteractionMenu) {
-    console.log('[InteractiveUserAvatar] Rendering NON-interactive avatar for:', user.displayName);
+    // console.log('[InteractiveUserAvatar] Rendering NON-interactive avatar for:', user.displayName);
     // Render non-interactive avatar
     return (
       <EnhancedAvatarV2
@@ -75,7 +75,7 @@ export function InteractiveUserAvatar({
     );
   }
 
-  console.log('[InteractiveUserAvatar] Rendering INTERACTIVE avatar with menu for:', user.displayName);
+  // console.log('[InteractiveUserAvatar] Rendering INTERACTIVE avatar with menu for:', user.displayName);
 
   // Render interactive avatar with menu
   return (
@@ -93,7 +93,7 @@ export function InteractiveUserAvatar({
         className="relative focus:outline-none"
         data-avatar-interactive="true"
         onClick={(e) => {
-          console.log('[InteractiveUserAvatar] Button clicked, stopping propagation.');
+          // console.log('[InteractiveUserAvatar] Button clicked, stopping propagation.');
           e.preventDefault();
           e.stopPropagation();
         }}

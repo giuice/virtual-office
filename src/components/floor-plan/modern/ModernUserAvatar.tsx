@@ -42,15 +42,15 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
 
   // Temporarily keep debug log for troubleshooting
   if (process.env.NODE_ENV === 'development') {
-    console.log('[ModernUserAvatar] Debug:', {
-      userId: user.id,
-      userDisplayName: user.displayName,
-      foundFullUser: !!fullUserData,
-      fullUserDisplayName: fullUserData?.displayName,
-      fullUserEmail: fullUserData?.email?.substring(0, 10) + '...',
-      hasFullUserAvatarUrl: !!fullUserData?.avatarUrl,
-      hasPresenceAvatarUrl: !!user.avatarUrl
-    });
+    // console.log('[ModernUserAvatar] Debug:', {
+    //   userId: user.id,
+    //   userDisplayName: user.displayName,
+    //   foundFullUser: !!fullUserData,
+    //   fullUserDisplayName: fullUserData?.displayName,
+    //   fullUserEmail: fullUserData?.email?.substring(0, 10) + '...',
+    //   hasFullUserAvatarUrl: !!fullUserData?.avatarUrl,
+    //   hasPresenceAvatarUrl: !!user.avatarUrl
+    // });
   }
 
   // Temporarily disable stopPropagation to test menu

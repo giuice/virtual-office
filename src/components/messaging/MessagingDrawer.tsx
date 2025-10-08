@@ -20,11 +20,11 @@ interface MessagingDrawerProps {
  * Mounted at the root layout level to persist across page navigation.
  */
 export function MessagingDrawer({ className }: MessagingDrawerProps) {
-  const { activeConversation, setActiveConversation, lastDirectConversation } = useMessaging();
+  const { activeConversation, lastActiveConversation , closeDrawer} = useMessaging();
   const { currentUserProfile, companyUsers } = useCompany();
   const [isMinimized, setIsMinimized] = useState(false);
 
-  const conversationToDisplay = activeConversation?.type === ConversationType.DIRECT ? activeConversation : lastDirectConversation;
+  const conversationToDisplay = activeConversation ?? lastActiveConversation;
 
   // Only show if there's a direct conversation to display
   if (!conversationToDisplay) {
@@ -32,7 +32,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   }
 
   const handleClose = () => {
-    setActiveConversation(null);
+    //setActiveConversation(null);
+    closeDrawer();
   };
 
   const handleToggleMinimize = () => {

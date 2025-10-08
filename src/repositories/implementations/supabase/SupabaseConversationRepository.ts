@@ -72,20 +72,42 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async findByUser(userId: string, options?: PaginationOptions): Promise<PaginatedResult<Conversation>> {
+  async findByUser(
+    userId: string,
+    options?: PaginationOptions & { type?: ConversationType; includeArchived?: boolean }
+  ): Promise<PaginatedResult<Conversation>> {
     try {
-      const limit = options?.limit ?? 20; // Default limit
+      const rawLimit = options?.limit;
+      const limit = Number.isFinite(rawLimit) && rawLimit ? Number(rawLimit) : 20;
       // Supabase range is inclusive [from, to]
-      const from = typeof options?.cursor === 'number' ? options.cursor : 0;
+      const cursorValue = options?.cursor;
+      let offset = 0;
+      if (typeof cursorValue === 'number') {
+        offset = cursorValue;
+      } else if (typeof cursorValue === 'string' && cursorValue.trim() !== '') {
+        const parsed = Number.parseInt(cursorValue, 10);
+        offset = Number.isNaN(parsed) ? 0 : parsed;
+      }
+
+      const from = offset;
       const to = from + limit - 1;
 
       // Query conversations where the user is a participant
-      const { data, error, count } = await this.supabaseClient
+      let query = this.supabaseClient
         .from(this.TABLE_NAME)
         .select('*', { count: 'exact' })
         .contains('participants', [userId])
-        .order('last_activity', { ascending: false })
-        .range(from, to);
+        .order('last_activity', { ascending: false });
+
+      if (options?.type) {
+        query = query.eq('type', options.type);
+      }
+
+      if (!options?.includeArchived) {
+        query = query.eq('is_archived', false);
+      }
+
+      const { data, error, count } = await query.range(from, to);
 
       if (error) {
         console.error('Error fetching conversations by user:', error);
@@ -93,11 +115,11 @@ export class SupabaseConversationRepository implements IConversationRepository {
       }
 
       // Map DB response array
-  const items = mapArrayToCamelCase((data as ConversationRow[]) || []);
-      const nextCursor = items.length === limit ? to + 1 : null;
+      const items = mapArrayToCamelCase((data as ConversationRow[]) || []);
+      const nextCursor = items.length === limit ? (to + 1).toString() : null;
 
       return {
-        items: items,
+        items,
         nextCursor: nextCursor,
         hasMore: nextCursor !== null,
         totalCount: count ?? undefined,

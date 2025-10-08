@@ -23,21 +23,21 @@ class AvatarCache {
   get(userId: string): string | null {
     const cached = this.cache.get(userId);
     if (!cached) {
-      debugLogger.avatar.cache('miss', userId);
+      // debugLogger.avatar.cache('miss', userId);
       return null;
     }
     
     // Check if cache is expired
     if (Date.now() - cached.timestamp > AVATAR_CACHE_TTL) {
       this.cache.delete(userId);
-      debugLogger.avatar.cache('invalidate', userId, { reason: 'expired' });
+      // debugLogger.avatar.cache('invalidate', userId, { reason: 'expired' });
       return null;
     }
     
-    debugLogger.avatar.cache('hit', userId, { 
-      url: cached.url.substring(0, 50) + (cached.url.length > 50 ? '...' : ''),
-      age: Date.now() - cached.timestamp 
-    });
+    // debugLogger.avatar.cache('hit', userId, { 
+    //   url: cached.url.substring(0, 50) + (cached.url.length > 50 ? '...' : ''),
+    //   age: Date.now() - cached.timestamp 
+    // });
     return cached.url;
   }
   
@@ -48,22 +48,22 @@ class AvatarCache {
       userId,
       version
     });
-    debugLogger.avatar.cache('set', userId, { 
-      url: url.substring(0, 50) + (url.length > 50 ? '...' : ''),
-      version 
-    });
+    // debugLogger.avatar.cache('set', userId, { 
+    //   url: url.substring(0, 50) + (url.length > 50 ? '...' : ''),
+    //   version 
+    // });
   }
   
   invalidate(userId: string): void {
     this.cache.delete(userId);
     this.retryAttempts.delete(userId);
-    debugLogger.avatar.cache('invalidate', userId, { reason: 'manual' });
+    // debugLogger.avatar.cache('invalidate', userId, { reason: 'manual' });
   }
   
   invalidateAll(): void {
     this.cache.clear();
     this.retryAttempts.clear();
-    debugLogger.log('Avatar', 'Invalidated all avatar cache');
+    // debugLogger.log('Avatar', 'Invalidated all avatar cache');
   }
   
   getRetryCount(userId: string): number {
@@ -189,20 +189,20 @@ export function generateAvatarDataUri(user: AvatarUser): string {
 // Enhanced debug helper to trace avatar resolution with better logging
 function debugAvatarResolution(user: any, source: string, value: string | null | undefined) {
   const userId = user?.id || 'unknown';
-  debugLogger.trace('Avatar', `User ${userId} - Checking ${source}: ${value ? 'Found' : 'Not found'}`);
+  // debugLogger.trace('Avatar', `User ${userId} - Checking ${source}: ${value ? 'Found' : 'Not found'}`);
   
   if (value) {
-    debugLogger.log('Avatar', `User ${userId} - Using ${source}`, {
-      url: value.substring(0, 100) + (value.length > 100 ? '...' : ''),
-      fullUrl: value
-    });
+    // debugLogger.log('Avatar', `User ${userId} - Using ${source}`, {
+    //   url: value.substring(0, 100) + (value.length > 100 ? '...' : ''),
+    //   fullUrl: value
+    // });
   }
 }
 
 // Enhanced avatar resolution tracking for comprehensive debugging
 function trackAvatarResolution(user: any, sources: Array<{ source: string; url: string | null; selected: boolean }>) {
   const userId = String(user?.id || 'unknown');
-  debugLogger.avatar.resolution(userId, sources);
+  // debugLogger.avatar.resolution(userId, sources);
 }
 
 // Log avatar loading failures with detailed information
@@ -310,7 +310,7 @@ function fixSupabaseStorageUrl(url: string): string {
   
   // Handle cases where the URL might be malformed or missing parts
   if (url.includes('supabase.co') && !url.includes('/storage/v1/object/public/')) {
-    debugLogger.warn('Avatar', 'Potentially malformed Supabase storage URL', { url });
+    // debugLogger.warn('Avatar', 'Potentially malformed Supabase storage URL', { url });
   }
   
   return url;
@@ -331,20 +331,20 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
   // Handle null or undefined user
   if (!user) {
     debugAvatarResolution(user, 'user', null);
-    debugLogger.trace('Avatar', 'No user provided, generating default avatar');
+    // debugLogger.trace('Avatar', 'No user provided, generating default avatar');
     const fallback = generateAvatarDataUri({ name: '' });
-    debugLogger.avatar.fallback('unknown', 'No user provided');
+    // debugLogger.avatar.fallback('unknown', 'No user provided');
     return fallback;
   }
   
   const userId = String((user as any).id || 'unknown');
-  debugLogger.trace('Avatar', `Resolving avatar for user ${userId}`);
+  // debugLogger.trace('Avatar', `Resolving avatar for user ${userId}`);
   
   // Track all resolution attempts for debugging
   const resolutionSources: Array<{ source: string; url: string | null; selected: boolean }> = [];
   
   // Priority 1: Database avatarUrl (custom uploaded avatar - highest priority)
-  debugAvatarResolution(user, 'avatarUrl', user.avatarUrl);
+  //debugAvatarResolution(user, 'avatarUrl', user.avatarUrl);
   const avatarUrl = user.avatarUrl;
   resolutionSources.push({ source: 'avatarUrl', url: avatarUrl || null, selected: false });
   
@@ -356,8 +356,8 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
       trackAvatarResolution(user, resolutionSources);
       
       const duration = performance.now() - startTime;
-      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'avatarUrl' });
-      debugLogger.avatar.loadSuccess(userId, fixedUrl, 'custom upload');
+      // debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'avatarUrl' });
+      // debugLogger.avatar.loadSuccess(userId, fixedUrl, 'custom upload');
       
       return fixedUrl;
     }
@@ -365,7 +365,7 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
   
   // Priority 2: Google OAuth photoURL (for Google authenticated users)
   const photoURL = (user as any).photoURL;
-  debugAvatarResolution(user, 'photoURL', photoURL);
+  //debugAvatarResolution(user, 'photoURL', photoURL);
   resolutionSources.push({ source: 'photoURL', url: photoURL || null, selected: false });
   
   if (photoURL) {
@@ -374,9 +374,9 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
       resolutionSources[resolutionSources.length - 1].selected = true;
       trackAvatarResolution(user, resolutionSources);
       
-      const duration = performance.now() - startTime;
-      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'photoURL' });
-      debugLogger.avatar.loadSuccess(userId, validatedPhotoUrl, 'Google OAuth');
+      // const duration = performance.now() - startTime;
+      // debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'photoURL' });
+      // debugLogger.avatar.loadSuccess(userId, validatedPhotoUrl, 'Google OAuth');
       
       return validatedPhotoUrl;
     }
@@ -384,7 +384,7 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
   
   // Priority 3: Legacy avatar field (backward compatibility)
   const legacyAvatar = (user as any).avatar;
-  debugAvatarResolution(user, 'avatar', legacyAvatar);
+  //debugAvatarResolution(user, 'avatar', legacyAvatar);
   resolutionSources.push({ source: 'avatar', url: legacyAvatar || null, selected: false });
   
   if (legacyAvatar) {
@@ -394,9 +394,9 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
       resolutionSources[resolutionSources.length - 1].selected = true;
       trackAvatarResolution(user, resolutionSources);
       
-      const duration = performance.now() - startTime;
-      debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'legacy' });
-      debugLogger.avatar.loadSuccess(userId, fixedUrl, 'legacy field');
+      // const duration = performance.now() - startTime;
+      // debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'legacy' });
+      // debugLogger.avatar.loadSuccess(userId, fixedUrl, 'legacy field');
       
       return fixedUrl;
     }
@@ -412,11 +412,11 @@ export function getAvatarUrl(user: User | UIUser | AvatarUser  | null | undefine
     name: (user as any).name || user.displayName || ''
   });
   
-  const duration = performance.now() - startTime;
-  debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'fallback' });
-  debugLogger.avatar.fallback(userId, 'No valid avatar URLs found', {
-    checkedSources: resolutionSources.length - 1
-  });
+  // const duration = performance.now() - startTime;
+  // debugLogger.avatar.performance(userId, 'getAvatarUrl', duration, { source: 'fallback' });
+  // debugLogger.avatar.fallback(userId, 'No valid avatar URLs found', {
+  //   checkedSources: resolutionSources.length - 1
+  // });
   
   return fallbackAvatar;
 }
@@ -454,7 +454,7 @@ export function getAvatarUrlWithFallback(
     if (enableCache) {
       avatarCache.set(userId, avatarUrl, cacheVersion);
     }
-    debugLogger.trace('Avatar', `Returning generated avatar for user ${userId}`);
+    // debugLogger.trace('Avatar', `Returning generated avatar for user ${userId}`);
     return avatarUrl;
   }
   
@@ -463,7 +463,7 @@ export function getAvatarUrlWithFallback(
     avatarCache.set(userId, avatarUrl, cacheVersion);
   }
   
-  debugLogger.trace('Avatar', `Returning external avatar URL for user ${userId}`, { url: avatarUrl });
+  // debugLogger.trace('Avatar', `Returning external avatar URL for user ${userId}`, { url: avatarUrl });
   
   // Components using this function should call handleAvatarLoadError on image load failures
   return avatarUrl;
@@ -513,22 +513,23 @@ export async function getAvatarUrlWithRetry(
       
       // Success - reset retry count and return URL
       avatarCache.resetRetryCount(userId);
-      debugLogger.log('Avatar', `Avatar URL validated successfully for user ${userId}`, { 
-        url: avatarUrl, 
-        attempt: attempt + 1 
-      });
+      // debugLogger.log('Avatar', `Avatar URL validated successfully for user ${userId}`, { 
+      //   url: avatarUrl, 
+      //   attempt: attempt + 1 
+      // });
       return avatarUrl;
       
     } catch (error) {
       lastError = error as Error;
-      const retryCount = avatarCache.incrementRetryCount(userId);
       
-      debugLogger.avatar.retry(userId, avatarUrl, attempt + 1, maxRetries);
-      debugLogger.warn('Avatar', `Avatar load attempt ${attempt + 1} failed for user ${userId}`, {
-        url: avatarUrl,
-        error: lastError.message,
-        totalRetries: retryCount
-      });
+      //const retryCount = avatarCache.incrementRetryCount(userId);
+      
+      // debugLogger.avatar.retry(userId, avatarUrl, attempt + 1, maxRetries);
+      // debugLogger.warn('Avatar', `Avatar load attempt ${attempt + 1} failed for user ${userId}`, {
+      //   url: avatarUrl,
+      //   error: lastError.message,
+      //   totalRetries: retryCount
+      // });
       
       // Call retry callback if provided
       if (onRetry) {
@@ -573,7 +574,7 @@ export async function getAvatarUrlWithRetry(
     avatarCache.set(userId, fallbackAvatar, cacheVersion);
   }
   
-  debugLogger.log('Avatar', `Using fallback avatar after retry failures for user ${userId}`);
+  // debugLogger.log('Avatar', `Using fallback avatar after retry failures for user ${userId}`);
   return fallbackAvatar;
 }
 
@@ -676,7 +677,7 @@ export function handleAvatarLoadError(
   
   // Return fallback avatar if requested
   if (options.generateFallback !== false) {
-    debugLogger.log('Avatar', `Generating fallback avatar for failed load - user ${userId}`);
+    // debugLogger.log('Avatar', `Generating fallback avatar for failed load - user ${userId}`);
     return generateAvatarDataUri({ 
       displayName: user?.displayName || (user as any)?.name || '',
       name: (user as any)?.name || user?.displayName || ''
@@ -716,7 +717,7 @@ export const avatarCacheManager = {
    */
   bustCache: (userId: string, newVersion?: string): void => {
     avatarCache.invalidate(userId);
-    debugLogger.log('Avatar', `Cache busted for user ${userId}`, { version: newVersion });
+    // debugLogger.log('Avatar', `Cache busted for user ${userId}`, { version: newVersion });
   },
   
   /**
@@ -724,7 +725,7 @@ export const avatarCacheManager = {
    */
   preWarm: (userId: string, avatarUrl: string, version?: string): void => {
     avatarCache.set(userId, avatarUrl, version);
-    debugLogger.log('Avatar', `Pre-warmed cache for user ${userId}`, { url: avatarUrl });
+    // debugLogger.log('Avatar', `Pre-warmed cache for user ${userId}`, { url: avatarUrl });
   }
 };
 
@@ -740,10 +741,10 @@ export function generateCacheBustingUrl(baseUrl: string, version?: string | numb
   const separator = baseUrl.includes('?') ? '&' : '?';
   const cacheBustUrl = `${baseUrl}${separator}v=${timestamp}`;
   
-  debugLogger.trace('Avatar', 'Generated cache-busting URL', { 
-    original: baseUrl, 
-    cacheBusted: cacheBustUrl 
-  });
+  // debugLogger.trace('Avatar', 'Generated cache-busting URL', { 
+  //   original: baseUrl, 
+  //   cacheBusted: cacheBustUrl 
+  // });
   
   return cacheBustUrl;
 }
@@ -773,11 +774,11 @@ export function updateAvatarWithCacheBust(
   // Pre-warm cache with new URL
   avatarCache.set(userId, finalUrl, String(version || Date.now()));
   
-  debugLogger.log('Avatar', `Updated avatar for user ${userId}`, {
-    url: finalUrl,
-    bustCache,
-    version
-  });
+  // debugLogger.log('Avatar', `Updated avatar for user ${userId}`, {
+  //   url: finalUrl,
+  //   bustCache,
+  //   version
+  // });
   
   return finalUrl;
 }
@@ -805,13 +806,13 @@ export function handleAvatarLoadErrorWithRetry(
   
   if (shouldRetry) {
     // Increment retry count
-    const newRetryCount = avatarCache.incrementRetryCount(userId);
+    //const newRetryCount = avatarCache.incrementRetryCount(userId);
     
-    debugLogger.warn('Avatar', `Avatar load failed, will retry (${newRetryCount}/${maxRetries})`, {
-      userId,
-      url: failedUrl,
-      retryCount: newRetryCount
-    });
+    // debugLogger.warn('Avatar', `Avatar load failed, will retry (${newRetryCount}/${maxRetries})`, {
+    //   userId,
+    //   url: failedUrl,
+    //   retryCount: newRetryCount
+    // });
     
     // Invalidate cache to force fresh attempt
     avatarCache.invalidate(userId);
@@ -830,7 +831,7 @@ export function handleAvatarLoadErrorWithRetry(
  */
 export function extractGoogleAvatarUrl(oauthUser: any): string | null {
   if (!oauthUser) {
-    debugLogger.warn('Avatar', 'No OAuth user data provided for Google avatar extraction');
+    // debugLogger.warn('Avatar', 'No OAuth user data provided for Google avatar extraction');
     return null;
   }
   
@@ -842,18 +843,18 @@ export function extractGoogleAvatarUrl(oauthUser: any): string | null {
     if (url && typeof url === 'string') {
       const validatedUrl = validateAndLogAvatarUrl(url, `google_oauth_${field}`, oauthUser.id);
       if (validatedUrl) {
-        debugLogger.log('Avatar', `Extracted Google avatar from ${field}`, { 
-          url: validatedUrl,
-          userId: oauthUser.id 
-        });
+        // debugLogger.log('Avatar', `Extracted Google avatar from ${field}`, { 
+        //   url: validatedUrl,
+        //   userId: oauthUser.id 
+        // });
         return validatedUrl;
       }
     }
   }
   
-  debugLogger.warn('Avatar', 'No valid Google avatar URL found in OAuth data', { 
-    availableFields: Object.keys(oauthUser),
-    userId: oauthUser.id 
-  });
+  // debugLogger.warn('Avatar', 'No valid Google avatar URL found in OAuth data', { 
+  //   availableFields: Object.keys(oauthUser),
+  //   userId: oauthUser.id 
+  // });
   return null;
 }

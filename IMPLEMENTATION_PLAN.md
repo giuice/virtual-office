@@ -1,143 +1,173 @@
-# MESSAGING_MINIMAL_VIABLE_IMPLEMENTATION_PLAN
+ # PERFECT_MESSAGING_SYSTEM_IMPLEMENTATION_PLAN
 
 ## Executive Summary
-- Define a narrowly scoped, verifiable path to restore direct messaging basics: realtime delivery, attention-grabbing UI, and read state propagation.
-- Ground every step in current code realities so junior developers can execute without guessing.
-- Prioritise observability and regression safety before altering behaviour.
+- Design an end-to-end overhaul of messaging so DMs and space chats share one reliable drawer, realtime delivery is deterministic, and unread/scroll states never desync.
+- Stabilise the stack across browser tabs by hardening Supabase subscriptions, adding resilient polling, and tightening repository contracts with explicit tests.
+- Deliver a phased rollout guarded by feature flags, complete with observability and QA scripts so regressions cannot slip through future sessions.
 
 ## Research Findings
-- `src/hooks/useConversations.ts:14-217` keeps conversations in local React state, so `useConversationRealtime` invalidations never reach the UI and unread counts/ordering drift.
-- `src/hooks/realtime/useConversationRealtime.ts:1-52` invalidates `['conversations', userId]`, but no query owns that key, confirming state/cache mismatch.
-- `src/components/messaging/MessagingDrawer.tsx:23-34` only renders when `activeConversation` or `lastDirectConversation` is populated; receivers never auto-populate these fields, so no popup appears.
-- `src/hooks/realtime/useMessageSubscription.ts:21-134` mirrors message rows into the cache but never touches conversation metadata (last activity, unread, drawer triggers).
-- `src/contexts/AuthContext.tsx:47-74` relies on `beforeunload` + async fetch for offline status, which browsers routinely cancel, explaining ghost-online users.
-- `src/hooks/useUserPresence.ts:18-210` lacks a heartbeat/backoff; `users.last_active` only updates on explicit API calls, so stale sessions persist past the two-minute grace window.
+- Realtime gaps: current `useMessageSubscription` only attaches to active IDs, leaving background DMs invisible when Supabase emits outside that scope.
+- API inconsistencies: `/api/conversations/get` returns snake_case timestamps; consumers treat them as `Date`, triggering runtime errors and defeating unread sort/order.
+- Drawer scope: floor-plan space clicks reuse the messaging context but do not segregate space chats versus DMs, causing accidental drawer opens when browsing rooms.
+- Delivery mismatch: message send route increments unread counts but the recipient drawer never refreshes conversation metadata, so new messages show up in the wrong chat or not at all until poll catches up.
+- UI limitations: `MessagingDrawer` lacks scroll-to-bottom persistence and a badge/minimize UX, making it easy to miss new content even after delivery.
+- Observability gaps: logs depend on `NODE_ENV==='development'`, so production toggles and QA in staging cannot inspect failures.
 
 ## Implementation Strategy
-- Phase 0 – Instrumentation: add targeted logging/metrics hooks to verify resolver, message, and presence flows before changing logic.
-- Phase 1 – Conversation cache: migrate `useConversations` to React Query, wiring it to realtime invalidation and exposing a derived selector for unread/ordering.
-- Phase 2 – Message-driven updates: extend `useMessageSubscription` and `MessagingContext` to raise unread counts, bump last activity, and prime the drawer when a new DM arrives.
-- Phase 3 – Read/delivered semantics: mark conversations as read on focus, emit delivery acknowledgements, and reconcile optimistic sends.
-- Phase 4 – Presence hardening: replace fragile `beforeunload` calls with `navigator.sendBeacon`, page visibility fallbacks, and a 45s heartbeat that zeroes `current_space_id` on failure.
-- Phase 5 – Verification: automated tests (unit + integration) plus dual-browser manual scenarios to prove send, receive, unread, and presence flows.
+1. **Instrumentation Refresh** — unify debug flag handling, add structured logging around Supabase channel lifecycle, and capture conversation IDs involved in every promotion.
+2. **Data Contract Hardening** — normalise API payloads, verify repository outputs, and introduce integration tests covering unread math, participants, and timestamps.
+3. **Realtime Backbone** — migrate to multi-channel subscriptions (one per conversation + global DM channel), add exponential backoff, and ensure message inserts map to the correct conversation cache.
+4. **Drawer Experience** — rebuild drawer to support per-conversation routing, dedicated minimize badge, scroll container with sticky composer, and optional grouping for room chats.
+5. **Delivery Semantics** — enforce sender/recipient flows: optimistic send, server acknowledgment, unread increment, drawer promotion, and read receipts on focus.
+6. **Space Chat Isolation** — separate floor-plan chat entry points from DM drawer (feature flag), with context boundaries preventing accidental openings.
+7. **QA & Rollout** — provide Playwright dual-session scripts, Vitest integration tests, and seed data loaders; gate new behaviour behind `NEXT_PUBLIC_MESSAGING_V2` for gradual release.
+
+## Research Findings (Trace Evidence)
+1. `temp/console.log`: duplicate `useConversations.direct` resolve calls and missing `onInsert` signals prove subscription gap.
+2. Browser logs: `TypeError: c.lastActivity.getTime` indicates snake_case timestamps flowing to UI without hydration.
+3. Supabase console: realtime events target `messages:conversationId` channels; our hook previously dropped non-active IDs, explaining silent failures.
+4. UX feedback: opening floor-plan triggers DM drawer because context lacks guard between space messaging and direct conversations.
+
+## Implementation Strategy
+- Already detailed above; each phase maps to Detailed Action Plan tasks.
 
 ## Repository and File Structure
 ```
 src/
-├─ contexts/
-│  ├─ AuthContext.tsx
-│  └─ messaging/
-│     └─ MessagingContext.tsx
-├─ hooks/
-│  ├─ useConversations.ts
-│  ├─ useMessages.ts
-│  ├─ realtime/
-│  │  ├─ useConversationRealtime.ts
-│  │  └─ useMessageSubscription.ts
+├─ app/
+│  └─ api/
+│     └─ conversations/get/route.ts             # Normalise payloads, enforce auth
 ├─ components/
 │  └─ messaging/
-│     ├─ MessagingDrawer.tsx
-│     ├─ message-feed.tsx
-│     └─ conversation-list.tsx
+│     ├─ MessagingDrawer.tsx                    # Rebuild unified drawer
+│     ├─ message-feed.tsx                       # Scroll + read acknowledgement
+│     └─ space-message-panel.tsx (existing)     # Ensure isolation
+├─ contexts/
+│  └─ messaging/
+│     ├─ MessagingContext.tsx                   # Subscription manager, polling
+│     └─ types.ts                               # Context contract
+├─ hooks/
+│  ├─ useConversations.ts                       # React Query cache owner
+│  ├─ useMessages.ts                            # Optimistic flow
+│  └─ realtime/
+│     ├─ useMessageSubscription.ts              # Multi-channel + backoff
+│     └─ useConversationRealtime.ts             # Conversation metadata stream
 ├─ lib/
-│  └─ messaging-api.ts
-└─ repositories/
-   └─ implementations/
-      └─ supabase/
-         └─ SupabaseConversationRepository.ts
-memory-bank/tasks/
-└─ operation-clean-slate-messaging-refactor-plan.md
+│  ├─ messaging-api.ts                          # Client fetch helpers
+│  └─ supabase/
+│     └─ client builders                        # Ensure realtime config
+├─ repositories/
+│  └─ implementations/supabase/
+│     └─ SupabaseConversationRepository.ts      # unread_count + timestamps
+└─ tests/
+   ├─ messaging/                                # Vitest suites
+   └─ e2e/messaging.spec.ts                     # Playwright dual-session
 ```
 
-**Existing files to modify**
-- `src/hooks/useConversations.ts` — Source of truth for conversations; owned by Messaging team; risk: list regressions.
-- `src/hooks/realtime/useConversationRealtime.ts` — Realtime bridge; Messaging; risk: dropped subscriptions.
-- `src/hooks/realtime/useMessageSubscription.ts` — Message listener; Messaging; risk: duplicate inserts.
-- `src/hooks/useMessages.ts` — Infinite query + optimistic send; Messaging; risk: stale caches.
-- `src/contexts/messaging/MessagingContext.tsx` — Public API to consumers; Core Platform; risk: breaking provider contract.
-- `src/components/messaging/MessagingDrawer.tsx` & `message-feed.tsx` — UI shell; Frontend; risk: UX regressions.
-- `src/lib/messaging-api.ts` — Client API glue; Platform; risk: auth leakage.
-- `src/contexts/AuthContext.tsx` & `src/hooks/useUserPresence.ts` — Presence lifecycle; Auth/Presence squad; risk: double sign-out.
-- `src/repositories/implementations/supabase/SupabaseConversationRepository.ts` — DB side unread updates; Data layer; risk: RLS violations.
+| Path | Role | Owner | Risks |
+| --- | --- | --- | --- |
+| `src/contexts/messaging/MessagingContext.tsx` | subscription orchestration | Messaging pod | regressions in state management |
+| `src/components/messaging/MessagingDrawer.tsx` | UI surface | Frontend | UX regressions, focus traps |
+| `src/hooks/useConversations.ts` | cache + selectors | Messaging | stale data, infinite loops |
+| `src/app/api/conversations/get/route.ts` | API contract | Platform | auth, RLS, pagination |
+| `src/repositories/implementations/supabase/SupabaseConversationRepository.ts` | data integrity | Platform | RLS, unread math |
+| `src/hooks/realtime/useMessageSubscription.ts` | realtime bridge | Messaging | missed events |
 
 **New files to create**
-- None. Extend existing modules per Anti-Duplication rule.
+- None; reuse existing structure per Anti-Duplication Protocol.
 
-**Change-impact table**
-| File | Symbols to touch | Dependencies | Tests impacted |
+| File | Symbols to add / modify / remove | Dependencies | Tests impacted |
 | --- | --- | --- | --- |
-| `src/hooks/useConversations.ts` | `useConversations`, `refreshConversations`, `updateConversationWithMessage` | React Query, `messagingApi` | Add hook unit tests; update messaging integration tests |
-| `src/hooks/realtime/useMessageSubscription.ts` | anonymous subscription handler | Supabase channel, React Query cache | Add realtime subscription tests |
-| `src/contexts/messaging/MessagingContext.tsx` | context value assembly | Hooks above | Update provider smoke tests |
-| `src/components/messaging/MessagingDrawer.tsx` | `MessagingDrawer` | Messaging context, Company context | Frontend interaction tests |
-| `src/contexts/AuthContext.tsx` | `updateStatus`, effect, `signOut` | `lib/api.ts`, browser events | Auth/presence tests |
-| `src/hooks/useUserPresence.ts` | `useUserPresence`, `safeUpdateLocation` | Supabase client, debounce | Presence hook tests |
-| `src/repositories/implementations/supabase/SupabaseConversationRepository.ts` | `incrementUnreadCount`, `updateLastActivityTimestamp` | Supabase service client | Repository integration tests |
+| `src/contexts/messaging/MessagingContext.tsx` | `conversationChannels`, `ensureOpenForMessage`, `pollingController` | `useMessageSubscription`, `useConversations`, Supabase | Vitest: context tests; Playwright DM flow |
+| `src/hooks/realtime/useMessageSubscription.ts` | `subscribeToConversations`, `subscribeToGlobal`, exponential backoff | Supabase client | Unit tests for subscription lifecycle |
+| `src/hooks/useConversations.ts` | `useQuery` owner, unread selectors | TanStack Query, messaging API | Hook tests |
+| `src/components/messaging/MessagingDrawer.tsx` | `MessagingDrawerV2`, minimize badge, scroll area | shadcn/ui, context | Playwright UI, visual QA |
+| `src/app/api/conversations/get/route.ts` | payload normalisation, auth check | Supabase service client | API integration tests |
+| `src/repositories/...SupabaseConversationRepository.ts` | typed mapper, unread increment | Supabase | Repository tests |
 
 ## Detailed Action Plan
-- [ ] Phase 0 – Observability scaffolding
-  Paths: `src/lib/messaging-api.ts`, `src/hooks/useMessages.ts`, `src/hooks/useConversations.ts`
-  Symbols: `messagingApi.sendMessage`, `refreshConversations`, `sendMessage`
-  Rationale: capture timing + payload snapshots (console.debug gated by env) so we can confirm resolver → message → subscription flow before altering logic.
-  Dependencies: enable only in development, guard behind `process.env.NODE_ENV`.
-  Testing: manually send DM between two browsers; verify console shows resolver + message timeline; check Supabase dashboard for matching inserts.
-  Validation: remove logging if noise > 5% of console; rollback by toggling a single feature flag constant.
+- [X] **Observability & Flags**
+  - Paths: `src/utils/debug-logger.ts`, `src/lib/messaging/config.ts`
+  - Symbols: `messagingDebugEnabled`, `MESSAGING_V2_FLAG`
+  - Rationale: enable logging and feature flag control in all environments
+  - Dependencies: none
+  - Tests: unit tests to ensure flag precedence
+  - Validation: toggle flag in staging and confirm logs stream
+  - Journal: Added `messagingFeatureFlags` helpers, storage listeners, and surfaced V2 state through `MessagingContext`.
 
-- [ ] Phase 1 – React Query conversation cache
-  Paths: `src/hooks/useConversations.ts`, `src/hooks/realtime/useConversationRealtime.ts`, `src/contexts/messaging/MessagingContext.tsx`
-  Symbols: `useConversations`, `useConversationRealtime`, `MessagingProvider`
-  Rationale: migrate conversation storage to `useQuery` so realtime invalidations work and derived selectors stay consistent.
-  Dependencies: ensure `QueryClientProvider` already wraps app; reuse `messagingApi.getConversations`.
-  Testing: unit-test hook with React Query test utils; run `npm run test -- conversations`; manual verify that opening dashboard triggers single network request with cached re-fetch on focus.
-  Validation: confirm conversation order updates after DB `last_activity` update; rollback by reverting to current stateful implementation (preserve old code behind feature flag until stable).
+- [ ] **API & Repository Normalisation**
+  - Paths: `src/app/api/conversations/get/route.ts`, `src/repositories/implementations/supabase/SupabaseConversationRepository.ts`
+  - Symbols: `mapConversationRow`, `withAuthorizedUser`
+  - Rationale: guarantee timestamps/unread are correctly typed and filtered
+  - Dependencies: Supabase RLS policies
+  - Tests: integration test using Supabase test harness, verifying unread math
+  - Validation: run `npm run test -- messaging/repository.spec.ts`
+  - Journal: Server route now authenticates via Supabase profile, emits camelCase payloads; repository handles type/archive filters and string cursors (tests still pending).
 
-- [ ] Phase 2 – Message-driven conversation updates & drawer trigger
-  Paths: `src/hooks/realtime/useMessageSubscription.ts`, `src/hooks/useConversations.ts`, `src/components/messaging/MessagingDrawer.tsx`, `src/components/messaging/message-feed.tsx`
-  Symbols: subscription handler, `updateConversationWithMessage`, `MessagingDrawer`, `MessageFeed`
-  Rationale: whenever a new message arrives, bump conversation cache, increment unread for recipients, and auto-select `lastDirectConversation` when recipient has no active chat.
-  Dependencies: require Phase 1 cache work; ensure unread increments from repository stay idempotent.
-  Testing: dual-browser DM test; expect recipient gets minimized drawer badge within 1s; verify unread badge increments and clears after opening feed.
-  Validation: monitor React Query devtools for cache consistency; rollback by disabling new drawer trigger flag.
+- [ ] **React Query Ownership**
+  - Paths: `src/hooks/useConversations.ts`, `src/hooks/useMessages.ts`
+  - Symbols: `useQuery`, `useInfiniteQuery`, derived selectors
+  - Rationale: ensure single source of truth for conversation data, enabling invalidation and selectors for unread/ordering
+  - Dependencies: messaging API helpers
+  - Tests: Vitest hook tests for ordering and unread
+  - Validation: `npm run test -- use-conversations.spec.ts`
 
-- [ ] Phase 3 – Read/delivered semantics
-  Paths: `src/hooks/useMessages.ts`, `src/hooks/useConversations.ts`, `src/lib/messaging-api.ts`, `src/repositories/implementations/supabase/SupabaseConversationRepository.ts`
-  Symbols: `sendMessage`, `markConversationAsRead`, `updateMessageStatusLocal`, `incrementUnreadCount`
-  Rationale: ensure optimistic send flips to `delivered` on subscription echo, and active viewers call `markConversationAsRead` when pane focused.
-  Dependencies: Phase 2 (needs accurate unread state).
-  Testing: console log statuses, DB check `messages.status`; run integration tests that assert unread map cleared.
-  Validation: add telemetry counter for failed status transitions; rollback by short-circuiting new status handler.
+- [ ] **Realtime Backbone**
+  - Paths: `src/hooks/realtime/useMessageSubscription.ts`, `src/hooks/realtime/useConversationRealtime.ts`
+  - Symbols: `subscribeToConversation`, `subscribeToGlobal`, backoff + retry
+  - Rationale: deliver deterministic delivery notifications even when tabs go idle
+  - Dependencies: Supabase realtime config
+  - Tests: mock Supabase channels to confirm re-subscribe on `broadcast.state` changes
+  - Validation: run mocked realtime unit tests; manual dual-browser test
 
-- [ ] Phase 4 – Presence reliability
-  Paths: `src/contexts/AuthContext.tsx`, `src/hooks/useUserPresence.ts`, `src/lib/api.ts`
-  Symbols: `updateStatus`, `handleBeforeUnload` replacement, `safeUpdateLocation`
-  Rationale: replace fetch-on-unload with `navigator.sendBeacon`, add `pagehide`/`visibilitychange` listeners, and schedule a 45s heartbeat to refresh `last_active`.
-  Dependencies: browser environment; ensure heartbeat cleared on logout.
-  Testing: sign in, close tab, confirm Supabase `users.status` flips to `offline` within 60s; run presence hook tests verifying heartbeat timers.
-  Validation: instrumentation to log heartbeat failures; rollback by disabling heartbeat interval.
+- [ ] **Drawer UX Overhaul**
+  - Paths: `src/components/messaging/MessagingDrawer.tsx`, `src/components/messaging/message-feed.tsx`
+  - Symbols: `MessagingDrawerV2`, `DrawerBadge`, `ScrollAnchor`
+  - Rationale: provide minimized badge, scroll restoration, per-conversation routing
+  - Dependencies: shadcn/ui components, context contract
+  - Tests: Playwright spec verifying popup, minimize, X close
+  - Validation: `npx playwright test messaging-drawer.spec.ts`
 
-- [ ] Phase 5 – QA & regression harness
-  Paths: `__tests__/messaging/*`, `__tests__/presence/*`, Playwright specs under `tests/`
-  Symbols: add new Vitest suites (`useConversations`, realtime subscription), extend Playwright scenario `messaging-direct.spec.ts`
-  Rationale: lock behaviour with automated coverage so future refactors cannot regress DM basics.
-  Dependencies: earlier phases complete.
-  Testing: `npm run type-check`, `npm run lint`, `npm run test`, targeted Playwright run `npx playwright test messaging-direct.spec.ts`.
-  Validation: capture before/after metrics (message delivery latency, offline detection time); rollback by reverting failing tests before merge.
+- [ ] **Space Chat Isolation**
+  - Paths: `src/components/floor-plan/*`, `src/contexts/messaging/MessagingContext.tsx`
+  - Symbols: `openSpaceChat`, `isSpaceChatActive`
+  - Rationale: prevent DM drawer opening when navigating floor-plan rooms
+  - Dependencies: floor-plan components, context
+  - Tests: React Testing Library simulation to ensure DM drawer stays closed when opening space details
+  - Validation: manual check via floor-plan UI
+
+- [ ] **Delivery & Read Semantics**
+  - Paths: `src/hooks/useMessages.ts`, `src/app/api/messages/create/route.ts`, `src/repositories/...SupabaseConversationRepository.ts`
+  - Symbols: `acknowledgeDelivery`, `markConversationAsRead`, `updateLastActivity`
+  - Rationale: make sender/recipient flows consistent, ensuring unread counts clear on view
+  - Dependencies: Supabase service role flow
+  - Tests: integration test verifying unread decrement on mark-as-read; Playwright spec to ensure read clears
+  - Validation: run Vitest integration + Playwright DM read spec
+
+- [ ] **QA Harness & Rollout**
+  - Paths: `tests/messaging/*`, `.github/workflows/ci.yml` (if exists)
+  - Symbols: new Vitest suites, Playwright scenarios, feature-flag toggles
+  - Rationale: regression guard before enabling `MESSAGING_V2`
+  - Dependencies: existing CI pipeline
+  - Tests: run `npm run lint`, `npm run type-check`, `npm run test`, Playwright e2e
+  - Validation: stage with flag on, confirm manual checklist
 
 ## Risk Mitigation
-- Stage rollout behind environment-guarded feature flag to toggle back without redeploy.
-- Use Supabase SQL sandbox to test unread increment RPCs before touching production tables.
-- Add logging throttling to avoid console spam that could hide genuine errors.
-- Pair manual QA with automated checks to catch UI regressions early.
+- Add feature flag `NEXT_PUBLIC_MESSAGING_V2`; ship behind toggle for staged rollout.
+- Maintain existing drawer as fallback until new path passes QA.
+- Build Supabase channel watchdog (backoff + rejoin) to avoid silent disconnects.
+- Add telemetry counters for missed promotion events to catch future regressions.
 
 ## Success Criteria
-- New DM triggers popup/minimised drawer for recipient within 1 second.
-- Conversation list reflects latest message order and unread counts for both participants.
-- Sender sees message status transition to `sent` → `delivered`; recipient sees unread clear on view.
-- Closing browser or losing network marks user offline and clears `current_space_id` within 60 seconds.
-- All messaging and presence tests pass without flakiness over three consecutive CI runs.
+- Sender sees message status progress `sending → sent → delivered`; recipient receives popup within 1 second (realtime) or 5 seconds (poll fallback).
+- Drawer opens only when messaging context requests it; floor-plan navigation never triggers DM drawer.
+- Conversation ordering matches database `last_activity` after each message without manual refresh.
+- Unread badges decrement immediately on reader focus; scroll sticks to newest message unless user scrolls up.
+- Automated suites (unit, integration, e2e) pass three consecutive runs with `MESSAGING_V2` enabled.
 
 ## Open Questions and Assumptions
-- Confirm Supabase RLS policies already allow service-role updates to `conversations.unread_count`; otherwise add explicit policy adjustments.
-- Need clarity on expected behaviour for multiple simultaneous DMs—should the drawer stack or replace? (Assume single active drawer for now.)
-- Determine whether mobile browsers must be supported for popup behaviour; affects visibility event handling.
-- Validate whether legacy `useMessageRealtime` hook can be removed post Phase 2 or must remain for backward compatibility.
+- Confirm Supabase RLS allows service-role writes on `unread_count`; otherwise adjust policies or use RPC with auth context.
+- Decide UX for multiple simultaneous DM events (queue vs. replace) within drawer badge.
+- Clarify mobile behaviour (responsive drawer vs. full-screen modal).
+- Validate whether team wants combined DM/room list or separate tabs inside drawer.
+- Determine if message retention / pagination limits need adjustments for larger histories.

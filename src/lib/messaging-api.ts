@@ -1,5 +1,24 @@
 // src/lib/messaging-api.ts
 import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment } from '@/types/messaging';
+import { debugLogger } from '@/utils/debug-logger';
+
+const getTimestamp = (): number => {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+};
+
+const createRequestId = (prefix: string): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch (error) {
+    // Ignore crypto errors and fallback to timestamp-based identifier
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
 
 function normalizeConversation(raw: any): Conversation {
   return {
@@ -8,11 +27,15 @@ function normalizeConversation(raw: any): Conversation {
     participants: Array.isArray(raw?.participants) ? raw.participants : [],
     lastActivity: raw?.lastActivity instanceof Date
       ? raw.lastActivity
-      : new Date(raw?.lastActivity ?? Date.now()),
+      : raw?.last_activity
+        ? new Date(raw.last_activity)
+        : raw?.lastActivity
+          ? new Date(raw.lastActivity)
+          : new Date(),
     name: raw?.name ?? undefined,
     isArchived: Boolean(raw?.isArchived),
-    unreadCount: raw?.unreadCount ?? {},
-    roomId: raw?.roomId ?? undefined,
+    unreadCount: raw?.unreadCount ?? raw?.unread_count ?? {},
+    roomId: raw?.roomId ?? raw?.room_id ?? undefined,
     visibility: raw?.visibility,
   } as Conversation;
 }
@@ -25,6 +48,16 @@ export const messagingApi = {
    * Send a new message
    */
   async sendMessage(message: Partial<Message>): Promise<Message> {
+    const scope = 'messagingApi.sendMessage';
+    const requestId = createRequestId('msg-send');
+    const start = getTimestamp();
+    debugLogger.messaging.event(scope, 'fetch:start', {
+      requestId,
+      conversationId: message.conversationId,
+      hasAttachments: Array.isArray(message.attachments) && message.attachments.length > 0,
+      type: message.type,
+    });
+
     try {
       const response = await fetch('/api/messages/create', {
         method: 'POST',
@@ -34,14 +67,36 @@ export const messagingApi = {
         body: JSON.stringify(message),
       });
 
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
+      });
+
       if (!response.ok) {
         const errorData = await response.json();
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
         throw new Error(errorData.error || 'Failed to send message');
       }
 
       const data = await response.json();
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        messageId: data.message?.id,
+        status: data.message?.status,
+      });
       return data.message;
     } catch (error) {
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
       console.error('Error sending message:', error);
       throw error;
     }
@@ -65,6 +120,18 @@ export const messagingApi = {
     nextCursor?: string; // legacy
     hasMore?: boolean;   // legacy
   }> {
+    const scope = 'messagingApi.getMessages';
+    const requestId = createRequestId('msg-list');
+    const start = getTimestamp();
+    debugLogger.messaging.event(scope, 'fetch:start', {
+      requestId,
+      conversationId,
+      limit: options?.limit,
+      cursor: options?.cursor,
+      cursorBefore: options?.cursorBefore,
+      cursorAfter: options?.cursorAfter,
+    });
+
     try {
       const params = new URLSearchParams();
       params.append('conversationId', conversationId);
@@ -78,13 +145,28 @@ export const messagingApi = {
       if (options?.cursorAfter) params.append('cursorAfter', options.cursorAfter);
       
       const response = await fetch(`/api/messages/get?${params.toString()}`);
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
+      });
       
       if (!response.ok) {
         const errorData = await response.json();
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
         throw new Error(errorData.error || 'Failed to fetch messages');
       }
       
       const data = await response.json();
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        total: Array.isArray(data.messages) ? data.messages.length : 0,
+        hasMoreOlder: data.hasMoreOlder,
+      });
       // Normalize timestamps to Date for client cache consistency
       if (Array.isArray(data.messages)) {
         data.messages = data.messages.map((m: any) => ({
@@ -94,6 +176,12 @@ export const messagingApi = {
       }
       return data;
     } catch (error) {
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
       console.error('Error fetching messages:', error);
       throw error;
     }
@@ -135,6 +223,15 @@ export const messagingApi = {
       | { type: ConversationType.DIRECT; userId: string }
       | { type: ConversationType.ROOM; roomId: string }
   ): Promise<Conversation> {
+    const scope = 'messagingApi.resolveConversation';
+    const requestId = createRequestId('conv-resolve');
+    const start = getTimestamp();
+    debugLogger.messaging.event(scope, 'request:start', {
+      requestId,
+      type: params.type,
+      target: 'userId' in params ? params.userId : params.roomId,
+    });
+
     try {
       const response = await fetch('/api/conversations/resolve', {
         method: 'POST',
@@ -144,14 +241,36 @@ export const messagingApi = {
         body: JSON.stringify(params),
       });
 
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
+      });
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
         throw new Error(errorData.error || 'Failed to resolve conversation');
       }
 
       const data = await response.json();
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        conversationId: data.conversation?.id,
+        type: data.conversation?.type,
+      });
       return normalizeConversation(data.conversation);
     } catch (error) {
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
       console.error('Error resolving conversation:', error);
       throw error;
     }
@@ -173,9 +292,20 @@ export const messagingApi = {
     nextCursor?: string;
     hasMore: boolean;
   }> {
+    const scope = 'messagingApi.getConversations';
+    const requestId = createRequestId('conv-list');
+    const start = getTimestamp();
+    debugLogger.messaging.event(scope, 'fetch:start', {
+      requestId,
+      userId,
+      type: options?.type,
+      includeArchived: options?.includeArchived,
+      limit: options?.limit,
+      cursor: options?.cursor,
+    });
+
     try {
       const params = new URLSearchParams();
-      params.append('userId', userId);
       
       if (options?.type) {
         params.append('type', options.type);
@@ -194,15 +324,41 @@ export const messagingApi = {
       }
       
       const response = await fetch(`/api/conversations/get?${params.toString()}`);
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
+      });
       
       if (!response.ok) {
         const errorData = await response.json();
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
         throw new Error(errorData.error || 'Failed to fetch conversations');
       }
       
       const data = await response.json();
+      // Normalize Date-like and optional fields so client code can rely on types
+      if (Array.isArray(data?.conversations)) {
+        data.conversations = data.conversations.map((raw: any) => normalizeConversation(raw));
+      }
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        total: Array.isArray(data.conversations) ? data.conversations.length : 0,
+        hasMore: data.hasMore,
+        nextCursor: data.nextCursor,
+      });
       return data;
     } catch (error) {
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
       console.error('Error fetching conversations:', error);
       throw error;
     }

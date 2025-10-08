@@ -1,64 +1,87 @@
 // src/app/api/conversations/get/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Conversation, ConversationType } from '@/types/messaging';
-import { IConversationRepository } from '@/repositories/interfaces'; // Import interface
-import { SupabaseConversationRepository } from '@/repositories/implementations/supabase'; // Import implementation
-import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Import server client
-import { PaginationOptions, PaginatedResult } from '@/types/common'; // Import common types
-// import { getAuth } from '@clerk/nextjs/server'; // TODO: Revisit auth import/implementation
+import { ConversationType } from '@/types/messaging';
+import { IConversationRepository } from '@/repositories/interfaces';
+import { SupabaseConversationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { PaginationOptions } from '@/types/common';
+import { debugLogger } from '@/utils/debug-logger';
 
 export async function GET(request: NextRequest) {
-  // TODO: Implement proper authentication and authorization
-  // const { userId: authenticatedUserId } = getAuth(request); // TODO: Revisit auth
-  // For now, get userId from query params for testing repository logic
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId'); // Using query param for now
-  const authenticatedUserId = userId; // Assume query param user is authenticated for this refactor
+  const supabase = await createSupabaseServerClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
 
-  if (!authenticatedUserId) {
-    // In real auth, this check would be more robust
-    return NextResponse.json({ error: 'Unauthorized or userId missing' }, { status: 401 });
+  if (authError || !authData?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createSupabaseServerClient(); // Create Supabase server client
-  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase); // Instantiate repository with client
+  const instrumentationEnabled = debugLogger.messaging.enabled();
 
   try {
-    // Get query parameters for filtering and pagination
-    const type = searchParams.get('type') as ConversationType | null;
+    const searchParams = new URL(request.url).searchParams;
+    const typeParam = searchParams.get('type');
     const includeArchived = searchParams.get('includeArchived') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const cursor = searchParams.get('cursor') || undefined; // Use undefined if null
+    const limit = Number.parseInt(searchParams.get('limit') || '50', 10);
+    const cursor = searchParams.get('cursor') ?? undefined;
 
-    // Prepare pagination options for the repository
-    const paginationOptions: PaginationOptions = { limit, cursor };
+    const paginationOptions: PaginationOptions & {
+      type?: ConversationType;
+      includeArchived?: boolean;
+    } = {
+      limit: Number.isNaN(limit) ? 50 : Math.min(Math.max(limit, 1), 100),
+      cursor,
+      includeArchived,
+    };
 
-    // Fetch paginated conversations for the user from the repository
-    const result: PaginatedResult<Conversation> = await conversationRepository.findByUser(authenticatedUserId, paginationOptions);
+    if (typeParam === ConversationType.DIRECT || typeParam === ConversationType.ROOM) {
+      paginationOptions.type = typeParam;
+    }
 
-    // TODO: Enhance repository's findByUser method to support filtering by type and archived status directly in the query.
-    // Apply filtering after fetching for now.
-    const filteredConversations = result.items.filter(conversation =>
-      (includeArchived || !conversation.isArchived) &&
-      (!type || conversation.type === type)
-    );
+    const serviceSupabase = await createSupabaseServerClient('service_role');
+    const userRepository = new SupabaseUserRepository(serviceSupabase);
+    const requesterProfile = await userRepository.findBySupabaseUid(authData.user.id);
 
-    // Note: The repository result already contains pagination info (nextCursor, hasMore).
-    // If post-filtering removes all items on the current page but hasMore was true,
-    // the client might need logic to auto-fetch the next page.
-    // Alternatively, the repository could be enhanced to handle filtering before pagination.
+    if (!requesterProfile) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    }
+
+    if (instrumentationEnabled) {
+      debugLogger.messaging.event('api.conversations.get', 'start', {
+        requesterId: requesterProfile.id,
+        limit: paginationOptions.limit,
+        cursor: paginationOptions.cursor,
+        includeArchived,
+        type: paginationOptions.type,
+      });
+    }
+
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
+    const result = await conversationRepository.findByUser(requesterProfile.id, paginationOptions);
+
+    if (instrumentationEnabled) {
+      debugLogger.messaging.event('api.conversations.get', 'success', {
+        requesterId: requesterProfile.id,
+        returned: result.items.length,
+        hasMore: result.hasMore,
+        nextCursor: result.nextCursor ?? null,
+      });
+    }
 
     return NextResponse.json({
-      conversations: filteredConversations,
-      nextCursor: result.nextCursor,
-      hasMore: result.hasMore // Rely on repository's hasMore calculation
+      conversations: result.items.map((conversation) => ({
+        ...conversation,
+        lastActivity: conversation.lastActivity.toISOString(),
+      })),
+      nextCursor: result.nextCursor ?? null,
+      hasMore: result.hasMore,
     });
   } catch (error) {
     console.error('Error getting conversations:', error);
-    // Consider more specific error handling based on repository errors
-    return NextResponse.json(
-      { error: 'Failed to retrieve conversations' },
-      { status: 500 }
-    );
+    if (instrumentationEnabled) {
+      debugLogger.messaging.error('api.conversations.get', 'failure', {
+        error: error instanceof Error ? error.message : error,
+      });
+    }
+    return NextResponse.json({ error: 'Failed to retrieve conversations' }, { status: 500 });
   }
 }

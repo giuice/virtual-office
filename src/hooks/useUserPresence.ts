@@ -12,7 +12,7 @@ type ConnectionStatus = 'idle' | 'subscribing' | 'subscribed' | 'error' | 'timed
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[useUserPresence] Initialize with userId: ${currentUserId || 'undefined'}`);
+    // console.log(`[useUserPresence] Initialize with userId: ${currentUserId || 'undefined'}`);
   }
   const queryClient = useQueryClient();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');

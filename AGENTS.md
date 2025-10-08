@@ -150,8 +150,7 @@ When asked to create, refactor, or improve code, follow this sequence and never 
    - List existing types/exports you will use or extend from `src/types/*`.
    - Note any RLS/auth constraints that affect repositories.
 
-5) Minimal Diffs
-   - Provide code diffs limited to changed sections only.
+5) Files Size
    - Keep files < ~500 lines and extract hooks where effects are complex.
 
 6) Tests First
@@ -166,7 +165,6 @@ When asked to create, refactor, or improve code, follow this sequence and never 
    - **Duplication Check**
    - **Patch Plan**
    - **Type Usage**
-   - **Diffs or code blocks**
    - **Deprecations**
    - **Confirmation Request**: Provide one concrete validation the user can run, then end with:
      Status: Pending user confirmation
@@ -188,7 +186,7 @@ Status: Pending user confirmation, until user confirms
 **Hard constraints**
 
 * Produce one GitHub-flavored Markdown planning report titled `# {VARIABLE}_IMPLEMENTATION_PLAN` where `VARIABLE = UPPER_SNAKE_CASE summary of the task` (e.g., `GOOGLE_OAUTH_NEXTJS`).
-* File name: `IMPLEMENTATION_PLAN.md`.
+* File name: `{FEATURE}_IMPLEMENTATION_PLAN.md`.
 * Planning only. No source code, no config values, no command lines, no diffs.
 * No code fences that contain code or commands. ASCII file trees allowed.
 * “Non-executable steps” = descriptions and decisions only.

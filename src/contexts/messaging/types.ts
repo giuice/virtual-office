@@ -13,7 +13,7 @@ export interface MessagingContextType {
   // Conversations
   conversations: Conversation[];
   activeConversation: Conversation | null;
-  lastDirectConversation?: Conversation | null;
+  lastActiveConversation?: Conversation | null;
   loadingConversations: boolean;
   errorConversations: string | null;
   setActiveConversation: (conversation: Conversation | null) => void;
@@ -24,6 +24,7 @@ export interface MessagingContextType {
   markConversationAsRead: (conversationId: string) => Promise<void>;
   totalUnreadCount: number;
   refreshConversations: () => Promise<void>;
+  closeDrawer: () => void;
 
   // Messages
   messages: Message[];
@@ -43,4 +44,7 @@ export interface MessagingContextType {
 
   // Realtime connection
   connectionStatus?: string | null;
+
+  // Feature flags
+  isMessagingV2Enabled: boolean;
 }
