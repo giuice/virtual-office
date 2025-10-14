@@ -1,7 +1,7 @@
 // src/repositories/implementations/supabase/SupabaseMessageRepository.ts
 import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
-import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus } from '@/types/messaging';
-import { PaginationOptions } from '@/types/common'; // Assuming common types exist
+import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus, ReadReceipt, MessagePin, MessageStar } from '@/types/messaging';
+import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 // --- Helper Functions ---
@@ -60,6 +60,39 @@ function mapReactionToCamelCase(data: { emoji: string; user_id: string; timestam
     };
 }
 
+// Map DB snake_case to ReadReceipt type (camelCase)
+function mapReadReceiptToCamelCase(data: { id: string; message_id: string; user_id: string; read_at: string }): ReadReceipt {
+  if (!data) return data;
+  return {
+    id: data.id,
+    messageId: data.message_id,
+    userId: data.user_id,
+    readAt: new Date(data.read_at)
+  };
+}
+
+// Map DB snake_case to MessagePin type (camelCase)
+function mapMessagePinToCamelCase(data: { id: string; message_id: string; user_id: string; pinned_at: string }): MessagePin {
+  if (!data) return data;
+  return {
+    id: data.id,
+    messageId: data.message_id,
+    userId: data.user_id,
+    pinnedAt: new Date(data.pinned_at)
+  };
+}
+
+// Map DB snake_case to MessageStar type (camelCase)
+function mapMessageStarToCamelCase(data: { id: string; message_id: string; user_id: string; starred_at: string }): MessageStar {
+  if (!data) return data;
+  return {
+    id: data.id,
+    messageId: data.message_id,
+    userId: data.user_id,
+    starredAt: new Date(data.starred_at)
+  };
+}
+
 // Map array helpers
 function mapMessageArrayToCamelCase(dataArray: MessageRow[]): Message[] {
   if (!dataArray) return [];
@@ -73,12 +106,19 @@ function mapReactionArrayToCamelCase(dataArray: { emoji: string; user_id: string
   if (!dataArray) return [];
   return dataArray.map(item => mapReactionToCamelCase(item));
 }
+function mapReadReceiptArrayToCamelCase(dataArray: { id: string; message_id: string; user_id: string; read_at: string }[]): ReadReceipt[] {
+  if (!dataArray) return [];
+  return dataArray.map(item => mapReadReceiptToCamelCase(item));
+}
 
 
 export class SupabaseMessageRepository implements IMessageRepository {
   private MSG_TABLE_NAME = 'messages'; // Ensure this matches your Supabase table name
   private REACTION_TABLE_NAME = 'message_reactions'; // Assuming separate table
   private ATTACHMENT_TABLE_NAME = 'message_attachments'; // Assuming separate table
+  private READ_RECEIPT_TABLE_NAME = 'message_read_receipts'; // Read receipts table
+  private MESSAGE_PIN_TABLE_NAME = 'message_pins'; // Message pins table
+  private MESSAGE_STAR_TABLE_NAME = 'message_stars'; // Message stars table
   private supabaseClient: SupabaseClient;
 
   constructor(supabaseClient: SupabaseClient) {
@@ -136,7 +176,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return message;
   }
 
-  async findByConversation(conversationId: string, options?: PaginationOptions): Promise<Message[]> {
+  async findByConversation(conversationId: string, options?: PaginationOptions): Promise<PaginatedResult<Message>> {
     const limit = options?.limit ?? 50; // Default limit for messages
 
     // Keyset pagination by timestamp when provided
@@ -147,7 +187,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     let error: any | null = null;
 
     if (hasCursorBefore || hasCursorAfter) {
-      // Use keyset pagination
+      // Use keyset pagination - fetch limit + 1 to check for more results
       let query = this.supabaseClient
         .from(this.MSG_TABLE_NAME)
         .select('*')
@@ -156,11 +196,11 @@ export class SupabaseMessageRepository implements IMessageRepository {
       if (hasCursorBefore) {
         query = query.lt('timestamp', options!.cursorBefore!);
         // Get older messages relative to cursorBefore, newest-first to apply limit
-        query = query.order('timestamp', { ascending: false }).limit(limit);
+        query = query.order('timestamp', { ascending: false }).limit(limit + 1);
       } else if (hasCursorAfter) {
         query = query.gt('timestamp', options!.cursorAfter!);
         // Get newer messages relative to cursorAfter, oldest-first for append
-        query = query.order('timestamp', { ascending: true }).limit(limit);
+        query = query.order('timestamp', { ascending: true }).limit(limit + 1);
       }
 
       const res = await query;
@@ -176,9 +216,9 @@ export class SupabaseMessageRepository implements IMessageRepository {
       }
     } else {
       // Backward-compatible path: offset-based pagination
-      // Supabase range is inclusive [from, to]
+      // Supabase range is inclusive [from, to] - fetch limit + 1 to check for more results
       const from = typeof options?.cursor === 'number' ? options.cursor : 0;
-      const to = from + limit - 1;
+      const to = from + limit; // Fetch one extra to determine hasMore
 
       const res = await this.supabaseClient
         .from(this.MSG_TABLE_NAME)
@@ -195,11 +235,20 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }
 
     if (!data || data.length === 0) {
-      return [];
+      return {
+        items: [],
+        hasMore: false,
+        nextCursor: null
+      };
     }
 
+    // Check if we have more results
+    const hasMore = data.length > limit;
+    // Trim to actual limit
+    const trimmedData = hasMore ? data.slice(0, limit) : data;
+
     // Map core message data
-    const messages = mapMessageArrayToCamelCase(data);
+    const messages = mapMessageArrayToCamelCase(trimmedData);
     const messageIds = messages.map(m => m.id);
 
     // Fetch all attachments for these messages in bulk
@@ -245,7 +294,25 @@ export class SupabaseMessageRepository implements IMessageRepository {
   message.reactions = reactionsByMessageId[message.id] || [];
     });
 
-    return messages;
+    // Determine nextCursor based on pagination type
+    let nextCursor: string | number | null = null;
+    if (hasMore) {
+      if (hasCursorBefore || hasCursorAfter) {
+        // For keyset pagination, use the timestamp of the last message
+        const lastMessage = messages[messages.length - 1];
+        nextCursor = lastMessage.timestamp.toISOString();
+      } else {
+        // For offset pagination, use the next offset
+        const currentOffset = typeof options?.cursor === 'number' ? options.cursor : 0;
+        nextCursor = currentOffset + limit;
+      }
+    }
+
+    return {
+      items: messages,
+      hasMore,
+      nextCursor
+    };
   }
 
   // Note: Input timestamp is Date object, Supabase handles conversion to TIMESTAMPTZ
@@ -417,5 +484,364 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }
     // Map DB response array
     return mapReactionArrayToCamelCase(data || []);
+  }
+
+  // --- Read Receipt Methods ---
+
+  async addReadReceipt(messageId: string, userId: string, readAt?: Date): Promise<ReadReceipt> {
+    const dbData = {
+      message_id: messageId,
+      user_id: userId,
+      read_at: readAt ? readAt.toISOString() : new Date().toISOString()
+    };
+
+    const { data, error } = await this.supabaseClient
+      .from(this.READ_RECEIPT_TABLE_NAME)
+      .upsert(dbData, { onConflict: 'message_id, user_id' })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error adding read receipt:', error);
+      throw error || new Error('Failed to add read receipt or retrieve created data.');
+    }
+
+    return mapReadReceiptToCamelCase(data);
+  }
+
+  async getReadReceipts(messageId: string): Promise<ReadReceipt[]> {
+    const { data, error } = await this.supabaseClient
+      .from(this.READ_RECEIPT_TABLE_NAME)
+      .select('*')
+      .eq('message_id', messageId)
+      .order('read_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching read receipts:', error);
+      throw error;
+    }
+
+    return mapReadReceiptArrayToCamelCase(data || []);
+  }
+
+  async getUnreadMessages(conversationId: string, userId: string, since?: Date): Promise<Message[]> {
+    // Get all messages in the conversation
+    let query = this.supabaseClient
+      .from(this.MSG_TABLE_NAME)
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('timestamp', { ascending: true });
+
+    if (since) {
+      query = query.gt('timestamp', since.toISOString());
+    }
+
+    const { data: messagesData, error: messagesError } = await query;
+
+    if (messagesError) {
+      console.error('Error fetching messages for unread check:', messagesError);
+      throw messagesError;
+    }
+
+    if (!messagesData || messagesData.length === 0) {
+      return [];
+    }
+
+    // Get message IDs
+    const messageIds = messagesData.map((m: any) => m.id);
+
+    // Get read receipts for this user
+    const { data: receiptsData, error: receiptsError } = await this.supabaseClient
+      .from(this.READ_RECEIPT_TABLE_NAME)
+      .select('message_id')
+      .in('message_id', messageIds)
+      .eq('user_id', userId);
+
+    if (receiptsError) {
+      console.error('Error fetching read receipts for unread check:', receiptsError);
+      throw receiptsError;
+    }
+
+    // Create a set of read message IDs
+    const readMessageIds = new Set((receiptsData || []).map((r: any) => r.message_id));
+
+    // Filter to only unread messages
+    const unreadMessagesData = messagesData.filter((m: any) => !readMessageIds.has(m.id));
+
+    // Map to Message objects
+    const messages = mapMessageArrayToCamelCase(unreadMessagesData);
+
+    // Fetch attachments and reactions for unread messages (similar to findByConversation)
+    if (messages.length > 0) {
+      const unreadMessageIds = messages.map(m => m.id);
+
+      // Fetch attachments
+      const { data: attachmentsData } = await this.supabaseClient
+        .from(this.ATTACHMENT_TABLE_NAME)
+        .select('*')
+        .in('message_id', unreadMessageIds);
+
+      type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+      const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
+        const msgId = row.message_id as string;
+        if (!acc[msgId]) acc[msgId] = [];
+        acc[msgId].push(mapAttachmentToCamelCase(row));
+        return acc;
+      }, {} as Record<string, FileAttachment[]>);
+
+      // Fetch reactions
+      const { data: reactionsData } = await this.supabaseClient
+        .from(this.REACTION_TABLE_NAME)
+        .select('*')
+        .in('message_id', unreadMessageIds);
+
+      type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+      const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
+        const msgId = row.message_id as string;
+        if (!acc[msgId]) acc[msgId] = [];
+        acc[msgId].push(mapReactionToCamelCase(row));
+        return acc;
+      }, {} as Record<string, MessageReaction[]>);
+
+      // Populate messages with attachments and reactions
+      messages.forEach(message => {
+        message.attachments = attachmentsByMessageId[message.id] || [];
+        message.reactions = reactionsByMessageId[message.id] || [];
+      });
+    }
+
+    return messages;
+  }
+
+  // --- Message Pin Methods ---
+
+  async pinMessage(messageId: string, userId: string): Promise<MessagePin> {
+    const dbData = {
+      message_id: messageId,
+      user_id: userId,
+      pinned_at: new Date().toISOString()
+    };
+
+    const { data, error } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .upsert(dbData, { onConflict: 'message_id, user_id' })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error pinning message:', error);
+      throw error || new Error('Failed to pin message or retrieve created data.');
+    }
+
+    return mapMessagePinToCamelCase(data);
+  }
+
+  async unpinMessage(messageId: string, userId: string): Promise<boolean> {
+    const { error, count } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error unpinning message:', error);
+      return false;
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  async getPinnedMessages(conversationId: string, userId: string): Promise<Message[]> {
+    // First, get the pinned message IDs for this user in this conversation
+    const { data: pinsData, error: pinsError } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .select('message_id')
+      .eq('user_id', userId);
+
+    if (pinsError) {
+      console.error('Error fetching pinned message IDs:', pinsError);
+      throw pinsError;
+    }
+
+    if (!pinsData || pinsData.length === 0) {
+      return [];
+    }
+
+    const pinnedMessageIds = pinsData.map((p: any) => p.message_id);
+
+    // Fetch the actual messages
+    const { data: messagesData, error: messagesError } = await this.supabaseClient
+      .from(this.MSG_TABLE_NAME)
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .in('id', pinnedMessageIds)
+      .order('timestamp', { ascending: false });
+
+    if (messagesError) {
+      console.error('Error fetching pinned messages:', messagesError);
+      throw messagesError;
+    }
+
+    if (!messagesData || messagesData.length === 0) {
+      return [];
+    }
+
+    // Map to Message objects
+    const messages = mapMessageArrayToCamelCase(messagesData);
+    const messageIds = messages.map(m => m.id);
+
+    // Fetch attachments and reactions (similar to findByConversation)
+    const { data: attachmentsData } = await this.supabaseClient
+      .from(this.ATTACHMENT_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapAttachmentToCamelCase(row));
+      return acc;
+    }, {} as Record<string, FileAttachment[]>);
+
+    const { data: reactionsData } = await this.supabaseClient
+      .from(this.REACTION_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapReactionToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessageReaction[]>);
+
+    messages.forEach(message => {
+      message.attachments = attachmentsByMessageId[message.id] || [];
+      message.reactions = reactionsByMessageId[message.id] || [];
+    });
+
+    return messages;
+  }
+
+  // --- Message Star Methods ---
+
+  async starMessage(messageId: string, userId: string): Promise<MessageStar> {
+    const dbData = {
+      message_id: messageId,
+      user_id: userId,
+      starred_at: new Date().toISOString()
+    };
+
+    const { data, error } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .upsert(dbData, { onConflict: 'message_id, user_id' })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error starring message:', error);
+      throw error || new Error('Failed to star message or retrieve created data.');
+    }
+
+    return mapMessageStarToCamelCase(data);
+  }
+
+  async unstarMessage(messageId: string, userId: string): Promise<boolean> {
+    const { error, count } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error unstarring message:', error);
+      return false;
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  async getStarredMessages(userId: string, conversationId?: string): Promise<Message[]> {
+    // First, get the starred message IDs for this user
+    const { data: starsData, error: starsError } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .select('message_id')
+      .eq('user_id', userId)
+      .order('starred_at', { ascending: false });
+
+    if (starsError) {
+      console.error('Error fetching starred message IDs:', starsError);
+      throw starsError;
+    }
+
+    if (!starsData || starsData.length === 0) {
+      return [];
+    }
+
+    const starredMessageIds = starsData.map((s: any) => s.message_id);
+
+    // Fetch the actual messages
+    let query = this.supabaseClient
+      .from(this.MSG_TABLE_NAME)
+      .select('*')
+      .in('id', starredMessageIds);
+
+    // Filter by conversation if specified
+    if (conversationId) {
+      query = query.eq('conversation_id', conversationId);
+    }
+
+    query = query.order('timestamp', { ascending: false });
+
+    const { data: messagesData, error: messagesError } = await query;
+
+    if (messagesError) {
+      console.error('Error fetching starred messages:', messagesError);
+      throw messagesError;
+    }
+
+    if (!messagesData || messagesData.length === 0) {
+      return [];
+    }
+
+    // Map to Message objects
+    const messages = mapMessageArrayToCamelCase(messagesData);
+    const messageIds = messages.map(m => m.id);
+
+    // Fetch attachments and reactions
+    const { data: attachmentsData } = await this.supabaseClient
+      .from(this.ATTACHMENT_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapAttachmentToCamelCase(row));
+      return acc;
+    }, {} as Record<string, FileAttachment[]>);
+
+    const { data: reactionsData } = await this.supabaseClient
+      .from(this.REACTION_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapReactionToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessageReaction[]>);
+
+    messages.forEach(message => {
+      message.attachments = attachmentsByMessageId[message.id] || [];
+      message.reactions = reactionsByMessageId[message.id] || [];
+    });
+
+    return messages;
   }
 }

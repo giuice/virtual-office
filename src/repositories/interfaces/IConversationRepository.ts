@@ -1,5 +1,5 @@
 // src/repositories/interfaces/IConversationRepository.ts
-import { Conversation, ConversationType } from '@/types/messaging';
+import { Conversation, ConversationType, ConversationPreferences, GroupedConversations, UnreadSummary } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 export interface IConversationRepository {
@@ -99,4 +99,56 @@ export interface IConversationRepository {
    * Finds a room conversation by the associated room identifier.
    */
   findRoomByRoomId(roomId: string): Promise<Conversation | null>;
+
+  // ============================================================================
+  // NEW METHODS: Per-user Conversation Preferences (Task 1.2)
+  // ============================================================================
+
+  /**
+   * Sets or updates per-user conversation preferences (pin, star, archive, notifications).
+   * Creates a new preferences record if none exists for this user/conversation pair.
+   * @param conversationId The unique ID of the conversation.
+   * @param userId The unique ID of the user.
+   * @param preferences Partial preferences to set or update.
+   * @returns A promise that resolves to the updated ConversationPreferences object.
+   */
+  setUserPreference(
+    conversationId: string,
+    userId: string,
+    preferences: Partial<Omit<ConversationPreferences, 'id' | 'conversationId' | 'userId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<ConversationPreferences>;
+
+  /**
+   * Gets per-user conversation preferences for a specific user and conversation.
+   * @param conversationId The unique ID of the conversation.
+   * @param userId The unique ID of the user.
+   * @returns A promise that resolves to the ConversationPreferences object or null if not found.
+   */
+  getUserPreference(conversationId: string, userId: string): Promise<ConversationPreferences | null>;
+
+  /**
+   * Finds conversations for a user, grouped by type (direct vs rooms).
+   * Optionally includes archived conversations and respects per-user archive preferences.
+   * @param userId The unique ID of the user.
+   * @param options Optional parameters for filtering (includeArchived).
+   * @returns A promise that resolves to a GroupedConversations object with direct and room arrays.
+   */
+  findByUserGrouped(
+    userId: string,
+    options?: { includeArchived?: boolean }
+  ): Promise<GroupedConversations>;
+
+  /**
+   * Finds conversations pinned by a specific user, ordered by pinned_order.
+   * @param userId The unique ID of the user.
+   * @returns A promise that resolves to an array of pinned Conversation objects in user-defined order.
+   */
+  findPinnedByUser(userId: string): Promise<Conversation[]>;
+
+  /**
+   * Gets aggregated unread counts for a user, broken down by conversation type.
+   * @param userId The unique ID of the user.
+   * @returns A promise that resolves to an UnreadSummary object with total, direct, and room unread counts.
+   */
+  getUnreadSummary(userId: string): Promise<UnreadSummary>;
 }

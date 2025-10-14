@@ -1,6 +1,6 @@
 // src/repositories/implementations/supabase/SupabaseConversationRepository.ts
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
-import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging'; 
+import { Conversation, ConversationType, ConversationVisibility, ConversationPreferences, GroupedConversations, UnreadSummary } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -37,6 +37,36 @@ function mapToCamelCase(data: ConversationRow): Conversation {
 function mapArrayToCamelCase(dataArray: ConversationRow[]): Conversation[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapToCamelCase(item));
+}
+
+// ConversationPreferences row type
+type ConversationPreferencesRow = {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  is_pinned: boolean;
+  pinned_order: number | null;
+  is_starred: boolean;
+  is_archived: boolean;
+  notifications_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+// Mapper for ConversationPreferences
+function mapPreferencesToCamelCase(data: ConversationPreferencesRow): ConversationPreferences {
+  return {
+    id: data.id,
+    conversationId: data.conversation_id,
+    userId: data.user_id,
+    isPinned: data.is_pinned,
+    pinnedOrder: data.pinned_order,
+    isStarred: data.is_starred,
+    isArchived: data.is_archived,
+    notificationsEnabled: data.notifications_enabled,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+  };
 }
 
 
@@ -442,6 +472,254 @@ export class SupabaseConversationRepository implements IConversationRepository {
       return data ? mapToCamelCase(data as ConversationRow) : null;
     } catch (error) {
       console.error(`Repository error in findRoomByRoomId(${roomId}):`, error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // NEW METHODS: Per-user Conversation Preferences (Task 1.2)
+  // ============================================================================
+
+  async setUserPreference(
+    conversationId: string,
+    userId: string,
+    preferences: Partial<Omit<ConversationPreferences, 'id' | 'conversationId' | 'userId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<ConversationPreferences> {
+    try {
+      // Map camelCase to snake_case for DB
+      const dbPreferences: any = {};
+      if (preferences.isPinned !== undefined) dbPreferences.is_pinned = preferences.isPinned;
+      if (preferences.pinnedOrder !== undefined) dbPreferences.pinned_order = preferences.pinnedOrder;
+      if (preferences.isStarred !== undefined) dbPreferences.is_starred = preferences.isStarred;
+      if (preferences.isArchived !== undefined) dbPreferences.is_archived = preferences.isArchived;
+      if (preferences.notificationsEnabled !== undefined) dbPreferences.notifications_enabled = preferences.notificationsEnabled;
+
+      // Always set updated_at
+      dbPreferences.updated_at = new Date().toISOString();
+
+      // Upsert: insert if not exists, update if exists
+      const { data, error } = await this.supabaseClient
+        .from('conversation_preferences')
+        .upsert(
+          {
+            conversation_id: conversationId,
+            user_id: userId,
+            ...dbPreferences,
+          },
+          {
+            onConflict: 'conversation_id,user_id',
+          }
+        )
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error setting user preference:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('Failed to retrieve user preference after upsert');
+      }
+
+      return mapPreferencesToCamelCase(data as ConversationPreferencesRow);
+    } catch (error) {
+      console.error(`Repository error in setUserPreference(${conversationId}, ${userId}):`, error);
+      throw error;
+    }
+  }
+
+  async getUserPreference(conversationId: string, userId: string): Promise<ConversationPreferences | null> {
+    try {
+      const { data, error } = await this.supabaseClient
+        .from('conversation_preferences')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Error fetching user preference:', error);
+        throw error;
+      }
+
+      return data ? mapPreferencesToCamelCase(data as ConversationPreferencesRow) : null;
+    } catch (error) {
+      console.error(`Repository error in getUserPreference(${conversationId}, ${userId}):`, error);
+      throw error;
+    }
+  }
+
+  async findByUserGrouped(
+    userId: string,
+    options?: { includeArchived?: boolean }
+  ): Promise<GroupedConversations> {
+    try {
+      // Join conversations with user preferences to respect per-user archive status
+      // We need to get all conversations where user is a participant
+      // and optionally filter by archive status from preferences
+
+      // First, get all conversations for the user
+      const conversationsQuery = this.supabaseClient
+        .from(this.TABLE_NAME)
+        .select(`
+          *,
+          conversation_preferences!left(
+            id,
+            conversation_id,
+            user_id,
+            is_pinned,
+            pinned_order,
+            is_starred,
+            is_archived,
+            notifications_enabled,
+            created_at,
+            updated_at
+          )
+        `)
+        .contains('participants', [userId])
+        .order('last_activity', { ascending: false });
+
+      const { data, error } = await conversationsQuery;
+
+      if (error) {
+        console.error('Error fetching grouped conversations:', error);
+        throw error;
+      }
+
+      if (!data) {
+        return { direct: [], rooms: [] };
+      }
+
+      // Process results and group by type
+      const direct: Conversation[] = [];
+      const rooms: Conversation[] = [];
+
+      for (const row of data) {
+        // Find the user's preference (join result is an array)
+        const userPrefs = Array.isArray(row.conversation_preferences)
+          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
+          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
+
+        // Filter by archive status if needed
+        if (!options?.includeArchived) {
+          // Check per-user archive preference if it exists, otherwise check global
+          const isArchived = userPrefs?.is_archived ?? row.is_archived ?? false;
+          if (isArchived) {
+            continue; // Skip archived conversations
+          }
+        }
+
+        // Map conversation with preferences
+        const conversation = mapToCamelCase(row as ConversationRow);
+        if (userPrefs) {
+          conversation.preferences = mapPreferencesToCamelCase(userPrefs);
+        }
+
+        // Group by type
+        if (conversation.type === ConversationType.DIRECT) {
+          direct.push(conversation);
+        } else if (conversation.type === ConversationType.ROOM) {
+          rooms.push(conversation);
+        }
+      }
+
+      return { direct, rooms };
+    } catch (error) {
+      console.error(`Repository error in findByUserGrouped(${userId}):`, error);
+      throw error;
+    }
+  }
+
+  async findPinnedByUser(userId: string): Promise<Conversation[]> {
+    try {
+      // Join conversations with preferences where is_pinned = true
+      // Order by pinned_order ascending (lower numbers first)
+      const { data, error } = await this.supabaseClient
+        .from('conversation_preferences')
+        .select(`
+          *,
+          conversations:conversation_id (*)
+        `)
+        .eq('user_id', userId)
+        .eq('is_pinned', true)
+        .order('pinned_order', { ascending: true, nullsFirst: false });
+
+      if (error) {
+        console.error('Error fetching pinned conversations:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Map the joined results to Conversation objects with preferences
+      const pinnedConversations: Conversation[] = [];
+      for (const row of data) {
+        if (row.conversations) {
+          const conversation = mapToCamelCase(row.conversations as any);
+          conversation.preferences = mapPreferencesToCamelCase(row as ConversationPreferencesRow);
+          pinnedConversations.push(conversation);
+        }
+      }
+
+      return pinnedConversations;
+    } catch (error) {
+      console.error(`Repository error in findPinnedByUser(${userId}):`, error);
+      throw error;
+    }
+  }
+
+  async getUnreadSummary(userId: string): Promise<UnreadSummary> {
+    try {
+      // Get all conversations where the user is a participant
+      const { data, error } = await this.supabaseClient
+        .from(this.TABLE_NAME)
+        .select('type, unread_count')
+        .contains('participants', [userId]);
+
+      if (error) {
+        console.error('Error fetching unread summary:', error);
+        throw error;
+      }
+
+      if (!data) {
+        return {
+          totalUnread: 0,
+          directUnread: 0,
+          roomUnread: 0,
+        };
+      }
+
+      // Aggregate unread counts by type
+      let totalUnread = 0;
+      let directUnread = 0;
+      let roomUnread = 0;
+
+      for (const row of data) {
+        const unreadCount = row.unread_count as Record<string, number> | null;
+        const userUnread = unreadCount?.[userId] || 0;
+
+        totalUnread += userUnread;
+
+        if (row.type === ConversationType.DIRECT) {
+          directUnread += userUnread;
+        } else if (row.type === ConversationType.ROOM) {
+          roomUnread += userUnread;
+        }
+      }
+
+      return {
+        totalUnread,
+        directUnread,
+        roomUnread,
+      };
+    } catch (error) {
+      console.error(`Repository error in getUnreadSummary(${userId}):`, error);
       throw error;
     }
   }

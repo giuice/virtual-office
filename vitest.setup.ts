@@ -167,6 +167,74 @@ vi.mock('next/server', () => {
   };
 });
 
+// Mock Supabase SSR client creation
+vi.mock('@supabase/ssr', () => ({
+  createBrowserClient: vi.fn().mockReturnValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null,
+      }),
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: 'test-user-id' } } },
+        error: null,
+      }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    }),
+  }),
+  createServerClient: vi.fn().mockReturnValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null,
+      }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    }),
+  }),
+}));
+
+// Mock browser client
+vi.mock('@/lib/supabase/browser-client', () => ({
+  createSupabaseBrowserClient: vi.fn().mockReturnValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null,
+      }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    }),
+  }),
+}));
+
+// Mock server client
+vi.mock('@/lib/supabase/server-client', () => ({
+  createSupabaseServerClient: vi.fn().mockReturnValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null,
+      }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    }),
+  }),
+}));
+
 // Mock createRouteHandlerClient for Supabase
 vi.mock('@supabase/auth-helpers-nextjs', () => {
   return {

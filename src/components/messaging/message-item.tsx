@@ -88,6 +88,8 @@ export function MessageItem({
 
   // Format message timestamp
   const formatMessageTime = (timestamp: Date) => {
+    if( !timestamp )
+      return '';
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
   };
   

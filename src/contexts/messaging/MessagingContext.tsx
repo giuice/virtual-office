@@ -3,15 +3,21 @@
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
-import { 
-  MessageType, 
+import {
+  MessageType,
   FileAttachment,
 } from '@/types/messaging';
-import { MessagingContextType } from './types';
+import { MessagingContextType, DrawerView } from './types';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
 import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
+
+// LocalStorage keys for drawer state persistence
+const DRAWER_STORAGE_KEYS = {
+  IS_MINIMIZED: 'messaging_drawer_minimized',
+  ACTIVE_VIEW: 'messaging_drawer_active_view',
+} as const;
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
@@ -22,13 +28,58 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const conversationsManager = useConversations();
   const { currentUserProfile } = useCompany();
   const [isMessagingV2Enabled, setIsMessagingV2Enabled] = useState(() => messagingFeatureFlags.isV2Enabled());
-  const { 
+  const {
     activeConversation,
     setActiveConversation,
     lastActiveConversation,
     refreshConversations,
     clearLastActiveConversation,
   } = conversationsManager;
+
+  // Drawer state with localStorage persistence
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = localStorage.getItem(DRAWER_STORAGE_KEYS.IS_MINIMIZED);
+    return stored === 'true';
+  });
+
+  const [activeView, setActiveView] = useState<DrawerView>(() => {
+    if (typeof window === 'undefined') return 'list';
+    const stored = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_VIEW);
+    return (stored as DrawerView) || 'list';
+  });
+
+  // Drawer is open when there's an active or last active conversation
+  const isDrawerOpen = Boolean(activeConversation || lastActiveConversation);
+
+  // Persist drawer state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DRAWER_STORAGE_KEYS.IS_MINIMIZED, String(isMinimized));
+    }
+  }, [isMinimized]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_VIEW, activeView);
+    }
+  }, [activeView]);
+
+  // Drawer control functions
+  const openDrawer = useCallback(() => {
+    if (!activeConversation && lastActiveConversation) {
+      setActiveConversation(lastActiveConversation);
+    }
+  }, [activeConversation, lastActiveConversation, setActiveConversation]);
+
+  const toggleMinimize = useCallback(() => {
+    setIsMinimized((prev) => !prev);
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('MessagingContext.toggleMinimize', 'toggled', {
+        isMinimized: !isMinimized,
+      });
+    }
+  }, [isMinimized]);
   
   useEffect(() => {
     const handler = () => {
@@ -237,10 +288,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const closeDrawer = useCallback(() => {
     setActiveConversation(null);
     clearLastActiveConversation();
+    setIsMinimized(false);
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('MessagingContext.closeDrawer', 'closed', {});
+    }
   }, [setActiveConversation, clearLastActiveConversation]);
-  
+
   // Create context value by combining all the hooks
   const value: MessagingContextType = {
+    // Drawer state
+    isDrawerOpen,
+    isMinimized,
+    activeView,
+    openDrawer,
+    toggleMinimize,
+    setActiveView,
     // Conversations (from conversationsManager)
     conversations: conversationsManager.conversations,
     activeConversation: conversationsManager.activeConversation,

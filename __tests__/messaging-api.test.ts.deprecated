@@ -252,28 +252,237 @@ describe('Messaging API Client', () => {
     });
   });
   
+  // Conversation Preferences Tests
+  describe('Conversation Preferences', () => {
+    test('getConversationPreferences should return user preferences', async () => {
+      const mockPreferences = {
+        isPinned: true,
+        pinnedOrder: 1,
+        isStarred: false,
+        isArchived: false,
+        notificationsEnabled: true,
+      };
+
+      const mockResponse = {
+        preferences: mockPreferences
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockResponse)
+      );
+
+      const result = await messagingApi.getConversationPreferences('conversation-id');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/preferences?conversationId=conversation-id',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
+
+      expect(result).toEqual(mockPreferences);
+    });
+
+    test('updateConversationPreferences should update and return preferences', async () => {
+      const updatedPreferences = {
+        isPinned: true,
+        pinnedOrder: 2,
+        isStarred: true,
+        isArchived: false,
+        notificationsEnabled: false,
+      };
+
+      const mockResponse = {
+        success: true,
+        preferences: updatedPreferences
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockResponse)
+      );
+
+      const result = await messagingApi.updateConversationPreferences('conversation-id', {
+        isPinned: true,
+        pinnedOrder: 2,
+        isStarred: true,
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/preferences',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify({
+            conversationId: 'conversation-id',
+            isPinned: true,
+            pinnedOrder: 2,
+            isStarred: true,
+          }),
+        })
+      );
+
+      expect(result).toEqual(updatedPreferences);
+    });
+  });
+
+  // Grouped Conversations Tests
+  describe('Grouped Conversations', () => {
+    test('getGroupedConversations should return conversations grouped by type', async () => {
+      const mockGrouped = {
+        direct: [
+          { id: 'conv-1', type: 'direct', participants: ['user-1', 'user-2'] },
+          { id: 'conv-2', type: 'direct', participants: ['user-1', 'user-3'] },
+        ],
+        rooms: [
+          { id: 'conv-3', type: 'room', roomId: 'room-1', participants: ['user-1', 'user-2', 'user-3'] },
+        ],
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockGrouped)
+      );
+
+      const result = await messagingApi.getGroupedConversations();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/get?grouped=true'
+      );
+
+      expect(result).toEqual(mockGrouped);
+    });
+
+    test('getGroupedConversations should support includeArchived option', async () => {
+      const mockGrouped = {
+        direct: [],
+        rooms: [],
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockGrouped)
+      );
+
+      await messagingApi.getGroupedConversations({ includeArchived: true });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/get?grouped=true&includeArchived=true'
+      );
+    });
+  });
+
+  // Pinned Conversations Tests
+  describe('Pinned Conversations', () => {
+    test('getPinnedConversations should return pinned conversations', async () => {
+      const mockPinned = {
+        conversations: [
+          { id: 'conv-1', type: 'direct', participants: ['user-1', 'user-2'], isPinned: true },
+          { id: 'conv-3', type: 'room', roomId: 'room-1', participants: ['user-1', 'user-2', 'user-3'], isPinned: true },
+        ],
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockPinned)
+      );
+
+      const result = await messagingApi.getPinnedConversations();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/get?pinned=true'
+      );
+
+      expect(result).toEqual(mockPinned.conversations);
+    });
+  });
+
+  // Unread Summary Tests
+  describe('Unread Summary', () => {
+    test('getUnreadSummary should return unread counts by type', async () => {
+      const mockSummary = {
+        totalUnread: 15,
+        directUnread: 8,
+        roomUnread: 7,
+      };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, mockSummary)
+      );
+
+      const result = await messagingApi.getUnreadSummary();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/conversations/get?summary=true'
+      );
+
+      expect(result).toEqual(mockSummary);
+    });
+
+    test('getUnreadSummary should default to zero counts on empty response', async () => {
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(200, {})
+      );
+
+      const result = await messagingApi.getUnreadSummary();
+
+      expect(result).toEqual({
+        totalUnread: 0,
+        directUnread: 0,
+        roomUnread: 0,
+      });
+    });
+  });
+
   // Error Handling Tests
   describe('Error Handling', () => {
     test('API should handle network errors', async () => {
-      (global.fetch as any).mockImplementationOnce(() => 
+      (global.fetch as any).mockImplementationOnce(() =>
         Promise.reject(new Error('Network error'))
       );
-      
+
       await expect(
         messagingApi.getMessageAttachments('message-id')
       ).rejects.toThrow('Network error');
     });
-    
+
     test('API should handle API errors with error messages', async () => {
       const errorResponse = { error: 'Resource not found' };
-      
-      (global.fetch as any).mockImplementationOnce(() => 
+
+      (global.fetch as any).mockImplementationOnce(() =>
         mockFetchResponse(404, errorResponse)
       );
-      
+
       await expect(
         messagingApi.getMessageAttachments('message-id')
       ).rejects.toThrow(errorResponse.error);
+    });
+
+    test('getConversationPreferences should handle errors', async () => {
+      const errorMessage = 'Conversation not found';
+      const mockResponse = { error: errorMessage };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(404, mockResponse)
+      );
+
+      await expect(
+        messagingApi.getConversationPreferences('invalid-id')
+      ).rejects.toThrow(errorMessage);
+    });
+
+    test('updateConversationPreferences should handle validation errors', async () => {
+      const errorMessage = 'At least one preference field must be provided';
+      const mockResponse = { error: errorMessage };
+
+      (global.fetch as any).mockImplementationOnce(() =>
+        mockFetchResponse(400, mockResponse)
+      );
+
+      await expect(
+        messagingApi.updateConversationPreferences('conversation-id', {})
+      ).rejects.toThrow(errorMessage);
     });
   });
 });

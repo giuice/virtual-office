@@ -1,5 +1,16 @@
 ## Relevant Files
 
+- `tasks/audit-report-messaging-gaps.md` - Comprehensive audit report identifying all gaps in types, repositories, and database schema for pin/star/archive, reactions, attachments, read receipts, and voice notes.
+- `src/migrations/20251009_messaging_features_phase1_new_tables.sql` - Migration adding conversation_preferences, message_read_receipts, message_pins, and message_stars tables with RLS policies.
+- `src/migrations/20251009_messaging_features_phase2_extend_tables.sql` - Migration extending message_attachments for voice note metadata and deprecating global is_archived.
+- `src/migrations/20251009_messaging_features_phase3_realtime.sql` - Migration adding new tables to Supabase Realtime publication for live updates.
+- `src/types/messaging.ts` - Extended with ConversationPreferences, GroupedConversations, and UnreadSummary types; added preferences field to Conversation interface.
+- `src/repositories/interfaces/IConversationRepository.ts` - Extended with 5 new methods: setUserPreference, getUserPreference, findByUserGrouped, findPinnedByUser, getUnreadSummary.
+- `src/repositories/implementations/supabase/SupabaseConversationRepository.ts` - Implemented all 5 new methods with proper snake_case/camelCase mapping and per-user preference support.
+- `src/app/api/conversations/get/route.ts` - Updated to support grouped queries (?grouped=true), pinned conversations (?pinned=true), unread summary (?summary=true), and include per-user preferences in responses.
+- `src/app/api/conversations/create/route.ts` - Added DM deduplication using participant fingerprint to prevent duplicate direct conversations.
+- `src/app/api/conversations/archive/route.ts` - Migrated from global archive to per-user archive using setUserPreference method.
+- `src/app/api/conversations/preferences/route.ts` - New API route for managing per-user conversation preferences (GET to retrieve, PATCH to update pin/star/notifications).
 - `src/components/messaging/MessagingDrawer.tsx` - Persistent drawer shell to orchestrate unified DM and room conversations.
 - `src/components/messaging/ConversationList.tsx` - Conversation list surface to group by type, support pin/star/archive, and show unread counts.
 - `src/components/messaging/EnhancedMessageFeed.tsx` - Message timeline requiring reactions, replies, scroll management, and pinned/starred affordances.
@@ -32,16 +43,16 @@
 
 ## Tasks
 
-- [ ] 1.0 Messaging Data Contracts & API Foundation
-  - [ ] 1.1 Audit `src/types/messaging.ts`, `IConversationRepository`, and `IMessageRepository` to catalogue gaps for pin/star/archive, reactions, attachments, and read receipts; document proposed schema deltas with Supabase migrations.
-  - [ ] 1.2 Extend conversation repository interface + `SupabaseConversationRepository` to return grouped DM/room payloads with pinned order, unread summaries, and archived filters consistent with PRD requirements.
-  - [ ] 1.3 Update `src/app/api/conversations/get/route.ts`, `create/route.ts`, and `archive/route.ts` to align responses and validation with new repository contracts and RLS-checked access rules.
-  - [ ] 1.4 Expand message repository interface + `SupabaseMessageRepository` plus `src/app/api/messages/create|react|status/route.ts` to cover attachments, voice notes metadata, reactions, and read receipt updates.
-  - [ ] 1.5 Refresh unit coverage in `__tests__/messaging-api.test.ts` and `__tests__/api/messages-api.test.ts` to exercise new APIs, including negative RLS scenarios.
+- [x] 1.0 Messaging Data Contracts & API Foundation ✅ COMPLETED
+  - [x] 1.1 Audit `src/types/messaging.ts`, `IConversationRepository`, and `IMessageRepository` to catalogue gaps for pin/star/archive, reactions, attachments, and read receipts; document proposed schema deltas with Supabase migrations.
+  - [x] 1.2 Extend conversation repository interface + `SupabaseConversationRepository` to return grouped DM/room payloads with pinned order, unread summaries, and archived filters consistent with PRD requirements.
+  - [x] 1.3 Update `src/app/api/conversations/get/route.ts`, `create/route.ts`, and `archive/route.ts` to align responses and validation with new repository contracts and RLS-checked access rules.
+  - [x] 1.4 Expand message repository interface + `SupabaseMessageRepository` plus `src/app/api/messages/create|react|status/route.ts` to cover attachments, voice notes metadata, reactions, and read receipt updates.
+  - [x] 1.5 Refresh unit coverage in `__tests__/messaging-api.test.ts` and `__tests__/api/messages-api.test.ts` to exercise new APIs, including negative RLS scenarios. (See `tasks/task-1.5-test-coverage-report.md` for details)
 
 - [ ] 2.0 Unified Drawer UX & Conversation Surfacing
-  - [ ] 2.1 Map active drawer state requirements in `MessagingDrawer.tsx` and `MessagingContext.tsx`, ensuring state survives route changes and supports minimize/restore controls.
-  - [ ] 2.2 Refactor `ConversationList.tsx` to group DMs vs rooms, surface pinned conversations, unread badges, and canonical avatars while respecting click-stop guards.
+  - [x] 2.1 Map active drawer state requirements in `MessagingDrawer.tsx` and `MessagingContext.tsx`, ensuring state survives route changes and supports minimize/restore controls.
+  - [x] 2.2 Refactor `ConversationList.tsx` to group DMs vs rooms, surface pinned conversations, unread badges, and canonical avatars while respecting click-stop guards.
   - [ ] 2.3 Integrate conversation search/start flows by wiring `ConversationList` with company directory data and `useConversations` mutations for DM creation and room joining.
   - [ ] 2.4 Ensure room navigation sync keeps the drawer stable by reconciling `MessagingDrawer` with floor-plan context and preventing unintended toggles.
   - [ ] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching.

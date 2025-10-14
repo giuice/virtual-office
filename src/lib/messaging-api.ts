@@ -653,5 +653,160 @@ export const messagingApi = {
       console.error('Error getting message attachments:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get user's preferences for a conversation
+   * @param conversationId The conversation ID
+   * @returns Promise resolving to the user's preferences
+   */
+  async getConversationPreferences(conversationId: string): Promise<any> {
+    try {
+      const response = await fetch(`/api/conversations/preferences?conversationId=${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get conversation preferences');
+      }
+
+      const data = await response.json();
+      return data.preferences;
+    } catch (error) {
+      console.error('Error getting conversation preferences:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update user's preferences for a conversation
+   * @param conversationId The conversation ID
+   * @param preferences Partial preferences to update
+   * @returns Promise resolving to the updated preferences
+   */
+  async updateConversationPreferences(
+    conversationId: string,
+    preferences: {
+      isPinned?: boolean;
+      pinnedOrder?: number | null;
+      isStarred?: boolean;
+      notificationsEnabled?: boolean;
+    }
+  ): Promise<any> {
+    try {
+      const response = await fetch('/api/conversations/preferences', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId, ...preferences }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update conversation preferences');
+      }
+
+      const data = await response.json();
+      return data.preferences;
+    } catch (error) {
+      console.error('Error updating conversation preferences:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get conversations grouped by type (direct vs rooms)
+   * @param options Query options
+   * @returns Promise resolving to grouped conversations
+   */
+  async getGroupedConversations(options?: { includeArchived?: boolean }): Promise<{
+    direct: Conversation[];
+    rooms: Conversation[];
+  }> {
+    try {
+      const params = new URLSearchParams();
+      params.append('grouped', 'true');
+
+      if (options?.includeArchived !== undefined) {
+        params.append('includeArchived', options.includeArchived.toString());
+      }
+
+      const response = await fetch(`/api/conversations/get?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch grouped conversations');
+      }
+
+      const data = await response.json();
+      return {
+        direct: data.direct || [],
+        rooms: data.rooms || [],
+      };
+    } catch (error) {
+      console.error('Error fetching grouped conversations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get pinned conversations for the current user
+   * @returns Promise resolving to pinned conversations
+   */
+  async getPinnedConversations(): Promise<Conversation[]> {
+    try {
+      const params = new URLSearchParams();
+      params.append('pinned', 'true');
+
+      const response = await fetch(`/api/conversations/get?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch pinned conversations');
+      }
+
+      const data = await response.json();
+      return data.conversations || [];
+    } catch (error) {
+      console.error('Error fetching pinned conversations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get unread summary counts by conversation type
+   * @returns Promise resolving to unread counts
+   */
+  async getUnreadSummary(): Promise<{
+    totalUnread: number;
+    directUnread: number;
+    roomUnread: number;
+  }> {
+    try {
+      const params = new URLSearchParams();
+      params.append('summary', 'true');
+
+      const response = await fetch(`/api/conversations/get?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch unread summary');
+      }
+
+      const data = await response.json();
+      return {
+        totalUnread: data.totalUnread || 0,
+        directUnread: data.directUnread || 0,
+        roomUnread: data.roomUnread || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching unread summary:', error);
+      throw error;
+    }
   }
 };

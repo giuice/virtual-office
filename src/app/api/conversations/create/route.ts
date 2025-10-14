@@ -73,8 +73,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid participants found' }, { status: 400 });
     }
 
+    // NEW: DM Deduplication - Check if direct conversation already exists
+    if (body.type === ConversationType.DIRECT) {
+      // Sort participant IDs to create consistent fingerprint
+      const sortedParticipants = [...updatedParticipants].sort();
+      const fingerprint = sortedParticipants.join(':');
+
+      console.log('Checking for existing DM with fingerprint:', fingerprint);
+
+      // Check if conversation already exists
+      const existingDM = await conversationRepository.findDirectByFingerprint(fingerprint);
+
+      if (existingDM) {
+        console.log('Found existing DM conversation:', existingDM.id);
+        return NextResponse.json(
+          {
+            conversation: existingDM,
+            message: 'Existing conversation returned'
+          },
+          { status: 200 }
+        );
+      }
+    }
+
     // Prepare data for repository create method
-    const conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'> = {
+    const conversationData: Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageTimestamp' | 'unreadCount'> & {
+      participantsFingerprint?: string;
+    } = {
       type: body.type as ConversationType,
       participants: updatedParticipants,
       name: body.name || undefined, // Optional, ensure it's undefined if falsy
@@ -82,6 +107,12 @@ export async function POST(request: NextRequest) {
       isArchived: false, // Default value
       lastActivity: new Date(), // Set initial activity timestamp
     };
+
+    // NEW: Add fingerprint for direct conversations
+    if (body.type === ConversationType.DIRECT) {
+      const sortedParticipants = [...updatedParticipants].sort();
+      conversationData.participantsFingerprint = sortedParticipants.join(':');
+    }
 
     console.log('Creating conversation with data:', JSON.stringify(conversationData, null, 2));
 

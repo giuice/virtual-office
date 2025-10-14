@@ -8,8 +8,19 @@ import {
   FileAttachment,
 } from '@/types/messaging';
 
+// Drawer view types
+export type DrawerView = 'list' | 'conversation' | 'search';
+
 // Define the context type
 export interface MessagingContextType {
+  // Drawer state
+  isDrawerOpen: boolean;
+  isMinimized: boolean;
+  activeView: DrawerView;
+  openDrawer: () => void;
+  toggleMinimize: () => void;
+  setActiveView: (view: DrawerView) => void;
+
   // Conversations
   conversations: Conversation[];
   activeConversation: Conversation | null;

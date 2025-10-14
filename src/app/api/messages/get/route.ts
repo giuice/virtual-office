@@ -49,10 +49,13 @@ export async function GET(request: NextRequest) {
         cursorAfter: cursorAfter || undefined,
       };
 
-      const messages: Message[] = await messageRepository.findByConversation(
+      const result: PaginatedResult<Message> = await messageRepository.findByConversation(
         conversationId,
         paginationOptions
       );
+
+      // Extract messages array from PaginatedResult
+      const messages = result.items;
 
       // Compute next cursors
       let nextCursorBefore: string | undefined;
@@ -62,11 +65,11 @@ export async function GET(request: NextRequest) {
         nextCursorBefore = messages[0].timestamp.toISOString(); // oldest in returned window
         // We cannot know hasMoreOlder without one extra fetch; do a cheap probe
         if (!cursorAfter) {
-          const probe = await messageRepository.findByConversation(conversationId, {
+          const probeResult = await messageRepository.findByConversation(conversationId, {
             limit: 1,
             cursorBefore: nextCursorBefore,
           });
-          hasMoreOlder = probe.length > 0;
+          hasMoreOlder = probeResult.items.length > 0;
         }
       }
 
@@ -84,10 +87,13 @@ export async function GET(request: NextRequest) {
       cursor: offset,
     };
 
-    const messages: Message[] = await messageRepository.findByConversation(
+    const result: PaginatedResult<Message> = await messageRepository.findByConversation(
       conversationId,
       paginationOptions
     );
+
+    // Extract messages array from PaginatedResult
+    const messages = result.items;
 
     const hasMore = messages.length > limit;
     const actualMessages = hasMore ? messages.slice(0, limit) : messages;
