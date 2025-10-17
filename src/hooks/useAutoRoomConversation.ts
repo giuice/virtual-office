@@ -21,7 +21,7 @@ export function useAutoRoomConversation(spaceId: string | null) {
   useEffect(() => {
     // Prevent duplicate processing for the same space
     if (spaceId && user && spaces && spaceId !== lastProcessedSpaceId.current) {
-      console.log(`[useAutoRoomConversation] Auto-creating room conversation for space: ${spaceId}`);
+      // console.log(`[useAutoRoomConversation] Auto-creating room conversation for space: ${spaceId}`);
       lastProcessedSpaceId.current = spaceId;
       
       // Find the space to get its name
@@ -31,11 +31,11 @@ export function useAutoRoomConversation(spaceId: string | null) {
       // Auto-create or join room conversation when user enters space
       getOrCreateRoomConversation(spaceId, spaceName)
         .then((conversation) => {
-          console.log(`[useAutoRoomConversation] Successfully joined room conversation:`, conversation);
+          // console.log(`[useAutoRoomConversation] Successfully joined room conversation:`, conversation);
           setActiveConversation(conversation);
         })
         .catch((error) => {
-          console.error(`[useAutoRoomConversation] Failed to create room conversation:`, error);
+          // console.error(`[useAutoRoomConversation] Failed to create room conversation:`, error);
         });
     } else if (!spaceId) {
       // Reset when user leaves all spaces

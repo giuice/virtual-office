@@ -145,7 +145,15 @@ export class SupabaseUserRepository implements IUserRepository {
   async update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>): Promise<User | null> {
      // Map camelCase fields from User type to snake_case for DB
      // Exclude fields that shouldn't be updated directly (id, createdAt, lastActive)
-    const { companyId, displayName, avatarUrl, statusMessage, supabase_uid, ...restUpdates } = updates; // email, status, preferences, role
+    const {
+      companyId,
+      displayName,
+      avatarUrl,
+      statusMessage,
+      supabase_uid,
+      currentSpaceId,
+      ...restUpdates
+    } = updates; // email, status, preferences, role
     const dbUpdates: Partial<{
       email: string;
       status: UserStatus;
@@ -177,6 +185,7 @@ export class SupabaseUserRepository implements IUserRepository {
      if (avatarUrl !== undefined) dbUpdates.avatar_url = avatarUrl;
      if (statusMessage !== undefined) dbUpdates.status_message = statusMessage;
      if (supabase_uid !== undefined) dbUpdates.supabase_uid = supabase_uid; // Allow updating this.supabase_uid if needed
+     if (currentSpaceId !== undefined) dbUpdates.current_space_id = currentSpaceId;
      // Update last_active automatically on any update
      dbUpdates.last_active = new Date().toISOString();
 

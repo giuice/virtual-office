@@ -111,7 +111,26 @@ export function EnhancedAvatarV2({
   const displayName = fallbackName || user?.displayName || (user as any)?.name || 'User';
   const initials = getUserInitials(displayName);
   const userColor = getUserColor(displayName);
-  const userStatus = status || (user as any)?.status;
+  const presenceOnline = Boolean((user as any)?.isOnline);
+  const hasExplicitStatus = status !== undefined;
+
+  let computedStatus = status || (user as any)?.status;
+
+  if (!hasExplicitStatus) {
+    if (presenceOnline) {
+      if (!computedStatus || computedStatus === 'offline') {
+        computedStatus = 'online';
+      }
+    } else {
+      if (!computedStatus || computedStatus === 'online') {
+        computedStatus = 'offline';
+      } else if (computedStatus === 'away' || computedStatus === 'busy') {
+        computedStatus = 'offline';
+      }
+    }
+  }
+
+  const userStatus = computedStatus;
   const userId = String((user as any)?.id || 'unknown');
 
   // Initialize avatar URL and determine if it's a data URI

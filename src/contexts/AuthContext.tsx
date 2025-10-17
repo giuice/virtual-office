@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase/client'; // Keep for direct auth actions
 import { AuthContextType } from '@/types/auth'; // Updated type
-import { getUserById, updateUserStatus, syncUserProfile } from '@/lib/api';
+import { getUserById, syncUserProfile } from '@/lib/api';
 import { User } from '@supabase/supabase-js';
 import { useSession } from '@/hooks/useSession'; // Import the new hook
 import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
@@ -22,56 +22,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Memoize the Supabase client instance from the import
   const supabaseClient = useMemo(() => supabase, []);
 
-  // Update user status (presence) based on the user from useSession
-  const updateStatus = async (currentUser: User | null, status: 'online' | 'offline') => {
-    // Corrected: Only one check for currentUser needed
-    if (currentUser) {
-      try {
-        // Check if user has a profile in the database using Supabase UID
-        const userProfile = await getUserById(currentUser.id); // getUserById expects supabase_uid
-        if (userProfile) {
-          // Update status using the Database User ID (assuming updateUserStatus expects DB ID)
-          // If updateUserStatus expects supabase_uid, change userProfile.id to currentUser.id
-          await updateUserStatus(userProfile.id, status);
-        } else {
-          console.warn(`User profile not found for supabase_uid: ${currentUser.id}. Cannot update status.`);
-        }
-      } catch (error) {
-        console.error('Error updating user status:', error);
-        // Optionally set an error state specific to status updates if needed
-      }
-    }
-  };
-
-  // Effect to update status when user logs in/out (based on useSession)
   useEffect(() => {
-    if (user) {
-      updateStatus(user, 'online');
-
-      // Check if this is a Google OAuth user and sync their profile
-      if (user.app_metadata?.provider === 'google' && user.user_metadata) {
-        syncGoogleOAuthUser(user);
-      }
+    if (user && user.app_metadata?.provider === 'google' && user.user_metadata) {
+      syncGoogleOAuthUser(user);
     }
-    // No explicit 'offline' on logout needed here if handled by beforeunload
-
-    // Update user status to offline when they close the tab or navigate away
-    const handleBeforeUnload = () => {
-      // Use the user state variable directly
-      if (user) {
-        // Note: This is best-effort and might not always run reliably,
-        // especially on mobile or abrupt closes. Consider backend mechanisms too.
-        updateStatus(user, 'offline');
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // No need to unsubscribe from onAuthStateChange here, useSession handles it
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // Depend on the user object from useSession
+  }, [user]);
 
   // --- Auth Actions ---
 
@@ -222,8 +177,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentUser = user;
     try {
       if (currentUser) {
-        // Attempt to set status to offline before sign out
-        await updateStatus(currentUser, 'offline');
+        // Get user profile to update both status and location
+        const userProfile = await getUserById(currentUser.id);
+        if (userProfile) {
+          // Set status to offline AND clear currentSpaceId
+          await fetch(`/api/users/update?id=${userProfile.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'offline',
+              currentSpaceId: null, // Clear space location
+              lastActive: new Date().toISOString()
+            }),
+          });
+        }
       }
       const { error } = await supabaseClient.auth.signOut();
       if (error) throw error;

@@ -49,8 +49,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return (stored as DrawerView) || 'list';
   });
 
-  // Drawer is open when there's an active or last active conversation
-  const isDrawerOpen = Boolean(activeConversation || lastActiveConversation);
+  // Drawer is open ONLY when there's an ACTIVE conversation
+  // lastActiveConversation is just for memory, not for auto-opening
+  // Drawer should only open when:
+  // 1. User enters a space (sets activeConversation)
+  // 2. User clicks a conversation in the list (sets activeConversation)
+  // 3. User creates new conversation from search (sets activeConversation)
+  const isDrawerOpen = Boolean(activeConversation);
 
   // Persist drawer state to localStorage
   useEffect(() => {
@@ -123,7 +128,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return 0;
   }, []);
 
-  // Fail-safe: polling fallback to detect new conversations/unreads when realtime is unavailable.
+  // Polling to refresh conversations list (but NOT auto-open them)
+  // Conversations should only open when:
+  // 1. User enters a specific space (floor-plan context)
+  // 2. User clicks on a conversation in the list
+  // 3. User creates a new conversation from search
   useEffect(() => {
     if (!currentUserProfile?.id) return;
     const defaultMs = 5000;
@@ -135,20 +144,26 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const tick = async () => {
       if (stopped) return;
       try {
+        // Refresh conversations to get latest unread counts, but DON'T auto-open
         await refreshConversations();
-        const uid = currentUserProfile.id;
-        const candidate = conversationsManager.conversations
-          .filter((c) => (c.unreadCount?.[uid] || 0) > 0)
-          .sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a))[0];
 
-        if (candidate && (!activeConversation || activeConversation.id !== candidate.id)) {
-          debugLogger.messaging.event('MessagingContext.poll', 'promote:unread', {
-            conv: candidate.id,
-            lastActivity: candidate.lastActivity instanceof Date ? candidate.lastActivity.toISOString() : undefined,
-            unread: candidate.unreadCount?.[uid],
-          });
-          setActiveConversation(candidate);
+        if (debugLogger.messaging.enabled()) {
+          const uid = currentUserProfile.id;
+          const unreadConvs = conversationsManager.conversations
+            .filter((c) => (c.unreadCount?.[uid] || 0) > 0);
+
+          if (unreadConvs.length > 0) {
+            debugLogger.messaging.event('MessagingContext.poll', 'unread-detected', {
+              count: unreadConvs.length,
+              conversations: unreadConvs.map(c => ({ id: c.id, unread: c.unreadCount?.[uid] })),
+            });
+          }
         }
+
+        // NOTE: Removed auto-opening logic - conversations should only open via:
+        // - Space navigation (floor-plan)
+        // - User clicking in conversation list
+        // - User starting new conversation from search
       } catch (e) {
         debugLogger.messaging.warn('MessagingContext.poll', 'error', e);
       } finally {
@@ -160,7 +175,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return () => {
       stopped = true;
     };
-  }, [activeConversation, conversationsManager.conversations, currentUserProfile?.id, getLastActivityMs, refreshConversations, setActiveConversation]);
+  }, [currentUserProfile?.id, conversationsManager.conversations, refreshConversations]);
 
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);

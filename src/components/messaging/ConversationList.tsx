@@ -43,40 +43,50 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   isLoading = false,
 }) => {
   const { currentUserProfile, companyUsers } = useCompany();
+  const viewerId = currentUserProfile?.id ?? null;
 
   // Group conversations by pinned, DMs, and rooms
   const groupedConversations = useMemo(() => {
-    if (!currentUserProfile) return { pinned: [], direct: [], rooms: [] };
-
     const pinned: Conversation[] = [];
     const direct: Conversation[] = [];
     const rooms: Conversation[] = [];
 
     conversations.forEach((conv) => {
-      // Check if conversation is pinned for current user
       const isPinned = conv.preferences?.isPinned ?? false;
 
       if (isPinned) {
         pinned.push(conv);
-      } else if (conv.type === ConversationType.DIRECT) {
-        direct.push(conv);
-      } else if (conv.type === ConversationType.ROOM || conv.type === ConversationType.GROUP) {
-        rooms.push(conv);
+        return;
       }
+
+      if (conv.type === ConversationType.DIRECT) {
+        direct.push(conv);
+        return;
+      }
+
+      if (conv.type === ConversationType.ROOM || conv.type === ConversationType.GROUP) {
+        rooms.push(conv);
+        return;
+      }
+
+      // Fallback: treat unknown conversation types as rooms for listing purposes
+      rooms.push(conv);
     });
 
     // Sort pinned by pinnedOrder (ascending), then by lastActivity
     pinned.sort((a, b) => {
       const aOrder = a.preferences?.pinnedOrder ?? Number.MAX_SAFE_INTEGER;
       const bOrder = b.preferences?.pinnedOrder ?? Number.MAX_SAFE_INTEGER;
-      if (aOrder !== bOrder) return aOrder - bOrder;
+
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
 
       const aTime = new Date(a.lastActivity).getTime();
       const bTime = new Date(b.lastActivity).getTime();
       return bTime - aTime;
     });
 
-    // Sort others by lastActivity (most recent first)
     const sortByActivity = (a: Conversation, b: Conversation) => {
       const aTime = new Date(a.lastActivity).getTime();
       const bTime = new Date(b.lastActivity).getTime();
@@ -87,14 +97,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     rooms.sort(sortByActivity);
 
     return { pinned, direct, rooms };
-  }, [conversations, currentUserProfile]);
+  }, [conversations]);
 
   // Render individual conversation item
   const renderConversation = (conv: Conversation) => {
-    if (!currentUserProfile) return null;
-
     const isSelected = conv.id === selectedConversationId;
-    const unreadCount = conv.unreadCount?.[currentUserProfile.id] || 0;
+    const unreadCount = viewerId ? conv.unreadCount?.[viewerId] || 0 : 0;
     const isPinned = conv.preferences?.isPinned ?? false;
     const isStarred = conv.preferences?.isStarred ?? false;
 
@@ -105,7 +113,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
     if (conv.type === ConversationType.DIRECT) {
       // For DMs, find the other participant
-      const otherUserId = conv.participants.find((id) => id !== currentUserProfile.id);
+      const otherUserId = conv.participants.find((id) => id !== viewerId) ?? conv.participants[0];
       const otherUser = companyUsers.find((u) => u.id === otherUserId);
 
       if (otherUser) {

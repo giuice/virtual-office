@@ -13,6 +13,7 @@
 - `src/app/api/conversations/preferences/route.ts` - New API route for managing per-user conversation preferences (GET to retrieve, PATCH to update pin/star/notifications).
 - `src/components/messaging/MessagingDrawer.tsx` - Persistent drawer shell to orchestrate unified DM and room conversations.
 - `src/components/messaging/ConversationList.tsx` - Conversation list surface to group by type, support pin/star/archive, and show unread counts.
+- `src/components/floor-plan/floor-plan.tsx` - Floor plan UI wiring that now opens the unified drawer and deprecates the legacy room chat panel.
 - `src/components/messaging/EnhancedMessageFeed.tsx` - Message timeline requiring reactions, replies, scroll management, and pinned/starred affordances.
 - `src/components/messaging/EnhancedMessageComposer.tsx` - Canonical composer to extend for attachments, voice notes, and offline queueing.
 - `src/components/messaging/message-item.tsx` - Individual message renderer to integrate reactions, reply previews, and read receipts.
@@ -53,7 +54,7 @@
 - [ ] 2.0 Unified Drawer UX & Conversation Surfacing
   - [x] 2.1 Map active drawer state requirements in `MessagingDrawer.tsx` and `MessagingContext.tsx`, ensuring state survives route changes and supports minimize/restore controls.
   - [x] 2.2 Refactor `ConversationList.tsx` to group DMs vs rooms, surface pinned conversations, unread badges, and canonical avatars while respecting click-stop guards.
-  - [ ] 2.3 Integrate conversation search/start flows by wiring `ConversationList` with company directory data and `useConversations` mutations for DM creation and room joining.
+  - [x] 2.3 Integrate conversation search/start flows by wiring `ConversationList` with company directory data and `useConversations` mutations for DM creation and room joining.
   - [ ] 2.4 Ensure room navigation sync keeps the drawer stable by reconciling `MessagingDrawer` with floor-plan context and preventing unintended toggles.
   - [ ] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching.
 

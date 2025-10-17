@@ -33,8 +33,10 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => {
   // Get current user's space ID for messaging integration
   const currentUserSpaceId = users?.find(u => u.id === currentUserId)?.currentSpaceId || null;
 
-  // Auto-manage room conversations based on presence
-  useAutoRoomConversation(currentUserSpaceId);
+  // DISABLED: Auto-manage room conversations based on presence
+  // This was causing drawer to auto-open on dashboard with persisted space data
+  // TODO: Move conversation opening to floor plan click handlers for explicit navigation only
+  // useAutoRoomConversation(currentUserSpaceId);
 
   // Log for debugging purposes
   if (process.env.NODE_ENV === 'development') {

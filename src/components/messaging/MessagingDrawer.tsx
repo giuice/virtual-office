@@ -1,15 +1,16 @@
 // src/components/messaging/MessagingDrawer.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { ConversationType } from '@/types/messaging';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, MessageSquare, Minimize2, ArrowLeft, Plus } from 'lucide-react';
+import { X, MessageSquare, Minimize2, ArrowLeft, Plus, List } from 'lucide-react';
 import { MessageFeed } from './message-feed';
 import { ConversationList } from './ConversationList';
+import { ConversationSearch } from './ConversationSearch';
 import { cn } from '@/lib/utils';
 
 interface MessagingDrawerProps {
@@ -27,6 +28,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
     lastActiveConversation,
     conversations,
     setActiveConversation,
+    getOrCreateUserConversation,
+    getOrCreateRoomConversation,
     loadingConversations,
     isDrawerOpen,
     isMinimized,
@@ -37,14 +40,28 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   } = useMessaging();
   const { currentUserProfile, companyUsers } = useCompany();
 
+  // Local state for tracking conversation creation
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+
   const conversationToDisplay = activeConversation ?? lastActiveConversation;
 
-  // Auto-switch to conversation view when a conversation becomes active
+  // Auto-switch to conversation view only when a NEW conversation becomes active
+  const previousConversationIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (activeConversation && activeView !== 'conversation') {
+    const currentId = activeConversation?.id ?? null;
+    const previousId = previousConversationIdRef.current;
+
+    // Store the latest id for the next render
+    previousConversationIdRef.current = currentId;
+
+    // Only switch views when a different conversation becomes active
+    const conversationChanged = currentId && currentId !== previousId;
+
+    if (conversationChanged && activeView !== 'conversation') {
       setActiveView('conversation');
     }
-  }, [activeConversation, activeView, setActiveView]);
+  }, [activeConversation?.id, activeView, setActiveView]);
 
   // Only show if drawer is open
   if (!isDrawerOpen) {
@@ -72,6 +89,36 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   // Handle new message button
   const handleNewMessage = () => {
     setActiveView('search');
+  };
+
+  // Handle user selection from search - create DM conversation
+  const handleSelectUser = async (userId: string) => {
+    try {
+      setIsCreatingConversation(true);
+      const conversation = await getOrCreateUserConversation(userId);
+      setActiveConversation(conversation);
+      // View will auto-switch to 'conversation' via useEffect
+    } catch (error) {
+      console.error('Error creating user conversation:', error);
+      // TODO: Show error toast/notification
+    } finally {
+      setIsCreatingConversation(false);
+    }
+  };
+
+  // Handle room selection from search - create room conversation
+  const handleSelectRoom = async (roomId: string, roomName: string) => {
+    try {
+      setIsCreatingConversation(true);
+      const conversation = await getOrCreateRoomConversation(roomId, roomName);
+      setActiveConversation(conversation);
+      // View will auto-switch to 'conversation' via useEffect
+    } catch (error) {
+      console.error('Error creating room conversation:', error);
+      // TODO: Show error toast/notification
+    } finally {
+      setIsCreatingConversation(false);
+    }
   };
 
   // Determine drawer title based on view and active conversation
@@ -151,8 +198,21 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
                 size="icon"
                 className="h-6 w-6"
                 onClick={handleNewMessage}
+                title="New message"
               >
                 <Plus className="h-3 w-3" />
+              </Button>
+            )}
+            {/* Show list button when NOT in list view - allows user to always navigate to list */}
+            {activeView !== 'list' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handleBackToList}
+                title="View all conversations"
+              >
+                <List className="h-3 w-3" />
               </Button>
             )}
             <Button
@@ -160,6 +220,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               size="icon"
               className="h-6 w-6"
               onClick={toggleMinimize}
+              title="Minimize"
             >
               <Minimize2 className="h-3 w-3" />
             </Button>
@@ -168,6 +229,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               size="icon"
               className="h-6 w-6"
               onClick={handleClose}
+              title="Close"
             >
               <X className="h-3 w-3" />
             </Button>
@@ -193,11 +255,21 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
             />
           )}
 
-          {/* Search view - placeholder for now (will be implemented in 2.3.3) */}
+          {/* Search view - find users or rooms to start conversations */}
           {activeView === 'search' && (
-            <div className="p-4 text-center text-muted-foreground">
-              Search functionality coming soon...
-            </div>
+            <>
+              {isCreatingConversation ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  Creating conversation...
+                </div>
+              ) : (
+                <ConversationSearch
+                  onSelectUser={handleSelectUser}
+                  onSelectRoom={handleSelectRoom}
+                  currentUserId={currentUserProfile?.id}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>

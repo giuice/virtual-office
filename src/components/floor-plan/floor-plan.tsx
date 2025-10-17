@@ -1,7 +1,7 @@
 // components/floor-plan/floor-plan.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Space, User, RoomTemplate } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -13,7 +13,6 @@ import { RoomManagement } from './room-management'
 import { RoomTemplateSelector } from './room-template-selector';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RoomChatIntegration } from './room-chat-integration';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
@@ -23,6 +22,7 @@ import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
+import { useMessaging } from '@/contexts/messaging/MessagingContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -35,6 +35,7 @@ export function FloorPlan() {
   const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
   const router = useRouter(); // Add router for navigation
   const { usersInSpaces, updateLocation, users } = usePresence(); // Presence context for real-time user data
+  const { getOrCreateRoomConversation, setActiveConversation } = useMessaging();
   // State for UI interactions
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
@@ -45,7 +46,6 @@ export function FloorPlan() {
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
-  const [chatRoom, setChatRoom] = useState<Space | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   const [useModernUI, setUseModernUI] = useState(false);
@@ -112,11 +112,8 @@ export function FloorPlan() {
           title: "Success",
           description: "Room deleted successfully"
         });
-        // Clear selection and chat if the deleted room was selected/active
+        // Clear selection if the deleted room was selected/active
         setSelectedSpace(null);
-        if (chatRoom && chatRoom.id === roomId) {
-          setChatRoom(null);
-        }
       },
       onError: (error: Error) => {
         toast({
@@ -167,15 +164,33 @@ export function FloorPlan() {
   };
 
 
-  // Handle opening chat for a room
-  const handleOpenChat = (room: Space) => {
-    setChatRoom(room);
-  };
+  // Handle opening chat for a room via unified messaging drawer
+  const handleOpenChat = useCallback(async (room: Space) => {
+    if (!room?.id) {
+      toast({
+        title: 'Error',
+        description: 'Cannot open chat: invalid room data.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-  // Handle closing chat
-  const handleCloseChat = () => {
-    setChatRoom(null);
-  };
+    // Keep UI context aware of the selected space
+    setSelectedSpace(room);
+    setHighlightedSpaceId(room.id);
+
+    try {
+      const conversation = await getOrCreateRoomConversation(room.id, room.name);
+      setActiveConversation(conversation);
+    } catch (error) {
+      console.error('[FloorPlan] Failed to open room conversation:', error);
+      toast({
+        title: 'Unable to open chat',
+        description: 'We could not join the room conversation. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [getOrCreateRoomConversation, setActiveConversation, toast, setSelectedSpace, setHighlightedSpaceId]);
 
   useEffect(() => {
     // If there's a last space ID, try to select it
@@ -314,15 +329,15 @@ export function FloorPlan() {
           </Button>
 
           {selectedSpace && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => handleOpenChat(selectedSpace)}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Chat in Room
-            </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={() => void handleOpenChat(selectedSpace)}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Chat in Room
+          </Button>
           )}
         </div>
       </div>
@@ -338,7 +353,7 @@ export function FloorPlan() {
                 <ModernFloorPlan
                   spaces={filteredSpaces || []}
                   onSpaceSelect={handleSpaceSelect}
-                  onSpaceDoubleClick={(space) => handleOpenChat(space)}
+                  onSpaceDoubleClick={(space) => void handleOpenChat(space)}
                   highlightedSpaceId={highlightedSpaceId}
                 />
               
@@ -377,7 +392,7 @@ export function FloorPlan() {
         onDeleteRoom={handleDeleteRoom} // Pass updated handler
         onDuplicateRoom={handleDuplicateRoom} // Pass updated handler
         onOpenChat={(room: Space) => { // Expect global Space
-          handleOpenChat(room);
+          void handleOpenChat(room);
           setIsRoomManagementOpen(false);
         }}
         open={isRoomManagementOpen}
@@ -410,11 +425,6 @@ export function FloorPlan() {
       </Dialog>
 
       {/* Room Chat Integration */}
-      <RoomChatIntegration
-        selectedRoom={chatRoom}
-        onCloseChat={handleCloseChat}
-        position="right"
-      />
     </div>
   )
 }

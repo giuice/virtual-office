@@ -3,11 +3,21 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { debounce } from 'lodash';
 import { supabase } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { UserPresenceData } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PRESENCE_QUERY_KEY = ['user-presence'];
+const PRESENCE_CHANNEL_NAME = 'user-presence-channel';
 type ConnectionStatus = 'idle' | 'subscribing' | 'subscribed' | 'error' | 'timed_out' | 'closed';
+
+type PresencePayload = {
+  user_id?: string;
+  status?: string;
+  current_space_id?: string | null;
+  last_seen_at?: string;
+  [key: string]: unknown;
+};
 
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
@@ -19,13 +29,15 @@ export function useUserPresence(currentUserId?: string) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [updateInProgress, setUpdateInProgress] = useState(false);
   const initializationGuard = useRef(false);
-  const subscriptionRef = useRef<any>(null);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const lastPresencePayloadRef = useRef<string | null>(null);
   const lastUpdateRef = useRef<string | null>(null);
+  const [presenceState, setPresenceState] = useState<Record<string, PresencePayload[]>>({});
   const { user: authUser } = useAuth();
   // Prefer user_metadata.avatar_url (Google) then direct photoURL
   const currentUserPhotoUrl = (authUser as any)?.user_metadata?.avatar_url || (authUser as any)?.photoURL || '';
 
-  const { data: users, isLoading, error } = useQuery<UserPresenceData[]>({
+  const { data: rawUsers, isLoading, error } = useQuery<UserPresenceData[]>({
     queryKey: PRESENCE_QUERY_KEY,
     queryFn: async () => {
       console.log('[Presence] Fetching user presence data with avatar info');
@@ -98,8 +110,79 @@ export function useUserPresence(currentUserId?: string) {
   });
 
   const currentUser = useMemo(() => {
-    return users?.find((u) => u.id === currentUserId) ?? null;
-  }, [users, currentUserId]);
+    return rawUsers?.find((u) => u.id === currentUserId) ?? null;
+  }, [rawUsers, currentUserId]);
+
+  const onlineUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.entries(presenceState).forEach(([key, presences]) => {
+      if (!Array.isArray(presences)) return;
+      presences.forEach((presence) => {
+        const id = (presence?.user_id ?? key) as string | undefined;
+        if (id) {
+          ids.add(String(id));
+        }
+      });
+    });
+    return ids;
+  }, [presenceState]);
+
+  const presenceAwareUsers = useMemo(() => {
+    if (!rawUsers) return undefined;
+
+    return rawUsers.map((user) => {
+      const isOnline = onlineUserIds.has(user.id);
+      let derivedStatus = user.status ?? 'offline';
+
+      if (isOnline) {
+        if (!user.status || user.status === 'offline') {
+          derivedStatus = 'online';
+        }
+      } else {
+        if (!user.status || user.status === 'online') {
+          derivedStatus = 'offline';
+        } else if (user.status === 'away' || user.status === 'busy') {
+          derivedStatus = 'offline';
+        }
+      }
+
+      return {
+        ...user,
+        status: derivedStatus,
+        isOnline,
+      };
+    });
+  }, [rawUsers, onlineUserIds]);
+
+  const snapshotPresenceState = useCallback((channel: RealtimeChannel) => {
+    const state = channel.presenceState() as Record<string, PresencePayload[]>;
+    const clone: Record<string, PresencePayload[]> = {};
+
+    Object.entries(state).forEach(([key, presences]) => {
+      clone[key] = Array.isArray(presences)
+        ? presences.map((presence) => ({ ...presence }))
+        : [];
+    });
+
+    setPresenceState(clone);
+  }, []);
+
+  const computePresenceSignature = useCallback((payload: PresencePayload | null) => {
+    if (!payload) return null;
+    const { last_seen_at, ...rest } = payload;
+    return JSON.stringify(rest);
+  }, []);
+
+  const buildPresencePayload = useCallback((): PresencePayload | null => {
+    if (!currentUserId) return null;
+
+    return {
+      user_id: currentUserId,
+      status: currentUser?.status ?? 'online',
+      current_space_id: currentUser?.currentSpaceId ?? null,
+      last_seen_at: new Date().toISOString(),
+    };
+  }, [currentUserId, currentUser?.status, currentUser?.currentSpaceId]);
 
   const debouncedUpdateLocation = useMemo(() =>
     debounce(async (spaceId: string | null) => {
@@ -198,7 +281,8 @@ export function useUserPresence(currentUserId?: string) {
     } finally {
       setUpdateInProgress(false);
     }
-  
+  }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient]);
+
   const updateLocation = async (spaceId: string | null) => {
     if (!currentUserId) {
       console.error("[Presence] Cannot update location: currentUserId is missing in updateLocation call.");
@@ -207,7 +291,7 @@ export function useUserPresence(currentUserId?: string) {
       console.warn("[Presence] Debug info: Make sure PresenceProvider has access to the current user ID");
       console.warn("[Presence] Current state:", {
         currentUserId,
-        usersCount: users?.length || 0,
+        usersCount: presenceAwareUsers?.length || 0,
         currentUser: currentUser ? { id: currentUser.id, name: currentUser.displayName } : null
       });
       
@@ -217,29 +301,50 @@ export function useUserPresence(currentUserId?: string) {
     return debouncedUpdateLocation(spaceId);
   };
 
-  }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient]);
-
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
-    (users ?? []).forEach((user) => {
+    (presenceAwareUsers ?? []).forEach((user) => {
       const key = user.currentSpaceId ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(user);
     });
     return map;
-  }, [users]);
+  }, [presenceAwareUsers]);
 
   useEffect(() => {
-    // Prevent multiple initializations
-    if (initializationGuard.current || isInitialized) {
-      console.log('[Presence] Already initialized, skipping subscription setup');
+    if (!currentUserId) return;
+    if (connectionStatus !== 'subscribed') return;
+
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
+
+    const payload = buildPresencePayload();
+    const signature = computePresenceSignature(payload);
+
+    if (!payload || !signature) return;
+    if (lastPresencePayloadRef.current === signature) {
+      return;
+    }
+
+    lastPresencePayloadRef.current = signature;
+
+    channel.track(payload).catch((error) => {
+      console.error('[Presence] Error updating presence payload:', error);
+    });
+  }, [currentUserId, connectionStatus, buildPresencePayload, computePresenceSignature]);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      return;
+    }
+
+    if (initializationGuard.current) {
       return;
     }
 
     initializationGuard.current = true;
     setConnectionStatus('subscribing');
-    
-    // Helper to map DB row (snake_case) to UserPresenceData
+
     const mapDbRowToPresence = (row: any): UserPresenceData => ({
       id: row.id,
       displayName: row.display_name ?? row.displayName ?? 'Unknown User',
@@ -251,8 +356,20 @@ export function useUserPresence(currentUserId?: string) {
       avatarError: false,
     });
 
-    const channel = supabase
-      .channel('user-presence-channel')
+    const channel = supabase.channel(PRESENCE_CHANNEL_NAME, {
+      config: {
+        presence: {
+          key: currentUserId,
+        },
+      },
+    });
+
+    const handlePresenceSnapshot = () => snapshotPresenceState(channel);
+
+    channel
+      .on('presence', { event: 'sync' }, handlePresenceSnapshot)
+      .on('presence', { event: 'join' }, handlePresenceSnapshot)
+      .on('presence', { event: 'leave' }, handlePresenceSnapshot)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users' },
@@ -267,11 +384,10 @@ export function useUserPresence(currentUserId?: string) {
               return old.filter((u) => u.id !== String(oldRow.id));
             }
 
-            if (!payload.new) return old; // Nothing to apply
+            if (!payload.new) return old;
             const newUser = mapDbRowToPresence(payload.new);
             const existing = old.find((u) => u.id === newUser.id);
 
-            // Skip if nothing meaningful changed
             if (
               existing &&
               existing.currentSpaceId === newUser.currentSpaceId &&
@@ -296,66 +412,83 @@ export function useUserPresence(currentUserId?: string) {
             return old;
           });
         }
-      )
-      .subscribe((status, err) => {
-        if (err) {
-          console.error('[Presence] Supabase subscription error:', err);
-          setConnectionStatus('error');
-          initializationGuard.current = false; // Allow retry on error
-        } else {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[Presence] Supabase subscription status: ${status}`);
+      );
+
+    presenceChannelRef.current = channel;
+
+    channel.subscribe(async (status, err) => {
+      if (err) {
+        console.error('[Presence] Supabase subscription error:', err);
+        setConnectionStatus('error');
+        initializationGuard.current = false;
+        return;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Presence] Supabase subscription status: ${status}`);
+      }
+
+      switch (status) {
+        case 'SUBSCRIBED': {
+          setConnectionStatus('subscribed');
+          setIsInitialized(true);
+          handlePresenceSnapshot();
+
+          const payload = buildPresencePayload();
+          const signature = computePresenceSignature(payload);
+
+          if (payload && signature) {
+            lastPresencePayloadRef.current = signature;
+            try {
+              await channel.track(payload);
+            } catch (trackError) {
+              console.error('[Presence] Failed to track presence payload:', trackError);
+            }
           }
-          switch (status) {
-            case 'SUBSCRIBED':
-              setConnectionStatus('subscribed');
-              setIsInitialized(true);
-              break;
-            case 'TIMED_OUT':
-              setConnectionStatus('timed_out');
-              console.warn(`[Presence] Subscription timed out. Supabase client may attempt reconnection.`);
-              initializationGuard.current = false; // Allow retry
-              break;
-            case 'CHANNEL_ERROR':
-              setConnectionStatus('error');
-              console.error(`[Presence] Channel error occurred.`);
-              initializationGuard.current = false; // Allow retry
-              break;
-            case 'CLOSED':
-              setConnectionStatus('closed');
-              // Do not flip isInitialized here to avoid effect re-run and cleanup loop
-              initializationGuard.current = false;
-              break;
-            default:
-              break;
-          }
+          break;
         }
-      });
+        case 'TIMED_OUT':
+          setConnectionStatus('timed_out');
+          console.warn('[Presence] Subscription timed out. Supabase client may attempt reconnection.');
+          initializationGuard.current = false;
+          break;
+        case 'CHANNEL_ERROR':
+          setConnectionStatus('error');
+          console.error('[Presence] Channel error occurred.');
+          initializationGuard.current = false;
+          break;
+        case 'CLOSED':
+          setConnectionStatus('closed');
+          initializationGuard.current = false;
+          break;
+        default:
+          break;
+      }
+    });
 
-    // Store subscription reference for cleanup
-    subscriptionRef.current = channel;
-
-    // Log initial subscription attempt
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Presence] Attempting to subscribe to Supabase presence channel.');
+      console.log(`[Presence] Attempting to subscribe to Supabase presence channel as ${currentUserId}`);
     }
 
     return () => {
       if (process.env.NODE_ENV === 'development') {
         console.log('[Presence] Unsubscribing from Supabase presence channel.');
       }
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current).catch(error => {
-          console.error('[Presence] Error removing Supabase channel:', error);
-        });
-        subscriptionRef.current = null;
-      }
+
+      setPresenceState({});
+      presenceChannelRef.current = null;
+      initializationGuard.current = false;
+      setIsInitialized(false);
+      lastPresencePayloadRef.current = null;
+
+      supabase.removeChannel(channel).catch((error) => {
+        console.error('[Presence] Error removing Supabase channel:', error);
+      });
     };
-  // Only depend on stable queryClient to avoid re-subscribe loops
-  }, [queryClient]);
+  }, [currentUserId, queryClient, snapshotPresenceState, buildPresencePayload, computePresenceSignature]);
 
   return {
-    users,
+    users: presenceAwareUsers,
     usersInSpaces,
     isLoading,
     error,
