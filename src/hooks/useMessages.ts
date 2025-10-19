@@ -29,6 +29,21 @@ const createTraceId = (prefix: string): string => {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 
+const dedupeMessages = (messages: Message[]): Message[] => {
+  const seen = new Set<string>();
+  const result: Message[] = [];
+
+  for (const message of messages) {
+    if (seen.has(message.id)) {
+      continue;
+    }
+    seen.add(message.id);
+    result.push(message);
+  }
+
+  return result;
+};
+
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
@@ -245,7 +260,9 @@ export function useMessages(activeConversationId: string | null) {
             if (!oldData || !oldData.pages) return oldData;
             const updatedPages = oldData.pages.map((page) => ({
               ...page,
-              messages: page.messages.map((m) => (m.id === optimisticMessage.id ? savedMessage : m)),
+              messages: dedupeMessages(
+                page.messages.map((m) => (m.id === optimisticMessage.id ? savedMessage : m))
+              ),
             }));
             return { ...oldData, pages: updatedPages };
           }

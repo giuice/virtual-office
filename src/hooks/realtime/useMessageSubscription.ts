@@ -1,7 +1,7 @@
 // src/hooks/realtime/useMessageSubscription.ts
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
@@ -47,6 +47,42 @@ const mapRowToMessage = (row: any): Message => ({
   isEdited: Boolean(row.is_edited),
 });
 
+const isOptimisticMatch = (existing: Message, incoming: Message) => {
+  if (!existing.id.startsWith('temp-')) {
+    return false;
+  }
+  if (existing.senderId !== incoming.senderId) {
+    return false;
+  }
+  if (existing.content !== incoming.content) {
+    return false;
+  }
+
+  const existingTime = existing.timestamp instanceof Date
+    ? existing.timestamp.getTime()
+    : new Date(existing.timestamp).getTime();
+  const incomingTime = incoming.timestamp instanceof Date
+    ? incoming.timestamp.getTime()
+    : new Date(incoming.timestamp).getTime();
+
+  return Number.isFinite(existingTime) && Number.isFinite(incomingTime) && Math.abs(existingTime - incomingTime) <= 1000;
+};
+
+const dedupeMessages = (messages: Message[]): Message[] => {
+  const seen = new Set<string>();
+  const result: Message[] = [];
+
+  for (const msg of messages) {
+    if (seen.has(msg.id)) {
+      continue;
+    }
+    seen.add(msg.id);
+    result.push(msg);
+  }
+
+  return result;
+};
+
 const appendMessageToCache = (queryClient: QueryClient, message: Message) => {
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', message.conversationId],
@@ -55,16 +91,27 @@ const appendMessageToCache = (queryClient: QueryClient, message: Message) => {
         return { pages: [{ messages: [message] }], pageParams: [undefined] };
       }
 
-      const exists = oldData.pages.some((page) =>
-        page.messages.some((existing) => existing.id === message.id)
-      );
-      if (exists) return oldData;
-
       const pages = [...oldData.pages];
       const lastIndex = pages.length - 1;
+      const lastPage = pages[lastIndex];
+      const messages = [...lastPage.messages];
+
+      const optimisticIndex = messages.findIndex((existing) => isOptimisticMatch(existing, message));
+
+      if (optimisticIndex >= 0) {
+        messages[optimisticIndex] = message;
+      } else {
+        const exists = messages.some((existing) => existing.id === message.id);
+        if (exists) {
+          return oldData;
+        }
+
+        messages.push(message);
+      }
+
       pages[lastIndex] = {
-        ...pages[lastIndex],
-        messages: [...pages[lastIndex].messages, message],
+        ...lastPage,
+        messages: dedupeMessages(messages),
       };
 
       return { ...oldData, pages };
@@ -123,15 +170,26 @@ export function useMessageSubscription(
   options?: UseMessageSubscriptionOptions
 ) {
   const isActive = options?.isActive ?? true;
-  const onInsert = options?.onInsert;
   const ignoreSenderId = options?.ignoreSenderId;
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<string | null>(null);
 
-  const ids = useMemo(() => {
-    if (!conversationIds) return [];
-    return Array.isArray(conversationIds) ? conversationIds.filter(Boolean) : [conversationIds];
+  const onInsertRef = useRef(options?.onInsert);
+
+  useEffect(() => {
+    onInsertRef.current = options?.onInsert;
+  }, [options?.onInsert]);
+
+  const stableIds = useMemo(() => {
+    if (!conversationIds) return [] as string[];
+    const raw = Array.isArray(conversationIds) ? conversationIds : [conversationIds];
+    const filtered = raw.filter(Boolean) as string[];
+    const unique = Array.from(new Set(filtered));
+    unique.sort();
+    return unique;
   }, [conversationIds]);
+
+  const subscriptionKey = useMemo(() => stableIds.join('|'), [stableIds]);
 
   useEffect(() => {
     if (!isActive) {
@@ -139,6 +197,7 @@ export function useMessageSubscription(
       return;
     }
 
+    const ids = stableIds;
     const featureFlagEnabled = messagingFeatureFlags.isV2Enabled();
     let isMounted = true;
     const teardownFns: Array<() => void> = [];
@@ -241,7 +300,10 @@ export function useMessageSubscription(
         return;
       }
 
-      onInsert?.(message);
+      const callback = onInsertRef.current;
+      if (callback) {
+        callback(message);
+      }
     };
 
     const handleConversationChange =
@@ -253,8 +315,11 @@ export function useMessageSubscription(
           const message = mapRowToMessage(payload.new);
           appendMessageToCache(queryClient, message);
 
+          const callback = onInsertRef.current;
           if (!ignoreSenderId || message.senderId !== ignoreSenderId) {
-            onInsert?.(message);
+            if (callback) {
+              callback(message);
+            }
           }
           return;
         }
@@ -300,7 +365,7 @@ export function useMessageSubscription(
       teardownFns.forEach((teardown) => teardown());
       setStatus(null);
     };
-  }, [ids, ignoreSenderId, isActive, onInsert, queryClient]);
+  }, [subscriptionKey, ignoreSenderId, isActive, queryClient]);
 
   return { status };
 }

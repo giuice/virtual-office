@@ -4,6 +4,7 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
+  Message,
   MessageType,
   FileAttachment,
 } from '@/types/messaging';
@@ -179,13 +180,6 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
-  // Subscribe to realtime for the active conversation and expose status
-  const { status: directConversationStatus } = useMessageSubscription(
-    activeConversation?.id || null,
-    {
-      isActive: Boolean(activeConversation?.id) && !isMessagingV2Enabled,
-    }
-  );
 
   
   // Robust: ensure opening a conversation for a received message with retries
@@ -266,25 +260,37 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeConversation?.id, conversationsManager, currentUserProfile?.id, refreshConversations, setActiveConversation]);
 
-  const conversationIds = useMemo(
-    () => conversationsManager.conversations.map((c) => c.id).filter(Boolean),
-    [conversationsManager.conversations]
+  const conversationIds = useMemo(() => {
+    const ids = conversationsManager.conversations.map((c) => c.id).filter(Boolean) as string[];
+    ids.sort();
+    return ids;
+  }, [conversationsManager.conversations]);
+
+  const shouldSubscribeToAll = conversationIds.length > 0;
+
+  const handleConversationInsert = useCallback((message: Message) => {
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('MessagingContext', 'onInsert:conversation', {
+        conversationId: message.conversationId,
+        senderId: message.senderId,
+      });
+    }
+    void ensureOpenForMessage({ conversationId: message.conversationId, senderId: message.senderId });
+  }, [ensureOpenForMessage]);
+
+  const { status: focusedConversationStatus } = useMessageSubscription(
+    activeConversation?.id || null,
+    {
+      isActive: Boolean(activeConversation?.id) && !shouldSubscribeToAll,
+    }
   );
 
-  const { status: multiConversationStatus } = useMessageSubscription(
-    isMessagingV2Enabled ? conversationIds : null,
+  const { status: allConversationStatus } = useMessageSubscription(
+    shouldSubscribeToAll ? conversationIds : null,
     {
-      isActive: isMessagingV2Enabled && conversationIds.length > 0,
+      isActive: shouldSubscribeToAll,
       ignoreSenderId: currentUserProfile?.id,
-      onInsert: (message) => {
-        if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.event('MessagingContext', 'onInsert:conversation', {
-            conversationId: message.conversationId,
-            senderId: message.senderId,
-          });
-        }
-        void ensureOpenForMessage({ conversationId: message.conversationId, senderId: message.senderId });
-      },
+      onInsert: handleConversationInsert,
     }
   );
   
@@ -345,7 +351,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
     // Realtime
-    connectionStatus: multiConversationStatus ?? directConversationStatus,
+    connectionStatus: allConversationStatus ?? focusedConversationStatus,
     isMessagingV2Enabled,
   };
   

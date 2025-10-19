@@ -23,6 +23,7 @@ import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
+import { ConversationType } from '@/types/messaging';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -35,7 +36,12 @@ export function FloorPlan() {
   const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
   const router = useRouter(); // Add router for navigation
   const { usersInSpaces, updateLocation, users } = usePresence(); // Presence context for real-time user data
-  const { getOrCreateRoomConversation, setActiveConversation } = useMessaging();
+  const {
+    getOrCreateRoomConversation,
+    setActiveConversation,
+    activeConversation,
+    setActiveView,
+  } = useMessaging();
   // State for UI interactions
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
@@ -179,9 +185,18 @@ export function FloorPlan() {
     setSelectedSpace(room);
     setHighlightedSpaceId(room.id);
 
+    if (
+      activeConversation?.type === ConversationType.ROOM &&
+      activeConversation.roomId === room.id
+    ) {
+      setActiveView('conversation');
+      return;
+    }
+
     try {
       const conversation = await getOrCreateRoomConversation(room.id, room.name);
       setActiveConversation(conversation);
+      setActiveView('conversation');
     } catch (error) {
       console.error('[FloorPlan] Failed to open room conversation:', error);
       toast({
@@ -190,7 +205,16 @@ export function FloorPlan() {
         variant: 'destructive',
       });
     }
-  }, [getOrCreateRoomConversation, setActiveConversation, toast, setSelectedSpace, setHighlightedSpaceId]);
+  }, [
+    activeConversation?.roomId,
+    activeConversation?.type,
+    getOrCreateRoomConversation,
+    setActiveConversation,
+    setActiveView,
+    toast,
+    setSelectedSpace,
+    setHighlightedSpaceId,
+  ]);
 
   useEffect(() => {
     // If there's a last space ID, try to select it
@@ -353,6 +377,7 @@ export function FloorPlan() {
                 <ModernFloorPlan
                   spaces={filteredSpaces || []}
                   onSpaceSelect={handleSpaceSelect}
+                  onOpenChat={handleOpenChat}
                   onSpaceDoubleClick={(space) => void handleOpenChat(space)}
                   highlightedSpaceId={highlightedSpaceId}
                 />
