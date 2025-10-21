@@ -22,6 +22,7 @@ const DRAWER_STORAGE_KEYS = {
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
+export { MessagingContext };
 
 // Provider component
 export function MessagingProvider({ children }: { children: React.ReactNode }) {

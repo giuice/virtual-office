@@ -137,6 +137,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           'flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent w-full',
           isSelected ? 'bg-accent' : ''
         )}
+        data-testid={`conversation-item-${conv.id}`}
+        data-conversation-section={isPinned ? 'pinned' : conv.type === ConversationType.DIRECT ? 'direct' : 'room'}
       >
         {/* Avatar or icon */}
         <div className="relative flex-shrink-0" data-avatar-interactive>
@@ -210,7 +212,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       <div className="flex flex-col gap-1 p-2">
         {/* Pinned conversations section */}
         {groupedConversations.pinned.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-2" data-testid="conversation-section-pinned">
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Pin className="h-3 w-3" />
               Pinned
@@ -223,7 +225,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
         {/* Direct messages section */}
         {groupedConversations.direct.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-2" data-testid="conversation-section-direct">
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <MessageSquare className="h-3 w-3" />
               Direct Messages
@@ -236,7 +238,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
         {/* Rooms section */}
         {groupedConversations.rooms.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-2" data-testid="conversation-section-rooms">
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Hash className="h-3 w-3" />
               Rooms

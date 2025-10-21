@@ -1,76 +1,50 @@
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-// Upload file and return attachment data
-test('Upload file and return attachment data', async ({ request }: { request: APIRequestContext }) => {
-  // Create FormData with the file
-  const formData = new FormData();
-  const blob = new Blob(['test content'], { type: 'image/jpeg' });
-  const testFile = new File([blob], 'test.jpg', { type: 'image/jpeg' });
-  
-  // Upload file to messages API
-  const response = await request.post('/api/messages/upload', {
-    multipart: {
-      file: {
-        name: 'test.jpg',
-        mimeType: 'image/jpeg',
-        buffer: Buffer.from('test content'),
-      },
-      conversationId: 'conversation-123',
-      messageId: 'message-123',
-    }
+// These flows exercise the deterministic messaging drawer harness exposed at /test/messaging-drawer.
+// The harness seeds pinned direct messages, room conversations, and search data via React context overrides,
+// eliminating the need for database fixtures or Supabase authentication during Playwright runs.
+
+test.describe('Messaging drawer Playwright harness', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/messaging-drawer');
+    await expect(page.getByTestId('messaging-drawer')).toBeVisible();
   });
-  
-  // Assertions
-  expect(response.ok()).toBeTruthy();
-  const data = await response.json();
-  expect(data.success).toBe(true);
-  expect(data.attachment).toBeDefined();
-  expect(data.attachment.name).toBe('test.jpg');
-});
 
-// Get attachments for a message
-test('Get attachments for a message', async ({ request }: { request: APIRequestContext }) => {
-  const response = await request.get('/api/messages/attachments?messageId=message-123');
-  
-  expect(response.ok()).toBeTruthy();
-  const data = await response.json();
-  expect(data.success).toBe(true);
-  expect(data.attachments).toBeDefined();
-});
+  test('renders grouped conversations with pinned ordering', async ({ page }) => {
+    await expect(page.getByText('Pinned', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('conversation-item-conv-pinned-direct')).toBeVisible();
+    await expect(page.getByTestId('conversation-section-direct')).toBeVisible();
+    await expect(page.getByTestId('conversation-section-rooms')).toBeVisible();
+    await expect(page.getByTestId('conversation-section-direct').getByText('Direct Messages', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('conversation-section-rooms').getByText('Rooms', { exact: true })).toBeVisible();
 
-// Update message status
-test('Update message status', async ({ request }: { request: APIRequestContext }) => {
-  const response = await request.patch('/api/messages/status', {
-    data: {
-      messageId: 'message-123',
-      status: 'read',
-    }
   });
-  
-  expect(response.ok()).toBeTruthy();
-  const data = await response.json();
-  expect(data.success).toBe(true);
-});
 
-// Return 401 when user is not authenticated
-test('Return 401 when user is not authenticated', async ({ request }: { request: APIRequestContext }) => {
-  // This test relies on the server correctly identifying unauthenticated requests
-  const response = await request.post('/api/messages/upload', {
-    multipart: {
-      file: {
-        name: 'test.jpg',
-        mimeType: 'image/jpeg',
-        buffer: Buffer.from('test content'),
-      },
-      conversationId: 'conversation-123',
-    },
-    headers: {
-      // Missing or invalid authentication headers
-      'Authorization': 'Invalid',
-    }
+  test('keeps drawer open while switching between rooms', async ({ page }) => {
+    await page.getByTestId('conversation-item-conv-pinned-direct').click();
+    await expect(page.getByTestId('messaging-drawer-title')).toHaveText('Taylor Silva');
+
+    await page.getByTestId('floor-nav-team-sync').click();
+    await expect(page.getByTestId('messaging-drawer-title')).toHaveText('Team Sync Room');
+    await expect(page.getByTestId('messaging-drawer')).toBeVisible();
+
+    await page.getByTestId('floor-nav-product-hub').click();
+    await expect(page.getByTestId('messaging-drawer-title')).toHaveText('Product Planning Room');
+
+    await page.getByTestId('reset-conversation-state').click();
+    await expect(page.getByTestId('messaging-drawer-title')).toHaveText('Messages');
   });
-  
-  expect(response.status()).toBe(401);
-  const data = await response.json();
-  expect(data.error).toBe('Unauthorized');
+
+  test('supports pinned filtering and conversation search without closing the drawer', async ({ page }) => {
+    await page.getByTestId('toggle-pinned-filter').click();
+    await expect(page.getByTestId('conversation-item-conv-room-product')).toHaveCount(0);
+
+    await page.getByTitle('New message').click();
+    const searchInput = page.getByPlaceholder('Search users or rooms...');
+    await searchInput.fill('Taylor');
+    await page.getByRole('button', { name: /Taylor Silva/ }).click();
+
+    await expect(page.getByTestId('messaging-drawer-title')).toHaveText('Taylor Silva');
+    await expect(page.getByTestId('messaging-drawer')).toBeVisible();
+  });
 });

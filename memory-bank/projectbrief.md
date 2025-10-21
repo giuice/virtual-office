@@ -22,10 +22,14 @@ The database is crucial for supporting real-time features, user management, spac
   - **`users`**: Manages user profiles (`id`, `firebase_uid` (legacy/optional), `company_id`, `email`, `display_name`, `avatar_url`, `status`, `preferences`, `role`, `last_active`).
   - **`spaces`**: Tracks virtual spaces/rooms (`id`, `company_id`, `name`, `type`, `status`, `capacity`, `features`, `position`, `user_ids`, `description`, `access_control`, `created_by`, `is_template`).
   - **`space_reservations`**: Manages booking of spaces (`id`, `space_id`, `user_id`, `start_time`, `end_time`, `purpose`).
-  - **`conversations`**: Represents chat threads (`id`, `type`, `participants`, `last_activity`, `name`, `is_archived`, `unread_count`, `room_id`).
+  - **`conversations`**: Represents chat threads (`id`, `type`, `participants`, `last_activity`, `name`, `is_archived` (deprecated), `unread_count`, `room_id`, `visibility`, `participants_fingerprint`).
+  - **`conversation_preferences`**: Per-user conversation settings (`id`, `conversation_id`, `user_id`, `is_pinned`, `pinned_order`, `is_starred`, `is_archived`, `notifications_enabled`, `created_at`, `updated_at`).
   - **`messages`**: Stores chat messages (`id`, `conversation_id`, `sender_id`, `content`, `timestamp`, `type`, `status`, `reply_to_id`, `is_edited`).
-  - **`message_attachments`**: Stores message file attachments (`id`, `message_id`, `name`, `type`, `size`, `url`).
+  - **`message_attachments`**: Stores message file attachments (`id`, `message_id`, `name`, `type`, `size`, `url`, `duration`, `waveform_data`, `transcription`).
   - **`message_reactions`**: Tracks reactions to messages (`id`, `message_id`, `user_id`, `emoji`).
+  - **`message_read_receipts`**: Tracks message read status per user (`id`, `message_id`, `user_id`, `read_at`).
+  - **`message_pins`**: User-specific pinned messages (`id`, `message_id`, `user_id`, `pinned_at`).
+  - **`message_stars`**: User-specific starred/bookmarked messages (`id`, `message_id`, `user_id`, `starred_at`).
   - **`announcements`**: Holds company-wide posts (`id`, `company_id`, `title`, `content`, `posted_by`, `timestamp`, `expiration`, `priority`).
   - **`meeting_notes`**: Archives meeting details (`id`, `room_id`, `title`, `meeting_date`, `transcript`, `summary`, `generated_by`, `edited_by`).
   - **`meeting_note_action_items`**: Tracks tasks from meetings (`id`, `note_id`, `description`, `assignee_id`, `due_date`, `completed`).
@@ -86,14 +90,20 @@ The database is crucial for supporting real-time features, user management, spac
 - **Real-Time Communication**
   - Text-based chat within spaces and direct messages.
   - Message threads and replies.
-  - Message reactions.
-  - File attachments.
+  - Message reactions with emoji support.
+  - File attachments including voice notes with metadata (duration, waveform, transcription).
+  - Read receipts and message status tracking.
+  - Per-user message pinning and starring.
+  - Per-user conversation preferences (pin/star/archive/notifications).
+  - Grouped conversation views (DMs vs. rooms).
+  - DM deduplication via participant fingerprinting.
   - Real-time updates via Supabase Realtime / Socket.IO.
 - **User Profiles**
   - Profile display with avatar, name, status.
   - Status indicators (online, away, etc.).
 
 ### In Progress / Planned Features
+- **Unified Messaging System:** (In Progress) Enhanced messaging with unified drawer UX, per-user preferences, message pins/stars, read receipts, voice notes, offline reliability.
 - **Meeting Notes System:** (In Progress) AI-generated notes, summaries, action items.
 - **Announcement System:** (In Progress) Company-wide announcements with priority.
 - **Enhanced Communication Tools:** (Planned) Video conferencing, screen sharing, virtual whiteboard.
@@ -171,9 +181,31 @@ The database is crucial for supporting real-time features, user management, spac
 - **Focus:** Build interactive canvas, implement space CRUD, reservations, real-time occupancy.
 - **Status:** Done.
 
-### Epic 4: Real-Time Messaging System (Completed)
+### Epic 4: Real-Time Messaging System (Completed - Enhancements In Progress)
 - **Focus:** Implement chat, threads, reactions, attachments using Supabase Realtime / Socket.IO.
-- **Status:** Done.
+- **Status:** Core features complete. Unified messaging system enhancements in progress (see Epic 4.1).
+
+### Epic 4.1: Unified Messaging System Enhancements (In Progress)
+- **Focus:** Enhance messaging with per-user preferences, unified drawer UX, advanced features.
+- **Status:** In Progress (Tasks 1.1-1.4 complete, Tasks 2.0-5.0 in progress).
+- **User Stories:**
+  - As a user, I want to pin/star conversations for quick access.
+  - As a user, I want to archive conversations without affecting others.
+  - As a user, I want to see DMs and rooms grouped separately.
+  - As a user, I want to pin/star individual messages for reference.
+  - As a user, I want read receipts to know when my messages are seen.
+  - As a user, I want to send voice notes with visual waveforms.
+  - As a user, I want reliable messaging even when offline.
+- **Completed Tasks:**
+  - Task 1.1: Audit messaging gaps (types, repositories, schema)
+  - Task 1.2: Extend conversation repository for grouped queries and preferences
+  - Task 1.3: Update conversation API routes for per-user preferences
+  - Task 1.4: Extend message repository for pins/stars/read receipts
+- **In Progress Tasks:**
+  - Task 2.0: Unified drawer UX and conversation surfacing
+  - Task 3.0: Timeline and composer feature parity
+  - Task 4.0: Realtime resilience and offline reliability
+  - Task 5.0: Analytics, notifications, and observability
 
 ### Epic 5: Meeting Notes System (In Progress)
 - **Focus:** Develop meeting note creation, editing, AI summaries, action items.
@@ -246,7 +278,19 @@ The database is crucial for supporting real-time features, user management, spac
 
 ### Current/Upcoming Sprints (Example Focus)
 
-#### Sprint Y: Meeting Notes & Announcements (Current Focus)
+#### Sprint Y: Unified Messaging System Enhancements (Current Focus)
+- **Focus:** Epic 4.1
+- **Sample Tasks:**
+  - Complete unified messaging drawer with grouped conversations.
+  - Implement per-user conversation preferences (pin/star/archive).
+  - Add message pins and stars with UI affordances.
+  - Implement read receipts and status tracking.
+  - Add voice note support with waveform visualization.
+  - Enhance realtime resilience with offline queue and retry logic.
+  - Add messaging analytics and notification improvements.
+  - Expand test coverage for new messaging features.
+
+#### Sprint Y+1: Meeting Notes & Announcements
 - **Focus:** Epics 5 & 6
 - **Sample Tasks:**
   - Complete Meeting Notes UI and basic functionality.

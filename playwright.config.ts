@@ -29,15 +29,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  /* Run local development server before starting the tests - commented out for now */
-  /* 
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
-    timeout: 120000, // 2 minutes
+    timeout: 180000,
   },
-  */
 });

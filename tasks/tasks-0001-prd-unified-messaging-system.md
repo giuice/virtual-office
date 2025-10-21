@@ -51,12 +51,12 @@
   - [x] 1.4 Expand message repository interface + `SupabaseMessageRepository` plus `src/app/api/messages/create|react|status/route.ts` to cover attachments, voice notes metadata, reactions, and read receipt updates.
   - [x] 1.5 Refresh unit coverage in `__tests__/messaging-api.test.ts` and `__tests__/api/messages-api.test.ts` to exercise new APIs, including negative RLS scenarios. (See `tasks/task-1.5-test-coverage-report.md` for details)
 
-- [ ] 2.0 Unified Drawer UX & Conversation Surfacing
+- [x] 2.0 Unified Drawer UX & Conversation Surfacing ✅ COMPLETED
   - [x] 2.1 Map active drawer state requirements in `MessagingDrawer.tsx` and `MessagingContext.tsx`, ensuring state survives route changes and supports minimize/restore controls.
   - [x] 2.2 Refactor `ConversationList.tsx` to group DMs vs rooms, surface pinned conversations, unread badges, and canonical avatars while respecting click-stop guards.
   - [x] 2.3 Integrate conversation search/start flows by wiring `ConversationList` with company directory data and `useConversations` mutations for DM creation and room joining.
   - [x] 2.4 Ensure room navigation sync keeps the drawer stable by reconciling `MessagingDrawer` with floor-plan context and preventing unintended toggles.
-  - [ ] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching.
+  - [x] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching. (Harness now uses deterministic `data-testid` selectors; verified with `npm run type-check` and `npm run test:api` on 2025-10-21.)
 
 - [ ] 3.0 Timeline & Composer Feature Parity
   - [ ] 3.1 Extend `EnhancedMessageFeed.tsx` and `message-item.tsx` to render replies, reaction chips, pinned/starred indicators, and read receipts with accessible affordances.

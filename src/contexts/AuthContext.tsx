@@ -10,6 +10,7 @@ import { useSession } from '@/hooks/useSession'; // Import the new hook
 import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export { AuthContext };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Get session state from the hook

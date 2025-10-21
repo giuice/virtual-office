@@ -152,6 +152,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
           'fixed bottom-4 right-4 z-50',
           className
         )}
+        data-testid="messaging-drawer"
       >
         <Button
           variant="default"
@@ -172,6 +173,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
         'fixed bottom-4 right-4 z-50 w-96 h-[500px]',
         className
       )}
+      data-testid="messaging-drawer"
     >
       <Card className="h-full flex flex-col shadow-xl border-2">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
@@ -188,7 +190,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               </Button>
             )}
             <MessageSquare className="h-4 w-4" />
-            <CardTitle className="text-sm font-medium">{drawerTitle}</CardTitle>
+            <CardTitle className="text-sm font-medium" data-testid="messaging-drawer-title">{drawerTitle}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
             {/* New message button for list view */}

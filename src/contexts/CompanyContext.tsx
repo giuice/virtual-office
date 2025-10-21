@@ -19,7 +19,7 @@ import {
   getSpacesByCompany,
 } from '@/lib/api';
 
-interface CompanyContextType {
+export interface CompanyContextType {
   company: Company | null;
   companyUsers: User[];
   spaces: Space[];
@@ -35,6 +35,7 @@ interface CompanyContextType {
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
+export { CompanyContext };
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
