@@ -37,7 +37,7 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -133,19 +133,26 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
   // Effect to trigger loading when auth user changes
   useEffect(() => {
-    if (user?.id) { // Ensure user and user.id exist
-      loadCompanyData(user.id);
-    } else {
-      // Reset all state if user logs out or is not available
-      console.log("[CompanyContext] User logged out or not available, resetting state.");
-      setCompany(null);
-      setCurrentUserProfile(null);
-      setCompanyUsers([]);
-      setSpaces([]);
-      setIsLoading(false);
-      setError(null);
+    const authUserId = user?.id;
+
+    if (!isAuthReady) {
+      setIsLoading(true);
+      return;
     }
-  }, [user, loadCompanyData]); // Depend on user and the memoized load function
+
+    if (authUserId) {
+      loadCompanyData(authUserId);
+      return;
+    }
+
+    console.log("[CompanyContext] User logged out or not available, resetting state.");
+    setCompany(null);
+    setCurrentUserProfile(null);
+    setCompanyUsers([]);
+    setSpaces([]);
+    setIsLoading(false);
+    setError(null);
+  }, [isAuthReady, loadCompanyData, user]); // Depend on auth readiness and the memoized load function
 
   // Create a new company
   const createNewCompany = async (name: string): Promise<string> => {

@@ -9,6 +9,8 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
+  /** True once the initial auth session check completes */
+  isAuthReady: boolean;
   // Auth Actions
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;

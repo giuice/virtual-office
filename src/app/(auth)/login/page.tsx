@@ -1,7 +1,7 @@
 // src/app/(auth)/login/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,81 +10,104 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
+import { Loader2 } from 'lucide-react';
+import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
+
+type FormStatus = 'idle' | 'credential' | 'google';
+
+function AuthLoadingScreen({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <p className="text-sm text-muted-foreground" aria-live="assertive">
+        {message}
+      </p>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
   const router = useRouter();
-  const { signIn, signInWithGoogle, user } = useAuth();
+  const {
+    signIn,
+    signInWithGoogle,
+    user,
+    loading: authLoading,
+    isAuthReady,
+    actionLoading,
+  } = useAuth();
   const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
   const { showSuccess, showError } = useNotification();
 
-  // Check if the user is authenticated and redirect accordingly
+  const isBusy = isLoading || actionLoading;
+  const isDisabled = isBusy || !isAuthReady;
+
   useEffect(() => {
-    // Skip if loading or if no user is authenticated
+    if (!isAuthReady) {
+      return;
+    }
+
     if (!user || companyLoading) return;
 
-    // Add debug logging to track state during redirection decision
-    console.log('[Debug] Login Page Redirect Check:', { 
-      isAuthenticated: !!user, 
-      userId: user?.id,
-      isCompanyLoading: companyLoading,
-      hasCompany: !!company, 
-      companyId: company?.id,
-      profileCompanyId: currentUserProfile?.companyId,
-      currentUserProfile
-    });
-    
-    // Add a small delay to ensure all state is properly settled
     const redirectTimer = setTimeout(() => {
-      // If user is logged in but doesn't have a company, redirect to company creation
       if (!company || !currentUserProfile?.companyId) {
-        console.log('Redirecting to create-company...', { 
-          hasCompany: !!company, 
-          hasCompanyId: !!currentUserProfile?.companyId,
-          currentUserProfile
-        });
         router.push('/create-company');
       } else {
-        // User has a company, redirect to office
-        console.log('Redirecting to office - user has company:', {
-          company,
-          companyId: currentUserProfile?.companyId
-        });
-        router.push('/office');
+        router.push('/dashboard');
       }
-    }, 500); // 500ms delay
-    
+    }, 400);
+
     return () => clearTimeout(redirectTimer);
-  }, [user, company, companyLoading, router, currentUserProfile]);
+  }, [company, companyLoading, currentUserProfile, isAuthReady, router, user]);
+
+  if (!isAuthReady || authLoading) {
+    return <AuthLoadingScreen message="Restoring session..." />;
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setFormError(null);
+    setStatusMessage('Signing in...');
     setIsLoading(true);
+    setFormStatus('credential');
 
     try {
       await signIn(email, password);
       showSuccess({ description: 'Successfully logged in!' });
-      // Redirects will be handled by the useEffect above
     } catch (error) {
-      showError({
-        description: error instanceof Error ? error.message : 'Failed to login'
-      });
+      const friendlyMessage = mapSupabaseAuthError(error);
+      showError({ description: friendlyMessage });
+      setFormError(friendlyMessage);
+      setStatusMessage(null);
+    } finally {
+      setFormStatus('idle');
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setFormError(null);
+    setStatusMessage('Signing in with Google...');
     setIsLoading(true);
+    setFormStatus('google');
+
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Successfully logged in with Google!' });
-      // Redirects will be handled by the useEffect above
     } catch (error) {
-      showError({
-        description: error instanceof Error ? error.message : 'Failed to login with Google'
-      });
+      const friendlyMessage = mapSupabaseAuthError(error);
+      showError({ description: friendlyMessage });
+      setFormError(friendlyMessage);
+      setStatusMessage(null);
+    } finally {
+      setFormStatus('idle');
       setIsLoading(false);
     }
   };
@@ -109,7 +132,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-                disabled={isLoading}
+                disabled={isDisabled}
               />
             </div>
             <div className="space-y-2">
@@ -123,15 +146,28 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
-                disabled={isLoading}
+                disabled={isDisabled}
               />
             </div>
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+
+            {formError && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {formError}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isDisabled}>
+              {isBusy && formStatus === 'credential' ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {statusMessage ?? 'Signing in...'}
+                </span>
+              ) : (
+                'Sign In'
+              )}
             </Button>
 
             <div className="relative">
@@ -139,39 +175,50 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
-            <Button 
+            <Button
               type="button"
               variant="outline"
               className="w-full"
               onClick={handleGoogleSignIn}
-              disabled={isLoading}
+              disabled={isDisabled}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
-              Sign in with Google
+              {isBusy && formStatus === 'google' ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {statusMessage ?? 'Signing in with Google...'}
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                  Sign in with Google
+                </span>
+              )}
             </Button>
+
+            <p aria-live="polite" className="min-h-[1.25rem] text-xs text-muted-foreground">
+              {statusMessage}
+            </p>
 
             <p className="text-sm text-center text-muted-foreground">
               Don't have an account?{' '}
@@ -185,3 +232,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

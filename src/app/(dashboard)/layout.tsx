@@ -4,6 +4,7 @@
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { SearchProvider } from '@/contexts/SearchContext';
 import { SpaceRealtimeProvider } from '@/components/providers/space-realtime-provider';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -15,10 +16,10 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-center">
-          <div className="h-8 w-32 bg-muted rounded mb-4 mx-auto"></div>
-          <div className="h-4 w-48 bg-muted rounded mx-auto"></div>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-center text-sm text-muted-foreground">
+          Restoring your workspace session...
         </div>
       </div>
     );

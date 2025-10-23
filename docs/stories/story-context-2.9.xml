@@ -1,0 +1,209 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>9</storyId>
+    <title>Authentication Flow Polish & Error Handling</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-22T17:33:27.592150+00:00</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.9.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>As a user</asA>
+    <iWant>I want smooth, error-free authentication with clear feedback during login and session restoration</iWant>
+    <soThat>So that I can confidently enter the virtual office workspace without confusion or failed loads.</soThat>
+    <tasks>- [ ] **Task 1: Fix AuthContext SSR hydration** (AC: #3, #4)
+  - [ ] 1.1: Review AuthContext.tsx for SSR → client hydration issues
+  - [ ] 1.2: Ensure auth session is fully loaded before marking context as "ready"
+  - [ ] 1.3: Add `isAuthReady` state to prevent premature data queries
+  - [ ] 1.4: Test page refresh in authenticated state
+
+- [ ] **Task 2: Improve loading states** (AC: #1)
+  - [ ] 2.1: Add loading spinner component to login/register pages
+  - [ ] 2.2: Display "Signing in..." or "Restoring session..." messages
+  - [ ] 2.3: Prevent user interaction during auth operations
+
+- [ ] **Task 3: Enhance error messaging** (AC: #2)
+  - [ ] 3.1: Map Supabase auth error codes to user-friendly messages
+  - [ ] 3.2: Display errors prominently on login/register forms
+  - [ ] 3.3: Add error logging for debugging (without exposing sensitive info)
+  - [ ] 3.4: Handle network errors separately ("Check your connection")
+
+- [ ] **Task 4: Fix post-login redirect timing** (AC: #5)
+  - [ ] 4.1: Review middleware.ts redirect logic
+  - [ ] 4.2: Ensure auth session is established before dashboard loads
+  - [ ] 4.3: Add retry logic for failed RLS context checks
+  - [ ] 4.4: Test redirect from `/login` → `/dashboard` flow
+
+- [ ] **Task 5: Guard floor plan data queries** (AC: #4)
+  - [ ] 5.1: Update dashboard page to check `isAuthReady` before rendering FloorPlan
+  - [ ] 5.2: Show loading state while auth context initializes
+  - [ ] 5.3: Ensure TanStack Query queries are disabled until auth ready
+  - [ ] 5.4: Test that no permission errors appear on initial dashboard load
+
+- [ ] **Task 6: Add E2E test** (AC: #6)
+  - [ ] 6.1: Write Playwright test: `auth-flow.spec.ts`
+  - [ ] 6.2: Test steps: Register → Login → Dashboard → Floor Plan navigation
+  - [ ] 6.3: Assert no console errors during flow
+  - [ ] 6.4: Assert floor plan renders with spaces visible
+  - [ ] 6.5: Run test in CI pipeline</tasks>
+  </story>
+
+  <acceptanceCriteria>1. **AC1:** Loading spinner displays during login/registration process with clear status message
+2. **AC2:** Error messages are specific and actionable (e.g., "Invalid credentials" vs generic "Error occurred")
+3. **AC3:** Session restoration on page refresh works reliably without errors
+4. **AC4:** Floor plan queries wait for auth context to be fully established before executing
+5. **AC5:** Post-login redirect to dashboard/floor plan completes successfully with no permission errors
+6. **AC6:** Playwright E2E test covers full journey: Login → Dashboard → Floor Plan (no errors)</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture Overview</title>
+  <section>Authentication Security</section>
+  <snippet>Supabase Auth with email/password + OAuth (Google); session management via @supabase/ssr; API route protection via middleware (src/middleware.ts).</snippet>
+</doc>
+<doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture Overview</title>
+  <section>RLS Critical Rules</section>
+  <snippet>Always use the server-side Supabase client in API routes; never use the browser client in API routes; test RLS policies to ensure users cannot access other companies' data.</snippet>
+</doc>
+<doc>
+  <path>docs/PRD.md</path>
+  <title>Product Requirements Document</title>
+  <section>Functional Requirements</section>
+  <snippet>FR002 mandates email/password authentication with secure session management via Supabase Auth for all tenants.</snippet>
+</doc>
+<doc>
+  <path>docs/implementation-readiness-report-2025-10-22.md</path>
+  <title>Implementation Readiness Report</title>
+  <section>Critical Gap #1</section>
+  <snippet>Login to floor plan transition currently shows confusing errors, fails to restore session reliably, and triggers RLS permission issues on initial load.</snippet>
+</doc>
+<doc>
+  <path>docs/google-login.md</path>
+  <title>Login with Google</title>
+  <section>Signing Users In</section>
+  <snippet>Supabase Auth supports signInWithOAuth for Google; provide a redirectTo URL for PKCE flows and handle the code exchange in the Next.js callback route.</snippet>
+</doc>
+<doc>
+  <path>docs/epics.md</path>
+  <title>Epics</title>
+  <section>Epic 2 Authentication &amp; Company Management</section>
+  <snippet>Epic 2 delivered SSR-compatible Supabase Auth, company onboarding, invitation system, and auth middleware protecting API routes.</snippet>
+</doc>
+    </docs>
+    <code>
+      <codeArtifact>
+        <path>src/contexts/AuthContext.tsx</path>
+        <kind>context</kind>
+        <symbol>AuthProvider</symbol>
+        <lines>1-240</lines>
+        <reason>Central auth state management; must add isAuthReady gate, loading/error handling, and Google sync.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/hooks/useSession.ts</path>
+        <kind>hook</kind>
+        <symbol>useSession</symbol>
+        <lines>1-200</lines>
+        <reason>Fetches Supabase session; ensure hydration delay and SSR compatibility for AC3.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/app/(auth)/login/page.tsx</path>
+        <kind>page</kind>
+        <symbol>LoginPage</symbol>
+        <lines>1-200</lines>
+        <reason>Needs loading state, error surface, and disabled interactions for AC1-AC2.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/app/(auth)/signup/page.tsx</path>
+        <kind>page</kind>
+        <symbol>SignupPage</symbol>
+        <lines>1-220</lines>
+        <reason>Shares auth form logic; must adopt improved spinner/error handling.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/middleware.ts</path>
+        <kind>middleware</kind>
+        <symbol>middleware</symbol>
+        <lines>1-200</lines>
+        <reason>Controls post-login redirects; adjust to wait for session and avoid premature floor plan load.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/app/(dashboard)/dashboard/page.tsx</path>
+        <kind>page</kind>
+        <symbol>DashboardPage</symbol>
+        <lines>1-220</lines>
+        <reason>Loads floor plan queries; must await isAuthReady and show placeholder until Auth ready.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/components/floor-plan/index.tsx</path>
+        <kind>component</kind>
+        <symbol>FloorPlan</symbol>
+        <lines>1-400</lines>
+        <reason>Wrap TanStack queries; ensure they respect auth readiness to avoid RLS errors.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>src/hooks/queries/useFloorPlan.ts</path>
+        <kind>hook</kind>
+        <symbol>useFloorPlan</symbol>
+        <lines>1-200</lines>
+        <reason>Controls query enabling; needs auth guard to prevent early Supabase calls.</reason>
+      </codeArtifact>
+      <codeArtifact>
+        <path>__tests__/e2e/login.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Login E2E</symbol>
+        <lines>1-200</lines>
+        <reason>Existing Playwright coverage; extend or replace with auth-flow.spec.ts for AC6.</reason>
+      </codeArtifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@supabase/ssr" version="^0.7.0" />
+        <package name="@supabase/supabase-js" version="^2.49.4" />
+        <package name="@tanstack/react-query" version="^5.72.2" />
+        <package name="next" version="^16.0.0" />
+        <package name="react" version="^19.1.0" />
+        <package name="@playwright/test" version="^1.51.1" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Reuse existing AuthContext and avoid introducing new global auth stores; extend via isAuthReady flag.</constraint>
+    <constraint>All Supabase data access in API routes must use createSupabaseServerClient() per Supabase &amp; RLS rule.</constraint>
+    <constraint>Await auth context readiness before triggering TanStack Query calls to prevent RLS permission errors.</constraint>
+    <constraint>Follow Click-Stop Standard for UI interactions: guard parent click handlers and mark interactive children.</constraint>
+    <constraint>Maintain TypeScript strict mode and reuse canonical types under src/types/auth.ts.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>AuthContextType</name>
+      <kind>interface</kind>
+      <signature>{ user: User | null; session: Session | null; signIn: (email: string, password: string) =&gt; Promise<void>; signUp: (email: string, password: string, displayName?: string) =&gt; Promise<void>; signOut: () =&gt; Promise<void>; isAuthReady: boolean; authError: string | null; authLoading: boolean; }</signature>
+      <path>src/types/auth.ts</path>
+    </interface>
+    <interface>
+      <name>middleware</name>
+      <kind>NextMiddleware</kind>
+      <signature>(request: NextRequest) =&gt; NextResponse</signature>
+      <path>src/middleware.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Vitest for AuthContext unit coverage; Playwright for end-to-end auth journey; Testing Library for React component rendering per PRD and story guidance.</standards>
+    <locations>__tests__/unit/**/*.test.ts, __tests__/integration/**/*.test.ts, __tests__/e2e/**/*.spec.ts</locations>
+    <ideas>
+      <testIdea ac="AC1">Render login form, trigger signIn, expect spinner text "Signing in..." and disabled inputs until auth resolves.</testIdea>
+    <testIdea ac="AC2">Mock Supabase error code `invalid_credentials`, assert specific message surface and no generic fallback.</testIdea>
+    <testIdea ac="AC3">Simulate page refresh with persisted session via useSession mock; ensure AuthContext sets isAuthReady true and retains user.</testIdea>
+    <testIdea ac="AC4">Mount dashboard with isAuthReady false; verify floor plan queries skipped until flag flips true.</testIdea>
+    <testIdea ac="AC5">Playwright flow login→dashboard, assert redirect completes without 403 and presence of floor plan canvas.</testIdea>
+    <testIdea ac="AC6">Playwright journey register→login→floor plan, capture console logs and fail if errors; ensure spaces render.</testIdea>
+    </ideas>
+  </tests>
+</story-context>

@@ -13,7 +13,7 @@ export function Nav() {
       <div className="flex justify-between h-16">
         <div className="flex">
         <div className="flex-shrink-0 flex items-center">
-          <img className="h-8 w-auto" src="/logo.svg" alt="Logo" />
+          <img className="h-8 w-auto" src="/images/virtual-office.png" alt="Logo" />
         </div>
         <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
           <Link href="/dashboard" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700">

@@ -1,5 +1,5 @@
 // Quick integration test for Google avatar functionality
-const { extractGoogleAvatarUrl } = require('./src/lib/avatar-utils.ts');
+const { extractGoogleAvatarUrl } = require('../src/lib/avatar-utils.ts');
 
 // Test data similar to what Google OAuth would provide
 const mockGoogleOAuthData = {

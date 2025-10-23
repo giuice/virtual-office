@@ -10,6 +10,7 @@ interface SessionState {
   user: User | null;
   loading: boolean;
   error: string | null;
+  initialized: boolean;
 }
 
 export function useSession() {
@@ -21,13 +22,14 @@ export function useSession() {
     user: null,
     loading: true, // Start in loading state
     error: null,
+    initialized: false,
   });
 
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
 
     // Set loading true when the effect runs
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState((prev) => ({ ...prev, loading: true, error: null, initialized: prev.initialized }));
 
     // Get initial session state
     supabase.auth.getSession().then(({ data, error }) => {
@@ -41,6 +43,7 @@ export function useSession() {
           user: null,
           loading: false,
           error: error.message,
+          initialized: true,
         }));
       } else {
         setState((prev) => ({
@@ -49,6 +52,7 @@ export function useSession() {
           user: data.session?.user ?? null,
           loading: false, // Initial load complete
           error: null,
+          initialized: true,
         }));
       }
     }).catch(err => {
@@ -60,6 +64,7 @@ export function useSession() {
             user: null,
             loading: false,
             error: err instanceof Error ? err.message : String(err),
+            initialized: true,
         }));
     });
 
@@ -78,10 +83,11 @@ export function useSession() {
               user: session?.user ?? null,
               loading: false, // Auth state change means loading is complete
               error: null,
+              initialized: true,
             };
           }
           // If tokens are the same, no actual session change occurred
-          return { ...prevState, loading: false, error: null }; // Ensure loading is false even if no change
+          return { ...prevState, loading: false, error: null, initialized: true }; // Ensure loading is false even if no change
         });
       }
     );
