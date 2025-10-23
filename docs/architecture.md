@@ -68,10 +68,12 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 
 **Epic 3 Status:** Basic floor plan complete; 12 UX stories pending (visual design, occupancy viz, templates)
 
-**Epic 4 Status:** ~35% complete
-- ✅ Task 1.0: Data contracts, repositories, APIs
-- ✅ Task 2.0 (partial): Drawer shell, conversation grouping
-- ❌ Task 2.5-5.0: Replies/reactions, attachments, offline queue, analytics
+**Epic 4A Status:** In Progress (Timeline & Composer features)
+- ✅ Foundation (Tasks 1.0 + 2.0): Data contracts, repositories, APIs, drawer shell, conversation grouping
+- 🚧 Tasks 2.5 + 3.0: Timeline UI (replies, reactions, pins), attachments, voice notes, search
+
+**Epic 4B Status:** Planned (Resilience & Scale features)
+- ⏳ Tasks 4.0 + 5.0: Offline queue, reconnection, polling fallback, analytics, notifications
 
 **Strengths:**
 1. **Hooks Organization**: ✅ Excellent (per system audit)
@@ -269,6 +271,8 @@ export async function GET(request: Request) {
 ## Integration Points for New Features
 
 ### Epic 5: Meeting Notes System (6-10 stories)
+
+**Design Note:** Epic 5 is intentionally designed to work with **external meeting transcripts** (Zoom, Google Meet, Microsoft Teams) initially, providing immediate value without waiting for Epic 8 (native video conferencing). When Epic 8 is implemented, the meeting notes system will seamlessly integrate with Virtual Office's native meetings, enabling automatic transcript capture.
 
 **Architecture Needs:**
 1. **New Tables:**
@@ -690,17 +694,23 @@ $$ LANGUAGE sql;
 
 ### Immediate Priorities (Phase 3 Completion)
 
-1. **Complete Epic 4 (Messaging)**: 18 stories remaining
-   - **Priority**: Stories 4.12-4.17 (threads, reactions, pagination) for feature parity
-   - **Timeline**: 2-3 weeks
-   - **Why**: Messaging is core value prop; users expect Slack-level features
+1. **Complete Epic 4A (Messaging Timeline & Composer)**: 12 stories (Tasks 2.5 + 3.0)
+   - **Priority**: Stories 4A.1-4A.12 (E2E tests, threads, reactions, attachments, voice notes, search)
+   - **Timeline**: 3-4 weeks
+   - **Why**: User-facing messaging features for Slack/Teams parity
 
-2. **Epic 3 Polish (Floor Plan)**: 12 UX stories
+2. **Complete Epic 4B (Messaging Resilience & Scale)**: 8 stories (Tasks 4.0 + 5.0)
+   - **Priority**: Stories 4B.1-4B.8 (offline queue, reconnection, analytics, notifications)
+   - **Timeline**: 2-3 weeks
+   - **Dependencies**: Epic 4A complete
+   - **Why**: Enterprise reliability and observability
+
+3. **Epic 3 Polish (Floor Plan)**: 12 UX stories
    - **Priority**: Stories 3.1-3.4 (visual design, occupancy, selection UX)
    - **Timeline**: 1-2 weeks
    - **Why**: Floor plan is unique differentiator; needs professional polish
 
-3. **Avatar Consolidation Cleanup**:
+4. **Avatar Consolidation Cleanup**:
    - **Priority**: High (reduces technical debt)
    - **Timeline**: 1 week
    - **Why**: Removes confusion, improves maintainability

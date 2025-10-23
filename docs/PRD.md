@@ -1,9 +1,9 @@
 # Virtual Office Product Requirements Document (PRD)
 
 **Author:** Giuliano
-**Date:** 2025-10-22
+**Date:** 2025-10-23
 **Project Level:** 3 (Complex System)
-**Target Scale:** 12-40 stories across 5-9 epics
+**Target Scale:** 12-40 stories across 5-10 epics
 
 ---
 
@@ -24,9 +24,9 @@
 **Virtual Office** is an AI-powered digital workspace addressing the core challenge of remote work: loss of ambient awareness and spontaneous collaboration. With permanent hybrid/remote models now standard (78% of companies post-2024), teams using traditional tools experience 25-35% productivity loss compared to in-office work due to fragmented communication, status ambiguity, and excessive meetings.
 
 **Current Development Status (Brownfield):**
-- **4 of 9 Epics Complete:** Infrastructure, Authentication, Floor Plan system, Real-time Messaging
-- **2 Epics In Progress:** Meeting Notes System, Announcement System
-- **3 Epics Planned:** AI Communication Enhancements, Video/Screen Sharing, Admin Dashboard & Analytics
+- **4 of 10 Epics Complete:** Infrastructure, Authentication, Floor Plan system (basic), Real-time Messaging (foundation)
+- **3 Epics In Progress:** Floor Plan (UX polish), Messaging Timeline & Composer (4A), Meeting Notes System, Announcement System
+- **3 Epics Planned:** Messaging Resilience & Scale (4B), AI Communication Enhancements, Video/Screen Sharing, Admin Dashboard & Analytics
 - **Tech Stack:** Next.js 15, React 19, Supabase (PostgreSQL + Realtime), TypeScript, Repository Pattern
 
 **Market Positioning:**
@@ -230,17 +230,23 @@ Virtual Office fills the gap between generic chat tools (Slack/Teams - no spatia
 **Stories:** ~8-12 stories (basic functionality complete, design/UX improvements needed)
 **Status:** In Progress - Basic floor plan functional, **needs major UX/design improvements for space interactions, visual styling, and usability**
 
-### Epic 4: Real-Time Messaging System 🚧 IN PROGRESS
-**Goal:** Deliver space-based and direct messaging with threads, reactions, attachments via Supabase Realtime
-**Stories:** ~25-30 stories total
-**Status:** In Progress (~35% complete)
-**Completed:** Data contracts, API foundation, unified drawer shell, conversation grouping
-**Remaining:** Reply/reaction UI rendering, attachments (drag/drop, voice notes), infinite scroll, offline queue, reconnection resilience, analytics, notifications
+### Epic 4A: Real-Time Messaging - Timeline & Composer 🚧 IN PROGRESS
+**Goal:** Deliver user-facing messaging features for feature parity with Slack/Teams (threads, reactions, attachments, search)
+**Stories:** ~12 stories (Tasks 2.5 + 3.0)
+**Status:** In Progress
+**Dependencies:** Tasks 1.0 + 2.0 complete (foundation)
+
+### Epic 4B: Real-Time Messaging - Resilience & Scale ⏳ PLANNED
+**Goal:** Ensure enterprise reliability with offline queue, reconnection, multi-client sync, analytics, notifications
+**Stories:** ~8 stories (Tasks 4.0 + 5.0)
+**Status:** Planned
+**Dependencies:** Epic 4A complete
 
 ### Epic 5: Meeting Notes System 🚧 IN PROGRESS
-**Goal:** Enable meeting note capture with AI summaries and action item tracking
+**Goal:** Enable meeting note capture with AI summaries and action item tracking for **external meetings** (Zoom, Google Meet, Teams transcripts). Integrates with Epic 8 native meetings when available.
 **Stories:** ~6-10 stories
 **Status:** In Progress - UI complete, AI integration pending
+**Note:** Designed for external meeting transcripts initially; seamlessly extends to Epic 8 native meetings later
 
 ### Epic 6: Announcement System 🚧 IN PROGRESS
 **Goal:** Provide company-wide announcements with priority levels and expiration
@@ -262,14 +268,15 @@ Virtual Office fills the gap between generic chat tools (Slack/Teams - no spatia
 **Stories:** ~8-12 stories
 **Status:** Planned - Dependencies: Epic 3, 4 complete (data collection exists)
 
-**Total Estimated Stories:** ~85-120 stories across 9 epics
-**Current Progress:** 2 epics complete (22%), 4 in progress (44%), 3 planned (33%)
+**Total Estimated Stories:** ~85-120 stories across 10 epics
+**Current Progress:** 2 epics complete (20%), 5 in progress (50%), 3 planned (30%)
 
 **Immediate Priorities:**
-1. **Epic 4 (Messaging):** Complete Timeline & Composer features (Task 3.0), Realtime resilience (Task 4.0)
+1. **Epic 4A (Messaging Timeline & Composer):** Complete reply/reaction UI, attachments, voice notes, search (Tasks 2.5 + 3.0)
 2. **Epic 3 (Floor Plan):** Major UX/design overhaul for space interactions and visual styling
-3. **Epic 5 (Meeting Notes):** Finish AI integration
-4. **Epic 6 (Announcements):** Complete filtering and search
+3. **Epic 4B (Messaging Resilience):** Offline queue, reconnection, analytics, notifications (Tasks 4.0 + 5.0)
+4. **Epic 5 (Meeting Notes):** Finish AI integration
+5. **Epic 6 (Announcements):** Complete filtering and search
 
 > **Note:** Detailed epic breakdown with full story specifications is available in [epics.md](./epics.md)
 

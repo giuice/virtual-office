@@ -1,3 +1,14 @@
+## Epic Mapping
+
+This task file maps to **Epic 4A** and **Epic 4B** in the PRD/Epics documentation:
+- **Epic 4A: Real-Time Messaging - Timeline & Composer** → Tasks 2.5 + 3.0 (Stories 4A.1-4A.12)
+- **Epic 4B: Real-Time Messaging - Resilience & Scale** → Tasks 4.0 + 5.0 (Stories 4B.1-4B.8)
+- **Foundation (Complete):** Tasks 1.0 + 2.0 (Original Stories 4.1-4.10)
+
+See `docs/epics.md` for full story breakdown and acceptance criteria.
+
+---
+
 ## Relevant Files
 
 - `tasks/audit-report-messaging-gaps.md` - Comprehensive audit report identifying all gaps in types, repositories, and database schema for pin/star/archive, reactions, attachments, read receipts, and voice notes.
@@ -56,7 +67,7 @@
   - [x] 2.2 Refactor `ConversationList.tsx` to group DMs vs rooms, surface pinned conversations, unread badges, and canonical avatars while respecting click-stop guards.
   - [x] 2.3 Integrate conversation search/start flows by wiring `ConversationList` with company directory data and `useConversations` mutations for DM creation and room joining.
   - [x] 2.4 Ensure room navigation sync keeps the drawer stable by reconciling `MessagingDrawer` with floor-plan context and preventing unintended toggles.
-  - [ ] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching.
+  - [x] 2.5 Update Playwright flow `__tests__/api/playwright/messages-api.spec.ts` to validate drawer interactions, filtering, and cross-room switching.
 
 - [ ] 3.0 Timeline & Composer Feature Parity
   - [ ] 3.1 Extend `EnhancedMessageFeed.tsx` and `message-item.tsx` to render replies, reaction chips, pinned/starred indicators, and read receipts with accessible affordances.

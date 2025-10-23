@@ -1,9 +1,9 @@
 # Virtual Office - Epic Breakdown
 
 **Author:** Giuliano
-**Date:** 2025-10-22
+**Date:** 2025-10-23
 **Project Level:** 3 (Complex System)
-**Target Scale:** 85-120 stories across 9 epics
+**Target Scale:** 85-120 stories across 10 epics
 
 ---
 
@@ -288,28 +288,27 @@ So that I can see team presence even when away from my desktop.
 
 ---
 
-## Epic 4: Real-Time Messaging System 🚧 IN PROGRESS (~35% complete)
+## Epic 4A: Real-Time Messaging - Timeline & Composer 🚧 IN PROGRESS
 
 **Expanded Goal:**
-Deliver a comprehensive, enterprise-grade messaging system that unifies space-based conversations and direct messages in a persistent drawer interface. Support full feature parity with modern chat tools: threads, reactions, attachments, voice notes, offline resilience, and real-time delivery via Supabase Realtime.
+Deliver user-facing messaging features to achieve feature parity with Slack/Teams: threaded conversations, reactions, message pins/stars, read receipts, infinite scroll, file attachments, voice notes, and conversation search. This epic focuses on the Timeline and Composer user experience.
 
 **Value Delivery:**
-This epic transforms Virtual Office from a spatial awareness tool into a complete collaboration platform, enabling teams to consolidate Slack/Teams usage into the virtual office environment.
+This epic completes the core messaging UX, enabling teams to communicate with the same richness they expect from modern chat tools, making Virtual Office a viable Slack/Teams replacement.
+
+**Task Alignment:** Tasks 2.5 + 3.0 from `tasks/tasks-0001-prd-unified-messaging-system.md`
 
 **Current Status:**
-- ✅ **Complete (Tasks 1.0 + 2.0 partial):** Data contracts, APIs, unified drawer shell, conversation grouping, DM deduplication
-- ❌ **Remaining (Tasks 2.5, 3.0, 4.0, 5.0):** Reply/reaction UI, attachments, offline queue, analytics, notifications
+- ✅ **Foundation Complete (Tasks 1.0 + 2.0):** Data contracts, APIs, unified drawer shell, conversation grouping
+- 🚧 **In Progress:** Timeline UI rendering and composer features
 
-### Stories (25-30 total; ~10 complete, ~18 remaining)
+### Stories (12 total; Stories 4A.1-4A.12 = Original 4.11-4.22)
 
-**Completed Stories (Retrospective - Task 1.0 & 2.0 partial):**
-- Stories 4.1-4.10: Data contracts, repository methods, API routes, drawer shell, conversation list grouping (Complete)
-
-**Remaining Stories (Tasks 2.5, 3.0, 4.0, 5.0):**
+**Remaining Stories (Tasks 2.5, 3.0):**
 
 ---
 
-**Story 4.11: Playwright E2E Tests for Drawer Interactions** (Task 2.5)
+**Story 4A.1: Playwright E2E Tests for Drawer Interactions** (Task 2.5)
 
 As a QA engineer,
 I want end-to-end tests validating drawer interactions,
@@ -323,11 +322,11 @@ So that we ensure the messaging drawer works correctly across different scenario
 5. Test: Archive conversation → Verify it moves to archived section
 6. All tests pass in CI/CD pipeline
 
-**Prerequisites:** Stories 4.1-4.10 (drawer and conversation list complete)
+**Prerequisites:** Tasks 1.0 + 2.0 complete (drawer and conversation list)
 
 ---
 
-**Story 4.12: Render Reply Indicators and Thread UI** (Task 3.1)
+**Story 4A.2: Render Reply Indicators and Thread UI** (Task 3.1)
 
 As a user,
 I want to see reply threads visually in the message timeline,
@@ -340,11 +339,11 @@ So that I can follow conversation flow and respond to specific messages.
 4. "Reply" button on each message opens composer in reply mode
 5. Reply composer shows preview of message being replied to with cancel option
 
-**Prerequisites:** Story 4.11
+**Prerequisites:** Story 4A.1
 
 ---
 
-**Story 4.13: Reaction Chips and Emoji Picker** (Task 3.1)
+**Story 4A.3: Reaction Chips and Emoji Picker** (Task 3.1)
 
 As a user,
 I want to add emoji reactions to messages,
@@ -358,11 +357,11 @@ So that I can quickly respond without typing full messages.
 5. Click existing reaction chip toggles user's reaction on/off
 6. Reactions update in real-time for all participants
 
-**Prerequisites:** Story 4.12
+**Prerequisites:** Story 4A.2
 
 ---
 
-**Story 4.14: Pinned and Starred Message Indicators** (Task 3.1)
+**Story 4A.4: Pinned and Starred Message Indicators** (Task 3.1)
 
 As a user,
 I want to pin important messages and star messages for later reference,
@@ -375,11 +374,11 @@ So that I can quickly find key information in busy conversations.
 4. Unpin/unstar options available in context menu
 5. Pin/star actions persist via API (`POST /api/messages/pin`, `/api/messages/star`)
 
-**Prerequisites:** Story 4.13
+**Prerequisites:** Story 4A.3
 
 ---
 
-**Story 4.15: Read Receipts Display** (Task 3.1)
+**Story 4A.5: Read Receipts Display** (Task 3.1)
 
 As a user,
 I want to see who has read my messages,
@@ -392,11 +391,11 @@ So that I know if my team saw important information.
 4. Read receipts update in real-time as others view messages
 5. Read receipt data fetched from `message_read_receipts` table
 
-**Prerequisites:** Story 4.14
+**Prerequisites:** Story 4A.4
 
 ---
 
-**Story 4.16: Infinite Scroll with Pagination** (Task 3.2)
+**Story 4A.6: Infinite Scroll with Pagination** (Task 3.2)
 
 As a user,
 I want to scroll up through message history infinitely,
@@ -409,11 +408,11 @@ So that I can access old conversations without pagination buttons.
 4. Scroll position maintained after new messages load (no jump)
 5. Performance: smooth scrolling with 500+ messages in conversation
 
-**Prerequisites:** Story 4.15
+**Prerequisites:** Story 4A.5
 
 ---
 
-**Story 4.17: Auto-Scroll to New Messages with Indicator** (Task 3.2)
+**Story 4A.7: Auto-Scroll to New Messages with Indicator** (Task 3.2)
 
 As a user,
 I want the feed to auto-scroll when new messages arrive,
@@ -426,11 +425,11 @@ So that I see new content without manual scrolling.
 4. Button shows count of unread messages (e.g., "3 new messages")
 5. Auto-scroll respects user intent (doesn't scroll if user actively reading old messages)
 
-**Prerequisites:** Story 4.16
+**Prerequisites:** Story 4A.6
 
 ---
 
-**Story 4.18: File Attachment Drag-and-Drop** (Task 3.3)
+**Story 4A.8: File Attachment Drag-and-Drop** (Task 3.3)
 
 As a user,
 I want to drag files into the composer to attach them,
@@ -445,11 +444,11 @@ So that I can share documents, images, and files easily.
 6. Supported file types: images (jpg, png, gif), docs (pdf, docx), archives (zip)
 7. Max file size: 10 MB per attachment
 
-**Prerequisites:** Story 4.17
+**Prerequisites:** Story 4A.7
 
 ---
 
-**Story 4.19: File Attachment Preview** (Task 3.3)
+**Story 4A.9: File Attachment Preview** (Task 3.3)
 
 As a user,
 I want to preview attachments inline in the message feed,
@@ -462,11 +461,11 @@ So that I can view images and files without downloading.
 4. Click image opens lightbox viewer with zoom controls
 5. Download button triggers secure file download from Supabase Storage URL
 
-**Prerequisites:** Story 4.18
+**Prerequisites:** Story 4A.8
 
 ---
 
-**Story 4.20: Voice Note Recording** (Task 3.3)
+**Story 4A.10: Voice Note Recording** (Task 3.3)
 
 As a user,
 I want to record and send voice notes,
@@ -480,11 +479,11 @@ So that I can communicate quickly when typing is inconvenient.
 5. Voice notes display in feed with play/pause button and waveform
 6. Voice note metadata stored in `message_attachments` table with `type: voice_note`
 
-**Prerequisites:** Story 4.19
+**Prerequisites:** Story 4A.9
 
 ---
 
-**Story 4.21: Conversation Search** (Task 3.4)
+**Story 4A.11: Conversation Search** (Task 3.4)
 
 As a user,
 I want to search within a conversation for specific messages,
@@ -498,11 +497,11 @@ So that I can find past information quickly.
 5. Search persists across scrolling (maintains highlights)
 6. Clear search button restores normal view
 
-**Prerequisites:** Story 4.20
+**Prerequisites:** Story 4A.10
 
 ---
 
-**Story 4.22: Starred Messages Filter** (Task 3.4)
+**Story 4A.12: Starred Messages Filter** (Task 3.4)
 
 As a user,
 I want to filter the feed to show only starred messages,
@@ -515,11 +514,36 @@ So that I can review important messages I've saved.
 4. Disable toggle returns to full conversation view
 5. Starred filter works alongside search (can search within starred)
 
-**Prerequisites:** Story 4.21
+**Prerequisites:** Story 4A.11
 
 ---
 
-**Story 4.23: Offline Message Queue** (Task 4.2)
+**Epic 4A Summary:**
+- **Total Stories:** 12
+- **Estimated Effort:** 24-32 hours
+- **Dependencies:** Supabase Storage, Web APIs (MediaRecorder for voice notes)
+- **Key Risk:** Attachment handling and voice note encoding across browsers
+- **Task Reference:** `tasks/tasks-0001-prd-unified-messaging-system.md` Tasks 2.5 + 3.0
+
+---
+
+## Epic 4B: Real-Time Messaging - Resilience & Scale 🚧 PLANNED
+
+**Expanded Goal:**
+Ensure enterprise-grade messaging reliability with offline resilience, reconnection handling, multi-client synchronization, and observability. Deliver analytics, notifications, and comprehensive testing to make messaging production-ready at scale.
+
+**Value Delivery:**
+This epic transforms messaging from functional to enterprise-ready, ensuring users never lose messages during network issues and admins have visibility into messaging health and engagement.
+
+**Task Alignment:** Tasks 4.0 + 5.0 from `tasks/tasks-0001-prd-unified-messaging-system.md`
+
+**Dependencies:** Epic 4A complete (Timeline & Composer features functional)
+
+### Stories (8 total; Stories 4B.1-4B.8 = Original 4.23-4.30)
+
+---
+
+**Story 4B.1: Offline Message Queue** (Task 4.2)
 
 As a user,
 I want my messages to send automatically when my internet reconnects,
@@ -532,11 +556,11 @@ So that I don't lose messages during network interruptions.
 4. Failed sends show "Failed to send" with retry button
 5. Queue persists across page refreshes (stored in `localStorage`)
 
-**Prerequisites:** Story 4.22
+**Prerequisites:** Epic 4A complete
 
 ---
 
-**Story 4.24: Realtime Reconnection with Exponential Backoff** (Task 4.1)
+**Story 4B.2: Realtime Reconnection with Exponential Backoff** (Task 4.1)
 
 As a developer,
 I want Supabase Realtime to reconnect automatically with smart backoff,
@@ -550,11 +574,11 @@ So that users have a reliable real-time experience even with unstable networks.
 5. Fetch missed messages via polling for gap period
 6. Log reconnection events for debugging
 
-**Prerequisites:** Story 4.23
+**Prerequisites:** Story 4B.1
 
 ---
 
-**Story 4.25: Polling Fallback for Missed Messages** (Task 4.3)
+**Story 4B.3: Polling Fallback for Missed Messages** (Task 4.3)
 
 As a user,
 I want the app to fetch missed messages when real-time is unavailable,
@@ -567,11 +591,11 @@ So that I don't miss important conversations.
 4. Stop polling when Realtime reconnects
 5. Polling respects rate limits (max 6 requests/minute)
 
-**Prerequisites:** Story 4.24
+**Prerequisites:** Story 4B.2
 
 ---
 
-**Story 4.26: Typing Indicators** (Task 4.4)
+**Story 4B.4: Typing Indicators** (Task 4.4)
 
 As a user,
 I want to see when others are typing,
@@ -584,11 +608,11 @@ So that I know a response is coming and avoid interrupting.
 4. Multiple typists show: "Jane, Bob, and Alice are typing..."
 5. Typing events throttled (max 1 per second to avoid spam)
 
-**Prerequisites:** Story 4.25
+**Prerequisites:** Story 4B.3
 
 ---
 
-**Story 4.27: Multi-Client Read Receipt Sync** (Task 4.4)
+**Story 4B.5: Multi-Client Read Receipt Sync** (Task 4.4)
 
 As a user with multiple devices,
 I want read receipts to sync across my devices,
@@ -601,11 +625,11 @@ So that messages marked read on desktop also show read on mobile.
 4. Unread count badge updates in real-time across devices
 5. Race condition handling: last-write-wins for read timestamps
 
-**Prerequisites:** Story 4.26
+**Prerequisites:** Story 4B.4
 
 ---
 
-**Story 4.28: Messaging Analytics Events** (Task 5.1)
+**Story 4B.6: Messaging Analytics Events** (Task 5.1)
 
 As a product manager,
 I want analytics on message latency and engagement,
@@ -618,11 +642,11 @@ So that I can monitor messaging health and optimize performance.
 4. Events include metadata: conversation_id, user_id, message_type, timestamp
 5. Analytics dashboard (future) can query these logs
 
-**Prerequisites:** Story 4.27
+**Prerequisites:** Story 4B.5
 
 ---
 
-**Story 4.29: Desktop Notifications** (Task 5.3)
+**Story 4B.7: Desktop Notifications** (Task 5.3)
 
 As a user,
 I want desktop notifications for new messages when the app isn't focused,
@@ -636,11 +660,11 @@ So that I don't miss important communications.
 5. Respect user preferences (can disable notifications per conversation)
 6. Notifications muted when user is actively viewing the conversation
 
-**Prerequisites:** Story 4.28
+**Prerequisites:** Story 4B.6
 
 ---
 
-**Story 4.30: Playwright Tests for Offline and Realtime** (Task 4.5)
+**Story 4B.8: Playwright Tests for Offline and Realtime** (Task 4.5)
 
 As a QA engineer,
 I want E2E tests covering offline scenarios and reconnection,
@@ -653,27 +677,39 @@ So that we ensure messaging reliability under adverse network conditions.
 4. Test: Duplicate message prevention → Same message doesn't appear twice after reconnect
 5. Test: Multi-client read receipts → Mark read on device 1 → Syncs to device 2
 
-**Prerequisites:** Story 4.29
+**Prerequisites:** Story 4B.7
 
 ---
 
-**Epic 4 Summary:**
-- **Total Stories:** 30 (10 complete, 20 remaining)
-- **Estimated Effort:** 40-60 hours for remaining stories
-- **Dependencies:** Supabase Realtime, Supabase Storage, Web APIs (Notifications, MediaRecorder)
-- **Key Risk:** Offline reliability and reconnection complexity - need robust testing
+**Epic 4B Summary:**
+- **Total Stories:** 8
+- **Estimated Effort:** 16-24 hours
+- **Dependencies:** Supabase Realtime, Web APIs (Notifications API)
+- **Key Risk:** Offline reliability and reconnection complexity - extensive testing required
+- **Task Reference:** `tasks/tasks-0001-prd-unified-messaging-system.md` Tasks 4.0 + 5.0
+
+---
+
+**Combined Epic 4A + 4B Summary:**
+- **Total Stories:** 20 (4A: 12 stories, 4B: 8 stories)
+- **Combined Effort:** 40-56 hours
+- **Implementation Order:** Complete Epic 4A first (user-facing features), then Epic 4B (resilience/scale)
+- **Original Epic 4 Stories 4.1-4.10:** Complete (Tasks 1.0 + 2.0)
+- **Remaining Stories:** 4A.1-4A.12 (Timeline/Composer) + 4B.1-4B.8 (Resilience/Scale)
 
 ---
 
 ## Epic 5: Meeting Notes System 🚧 IN PROGRESS
 
 **Expanded Goal:**
-Enable seamless meeting note capture with AI-powered summaries and action item tracking, allowing teams to document meetings efficiently and follow up on commitments automatically.
+Enable seamless meeting note capture with AI-powered summaries and action item tracking for **external meetings** (Zoom, Google Meet, Microsoft Teams). Users can upload transcripts from third-party meeting tools and leverage AI to generate summaries and extract action items automatically. This makes Epic 5 valuable immediately without waiting for Epic 8's native video conferencing.
 
 **Value Delivery:**
-This epic reduces meeting overhead by automating note-taking and action tracking, freeing participants to focus on discussion rather than documentation.
+This epic reduces meeting overhead by automating note-taking and action tracking for external meetings, freeing participants to focus on discussion rather than documentation. Once Epic 8 (native video conferencing) is complete, the meeting notes system will seamlessly integrate with Virtual Office's native meetings.
 
 **Current Status:** UI complete, AI integration pending
+
+**Implementation Note:** This epic is designed to work with **external meeting transcripts** initially. When Epic 8 (Enhanced Communication Tools with WebRTC video conferencing) is implemented, native Virtual Office meetings will automatically integrate with the meeting notes system, enabling one-click transcript capture for internal meetings.
 
 ### Stories (6-10 total)
 
@@ -728,18 +764,21 @@ So that I can reference decisions and update action items.
 
 ---
 
-**Story 5.4: AI Meeting Transcript Upload** (Placeholder)
+**Story 5.4: AI Meeting Transcript Upload (External Meetings)** (Placeholder)
 
 As a user,
-I want to upload a meeting transcript,
-So that AI can generate summaries and action items automatically.
+I want to upload a meeting transcript from external tools (Zoom, Google Meet, Microsoft Teams),
+So that AI can generate summaries and action items automatically for meetings held outside Virtual Office.
 
 **Acceptance Criteria:**
-1. Upload .txt or .vtt transcript file (from Zoom, Google Meet, etc.)
+1. Upload .txt or .vtt transcript file from external meeting platforms (Zoom, Google Meet, Microsoft Teams, etc.)
 2. Transcript stored in `meeting_notes.transcript` field
 3. "Generate Summary" button triggers AI processing
 4. Loading indicator while AI processes (expected 10-30 seconds)
 5. Error handling for failed AI calls (timeout, API errors)
+6. Support for common transcript formats: plain text (.txt), WebVTT (.vtt), SRT (.srt)
+
+**Implementation Note:** This story focuses on external meeting transcripts. When Epic 8 (native video conferencing) is complete, transcripts from Virtual Office meetings will be automatically available without manual upload.
 
 **Prerequisites:** Story 5.3
 
