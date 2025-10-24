@@ -75,6 +75,8 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         compact ? "min-h-[120px]" : "min-h-[160px]",
         className
       )}
+      data-testid={`space-${space.id}`}
+      data-space-id={space.id}
       onPointerDownCapture={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('[data-avatar-interactive]')) {

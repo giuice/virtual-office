@@ -113,9 +113,9 @@ export function MessageComposer({
   };
   
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full" data-testid="composer">
       {renderReplyPreview()}
-      
+
       <form onSubmit={handleSubmit} className="w-full">
         <div className="relative">
           <Textarea
@@ -167,6 +167,7 @@ export function MessageComposer({
               type="submit"
               disabled={!content.trim() || disabled}
               className="h-8 w-8 p-0"
+              data-testid="message-send-button"
             >
               <Send className="h-4 w-4" />
             </Button>

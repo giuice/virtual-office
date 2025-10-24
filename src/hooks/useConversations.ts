@@ -319,32 +319,36 @@ export function useConversations() {
       });
     }
 
-    try {
-      // Call the API to archive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, true);
-      // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
+    // Optimistic update first
+    let reverted = false;
+    setConversations(prev => 
+      prev.map(conversation => 
+        conversation.id === conversationId 
+          ? { ...conversation, isArchived: true } 
+          : conversation
+      )
+    );
 
-      // Update local state (Optimistic update remains)
+    // If this was the active conversation, clear it
+    if (activeConversation && activeConversation.id === conversationId) {
+      setActiveConversation(null);
+    }
+
+    try {
+      await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, true);
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useConversations.archive', 'success', { traceId, conversationId });
+      }
+    } catch (error) {
+      // Revert on error
+      reverted = true;
       setConversations(prev => 
         prev.map(conversation => 
           conversation.id === conversationId 
-            ? { ...conversation, isArchived: true } 
+            ? { ...conversation, isArchived: false } 
             : conversation
         )
       );
-      
-      // If this was the active conversation, clear it
-      if (activeConversation && activeConversation.id === conversationId) {
-        setActiveConversation(null);
-      }
-
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('useConversations.archive', 'success', {
-          traceId,
-          conversationId,
-        });
-      }
-    } catch (error) {
       if (instrumentationEnabled) {
         debugLogger.messaging.error('useConversations.archive', 'error', {
           traceId,
@@ -353,7 +357,7 @@ export function useConversations() {
         });
       }
       console.error('Error archiving conversation:', error);
-      throw error;
+      if (reverted) throw error;
     }
   }, [activeConversation, currentUserProfile?.id]);
   
@@ -370,27 +374,31 @@ export function useConversations() {
         userId,
       });
     }
-    try {
-      // Call the API to unarchive the conversation
-      await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, false);
-      // console.warn("setConversationArchiveStatus API call not implemented yet."); // Remove warning
+    // Optimistic update first
+    let failed = false;
+    setConversations(prev => 
+      prev.map(conversation => 
+        conversation.id === conversationId 
+          ? { ...conversation, isArchived: false } 
+          : conversation
+      )
+    );
 
-      // Update local state (Optimistic update remains)
+    try {
+      await messagingApi.setConversationArchiveStatus(conversationId, currentUserProfile!.id, false);
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useConversations.unarchive', 'success', { traceId, conversationId });
+      }
+    } catch (error) {
+      // Revert on error
+      failed = true;
       setConversations(prev => 
         prev.map(conversation => 
           conversation.id === conversationId 
-            ? { ...conversation, isArchived: false } 
+            ? { ...conversation, isArchived: true } 
             : conversation
         )
       );
-
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('useConversations.unarchive', 'success', {
-          traceId,
-          conversationId,
-        });
-      }
-    } catch (error) {
       if (instrumentationEnabled) {
         debugLogger.messaging.error('useConversations.unarchive', 'error', {
           traceId,
@@ -399,8 +407,60 @@ export function useConversations() {
         });
       }
       console.error('Error unarchiving conversation:', error);
+      if (failed) throw error;
     }
   }, [currentUserProfile?.id]);
+
+  // Pin / Unpin conversations with optimistic updates
+  const pinConversation = useCallback(async (conversationId: string) => {
+    const traceId = debugLogger.messaging.enabled() ? createTraceId('pin-conv') : '';
+    // Optimistic
+    setConversations(prev => prev.map(c => c.id === conversationId ? {
+      ...c,
+      preferences: { ...(c.preferences ?? {}), isPinned: true, pinnedOrder: c.preferences?.pinnedOrder ?? 0 }
+    } : c));
+    try {
+      await messagingApi.updateConversationPreferences(conversationId, { isPinned: true });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.event('useConversations.pin', 'success', { traceId, conversationId });
+      }
+    } catch (error) {
+      // Revert
+      setConversations(prev => prev.map(c => c.id === conversationId ? {
+        ...c,
+        preferences: { ...(c.preferences ?? {}), isPinned: false }
+      } : c));
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.error('useConversations.pin', 'error', { traceId, conversationId, error: error instanceof Error ? error.message : error });
+      }
+      throw error;
+    }
+  }, []);
+
+  const unpinConversation = useCallback(async (conversationId: string) => {
+    const traceId = debugLogger.messaging.enabled() ? createTraceId('unpin-conv') : '';
+    // Optimistic
+    setConversations(prev => prev.map(c => c.id === conversationId ? {
+      ...c,
+      preferences: { ...(c.preferences ?? {}), isPinned: false }
+    } : c));
+    try {
+      await messagingApi.updateConversationPreferences(conversationId, { isPinned: false });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.event('useConversations.unpin', 'success', { traceId, conversationId });
+      }
+    } catch (error) {
+      // Revert
+      setConversations(prev => prev.map(c => c.id === conversationId ? {
+        ...c,
+        preferences: { ...(c.preferences ?? {}), isPinned: true }
+      } : c));
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.error('useConversations.unpin', 'error', { traceId, conversationId, error: error instanceof Error ? error.message : error });
+      }
+      throw error;
+    }
+  }, []);
   
   // Function to mark a conversation as read
   const markConversationAsRead = useCallback(async (conversationId: string) => {
@@ -551,6 +611,8 @@ export function useConversations() {
     getOrCreateUserConversation,
     archiveConversation,
     unarchiveConversation,
+    pinConversation,
+    unpinConversation,
     markConversationAsRead,
     totalUnreadCount,
     updateConversationWithMessage,

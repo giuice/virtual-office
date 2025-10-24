@@ -242,6 +242,7 @@ export function MessageItem({
   
   return (
     <div
+      data-testid={`message-${message.id}`}
       className={cn(
         "relative flex items-start mb-4 px-4 group",
         isCurrentUser ? "justify-end" : "justify-start"

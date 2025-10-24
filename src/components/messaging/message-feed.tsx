@@ -157,13 +157,15 @@ export function MessageFeed({
   }
   
   return (
-    <Card className={cn("w-full flex flex-col", className)}>
+    <Card className={cn("w-full flex flex-col", className)} data-testid="messages-feed">
+      {/* Legacy test hook for older specs */}
+      <div data-testid="message-feed" className="sr-only" />
       <CardHeader className="pb-2">
         <CardTitle>{activeConversation.name || 'Conversation'}</CardTitle>
       </CardHeader>
-      
+
       <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea 
+        <ScrollArea
           className="h-full"
           style={{ maxHeight }}
         >

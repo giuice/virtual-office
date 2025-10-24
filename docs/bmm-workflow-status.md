@@ -21,17 +21,17 @@ PHASE_4_COMPLETE: false
 
 ## Development Queue
 
-STORIES_SEQUENCE: [2.9]
+STORIES_SEQUENCE: [2.9, 4A.1]
 TODO_STORY:
 TODO_TITLE:
-IN_PROGRESS_STORY:
-IN_PROGRESS_TITLE:
+IN_PROGRESS_STORY: 4A.1
+IN_PROGRESS_TITLE: Playwright E2E Tests for Drawer Interactions
 STORIES_DONE: [2.9]
 
 ## Next Action
 
-NEXT_ACTION: Begin Epic 4A implementation (Messaging Timeline & Composer) OR create tech-spec for detailed planning
-NEXT_COMMAND: Start Epic 4A Story 4A.1 (E2E tests) OR run *tech-spec for Epic 4A
+NEXT_ACTION: Implement Story 4A.1 Playwright drawer interactions end-to-end tests
+NEXT_COMMAND: Switch to dev agent and run *dev-story for Story 4A.1
 NEXT_AGENT: dev
 RECOMMENDATION: Epic 4A has highest priority - foundation complete (Tasks 1.0+2.0), architecture validated, clear user value
 

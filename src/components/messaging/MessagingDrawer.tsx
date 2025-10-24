@@ -168,6 +168,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   // Expanded state - show full messaging interface
   return (
     <div
+      data-testid="messaging-drawer"
       className={cn(
         'fixed bottom-4 right-4 z-50 w-96 h-[500px]',
         className
@@ -230,6 +231,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               className="h-6 w-6"
               onClick={handleClose}
               title="Close"
+              data-testid="messaging-drawer-close"
             >
               <X className="h-3 w-3" />
             </Button>

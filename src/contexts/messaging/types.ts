@@ -32,6 +32,8 @@ export interface MessagingContextType {
   getOrCreateUserConversation: (userId: string) => Promise<Conversation>;
   archiveConversation: (conversationId: string) => Promise<void>;
   unarchiveConversation: (conversationId: string) => Promise<void>;
+  pinConversation?: (conversationId: string) => Promise<void>;
+  unpinConversation?: (conversationId: string) => Promise<void>;
   markConversationAsRead: (conversationId: string) => Promise<void>;
   totalUnreadCount: number;
   refreshConversations: () => Promise<void>;

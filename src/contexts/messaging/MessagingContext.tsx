@@ -50,13 +50,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return (stored as DrawerView) || 'list';
   });
 
-  // Drawer is open ONLY when there's an ACTIVE conversation
-  // lastActiveConversation is just for memory, not for auto-opening
-  // Drawer should only open when:
-  // 1. User enters a space (sets activeConversation)
-  // 2. User clicks a conversation in the list (sets activeConversation)
-  // 3. User creates new conversation from search (sets activeConversation)
-  const isDrawerOpen = Boolean(activeConversation);
+  // Drawer explicit open state (decoupled from activeConversation)
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
   // Persist drawer state to localStorage
   useEffect(() => {
@@ -73,6 +68,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Drawer control functions
   const openDrawer = useCallback(() => {
+    setIsDrawerOpen(true);
+    // Default to list view when no active conversation
+    if (!activeConversation) {
+      setActiveView('list');
+    }
+    // Optionally restore last active conversation
     if (!activeConversation && lastActiveConversation) {
       setActiveConversation(lastActiveConversation);
     }
@@ -307,6 +308,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, [activeConversation, messagesManager.sendMessage]);
 
   const closeDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
     setActiveConversation(null);
     clearLastActiveConversation();
     setIsMinimized(false);
@@ -335,6 +337,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     getOrCreateUserConversation: conversationsManager.getOrCreateUserConversation,
     archiveConversation: conversationsManager.archiveConversation,
     unarchiveConversation: conversationsManager.unarchiveConversation,
+    pinConversation: conversationsManager.pinConversation,
+    unpinConversation: conversationsManager.unpinConversation,
     markConversationAsRead: conversationsManager.markConversationAsRead,
     totalUnreadCount: conversationsManager.totalUnreadCount,
     refreshConversations: conversationsManager.refreshConversations,

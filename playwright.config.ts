@@ -1,36 +1,44 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Derive __dirname in ESM context and load .env.local for Playwright tests
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 /**
  * See https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
   testDir: './__tests__/api/playwright',
-  /* Run tests in files in parallel */
-  fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Reporter to use */
-  reporter: 'html',
-  /* Shared settings for all the projects below */
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+  ],
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:3000',
-    /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',
-    /* Record video for API test */
     video: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
-  /* Configure projects for different environments */
   projects: [
     {
-      name: 'API Testing',
+      name: 'api',
+      testMatch: ['**/messages-api.spec.ts', '**/auth-flow.spec.ts'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'messaging-drawer',
+      testMatch: ['**/epic-4A-*.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  /* Run local development server before starting the tests - commented out for now */
-  /* 
+  // Run local development server before starting the tests
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
@@ -39,5 +47,4 @@ export default defineConfig({
     stderr: 'pipe',
     timeout: 120000, // 2 minutes
   },
-  */
 });

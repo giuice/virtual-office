@@ -9,6 +9,7 @@ import { PresenceProvider } from '@/contexts/PresenceContext';
 import { CallingProvider } from '@/contexts/CallingContext';
 import { CallNotifications } from '@/components/messaging/CallNotification';
 import { MessagingDrawer } from '@/components/messaging/MessagingDrawer';
+import { MessagingTrigger } from '@/components/messaging/MessagingTrigger';
 import './globals.css';
 
 export default function RootLayout({
@@ -33,6 +34,7 @@ export default function RootLayout({
                     <CallingProvider>
                     {children}
                     <CallNotifications />
+                    <MessagingTrigger />
                     <MessagingDrawer />
                     <Toaster richColors closeButton position="top-right" />
                     </CallingProvider>

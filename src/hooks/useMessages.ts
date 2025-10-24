@@ -278,7 +278,7 @@ export function useMessages(activeConversationId: string | null) {
             error: err instanceof Error ? err.message : err,
           });
         }
-        // Mark optimistic as failed
+        // Remove the optimistic message on failure so UI does not show a failed temp message
         queryClient.setQueryData(
           ['messages', activeConversationId],
           (oldData:
@@ -287,9 +287,7 @@ export function useMessages(activeConversationId: string | null) {
             if (!oldData || !oldData.pages) return oldData;
             const updatedPages = oldData.pages.map((page) => ({
               ...page,
-              messages: page.messages.map((m) =>
-                m.id === optimisticMessage.id ? { ...m, status: MessageStatus.FAILED } : m
-              ),
+              messages: page.messages.filter((m) => m.id !== optimisticMessage.id),
             }));
             return { ...oldData, pages: updatedPages };
           }

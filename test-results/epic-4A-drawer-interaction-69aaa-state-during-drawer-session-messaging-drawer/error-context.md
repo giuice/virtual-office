@@ -1,0 +1,99 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e7]:
+        - img "Logo" [ref=e9]
+        - generic [ref=e10]:
+          - link "Home" [ref=e11] [cursor=pointer]:
+            - /url: /dashboard
+          - link "About" [ref=e12] [cursor=pointer]:
+            - /url: /about
+          - link "Contact" [ref=e13] [cursor=pointer]:
+            - /url: /contact
+    - main [ref=e14]:
+      - generic [ref=e18]:
+        - button "Show Debug Panel" [ref=e20]
+        - generic [ref=e21]:
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - img [ref=e26]
+              - generic [ref=e31]: Online Users
+            - generic [ref=e32]: "3"
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - img [ref=e37]
+              - generic [ref=e40]: Active Meetings
+            - generic [ref=e41]: "2"
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - generic [ref=e48]: Messages
+            - generic [ref=e49]: "--"
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - button "Manage Rooms" [ref=e52]:
+              - img
+              - text: Manage Rooms
+            - button "Use Template" [ref=e53]:
+              - img
+              - text: Use Template
+            - generic [ref=e54]:
+              - combobox [ref=e55]:
+                - generic: All Types
+                - img [ref=e56]
+              - textbox "Search rooms..." [ref=e58]
+          - button "Create Room" [ref=e60]:
+            - img
+            - text: Create Room
+        - generic [ref=e64]:
+          - button "Enter space Test Space 1 174f31e2-331e-4ee0-9d82-89e89af0c38f" [ref=e65]:
+            - generic [ref=e66]:
+              - generic [ref=e67]:
+                - generic [ref=e68]:
+                  - img [ref=e70]
+                  - text: Active
+                - generic [ref=e75]:
+                  - img [ref=e76]
+                  - generic [ref=e81]: 0/8
+              - heading "Test Space 1 174f31e2-331e-4ee0-9d82-89e89af0c38f" [level=3] [ref=e82]
+              - generic [ref=e84]:
+                - img [ref=e85]
+                - generic [ref=e88]: Workspace
+            - paragraph [ref=e90]: Automated test space 174f31e2-331e-4ee0-9d82-89e89af0c38f-1
+            - generic [ref=e93]: Empty
+          - button "Enter space Test Space 2 174f31e2-331e-4ee0-9d82-89e89af0c38f" [ref=e94]:
+            - generic [ref=e95]:
+              - generic [ref=e96]:
+                - generic [ref=e97]:
+                  - img [ref=e99]
+                  - text: Active
+                - generic [ref=e104]:
+                  - img [ref=e105]
+                  - generic [ref=e110]: 0/9
+              - heading "Test Space 2 174f31e2-331e-4ee0-9d82-89e89af0c38f" [level=3] [ref=e111]
+              - generic [ref=e113]:
+                - img [ref=e114]
+                - generic [ref=e117]: Conference
+            - paragraph [ref=e119]: Automated test space 174f31e2-331e-4ee0-9d82-89e89af0c38f-2
+            - generic [ref=e122]: Empty
+  - generic [ref=e125]:
+    - generic [ref=e126]:
+      - generic [ref=e127]:
+        - img [ref=e128]
+        - generic [ref=e130]: Messages
+      - generic [ref=e131]:
+        - button "New message" [ref=e132]:
+          - img
+        - button "Minimize" [ref=e133]:
+          - img
+        - button "Close" [ref=e134]:
+          - img
+    - generic [ref=e136]: Loading conversations...
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e142] [cursor=pointer]:
+    - img [ref=e143]
+  - alert [ref=e146]
+```
