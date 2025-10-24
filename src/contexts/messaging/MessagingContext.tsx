@@ -50,13 +50,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return (stored as DrawerView) || 'list';
   });
 
-  // Drawer is open ONLY when there's an ACTIVE conversation
-  // lastActiveConversation is just for memory, not for auto-opening
-  // Drawer should only open when:
+  // Force open drawer state (for opening drawer to list view without active conversation)
+  const [forceOpenDrawer, setForceOpenDrawer] = useState<boolean>(false);
+
+  // Drawer is open when there's an ACTIVE conversation OR when forcibly opened
+  // Drawer should open when:
   // 1. User enters a space (sets activeConversation)
   // 2. User clicks a conversation in the list (sets activeConversation)
   // 3. User creates new conversation from search (sets activeConversation)
-  const isDrawerOpen = Boolean(activeConversation);
+  // 4. User clicks a drawer trigger to view conversation list (forceOpenDrawer)
+  const isDrawerOpen = Boolean(activeConversation) || forceOpenDrawer;
 
   // Persist drawer state to localStorage
   useEffect(() => {
@@ -75,8 +78,24 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const openDrawer = useCallback(() => {
     if (!activeConversation && lastActiveConversation) {
       setActiveConversation(lastActiveConversation);
+    } else if (!activeConversation) {
+      // Force open drawer to list view if no active conversation
+      setForceOpenDrawer(true);
+      setActiveView('list');
     }
   }, [activeConversation, lastActiveConversation, setActiveConversation]);
+
+  const forceOpenDrawerToList = useCallback(() => {
+    setForceOpenDrawer(true);
+    setActiveView('list');
+  }, []);
+
+  const forceCloseDrawer = useCallback(() => {
+    setForceOpenDrawer(false);
+    setActiveConversation(null);
+    clearLastActiveConversation();
+    setIsMinimized(false);
+  }, [setActiveConversation, clearLastActiveConversation]);
 
   const toggleMinimize = useCallback(() => {
     setIsMinimized((prev) => !prev);
@@ -309,6 +328,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const closeDrawer = useCallback(() => {
     setActiveConversation(null);
     clearLastActiveConversation();
+    setForceOpenDrawer(false);
     setIsMinimized(false);
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.event('MessagingContext.closeDrawer', 'closed', {});
@@ -322,6 +342,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     isMinimized,
     activeView,
     openDrawer,
+    forceOpenDrawerToList,
+    forceCloseDrawer,
     toggleMinimize,
     setActiveView,
     // Conversations (from conversationsManager)

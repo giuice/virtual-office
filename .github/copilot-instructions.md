@@ -227,3 +227,9 @@ When asked to create, refactor, or improve code, follow this sequence and never 
 Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
 Status: Pending user confirmation, until user confirms
 
+
+## Active Technologies
+- TypeScript 5 (strict mode) + Next.js 15.3.0, React 19.1.0, Supabase (@supabase/ssr v0.6.1), Playwright, Vitest 3, Testing Library (001-drawer-e2e-tests)
+
+## Recent Changes
+- 001-drawer-e2e-tests: Added TypeScript 5 (strict mode) + Next.js 15.3.0, React 19.1.0, Supabase (@supabase/ssr v0.6.1), Playwright, Vitest 3, Testing Library

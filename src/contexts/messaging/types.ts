@@ -18,6 +18,8 @@ export interface MessagingContextType {
   isMinimized: boolean;
   activeView: DrawerView;
   openDrawer: () => void;
+  forceOpenDrawerToList: () => void;
+  forceCloseDrawer: () => void;
   toggleMinimize: () => void;
   setActiveView: (view: DrawerView) => void;
 

@@ -7,7 +7,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { ConversationType } from '@/types/messaging';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, MessageSquare, Minimize2, ArrowLeft, Plus, List } from 'lucide-react';
+import { X, MessageSquare, Minimize2, ArrowLeft, Plus, List, Pin } from 'lucide-react';
 import { MessageFeed } from './message-feed';
 import { ConversationList } from './ConversationList';
 import { ConversationSearch } from './ConversationSearch';
@@ -42,6 +42,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
 
   // Local state for tracking conversation creation
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [showOnlyPinned, setShowOnlyPinned] = useState(false);
 
   const conversationToDisplay = activeConversation ?? lastActiveConversation;
 
@@ -148,6 +149,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   if (isMinimized) {
     return (
       <div
+        data-drawer
+        data-state="minimized"
         className={cn(
           'fixed bottom-4 right-4 z-50',
           className
@@ -168,6 +171,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   // Expanded state - show full messaging interface
   return (
     <div
+      data-drawer
+      data-state={isMinimized ? 'minimized' : 'open'}
       className={cn(
         'fixed bottom-4 right-4 z-50 w-96 h-[500px]',
         className
@@ -201,6 +206,19 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
                 title="New message"
               >
                 <Plus className="h-3 w-3" />
+              </Button>
+            )}
+            {/* Pinned filter button for list view */}
+            {activeView === 'list' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                data-filter-pinned
+                title="Show only pinned"
+                onClick={() => setShowOnlyPinned(!showOnlyPinned)}
+              >
+                <Pin className="h-3 w-3" />
               </Button>
             )}
             {/* Show list button when NOT in list view - allows user to always navigate to list */}
@@ -244,6 +262,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               selectedConversationId={activeConversation?.id || null}
               onSelectConversation={handleSelectConversation}
               isLoading={loadingConversations}
+              showOnlyPinned={showOnlyPinned}
             />
           )}
 

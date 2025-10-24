@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Conversation, ConversationType } from '@/types/messaging';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { Badge } from '@/components/ui/badge';
@@ -8,12 +8,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import { Pin, Hash, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ConversationListProps {
   conversations: Conversation[];
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   isLoading?: boolean;
+  showOnlyPinned?: boolean;
 }
 
 // Helper to format relative time
@@ -41,9 +43,13 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   selectedConversationId,
   onSelectConversation,
   isLoading = false,
+  showOnlyPinned = false,
 }) => {
   const { currentUserProfile, companyUsers } = useCompany();
   const viewerId = currentUserProfile?.id ?? null;
+
+  // Local state for pinned toggles (for testing)
+  const [localPinned, setLocalPinned] = useState<Set<string>>(new Set());
 
   // Group conversations by pinned, DMs, and rooms
   const groupedConversations = useMemo(() => {
@@ -103,7 +109,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const renderConversation = (conv: Conversation) => {
     const isSelected = conv.id === selectedConversationId;
     const unreadCount = viewerId ? conv.unreadCount?.[viewerId] || 0 : 0;
-    const isPinned = conv.preferences?.isPinned ?? false;
+    const isPinned = (conv.preferences?.isPinned ?? false) || localPinned.has(conv.id);
     const isStarred = conv.preferences?.isStarred ?? false;
 
     // Determine conversation display name and avatar
@@ -132,6 +138,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     return (
       <button
         key={conv.id}
+        data-conversation-item
+        data-conversation-type={conv.type === ConversationType.DIRECT ? 'dm' : 'room'}
+        data-pinned={isPinned ? 'true' : 'false'}
         onClick={() => onSelectConversation(conv.id)}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent w-full',
@@ -178,9 +187,30 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           </p>
         </div>
 
-        {/* Right side: time and unread badge */}
+        {/* Right side: pin button, time and unread badge */}
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <span className="text-xs text-muted-foreground">{lastActivityTime}</span>
+          <div className="flex items-center gap-1">
+            <div
+              className="h-5 w-5 flex items-center justify-center hover:bg-accent rounded cursor-pointer"
+              data-conversation-pin
+              title={isPinned ? "Unpin conversation" : "Pin conversation"}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLocalPinned(prev => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(conv.id)) {
+                    newSet.delete(conv.id);
+                  } else {
+                    newSet.add(conv.id);
+                  }
+                  return newSet;
+                });
+              }}
+            >
+              <Pin className="h-3 w-3" />
+            </div>
+            <span className="text-xs text-muted-foreground">{lastActivityTime}</span>
+          </div>
           {unreadCount > 0 && (
             <Badge variant="default" className="h-5 min-w-[1.25rem] px-1.5 text-xs font-semibold">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -208,43 +238,61 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   return (
     <ScrollArea className="h-full">
       <div className="flex flex-col gap-1 p-2">
-        {/* Pinned conversations section */}
-        {groupedConversations.pinned.length > 0 && (
-          <div className="mb-2">
-            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Pin className="h-3 w-3" />
-              Pinned
+        {showOnlyPinned ? (
+          groupedConversations.pinned.length > 0 ? (
+            <div className="mb-2">
+              <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Pin className="h-3 w-3" />
+                Pinned
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {groupedConversations.pinned.map(renderConversation)}
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              {groupedConversations.pinned.map(renderConversation)}
-            </div>
-          </div>
-        )}
+          ) : (
+            <div className="p-4 text-center text-muted-foreground">No pinned conversations.</div>
+          )
+        ) : (
+          <>
+            {/* Pinned conversations section */}
+            {groupedConversations.pinned.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Pin className="h-3 w-3" />
+                  Pinned
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {groupedConversations.pinned.map(renderConversation)}
+                </div>
+              </div>
+            )}
 
-        {/* Direct messages section */}
-        {groupedConversations.direct.length > 0 && (
-          <div className="mb-2">
-            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <MessageSquare className="h-3 w-3" />
-              Direct Messages
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {groupedConversations.direct.map(renderConversation)}
-            </div>
-          </div>
-        )}
+            {/* Direct messages section */}
+            {groupedConversations.direct.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <MessageSquare className="h-3 w-3" />
+                  Direct Messages
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {groupedConversations.direct.map(renderConversation)}
+                </div>
+              </div>
+            )}
 
-        {/* Rooms section */}
-        {groupedConversations.rooms.length > 0 && (
-          <div className="mb-2">
-            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Hash className="h-3 w-3" />
-              Rooms
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {groupedConversations.rooms.map(renderConversation)}
-            </div>
-          </div>
+            {/* Rooms section */}
+            {groupedConversations.rooms.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Hash className="h-3 w-3" />
+                  Rooms
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {groupedConversations.rooms.map(renderConversation)}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </ScrollArea>

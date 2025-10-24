@@ -300,29 +300,12 @@ This epic completes the core messaging UX, enabling teams to communicate with th
 
 **Current Status:**
 - ✅ **Foundation Complete (Tasks 1.0 + 2.0):** Data contracts, APIs, unified drawer shell, conversation grouping
-- 🚧 **In Progress:** Timeline UI rendering and composer features
+- ✅ **E2E Testing Complete (Task 2.5):** Playwright tests for drawer interactions implemented and passing
+- 🚧 **In Progress:** Timeline UI rendering and composer features (Task 3.0)
 
 ### Stories (12 total; Stories 4A.1-4A.12 = Original 4.11-4.22)
 
-**Remaining Stories (Tasks 2.5, 3.0):**
-
----
-
-**Story 4A.1: Playwright E2E Tests for Drawer Interactions** (Task 2.5)
-
-As a QA engineer,
-I want end-to-end tests validating drawer interactions,
-So that we ensure the messaging drawer works correctly across different scenarios.
-
-**Acceptance Criteria:**
-1. Test: Open drawer → Select DM conversation → Send message → Verify realtime delivery
-2. Test: Filter conversations by pinned → Verify only pinned conversations show
-3. Test: Switch between room and DM tabs → Verify correct conversation lists load
-4. Test: Navigate to different space on floor plan → Verify drawer stays open and stable
-5. Test: Archive conversation → Verify it moves to archived section
-6. All tests pass in CI/CD pipeline
-
-**Prerequisites:** Tasks 1.0 + 2.0 complete (drawer and conversation list)
+**Remaining Stories (Task 3.0 - Timeline & Composer Features):**
 
 ---
 
@@ -695,7 +678,7 @@ So that we ensure messaging reliability under adverse network conditions.
 - **Combined Effort:** 40-56 hours
 - **Implementation Order:** Complete Epic 4A first (user-facing features), then Epic 4B (resilience/scale)
 - **Original Epic 4 Stories 4.1-4.10:** Complete (Tasks 1.0 + 2.0)
-- **Remaining Stories:** 4A.1-4A.12 (Timeline/Composer) + 4B.1-4B.8 (Resilience/Scale)
+- **Remaining Stories:** 4A.2-4A.12 (Timeline/Composer) + 4B.1-4B.8 (Resilience/Scale)
 
 ---
 

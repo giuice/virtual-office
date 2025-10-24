@@ -126,6 +126,7 @@ export function MessageComposer({
             placeholder={placeholder}
             className="min-h-[80px] resize-none pr-24"
             disabled={disabled}
+            data-message-input
           />
           
           <div className="absolute bottom-2 right-2 flex items-center space-x-1">
@@ -167,6 +168,7 @@ export function MessageComposer({
               type="submit"
               disabled={!content.trim() || disabled}
               className="h-8 w-8 p-0"
+              data-send-button
             >
               <Send className="h-4 w-4" />
             </Button>

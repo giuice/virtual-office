@@ -423,7 +423,7 @@ export const messagingApi = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messageId, reaction, userId }),
+        body: JSON.stringify({ messageId, emoji: reaction, userId }),
       });
 
       if (!response.ok) {
@@ -449,7 +449,7 @@ export const messagingApi = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messageId, reaction, userId }),
+        body: JSON.stringify({ messageId, emoji: reaction, userId }),
       });
 
       if (!response.ok) {

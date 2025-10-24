@@ -113,11 +113,24 @@ export function MessageItem({
   const renderMessageContent = () => {
     switch (message.type) {
       case MessageType.TEXT:
-        return <p className="whitespace-pre-wrap break-words">{message.content}</p>;
+        return (
+          <div>
+            <p className="mb-2" data-message-content>{message.content}</p>
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="rounded-md overflow-hidden">
+                <img 
+                  src={message.attachments[0].url} 
+                  alt={message.attachments[0].name}
+                  className="max-w-full h-auto"
+                />
+              </div>
+            )}
+          </div>
+        );
       case MessageType.IMAGE:
         return (
           <div>
-            <p className="mb-2">{message.content}</p>
+            <p className="mb-2" data-message-content>{message.content}</p>
             {message.attachments && message.attachments.length > 0 && (
               <div className="rounded-md overflow-hidden">
                 <img 
@@ -132,7 +145,7 @@ export function MessageItem({
       case MessageType.FILE:
         return (
           <div>
-            <p className="mb-2">{message.content}</p>
+            <p className="mb-2" data-message-content>{message.content}</p>
             {message.attachments && message.attachments.length > 0 && (
               <div className="flex items-center p-2 rounded-md bg-secondary">
                 <File className="h-5 w-5 mr-2" />
@@ -150,12 +163,12 @@ export function MessageItem({
         );
       case MessageType.SYSTEM:
         return (
-          <div className="text-center text-muted-foreground text-sm italic">
+          <div className="text-center text-muted-foreground text-sm italic" data-message-content>
             {message.content}
           </div>
         );
       default:
-        return <p>{message.content}</p>;
+        return <p data-message-content>{message.content}</p>;
     }
   };
   

@@ -1,0 +1,86 @@
+openapi: 3.0.0
+info:
+  title: Virtual Office Messaging API Contracts for E2E Tests
+  version: 1.0.0
+  description: API endpoints used in Playwright E2E tests for messaging drawer.
+
+paths:
+  /api/auth/login:
+    post:
+      summary: Authenticate user for tests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: {type: string}
+                password: {type: string}
+      responses:
+        '200': {description: Success}
+
+  /api/conversations:
+    get:
+      summary: Get user conversations (for drawer list)
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: string}
+                    type: {type: string, enum: [dm, room]}
+                    is_pinned: {type: boolean}
+                    is_archived: {type: boolean}
+    post:
+      summary: Create conversation (for seeding)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: {type: string}
+                participants: {type: array, items: {type: string}}
+      responses:
+        '201': {description: Created}
+
+  /api/messages:
+    post:
+      summary: Send message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversation_id: {type: string}
+                content: {type: string}
+      responses:
+        '201': {description: Sent}
+
+  /api/conversations/{id}/pin:
+    post:
+      summary: Pin/unpin conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Updated}
+
+  /api/conversations/{id}/archive:
+    post:
+      summary: Archive/unarchive conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Updated}</content>
+<parameter name="filePath">/home/giuice/apps/virtual-office/specs/001-drawer-e2e-tests/contracts/openapi.yaml

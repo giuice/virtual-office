@@ -60,6 +60,59 @@ If you encounter issues with duplicate companies, you can use the cleanup tool:
    - Remove duplicates
    - Update user profiles
 
+## Testing
+
+### E2E Tests
+
+The project includes Playwright E2E tests for messaging drawer interactions.
+
+#### Prerequisites
+
+- Node.js and npm installed
+- Supabase project running
+- Test data seeded
+
+#### Setup
+
+1. Install Playwright browsers:
+   ```bash
+   npx playwright install
+   ```
+
+2. Seed test data (run once before tests):
+   ```bash
+   npx tsx __tests__/e2e/fixtures/seed-test-data.ts
+   ```
+
+#### Running Tests
+
+Run all E2E tests:
+```bash
+npx playwright test __tests__/e2e/
+```
+
+Run specific test file:
+```bash
+npx playwright test __tests__/e2e/messaging-drawer-interactions.spec.ts
+```
+
+Run in headed mode (visible browser):
+```bash
+npx playwright test __tests__/e2e/messaging-drawer-interactions.spec.ts --headed
+```
+
+Run with debugging:
+```bash
+npx playwright test __tests__/e2e/messaging-drawer-interactions.spec.ts --debug
+```
+
+#### CI Integration
+
+Tests run automatically on push to main branch with:
+- 3-minute timeout
+- Screenshots/videos on failure
+- Parallel execution for faster runs
+
 ## Documentation
 
 - **Database Schema**: See [docs/database.md](./docs/database.md)
