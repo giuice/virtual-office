@@ -199,6 +199,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       <button
         key={conv.id}
         data-testid={`conversation-item-${conv.id}`}
+        data-pinned={isPinned ? 'true' : 'false'}
+        data-archived={conv.isArchived ? 'true' : 'false'}
         onClick={handleItemClick}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -377,6 +379,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             variant={pinnedOnly ? 'default' : 'outline'}
             onClick={() => setPinnedOnly((p) => !p)}
             data-testid="filter-pinned-toggle"
+            aria-pressed={pinnedOnly}
+            data-pinned-only={pinnedOnly ? 'true' : 'false'}
           >
             Pinned
           </Button>
@@ -386,6 +390,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             variant={showArchived ? 'default' : 'outline'}
             onClick={() => setShowArchived((s) => !s)}
             data-testid="show-archived-button"
+            aria-pressed={showArchived}
+            data-archived-visible={showArchived ? 'true' : 'false'}
           >
             Archived
           </Button>

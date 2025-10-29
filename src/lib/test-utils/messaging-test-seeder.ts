@@ -341,6 +341,16 @@ export class MessagingTestSeeder {
     const fingerprint = [...participants].sort().join(':');
     const now = new Date();
 
+    const existing = await this.conversationRepository.findDirectByFingerprint(fingerprint);
+
+    if (existing) {
+      await this.conversationRepository.updateLastActivityTimestamp(existing.id, now.toISOString());
+      return {
+        ...existing,
+        lastActivity: now,
+      };
+    }
+
     return this.conversationRepository.create({
       type: ConversationType.DIRECT,
       participants,

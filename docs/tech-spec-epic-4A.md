@@ -657,3 +657,11 @@ Response: {
 - Pre-merge: Full test suite (unit + integration + E2E)
 - Post-merge: Deploy to staging, run smoke tests
 - Nightly: Full regression suite + performance benchmarks
+
+## Post-Review Follow-ups
+
+- 4A.1: Replace fixed waits in Playwright helpers with response/state-driven waits for pin/unpin and archive/unarchive (helpers/drawer-helpers.ts)
+- 4A.1: Add explicit realtime subscription-ready signal and update tests to wait for it (MessagingContext.tsx + drawer-helpers.ts)
+- 4A.1: Introduce Playwright storageState-based auth to reduce flakiness and speed up tests (fixtures/messaging.ts)
+- 4A.1: Add CI workflow to run Playwright 3x and upload HTML report; enforce < 5 minutes total (GitHub Actions)
+- 4A.1: Expand E2E README and ensure stable data-testid coverage across drawer controls

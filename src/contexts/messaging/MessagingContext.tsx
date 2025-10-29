@@ -294,6 +294,33 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       onInsert: handleConversationInsert,
     }
   );
+
+  const realtimeStatus = allConversationStatus ?? focusedConversationStatus ?? null;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const root = document.documentElement;
+    if (!root) {
+      return;
+    }
+
+    if (!realtimeStatus) {
+      root.removeAttribute('data-messaging-realtime-status');
+      root.removeAttribute('data-messaging-realtime-ready');
+      return;
+    }
+
+    root.setAttribute('data-messaging-realtime-status', realtimeStatus);
+
+    if (realtimeStatus === 'SUBSCRIBED') {
+      root.setAttribute('data-messaging-realtime-ready', 'true');
+    } else {
+      root.removeAttribute('data-messaging-realtime-ready');
+    }
+  }, [realtimeStatus]);
   
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
@@ -355,7 +382,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
     // Realtime
-    connectionStatus: allConversationStatus ?? focusedConversationStatus,
+    connectionStatus: realtimeStatus,
     isMessagingV2Enabled,
   };
   

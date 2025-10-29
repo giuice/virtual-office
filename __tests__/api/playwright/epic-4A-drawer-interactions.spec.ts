@@ -116,11 +116,7 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     const sendButton = composer.locator('[data-testid="message-send-button"]');
     await sendButton.click();
 
-    // Verify error handling (message should not appear or show error state)
-    // Note: Exact error UX depends on implementation
-    await primaryPage.waitForTimeout(2000);
-
-    // Message should not be in the feed
+    // Message should not be in the feed (flaky retries handled via polling)
     const messages = primaryPage.locator('[data-testid^="message-"]', {
       hasText: 'This message should fail',
     });
@@ -146,11 +142,7 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
     const roomConversationId = messagingData.roomConversationIds[0];
     await pinConversation(primaryPage, roomConversationId);
 
-    // Wait for pin state to update
-    await primaryPage.waitForTimeout(1000);
-
-    // Verify conversation is pinned
-    expect(await isConversationPinned(primaryPage, roomConversationId)).toBe(true);
+    await expect.poll(() => isConversationPinned(primaryPage, roomConversationId)).toBe(true);
 
     // Get initial conversation count
     const initialCount = await getConversationCount(primaryPage);
@@ -158,13 +150,8 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
 
     // Toggle "Pinned Only" filter
     await togglePinnedFilter(primaryPage);
-
-    // Wait for filter to apply
-    await primaryPage.waitForTimeout(1000);
-
-    // Verify only pinned conversations are displayed
-    const filteredCount = await getConversationCount(primaryPage);
-    expect(filteredCount).toBeLessThan(initialCount);
+    await expect(primaryPage.locator('[data-testid="filter-pinned-toggle"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => getConversationCount(primaryPage)).toBeLessThan(initialCount);
 
     // Verify the pinned conversation is still visible
     await expect(
@@ -174,9 +161,6 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
     // Unpin the conversation
     await unpinConversation(primaryPage, roomConversationId);
 
-    // Wait for unpin to process
-    await primaryPage.waitForTimeout(1000);
-
     // Verify conversation disappears from filtered view immediately
     await expect(
       primaryPage.locator(`[data-testid="conversation-item-${roomConversationId}"]`)
@@ -184,13 +168,8 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
 
     // Disable filter
     await togglePinnedFilter(primaryPage);
-
-    // Wait for filter to clear
-    await primaryPage.waitForTimeout(1000);
-
-    // Verify all conversations reappear
-    const finalCount = await getConversationCount(primaryPage);
-    expect(finalCount).toBe(initialCount);
+    await expect(primaryPage.locator('[data-testid="filter-pinned-toggle"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => getConversationCount(primaryPage)).toBe(initialCount);
   });
 
   test('should persist pinned filter state during drawer session', async ({
@@ -206,7 +185,7 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
 
     // Enable pinned filter
     await togglePinnedFilter(primaryPage);
-    await primaryPage.waitForTimeout(1000);
+    await expect(primaryPage.locator('[data-testid="filter-pinned-toggle"]')).toHaveAttribute('aria-pressed', 'true');
 
     // Select a conversation and navigate away
     await selectConversation(primaryPage, { id: messagingData.directConversationId });
@@ -216,8 +195,8 @@ test.describe('AC2: Filter Conversations by Pinned', () => {
     await backButton.click();
 
     // Filter should still be active
-    const filteredCount = await getConversationCount(primaryPage);
-    expect(filteredCount).toBeLessThan(3); // Assuming we have more than 2 total conversations
+    await expect(primaryPage.locator('[data-testid="filter-pinned-toggle"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => getConversationCount(primaryPage)).toBeLessThan(3); // Assuming more than 2 total conversations
   });
 });
 
@@ -249,7 +228,7 @@ test.describe('AC3: Switch Between Room and DM Tabs', () => {
     const roomsTab = primaryPage.locator('[data-testid="conversation-tab-rooms"]').or(
       primaryPage.getByRole('tab', { name: /rooms/i })
     );
-    await expect(roomsTab).toHaveAttribute('aria-selected', 'true');
+    await expect(roomsTab).toHaveAttribute('data-state', 'active');
 
     // Room conversations should be visible
     for (const roomId of messagingData.roomConversationIds) {
@@ -263,7 +242,7 @@ test.describe('AC3: Switch Between Room and DM Tabs', () => {
     const dmsTab = primaryPage.locator('[data-testid="conversation-tab-dms"]').or(
       primaryPage.getByRole('tab', { name: /dms/i })
     );
-    await expect(dmsTab).toHaveAttribute('aria-selected', 'true');
+    await expect(dmsTab).toHaveAttribute('data-state', 'active');
 
     // DM conversation should be visible
     await expect(
@@ -284,7 +263,7 @@ test.describe('AC3: Switch Between Room and DM Tabs', () => {
 
     // Enable pinned filter
     await togglePinnedFilter(primaryPage);
-    await primaryPage.waitForTimeout(1000);
+    await expect(primaryPage.locator('[data-testid="filter-pinned-toggle"]')).toHaveAttribute('aria-pressed', 'true');
 
     const roomsFilteredCount = await getConversationCount(primaryPage);
 
@@ -332,9 +311,6 @@ test.describe('AC4: Navigate Space → Drawer Stability', () => {
 
       // Active conversation should be maintained
       await expect(primaryPage.locator('[data-testid="messages-feed"]')).toBeVisible();
-
-      // Verify no flickering (drawer remains visible throughout)
-      await primaryPage.waitForTimeout(500);
       expect(await isDrawerOpen(primaryPage)).toBe(true);
     }
   });
@@ -351,14 +327,12 @@ test.describe('AC4: Navigate Space → Drawer Stability', () => {
     if (messagingData.spaceIds.length >= 2) {
       for (let i = 0; i < 3; i++) {
         await navigateToSpace(primaryPage, messagingData.spaceIds[0]);
-        await primaryPage.waitForTimeout(200);
         await navigateToSpace(primaryPage, messagingData.spaceIds[1]);
-        await primaryPage.waitForTimeout(200);
       }
 
       // Drawer should remain stable
       expect(await isDrawerOpen(primaryPage)).toBe(true);
-      await expect(primaryPage.locator('[data-testid="message-feed"]')).toBeVisible();
+      await expect(primaryPage.locator('[data-testid="messages-feed"]')).toBeVisible();
     }
   });
 });

@@ -130,14 +130,12 @@ export async function waitForRealtimeMessage(
  * Switches between conversation tabs (Rooms / DMs).
  */
 export async function switchTab(page: Page, tab: 'rooms' | 'dms'): Promise<void> {
-  const tabButton = page.getByRole('tab', { name: new RegExp(tab, 'i') }).or(
-    page.locator(`[data-testid="conversation-tab-${tab}"]`)
+  const tabButton = page.locator(`[data-testid="conversation-tab-${tab}"]`).or(
+    page.getByRole('tab', { name: new RegExp(tab, 'i') })
   );
 
   await tabButton.click();
-
-  // Wait for tab content to load
-  await page.waitForTimeout(500); // Brief stabilization wait
+  await expect(tabButton).toHaveAttribute('data-state', 'active');
 }
 
 /**
@@ -148,10 +146,16 @@ export async function togglePinnedFilter(page: Page): Promise<void> {
     page.locator('[data-testid="filter-pinned-toggle"]')
   );
 
+  const previousState = await filterButton.getAttribute('aria-pressed');
+
   await filterButton.click();
 
-  // Wait for filter to apply
-  await page.waitForTimeout(500);
+  if (previousState) {
+    const expectedState = previousState === 'true' ? 'false' : 'true';
+    await expect(filterButton).toHaveAttribute('aria-pressed', expectedState);
+  } else {
+    await expect(filterButton).toHaveAttribute('aria-pressed', /true|false/);
+  }
 }
 
 /**
@@ -175,7 +179,15 @@ export async function archiveConversation(page: Page, conversationId: string): P
     page.locator('[data-testid="conversation-action-archive"]')
   );
 
-  await archiveOption.click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/conversations/archive') &&
+        response.request().method() === 'PATCH' &&
+        response.ok()
+    ),
+    archiveOption.click(),
+  ]);
 
   // Wait for conversation to disappear from list
   await expect(conversationItem).toBeHidden({ timeout: 5_000 });
@@ -211,7 +223,15 @@ export async function unarchiveConversation(page: Page, conversationId: string):
     page.locator('[data-testid="conversation-action-unarchive"]')
   );
 
-  await unarchiveOption.click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/conversations/archive') &&
+        response.request().method() === 'PATCH' &&
+        response.ok()
+    ),
+    unarchiveOption.click(),
+  ]);
 
   // Wait for conversation to disappear from archived list
   await expect(conversationItem).toBeHidden({ timeout: 5_000 });
@@ -235,10 +255,18 @@ export async function pinConversation(page: Page, conversationId: string): Promi
     page.locator('[data-testid="conversation-action-pin"]')
   );
 
-  await pinOption.click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/conversations/preferences') &&
+        response.request().method() === 'PATCH' &&
+        response.ok()
+    ),
+    pinOption.click(),
+  ]);
 
   // Wait for pin state to update
-  await page.waitForTimeout(500);
+  await expect(conversationItem.locator('[data-testid="pin-indicator"]')).toBeVisible({ timeout: 5_000 });
 }
 
 /**
@@ -259,10 +287,18 @@ export async function unpinConversation(page: Page, conversationId: string): Pro
     page.locator('[data-testid="conversation-action-unpin"]')
   );
 
-  await unpinOption.click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/conversations/preferences') &&
+        response.request().method() === 'PATCH' &&
+        response.ok()
+    ),
+    unpinOption.click(),
+  ]);
 
   // Wait for pin state to update
-  await page.waitForTimeout(500);
+  await expect(conversationItem.locator('[data-testid="pin-indicator"]')).toBeHidden({ timeout: 5_000 });
 }
 
 /**
@@ -274,10 +310,17 @@ export async function navigateToSpace(page: Page, spaceId: string): Promise<void
     page.locator(`[data-space-id="${spaceId}"]`)
   );
 
-  await spaceElement.click();
-
-  // Wait for navigation to complete
-  await page.waitForTimeout(1000);
+  await Promise.all([
+    page.waitForFunction(
+      (id) => {
+        const target = document.querySelector<HTMLElement>(`[data-testid="space-${id}"]`);
+        return target?.getAttribute('data-selected') === 'true';
+      },
+      spaceId,
+      { timeout: 5_000 }
+    ),
+    spaceElement.click(),
+  ]);
 }
 
 /**
@@ -303,6 +346,8 @@ export async function isConversationPinned(page: Page, conversationId: string): 
  * This helps prevent race conditions in realtime tests.
  */
 export async function waitForRealtimeReady(page: Page): Promise<void> {
-  // Wait for subscription status indicator or a brief stabilization period
-  await page.waitForTimeout(2000); // Supabase Realtime connection establishment
+  await page.waitForFunction(() => {
+    const root = document.documentElement;
+    return root?.getAttribute('data-messaging-realtime-ready') === 'true';
+  }, undefined, { timeout: 15_000 });
 }

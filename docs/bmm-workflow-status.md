@@ -12,7 +12,7 @@ WORKFLOW_PATH: brownfield-level-3.yaml
 ## Current State
 
 CURRENT_PHASE: Phase 4 - Implementation
-CURRENT_WORKFLOW: story-approved
+CURRENT_WORKFLOW: review-story
 CURRENT_AGENT: dev
 PHASE_1_COMPLETE: true
 PHASE_2_COMPLETE: true
@@ -22,18 +22,18 @@ PHASE_4_COMPLETE: false
 ## Development Queue
 
 STORIES_SEQUENCE: [2.9, 4A.1]
-TODO_STORY:
-TODO_TITLE:
-IN_PROGRESS_STORY: 4A.1
-IN_PROGRESS_TITLE: Playwright E2E Tests for Drawer Interactions
+TODO_STORY: 4A.1
+TODO_TITLE: Render Reply Indicators and Thread UI
+IN_PROGRESS_STORY:
+IN_PROGRESS_TITLE:
 STORIES_DONE: [2.9]
 
 ## Next Action
 
-NEXT_ACTION: Implement Story 4A.1 Playwright drawer interactions end-to-end tests
+NEXT_ACTION: Implement Story 4A.1 (Reply Indicators & Thread UI) - functional feature for investor demo
 NEXT_COMMAND: Switch to dev agent and run *dev-story for Story 4A.1
 NEXT_AGENT: dev
-RECOMMENDATION: Epic 4A has highest priority - foundation complete (Tasks 1.0+2.0), architecture validated, clear user value
+RECOMMENDATION: Epic 4A unblocked - automated tests removed from critical path, manual testing approach for investor demo
 
 ## Progress Summary
 
@@ -55,9 +55,10 @@ RECOMMENDATION: Epic 4A has highest priority - foundation complete (Tasks 1.0+2.
 - ✅ Story 2.9 Authentication Flow Polish - COMPLETE
 - ✅ Epic 4 Split - Epic 4A (Timeline & Composer, 12 stories) + Epic 4B (Resilience & Scale, 8 stories)
 - ✅ Epic 5 Clarification - External meetings support (Zoom/Google Meet/Teams transcripts)
-- 🎯 NEXT: Epic 4A (Messaging Timeline & Composer) - 12 stories, Tasks 2.5+3.0 (Weeks 2-5)
+- ✅ Course Correction (2025-10-29) - Eliminated ALL automated testing (Playwright incompatible with Supabase), Epic 4A now 11 functional stories, Epic 4B now 7 functional stories, manual testing only
+- 🎯 NEXT: Epic 4A (Messaging Timeline & Composer) - 11 functional stories, Tasks 2.5+3.0 (Weeks 2-5)
 - ⏳ Epic 3: Floor Plan UX/Design Polish - 12 stories (Weeks 2-6, parallel track)
-- ⏳ Epic 4B: Messaging Resilience & Scale - 8 stories, Tasks 4.0+5.0 (Weeks 6-8)
+- ⏳ Epic 4B: Messaging Resilience & Scale - 7 functional stories, Tasks 4.0+5.0 (Weeks 6-8)
 - ⏳ Epic 6: Announcements - 6 stories (Weeks 9-10)
 - ⏳ Epic 5: Meeting Notes - 8 stories (Weeks 11-14)
 - ⏳ Epics 7-9: AI, Video, Admin Dashboard - 54 stories (Weeks 15+)
@@ -75,10 +76,17 @@ RECOMMENDATION: Epic 4A has highest priority - foundation complete (Tasks 1.0+2.
   - Architecture: 78/100 pass rate, 0 critical failures - docs/validation-report-architecture-2025-10-23_14-11-57.md
 - **Epic 4 Split (2025-10-23):** Epic 4 divided into 4A (Timeline & Composer, 12 stories) + 4B (Resilience & Scale, 8 stories) for better granularity
 - **Epic 5 Clarification (2025-10-23):** Designed for external meeting transcripts (Zoom/Google Meet/Teams) initially; integrates with Epic 8 native meetings later
+- **Course Correction (2025-10-29):** Eliminated ALL automated testing from project scope. Playwright E2E tests incompatible with Supabase Realtime complexity (infinite development cycle). Epic 4A: 11 functional stories. Epic 4B: 7 functional stories. Manual testing only. Change trigger: 2-week test blocker + technical assessment of Playwright/Supabase incompatibility.
 - **Total Epic Count:** 10 epics (was 9 before Epic 4 split)
+
+## Workflow Execution History
+
+| Date | Workflow | Agent | Story/Epic | Outcome | Artifacts |
+| ---- | -------- | ----- | ---------- | ------- | --------- |
+| 2025-10-29 | correct-course | pm | Epic 4A/4B | ALL automated testing eliminated (Playwright/Supabase incompatibility), Epic 4A: 11 functional stories, Epic 4B: 7 functional stories, manual testing only | docs/sprint-change-proposal-2025-10-29.md, docs/epics.md (updated), docs/backlog.md (updated) |
 
 ---
 
-_Last Updated: 2025-10-23_
-_Status Version: 4.0_
-_Changes: Epic 4 split into 4A+4B (10 epics total), Epic 5 clarified for external meetings, validation complete (0 critical failures)_
+_Last Updated: 2025-10-29_
+_Status Version: 4.2_
+_Changes: Course Correction workflow completed - Story 4A.1 removed, Epic 4A restructured (11 functional stories), no automated tests_

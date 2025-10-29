@@ -15,6 +15,7 @@
     "test:api": "playwright test",
     "test:api:debug": "playwright test --debug",
     "test:api:ui": "playwright test --ui",
+    "test:api:ci": "playwright test --project=messaging-drawer --repeat-each=3",
     "test:all": "node run-tests.js"
   },
   "dependencies": {

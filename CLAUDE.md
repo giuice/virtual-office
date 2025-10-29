@@ -120,66 +120,13 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Lint: `npm run lint`
 - Find errors: `npm run type-check`
 
-## Planning mode
-**Trigger**
-- Activate when the user asks for a plan, roadmap, implementation strategy, refactor plan, or debugging plan.
-
-**Audience**
-- Junior developers. Prescriptive and step-by-step. No assumed context.
-
-**Overrides**
-- When active, ignore “Response Format (required)” and “Workflow Example”. Output the planning report only.
-
-**Hard constraints**
-- Produce one GitHub-flavored Markdown report titled `# {VARIABLE}_IMPLEMENTATION_PLAN` where `VARIABLE = UPPER_SNAKE_CASE summary of the task` (e.g., `GOOGLE_OAUTH_NEXTJS`).
-- File name: `IMPLEMENTATION_PLAN.md`.
-- Planning only. No source code, no diffs, no command lines, no config values.
-- No code fences that contain code or commands. ASCII file trees allowed.
-- Use checkboxes `[ ]` for tasks.
-- End with: `Status: Pending user confirmation`.
-
-**Required sections**
-1. **Executive Summary**
-2. **Research Findings**  
-   - Cite titles and URLs when tools allow.  
-   - If tools unavailable, prefix with `Further Research:` and include a short query.
-3. **Implementation Strategy**
-4. **Repository and File Structure**  
-   - ASCII tree of relevant folders/files.  
-   - Existing files to modify: exact paths, role, owner, risks.  
-   - New files to create: exact paths, purpose.  
-   - Change-impact table: file → symbols to add/modify/remove (names only), dependencies, tests impacted.  
-   - Place new files under existing feature folders. Do not add top-level directories.
-5. **Detailed Action Plan** (checkboxes `[ ]`)  
-   For each task include:
-   - Paths to edit or create.  
-   - Symbols to add/modify (function/class/interface names only).  
-   - Rationale and expected behavior change.  
-   - Dependencies and ordering.  
-   - Testing procedures as cases and pass/fail criteria.  
-   - Validation checkpoints and rollback notes.
-6. **Risk Mitigation**
-7. **Success Criteria**
-8. **Open Questions and Assumptions**
-
-**Research protocol**
-- Analyze current project structure and implementations first. Apply the Anti-Duplication Protocol inside the plan.
-- When tools are available, research best practices, pitfalls, libraries, and recent changes; cite sources by title and URL.
-- When tools are unavailable, infer from first principles and mark items `Further Research:` with a proposed query.
-
-**Granularity standard**
-- Reference exact file paths for every change.  
-- Name functions, classes, interfaces, environment keys, and config keys, but do not include bodies or values.  
-- Every checklist item maps to specific files or artifacts.  
-- Respect RLS/auth constraints and the Type Registry. Expand acronyms on first use.
-
 ## Response Format (required)
 When proposing changes, output only:
-1. **Duplication Check:** summary of what you reused or extended.
-2. **Patch Plan:** list of files to touch with exact paths.
-3. **Type Usage:** existing types and exports referenced.
-4. **Diffs or code blocks** limited to changed sections only.
-5. **Deprecations:** if you remove or replace a duplicate, list it.
+1. **Restate Scope** Do not guess. Verify. If unknown, say “I don’t know.”, summary and acceptance criteria.
+2. **Duplication Check:** summary of what you reused or extended.
+3. **Patch Plan:** list of files to touch with exact paths.
+4. **Deprecations:** if you remove or replace a duplicate, list it.
+5. **Concise Report** a concise report guiding user how to test if changes are really working.
 6. **Confirmation Request:** one concrete check the user can run to validate the change in their environment, then end with: `Status: Pending user confirmation`.
 
 # Workflow Example:
@@ -189,7 +136,7 @@ When asked to create, refactor, or improve code, follow this sequence and never 
 1) Restate Scope
    - Summarize the requested change and acceptance criteria in 2–4 lines.
    - If any requirement is unknown, state “I don’t know” and ask and gather information.
-   - You have search, database, and last libs update documentation tools, use it if needs.
+   - You have search, database, and last libs update documentation tools, use it if needs.(Supabase, Context7)
 
 2) Anti-Duplication Protocol
    - Search for existing components/hooks/types.
@@ -199,30 +146,25 @@ When asked to create, refactor, or improve code, follow this sequence and never 
    - List exact files to touch with paths.
    - Map each change to an acceptance criterion.
 
-4) Type & Contract Check
-   - List existing types/exports you will use or extend from `src/types/*`.
-   - Note any RLS/auth constraints that affect repositories.
-
-5) Minimal Diffs
-   - Provide code diffs limited to changed sections only.
+4) Files Size
    - Keep files < ~500 lines and extract hooks where effects are complex.
 
-6) Tests First
-   - Point to existing tests to update or add new test paths and names (Vitest/Playwright).
-   - Include example assertions and how to seed data if needed.
-
-7) Local Verification Steps
+5) Concise Report:
+   - Write a concise report guiding the user on how to test your change, **you must write as the user is a junior developer**.
    - Exact commands: `npm run type-check`, `npm run lint`, `npm run test`, and any Playwright command.
    - Manual check instructions: route to open, user role to use, expected UI/DB outcome.
 
+6) Confirmation Request: 
+   - Just consider the task finished on user confirmation 
+
 8) Response Format Output
+   - **Restate Scope**
    - **Duplication Check**
    - **Patch Plan**
-   - **Type Usage**
-   - **Diffs or code blocks**
    - **Deprecations**
+   - **Concise Report**
    - **Confirmation Request**: Provide one concrete validation the user can run, then end with:
      Status: Pending user confirmation
 
-Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved”. Always end with:
+Rule: Completion is user-gated. Never state or imply “done”, “fixed”, or “resolved” BEFORE user confirmation. Always end with:
 Status: Pending user confirmation, until user confirms

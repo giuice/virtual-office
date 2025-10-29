@@ -301,32 +301,15 @@ This epic completes the core messaging UX, enabling teams to communicate with th
 **Current Status:**
 - ✅ **Foundation Complete (Tasks 1.0 + 2.0):** Data contracts, APIs, unified drawer shell, conversation grouping
 - 🚧 **In Progress:** Timeline UI rendering and composer features
+- ⚠️ **Testing Strategy:** Manual testing only for investor demo - automated tests deferred to Epic 4B
 
-### Stories (12 total; Stories 4A.1-4A.12 = Original 4.11-4.22)
+### Stories (11 total - functional features only)
 
-**Remaining Stories (Tasks 2.5, 3.0):**
-
----
-
-**Story 4A.1: Playwright E2E Tests for Drawer Interactions** (Task 2.5)
-
-As a QA engineer,
-I want end-to-end tests validating drawer interactions,
-So that we ensure the messaging drawer works correctly across different scenarios.
-
-**Acceptance Criteria:**
-1. Test: Open drawer → Select DM conversation → Send message → Verify realtime delivery
-2. Test: Filter conversations by pinned → Verify only pinned conversations show
-3. Test: Switch between room and DM tabs → Verify correct conversation lists load
-4. Test: Navigate to different space on floor plan → Verify drawer stays open and stable
-5. Test: Archive conversation → Verify it moves to archived section
-6. All tests pass in CI/CD pipeline
-
-**Prerequisites:** Tasks 1.0 + 2.0 complete (drawer and conversation list)
+**Remaining Stories (Tasks 3.0 - Timeline & Composer Features):**
 
 ---
 
-**Story 4A.2: Render Reply Indicators and Thread UI** (Task 3.1)
+**Story 4A.1: Render Reply Indicators and Thread UI** (Task 3.1)
 
 As a user,
 I want to see reply threads visually in the message timeline,
@@ -339,11 +322,17 @@ So that I can follow conversation flow and respond to specific messages.
 4. "Reply" button on each message opens composer in reply mode
 5. Reply composer shows preview of message being replied to with cancel option
 
-**Prerequisites:** Story 4A.1
+**Manual Testing Checklist:**
+- [ ] Verify reply thread display in drawer
+- [ ] Test reply composition and thread expansion
+- [ ] Verify real-time updates when others reply
+- [ ] Check thread UI on different screen sizes
+
+**Prerequisites:** Foundation complete (Tasks 1.0 + 2.0)
 
 ---
 
-**Story 4A.3: Reaction Chips and Emoji Picker** (Task 3.1)
+**Story 4A.2: Reaction Chips and Emoji Picker** (Task 3.1)
 
 As a user,
 I want to add emoji reactions to messages,
@@ -357,11 +346,17 @@ So that I can quickly respond without typing full messages.
 5. Click existing reaction chip toggles user's reaction on/off
 6. Reactions update in real-time for all participants
 
-**Prerequisites:** Story 4A.2
+**Manual Testing Checklist:**
+- [ ] Test emoji picker opens and closes correctly
+- [ ] Verify reaction chips display with correct counts
+- [ ] Test toggling reactions on/off
+- [ ] Verify real-time reaction updates across users
+
+**Prerequisites:** Story 4A.1
 
 ---
 
-**Story 4A.4: Pinned and Starred Message Indicators** (Task 3.1)
+**Story 4A.3: Pinned and Starred Message Indicators** (Task 3.1)
 
 As a user,
 I want to pin important messages and star messages for later reference,
@@ -374,11 +369,17 @@ So that I can quickly find key information in busy conversations.
 4. Unpin/unstar options available in context menu
 5. Pin/star actions persist via API (`POST /api/messages/pin`, `/api/messages/star`)
 
-**Prerequisites:** Story 4A.3
+**Manual Testing Checklist:**
+- [ ] Test pin/star via context menu
+- [ ] Verify pinned messages section displays correctly
+- [ ] Test starred filter functionality
+- [ ] Verify persistence after page refresh
+
+**Prerequisites:** Story 4A.2
 
 ---
 
-**Story 4A.5: Read Receipts Display** (Task 3.1)
+**Story 4A.4: Read Receipts Display** (Task 3.1)
 
 As a user,
 I want to see who has read my messages,
@@ -391,11 +392,17 @@ So that I know if my team saw important information.
 4. Read receipts update in real-time as others view messages
 5. Read receipt data fetched from `message_read_receipts` table
 
-**Prerequisites:** Story 4A.4
+**Manual Testing Checklist:**
+- [ ] Verify read status indicators display correctly
+- [ ] Test tooltip showing reader names and timestamps
+- [ ] Verify real-time updates as messages are read
+- [ ] Test DM-specific read receipts
+
+**Prerequisites:** Story 4A.3
 
 ---
 
-**Story 4A.6: Infinite Scroll with Pagination** (Task 3.2)
+**Story 4A.5: Infinite Scroll with Pagination** (Task 3.2)
 
 As a user,
 I want to scroll up through message history infinitely,
@@ -408,11 +415,17 @@ So that I can access old conversations without pagination buttons.
 4. Scroll position maintained after new messages load (no jump)
 5. Performance: smooth scrolling with 500+ messages in conversation
 
-**Prerequisites:** Story 4A.5
+**Manual Testing Checklist:**
+- [ ] Test initial message load (last 50)
+- [ ] Scroll to top and verify older messages load
+- [ ] Verify scroll position doesn't jump
+- [ ] Test with large conversation (100+ messages)
+
+**Prerequisites:** Story 4A.4
 
 ---
 
-**Story 4A.7: Auto-Scroll to New Messages with Indicator** (Task 3.2)
+**Story 4A.6: Auto-Scroll to New Messages with Indicator** (Task 3.2)
 
 As a user,
 I want the feed to auto-scroll when new messages arrive,
@@ -425,11 +438,17 @@ So that I see new content without manual scrolling.
 4. Button shows count of unread messages (e.g., "3 new messages")
 5. Auto-scroll respects user intent (doesn't scroll if user actively reading old messages)
 
-**Prerequisites:** Story 4A.6
+**Manual Testing Checklist:**
+- [ ] Test auto-scroll when at bottom
+- [ ] Test "New Messages" button when scrolled up
+- [ ] Verify button shows correct unread count
+- [ ] Test that auto-scroll respects user intent
+
+**Prerequisites:** Story 4A.5
 
 ---
 
-**Story 4A.8: File Attachment Drag-and-Drop** (Task 3.3)
+**Story 4A.7: File Attachment Drag-and-Drop** (Task 3.3)
 
 As a user,
 I want to drag files into the composer to attach them,
@@ -444,11 +463,18 @@ So that I can share documents, images, and files easily.
 6. Supported file types: images (jpg, png, gif), docs (pdf, docx), archives (zip)
 7. Max file size: 10 MB per attachment
 
-**Prerequisites:** Story 4A.7
+**Manual Testing Checklist:**
+- [ ] Test drag-and-drop file upload
+- [ ] Verify upload progress indicator
+- [ ] Test file preview chip and remove button
+- [ ] Test various file types (images, docs, archives)
+- [ ] Test file size limit (10 MB)
+
+**Prerequisites:** Story 4A.6
 
 ---
 
-**Story 4A.9: File Attachment Preview** (Task 3.3)
+**Story 4A.8: File Attachment Preview** (Task 3.3)
 
 As a user,
 I want to preview attachments inline in the message feed,
@@ -461,11 +487,17 @@ So that I can view images and files without downloading.
 4. Click image opens lightbox viewer with zoom controls
 5. Download button triggers secure file download from Supabase Storage URL
 
-**Prerequisites:** Story 4A.8
+**Manual Testing Checklist:**
+- [ ] Test image thumbnail display and lightbox
+- [ ] Test PDF preview rendering
+- [ ] Test file download functionality
+- [ ] Verify lightbox zoom controls work
+
+**Prerequisites:** Story 4A.7
 
 ---
 
-**Story 4A.10: Voice Note Recording** (Task 3.3)
+**Story 4A.9: Voice Note Recording** (Task 3.3)
 
 As a user,
 I want to record and send voice notes,
@@ -479,11 +511,18 @@ So that I can communicate quickly when typing is inconvenient.
 5. Voice notes display in feed with play/pause button and waveform
 6. Voice note metadata stored in `message_attachments` table with `type: voice_note`
 
-**Prerequisites:** Story 4A.9
+**Manual Testing Checklist:**
+- [ ] Test microphone permission request
+- [ ] Test recording with waveform visualization
+- [ ] Test playback preview before sending
+- [ ] Verify voice note upload and display in feed
+- [ ] Test on different browsers (Chrome, Firefox, Safari)
+
+**Prerequisites:** Story 4A.8
 
 ---
 
-**Story 4A.11: Conversation Search** (Task 3.4)
+**Story 4A.10: Conversation Search** (Task 3.4)
 
 As a user,
 I want to search within a conversation for specific messages,
@@ -497,11 +536,18 @@ So that I can find past information quickly.
 5. Search persists across scrolling (maintains highlights)
 6. Clear search button restores normal view
 
-**Prerequisites:** Story 4A.10
+**Manual Testing Checklist:**
+- [ ] Test search with various keywords
+- [ ] Verify real-time highlighting
+- [ ] Test next/previous navigation
+- [ ] Verify search persists during scroll
+- [ ] Test clear search functionality
+
+**Prerequisites:** Story 4A.9
 
 ---
 
-**Story 4A.12: Starred Messages Filter** (Task 3.4)
+**Story 4A.11: Starred Messages Filter** (Task 3.4)
 
 As a user,
 I want to filter the feed to show only starred messages,
@@ -514,16 +560,24 @@ So that I can review important messages I've saved.
 4. Disable toggle returns to full conversation view
 5. Starred filter works alongside search (can search within starred)
 
-**Prerequisites:** Story 4A.11
+**Manual Testing Checklist:**
+- [ ] Test starred filter toggle
+- [ ] Verify only starred messages display when enabled
+- [ ] Test chronological ordering
+- [ ] Test filter combined with search
+
+**Prerequisites:** Story 4A.10
 
 ---
 
 **Epic 4A Summary:**
-- **Total Stories:** 12
-- **Estimated Effort:** 24-32 hours
+- **Total Stories:** 11 (functional features only)
+- **Estimated Effort:** 22-30 hours
+- **Testing Strategy:** Manual testing only - automated E2E tests deferred to Epic 4B
 - **Dependencies:** Supabase Storage, Web APIs (MediaRecorder for voice notes)
 - **Key Risk:** Attachment handling and voice note encoding across browsers
-- **Task Reference:** `tasks/tasks-0001-prd-unified-messaging-system.md` Tasks 2.5 + 3.0
+- **Task Reference:** `tasks/tasks-0001-prd-unified-messaging-system.md` Task 3.0
+- **Change Note:** Story 4A.1 (Playwright tests) removed to unblock investor demo - automated testing moved to Epic 4B.8
 
 ---
 
@@ -660,42 +714,36 @@ So that I don't miss important communications.
 5. Respect user preferences (can disable notifications per conversation)
 6. Notifications muted when user is actively viewing the conversation
 
+**Manual Testing Checklist:**
+- [ ] Test notification permission request flow
+- [ ] Verify DM notifications show when app in background
+- [ ] Test @mention notifications in spaces
+- [ ] Verify clicking notification opens correct conversation
+- [ ] Test notification preferences per conversation
+
 **Prerequisites:** Story 4B.6
 
 ---
 
-**Story 4B.8: Playwright Tests for Offline and Realtime** (Task 4.5)
-
-As a QA engineer,
-I want E2E tests covering offline scenarios and reconnection,
-So that we ensure messaging reliability under adverse network conditions.
-
-**Acceptance Criteria:**
-1. Test: Send message while offline → Goes to queue → Auto-sends on reconnect
-2. Test: Disconnect Realtime → Polling fallback activates → Messages received via polling
-3. Test: Reconnection with exponential backoff → Verify retry intervals
-4. Test: Duplicate message prevention → Same message doesn't appear twice after reconnect
-5. Test: Multi-client read receipts → Mark read on device 1 → Syncs to device 2
-
-**Prerequisites:** Story 4B.7
-
----
-
 **Epic 4B Summary:**
-- **Total Stories:** 8
-- **Estimated Effort:** 16-24 hours
+- **Total Stories:** 7 (all functional)
+- **Estimated Effort:** 14-20 hours
+- **Testing Strategy:** Manual testing only - no automated tests
 - **Dependencies:** Supabase Realtime, Web APIs (Notifications API)
-- **Key Risk:** Offline reliability and reconnection complexity - extensive testing required
+- **Key Risk:** Offline reliability and reconnection complexity - thorough manual testing required
 - **Task Reference:** `tasks/tasks-0001-prd-unified-messaging-system.md` Tasks 4.0 + 5.0
+- **Change Note:** All automated testing eliminated - Playwright incompatible with Supabase tech stack complexity
 
 ---
 
 **Combined Epic 4A + 4B Summary:**
-- **Total Stories:** 20 (4A: 12 stories, 4B: 8 stories)
-- **Combined Effort:** 40-56 hours
+- **Total Stories:** 18 functional stories (4A: 11 stories, 4B: 7 stories)
+- **Combined Effort:** 36-50 hours
+- **Testing Strategy:** Manual testing only - no automated tests
 - **Implementation Order:** Complete Epic 4A first (user-facing features), then Epic 4B (resilience/scale)
 - **Original Epic 4 Stories 4.1-4.10:** Complete (Tasks 1.0 + 2.0)
-- **Remaining Stories:** 4A.1-4A.12 (Timeline/Composer) + 4B.1-4B.8 (Resilience/Scale)
+- **Remaining Stories:** 4A.1-4A.11 (Timeline/Composer) + 4B.1-4B.7 (Resilience/Scale)
+- **Change Note:** All automated testing eliminated per technical assessment - Playwright incompatible with Supabase Realtime complexity
 
 ---
 

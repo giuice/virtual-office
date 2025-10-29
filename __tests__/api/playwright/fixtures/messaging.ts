@@ -1,4 +1,11 @@
-import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type Page,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+} from '@playwright/test';
 
 type MessagingTestData = {
   runId: string;
@@ -17,12 +24,6 @@ type MessagingTestData = {
     password: string;
     userId: string;
   };
-};
-
-type MessagingFixtures = {
-  primaryPage: Page;
-  secondaryPage: Page;
-  messagingData: MessagingTestData;
 };
 
 const PLAYWRIGHT_SECRET = process.env.PLAYWRIGHT_TEST_SECRET;
@@ -93,6 +94,25 @@ async function login(page: Page, email: string, password: string) {
   await page.waitForURL(/dashboard|floor-plan/, { timeout: 30_000 });
 }
 
+async function createStorageState(browser: Browser, email: string, password: string): Promise<AuthStorageState> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, email, password);
+  const state = await context.storageState();
+  await context.close();
+  return state;
+}
+
+type AuthStorageState = Awaited<ReturnType<BrowserContext['storageState']>>;
+
+type MessagingFixtures = {
+  primaryPage: Page;
+  secondaryPage: Page;
+  messagingData: MessagingTestData;
+  primaryStorageState: AuthStorageState;
+  secondaryStorageState: AuthStorageState;
+};
+
 export const test = base.extend<MessagingFixtures>({
   messagingData: async ({ request }, use) => {
     if (!PLAYWRIGHT_SECRET) {
@@ -107,19 +127,23 @@ export const test = base.extend<MessagingFixtures>({
       await cleanupMessagingData(request, data);
     }
   },
-  primaryPage: async ({ browser, messagingData }, use) => {
-    const context = await browser.newContext();
+  primaryStorageState: async ({ browser, messagingData }, use) => {
+    const state = await createStorageState(browser, messagingData.primary.email, messagingData.primary.password);
+    await use(state);
+  },
+  secondaryStorageState: async ({ browser, messagingData }, use) => {
+    const state = await createStorageState(browser, messagingData.secondary.email, messagingData.secondary.password);
+    await use(state);
+  },
+  primaryPage: async ({ browser, primaryStorageState }, use) => {
+    const context = await browser.newContext({ storageState: primaryStorageState });
     const page = await context.newPage();
-
-    await login(page, messagingData.primary.email, messagingData.primary.password);
     await use(page);
     await context.close();
   },
-  secondaryPage: async ({ browser, messagingData }, use) => {
-    const context = await browser.newContext();
+  secondaryPage: async ({ browser, secondaryStorageState }, use) => {
+    const context = await browser.newContext({ storageState: secondaryStorageState });
     const page = await context.newPage();
-
-    await login(page, messagingData.secondary.email, messagingData.secondary.password);
     await use(page);
     await context.close();
   },

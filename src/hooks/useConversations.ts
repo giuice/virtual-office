@@ -415,10 +415,19 @@ export function useConversations() {
   const pinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('pin-conv') : '';
     // Optimistic
-    setConversations(prev => prev.map(c => c.id === conversationId ? {
-      ...c,
-      preferences: { ...(c.preferences ?? {}), isPinned: true, pinnedOrder: c.preferences?.pinnedOrder ?? 0 }
-    } : c));
+    setConversations(prev => prev.map(c => {
+      if (c.id !== conversationId || !c.preferences) {
+        return c;
+      }
+      return {
+        ...c,
+        preferences: {
+          ...c.preferences,
+          isPinned: true,
+          pinnedOrder: c.preferences.pinnedOrder ?? 0,
+        },
+      };
+    }));
     try {
       await messagingApi.updateConversationPreferences(conversationId, { isPinned: true });
       if (debugLogger.messaging.enabled()) {
@@ -426,10 +435,18 @@ export function useConversations() {
       }
     } catch (error) {
       // Revert
-      setConversations(prev => prev.map(c => c.id === conversationId ? {
-        ...c,
-        preferences: { ...(c.preferences ?? {}), isPinned: false }
-      } : c));
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId || !c.preferences) {
+          return c;
+        }
+        return {
+          ...c,
+          preferences: {
+            ...c.preferences,
+            isPinned: false,
+          },
+        };
+      }));
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.error('useConversations.pin', 'error', { traceId, conversationId, error: error instanceof Error ? error.message : error });
       }
@@ -440,10 +457,19 @@ export function useConversations() {
   const unpinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('unpin-conv') : '';
     // Optimistic
-    setConversations(prev => prev.map(c => c.id === conversationId ? {
-      ...c,
-      preferences: { ...(c.preferences ?? {}), isPinned: false }
-    } : c));
+    setConversations(prev => prev.map(c => {
+      if (c.id !== conversationId || !c.preferences) {
+        return c;
+      }
+      return {
+        ...c,
+        preferences: {
+          ...c.preferences,
+          isPinned: false,
+          pinnedOrder: null,
+        },
+      };
+    }));
     try {
       await messagingApi.updateConversationPreferences(conversationId, { isPinned: false });
       if (debugLogger.messaging.enabled()) {
@@ -451,10 +477,18 @@ export function useConversations() {
       }
     } catch (error) {
       // Revert
-      setConversations(prev => prev.map(c => c.id === conversationId ? {
-        ...c,
-        preferences: { ...(c.preferences ?? {}), isPinned: true }
-      } : c));
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId || !c.preferences) {
+          return c;
+        }
+        return {
+          ...c,
+          preferences: {
+            ...c.preferences,
+            isPinned: true,
+          },
+        };
+      }));
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.error('useConversations.unpin', 'error', { traceId, conversationId, error: error instanceof Error ? error.message : error });
       }
