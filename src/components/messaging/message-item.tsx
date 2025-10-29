@@ -13,12 +13,13 @@ import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAva
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  CheckCheck, 
-  AlertCircle, 
+  CheckCheck,
+  AlertCircle,
   File,
   Reply,
   Smile,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
@@ -34,17 +35,28 @@ interface MessageItemProps {
   sender?: User | AvatarUser | null;
   onReply?: (message: Message) => void;
   onReaction?: (messageId: string, emoji: string) => void;
+  replyCount?: number;
+  onToggleThread?: () => void;
+  isThreadExpanded?: boolean;
+  depth?: number;
+  parentMessage?: Message | null;
 }
 
 export function MessageItem({
   message,
   sender,
   onReply,
-  onReaction
+  onReaction,
+  replyCount = 0,
+  onToggleThread,
+  isThreadExpanded = false,
+  depth = 0,
+  parentMessage,
 }: MessageItemProps) {
   const { users } = usePresence();
   const { companyUsers, currentUserProfile } = useCompany();
   const [showActions, setShowActions] = useState(false);
+  const showReplyIndicator = replyCount > 0;
 
   // Get sender presence information
   const senderPresence = users?.find(u => u.id === message.senderId);
@@ -162,10 +174,18 @@ export function MessageItem({
   // Render reply badge if this is a reply to another message
   const renderReplyBadge = () => {
     if (!message.replyToId) return null;
-    
+
+    const previewText = parentMessage?.content ?? 'Original message';
+
     return (
-      <div className="bg-secondary/50 p-2 rounded-t-md text-xs text-muted-foreground">
-        Replying to a message
+      <div
+        className="bg-secondary/50 p-2 rounded-t-md text-xs text-muted-foreground"
+        data-testid={`reply-context-${message.id}`}
+      >
+        <div className="font-semibold mb-0.5">Replying to {parentMessage ? 'this thread' : 'a message'}</div>
+        <div className="text-muted-foreground/80 truncate" title={previewText}>
+          {previewText}
+        </div>
       </div>
     );
   };
@@ -244,11 +264,12 @@ export function MessageItem({
     <div
       data-testid={`message-${message.id}`}
       className={cn(
-        "relative flex items-start mb-4 px-4 group",
-        isCurrentUser ? "justify-end" : "justify-start"
+        'relative flex items-start mb-4 px-4 group',
+        isCurrentUser ? 'justify-end' : 'justify-start'
       )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
+      data-thread-depth={depth}
     >
       {showAvatar && (
         interactiveUser ? (
@@ -285,10 +306,10 @@ export function MessageItem({
         
         <div
           className={cn(
-            "p-3 rounded-md",
-            isCurrentUser 
-              ? "bg-primary text-primary-foreground" 
-              : "bg-secondary text-secondary-foreground"
+            'p-3 rounded-md',
+            isCurrentUser
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground'
           )}
         >
           {renderMessageContent()}
@@ -301,6 +322,34 @@ export function MessageItem({
           {isCurrentUser && message.status && (
             <span className="ml-2">{getMessageStatusIcon(message.status)}</span>
           )}
+        </div>
+
+        <div className="flex items-center gap-2 mt-2">
+          {showReplyIndicator && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onToggleThread?.()}
+              data-testid={`reply-count-${message.id}`}
+            >
+              <ChevronDown
+                className={cn('h-3 w-3 mr-1 transition-transform', {
+                  'rotate-180': isThreadExpanded,
+                })}
+              />
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => onReply?.(message)}
+            data-testid={`reply-button-${message.id}`}
+          >
+            Reply
+          </Button>
         </div>
       </div>
       

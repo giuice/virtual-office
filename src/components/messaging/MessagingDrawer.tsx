@@ -31,6 +31,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
     getOrCreateUserConversation,
     getOrCreateRoomConversation,
     loadingConversations,
+    refreshingConversations,
+    hasLoadedConversations,
     isDrawerOpen,
     isMinimized,
     activeView,
@@ -246,6 +248,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               selectedConversationId={activeConversation?.id || null}
               onSelectConversation={handleSelectConversation}
               isLoading={loadingConversations}
+              isRefreshing={refreshingConversations}
+              hasLoadedConversations={hasLoadedConversations}
             />
           )}
 

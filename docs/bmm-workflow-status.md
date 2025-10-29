@@ -12,7 +12,7 @@ WORKFLOW_PATH: brownfield-level-3.yaml
 ## Current State
 
 CURRENT_PHASE: Phase 4 - Implementation
-CURRENT_WORKFLOW: review-story
+CURRENT_WORKFLOW: story-done
 CURRENT_AGENT: dev
 PHASE_1_COMPLETE: true
 PHASE_2_COMPLETE: true
@@ -21,19 +21,19 @@ PHASE_4_COMPLETE: false
 
 ## Development Queue
 
-STORIES_SEQUENCE: [2.9, 4A.1]
-TODO_STORY: 4A.1
-TODO_TITLE: Render Reply Indicators and Thread UI
+STORIES_SEQUENCE: [4A.2, 4A.3, 4A.4]
+TODO_STORY: 4A.2
+TODO_TITLE: Reaction Chips and Emoji Picker
 IN_PROGRESS_STORY:
 IN_PROGRESS_TITLE:
-STORIES_DONE: [2.9]
+STORIES_DONE: [2.9, 4A.1]
 
 ## Next Action
 
-NEXT_ACTION: Implement Story 4A.1 (Reply Indicators & Thread UI) - functional feature for investor demo
-NEXT_COMMAND: Switch to dev agent and run *dev-story for Story 4A.1
-NEXT_AGENT: dev
-RECOMMENDATION: Epic 4A unblocked - automated tests removed from critical path, manual testing approach for investor demo
+NEXT_ACTION: Draft Story 4A.2 implementation plan and hand off for development
+NEXT_COMMAND: *create-story (Story 4A.2 Reaction Chips and Emoji Picker)
+NEXT_AGENT: sm
+RECOMMENDATION: Use updated sprint-status.yaml as source of truth; keep manual testing approach for investor demo
 
 ## Progress Summary
 
@@ -56,6 +56,8 @@ RECOMMENDATION: Epic 4A unblocked - automated tests removed from critical path, 
 - ✅ Epic 4 Split - Epic 4A (Timeline & Composer, 12 stories) + Epic 4B (Resilience & Scale, 8 stories)
 - ✅ Epic 5 Clarification - External meetings support (Zoom/Google Meet/Teams transcripts)
 - ✅ Course Correction (2025-10-29) - Eliminated ALL automated testing (Playwright incompatible with Supabase), Epic 4A now 11 functional stories, Epic 4B now 7 functional stories, manual testing only
+- ✅ Story 4A.1 Playwright E2E Tests for Drawer Interactions - COMPLETE (2025-10-29)
+- ✅ Sprint status regenerated (2025-10-29) – full backlog captured from docs/epics.md
 - 🎯 NEXT: Epic 4A (Messaging Timeline & Composer) - 11 functional stories, Tasks 2.5+3.0 (Weeks 2-5)
 - ⏳ Epic 3: Floor Plan UX/Design Polish - 12 stories (Weeks 2-6, parallel track)
 - ⏳ Epic 4B: Messaging Resilience & Scale - 7 functional stories, Tasks 4.0+5.0 (Weeks 6-8)
@@ -89,4 +91,4 @@ RECOMMENDATION: Epic 4A unblocked - automated tests removed from critical path, 
 
 _Last Updated: 2025-10-29_
 _Status Version: 4.2_
-_Changes: Course Correction workflow completed - Story 4A.1 removed, Epic 4A restructured (11 functional stories), no automated tests_
+_Changes: Story 4A.1 marked done; Course Correction workflow completed - Epic 4A restructured (11 functional stories), no automated tests_

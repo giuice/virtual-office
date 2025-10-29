@@ -1,7 +1,7 @@
 // src/components/messaging/message-feed.tsx
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message } from '@/types/messaging';
@@ -45,7 +45,43 @@ export function MessageFeed({
   
   const [isLoading, setIsLoading] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const messageMap = useMemo(() => {
+    const map = new Map<string, Message>();
+    messages.forEach((message) => {
+      map.set(message.id, message);
+    });
+    return map;
+  }, [messages]);
+
+  const repliesByParent = useMemo(() => {
+    const grouped = new Map<string, Message[]>();
+    messages.forEach((message) => {
+      if (message.replyToId) {
+        const list = grouped.get(message.replyToId) ?? [];
+        list.push(message);
+        grouped.set(message.replyToId, list);
+      }
+    });
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    });
+
+    return grouped;
+  }, [messages]);
+
+  const topLevelMessages = useMemo(() => {
+    return messages.filter((message) => {
+      if (!message.replyToId) {
+        return true;
+      }
+      // If parent message is not currently loaded, treat as top-level so it remains visible
+      return !messageMap.has(message.replyToId);
+    });
+  }, [messages, messageMap]);
   
   // Initialize / switch conversation when roomId changes
   useEffect(() => {
@@ -74,6 +110,36 @@ export function MessageFeed({
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  useEffect(() => {
+    // Collapse any thread entries that no longer have replies
+    setExpandedThreads((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        if (!repliesByParent.has(key) || (repliesByParent.get(key)?.length ?? 0) === 0) {
+          delete next[key];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [repliesByParent]);
+
+  useEffect(() => {
+    if (!replyToMessage) {
+      return;
+    }
+    const parentId = replyToMessage.replyToId && messageMap.has(replyToMessage.replyToId)
+      ? replyToMessage.replyToId
+      : replyToMessage.id;
+    setExpandedThreads((prev) => {
+      if (prev[parentId]) {
+        return prev;
+      }
+      return { ...prev, [parentId]: true };
+    });
+  }, [replyToMessage, messageMap]);
   
   // Handle sending a message
   const handleSendMessage = async (content: string) => {
@@ -98,6 +164,43 @@ export function MessageFeed({
   const handleReaction = (messageId: string, emoji: string) => {
     addReaction(messageId, emoji);
   };
+
+  const toggleThread = useCallback((messageId: string) => {
+    setExpandedThreads((prev) => ({
+      ...prev,
+      [messageId]: !prev[messageId],
+    }));
+  }, []);
+
+  const renderMessageTree = useCallback((message: Message, depth = 0): React.ReactNode => {
+    const replies = repliesByParent.get(message.id) ?? [];
+    const replyCount = replies.length;
+    const isExpanded = expandedThreads[message.id] ?? false;
+    const parentMessage = depth > 0 && message.replyToId ? messageMap.get(message.replyToId) ?? null : null;
+
+    return (
+      <div key={`${message.id}-${depth}`} data-thread-depth={depth} className={depth > 0 ? 'mt-2' : undefined}>
+        <MessageItem
+          message={message}
+          onReply={handleReply}
+          onReaction={handleReaction}
+          replyCount={replyCount}
+          onToggleThread={replyCount > 0 ? () => toggleThread(message.id) : undefined}
+          isThreadExpanded={isExpanded}
+          depth={depth}
+          parentMessage={parentMessage}
+        />
+        {replyCount > 0 && isExpanded && (
+          <div
+            className="ml-6 border-l border-border/60 pl-4 space-y-2 pt-2"
+            data-testid={`thread-panel-${message.id}`}
+          >
+            {replies.map((reply) => renderMessageTree(reply, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }, [expandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap]);
   
   // Render loading state
   if (isLoading || loadingMessages) {
@@ -183,19 +286,12 @@ export function MessageFeed({
           )}
           
           <div className="py-4">
-            {messages.length === 0 ? (
+            {topLevelMessages.length === 0 ? (
               <div className="text-center text-muted-foreground p-4">
                 <p>No messages yet. Start the conversation!</p>
               </div>
             ) : (
-              messages.map((message) => (
-                <MessageItem 
-                  key={message.id}
-                  message={message}
-                  onReply={handleReply}
-                  onReaction={handleReaction}
-                />
-              ))
+              topLevelMessages.map((message) => renderMessageTree(message))
             )}
             <div ref={messagesEndRef} />
           </div>

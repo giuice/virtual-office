@@ -26,6 +26,8 @@ export interface MessagingContextType {
   activeConversation: Conversation | null;
   lastActiveConversation?: Conversation | null;
   loadingConversations: boolean;
+  refreshingConversations: boolean;
+  hasLoadedConversations: boolean;
   errorConversations: string | null;
   setActiveConversation: (conversation: Conversation | null) => void;
   getOrCreateRoomConversation: (roomId: string, roomName: string) => Promise<Conversation>;

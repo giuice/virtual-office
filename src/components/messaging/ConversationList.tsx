@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
-import { Pin, Hash, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Pin, Hash, MessageSquare, MoreHorizontal, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -25,6 +25,8 @@ interface ConversationListProps {
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   isLoading?: boolean;
+  isRefreshing?: boolean;
+  hasLoadedConversations?: boolean;
 }
 
 // Helper to format relative time
@@ -52,6 +54,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   selectedConversationId,
   onSelectConversation,
   isLoading = false,
+  isRefreshing = false,
+  hasLoadedConversations = false,
 }) => {
   const { currentUserProfile, companyUsers } = useCompany();
   const { archiveConversation, unarchiveConversation, refreshConversations, pinConversation, unpinConversation } = useMessaging();
@@ -348,16 +352,18 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   // Loading state
-  if (isLoading) {
-    return <div className="p-4 text-center text-muted-foreground">Loading conversations...</div>;
-  }
-
-  // Empty state
   const hasConversations = groupedConversations.pinned.length > 0 ||
                           groupedConversations.direct.length > 0 ||
                           groupedConversations.rooms.length > 0;
 
-  if (!hasConversations) {
+  const showInitialLoading = isLoading && !hasLoadedConversations;
+
+  if (showInitialLoading) {
+    return <div className="p-4 text-center text-muted-foreground">Loading conversations...</div>;
+  }
+
+  // Empty state
+  if (!hasConversations && hasLoadedConversations) {
     return <div className="p-4 text-center text-muted-foreground">No conversations yet.</div>;
   }
 
@@ -369,7 +375,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           <TabsList>
             <TabsTrigger value="dms" data-testid="conversation-tab-dms">DMs</TabsTrigger>
             <TabsTrigger value="rooms" data-testid="conversation-tab-rooms">Rooms</TabsTrigger>
-            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="all" data-testid="conversation-tab-all">All</TabsTrigger>
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-2">
@@ -397,6 +403,16 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           </Button>
         </div>
       </div>
+
+      {isRefreshing && hasLoadedConversations && (
+        <div
+          className="px-3 py-1 text-xs text-muted-foreground flex items-center gap-1"
+          data-testid="conversation-refresh-indicator"
+        >
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>Refreshing conversations…</span>
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-1 p-2">

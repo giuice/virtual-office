@@ -358,6 +358,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     activeConversation: conversationsManager.activeConversation,
     lastActiveConversation: conversationsManager.lastActiveConversation,
     loadingConversations: conversationsManager.loadingConversations,
+    refreshingConversations: conversationsManager.refreshingConversations,
+    hasLoadedConversations: conversationsManager.hasLoadedConversations,
     errorConversations: conversationsManager.errorConversations,
     setActiveConversation: conversationsManager.setActiveConversation,
     getOrCreateRoomConversation: conversationsManager.getOrCreateRoomConversation,

@@ -1,0 +1,135 @@
+# generated: 2025-10-29T18:39:05.832120+00:00
+# project: virtual-office
+# project_key: virtual-office
+# tracking_system: file-system
+# story_location: "{project-root}/docs/stories"
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists in epic file but not contexted
+#   - contexted: Epic tech context created (required before drafting stories)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM drafts next story after previous one is 'done'
+
+generated: 2025-10-29T18:39:05.832120+00:00
+project: virtual-office
+project_key: virtual-office
+tracking_system: file-system
+story_location: "{project-root}/docs/stories"
+
+development_status:
+  epic-1: backlog
+  epic-1-retrospective: optional
+  epic-2: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-visual-design-overhaul: backlog
+  3-2-space-occupancy-visualization: backlog
+  3-3-customizable-space-styling: backlog
+  3-4-improved-space-selection-ux: backlog
+  3-5-space-grouping-and-zones: backlog
+  3-6-enhanced-zoom-and-pan-controls: backlog
+  3-7-space-templates-gallery: backlog
+  3-8-space-capacity-and-room-full-handling: backlog
+  3-9-real-time-presence-animation: backlog
+  3-10-space-detail-panel-redesign: backlog
+  3-11-drag-and-drop-space-positioning-polish: backlog
+  3-12-mobile-responsive-floor-plan-basic: backlog
+  epic-3-retrospective: optional
+  epic-4a: backlog
+  4a-1-render-reply-indicators-and-thread-ui: done
+  4a-2-reaction-chips-and-emoji-picker: backlog
+  4a-3-pinned-and-starred-message-indicators: backlog
+  4a-4-read-receipts-display: backlog
+  4a-5-infinite-scroll-with-pagination: backlog
+  4a-6-auto-scroll-to-new-messages-with-indicator: backlog
+  4a-7-file-attachment-drag-and-drop: backlog
+  4a-8-file-attachment-preview: backlog
+  4a-9-voice-note-recording: backlog
+  4a-10-conversation-search: backlog
+  4a-11-starred-messages-filter: backlog
+  epic-4a-retrospective: optional
+  epic-4b: backlog
+  4b-1-offline-message-queue: backlog
+  4b-2-realtime-reconnection-with-exponential-backoff: backlog
+  4b-3-polling-fallback-for-missed-messages: backlog
+  4b-4-typing-indicators: backlog
+  4b-5-multi-client-read-receipt-sync: backlog
+  4b-6-messaging-analytics-events: backlog
+  4b-7-desktop-notifications: backlog
+  epic-4b-retrospective: optional
+  epic-5: backlog
+  5-1-meeting-note-creation-ui: backlog
+  5-2-action-item-tracking: backlog
+  5-3-meeting-note-viewing-and-editing: backlog
+  5-4-ai-meeting-transcript-upload-external-meetings: backlog
+  5-5-ai-generated-summary: backlog
+  5-6-ai-action-item-extraction: backlog
+  5-7-meeting-note-search: backlog
+  5-8-action-item-notifications-and-reminders: backlog
+  epic-5-retrospective: optional
+  epic-6: backlog
+  6-1-announcement-creation-admin: backlog
+  6-2-announcement-display-for-users: backlog
+  6-3-announcement-filtering-and-search: backlog
+  6-4-announcement-editing-and-deletion: backlog
+  6-5-announcement-notifications: backlog
+  6-6-announcement-analytics-admin: backlog
+  epic-6-retrospective: optional
+  epic-7: backlog
+  7-1-ai-service-integration-setup: backlog
+  7-2-real-time-meeting-transcription: backlog
+  7-3-semantic-search-across-messages: backlog
+  7-4-intelligent-message-summarization: backlog
+  7-5-ai-powered-meeting-recaps: backlog
+  7-6-task-and-reminder-extraction: backlog
+  7-7-smart-availability-predictions: backlog
+  7-8-context-aware-ai-assistant-chat-interface: backlog
+  7-9-ai-translation-for-global-teams: backlog
+  7-10-ai-powered-search-suggestions: backlog
+  7-11-ai-cost-monitoring-and-limits: backlog
+  7-12-ai-feature-opt-out: backlog
+  epic-7-retrospective: optional
+  epic-8: backlog
+  8-1-webrtc-infrastructure-setup: backlog
+  8-2-audio-only-calling: backlog
+  8-3-video-conferencing: backlog
+  8-4-screen-sharing: backlog
+  8-5-virtual-whiteboard: backlog
+  8-6-call-recording: backlog
+  8-7-background-blur-and-virtual-backgrounds: backlog
+  8-8-call-quality-indicators: backlog
+  8-9-picture-in-picture-mode: backlog
+  8-10-integration-with-calendar-future: backlog
+  epic-8-retrospective: optional
+  epic-9: backlog
+  9-1-admin-dashboard-home: backlog
+  9-2-presence-report-generation: backlog
+  9-3-space-utilization-analytics: backlog
+  9-4-user-activity-timeline: backlog
+  9-5-team-collaboration-patterns: backlog
+  9-6-message-analytics: backlog
+  9-7-compliance-audit-export: backlog
+  9-8-custom-report-builder: backlog
+  9-9-real-time-monitoring-view: backlog
+  9-10-performance-and-health-metrics: backlog
+  9-11-user-management-tools: backlog
+  9-12-data-retention-and-privacy-controls: backlog
+  epic-9-retrospective: optional

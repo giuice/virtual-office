@@ -35,6 +35,8 @@ export function useConversations() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [lastActiveConversation, setLastActiveConversation] = useState<Conversation | null>(null);
   const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
+  const [refreshingConversations, setRefreshingConversations] = useState<boolean>(false);
+  const [hasLoadedConversations, setHasLoadedConversations] = useState<boolean>(false);
   const [errorConversations, setErrorConversations] = useState<string | null>(null);
   
   // Subscribe to realtime updates using the Database User ID (canonical)
@@ -92,7 +94,11 @@ export function useConversations() {
     }
 
     try {
-      setLoadingConversations(true);
+      if (!hasLoadedConversations) {
+        setLoadingConversations(true);
+      } else {
+        setRefreshingConversations(true);
+      }
       setErrorConversations(null);
 
       // Query conversations by Database User ID
@@ -113,6 +119,9 @@ export function useConversations() {
       }
 
       setConversations(result.conversations);
+      if (!hasLoadedConversations) {
+        setHasLoadedConversations(true);
+      }
     } catch (error) {
       if (instrumentationEnabled) {
         const duration = start ? getTimestamp() - start : 0;
@@ -127,8 +136,9 @@ export function useConversations() {
       setErrorConversations('Failed to load conversations');
     } finally {
       setLoadingConversations(false);
+      setRefreshingConversations(false);
     }
-  }, [currentUserProfile?.id]);
+  }, [currentUserProfile?.id, hasLoadedConversations]);
 
   const clearLastActiveConversation = useCallback(() => {
     setLastActiveConversation(null);
@@ -639,6 +649,8 @@ export function useConversations() {
     lastActiveConversation,
     setActiveConversation,
     loadingConversations,
+    refreshingConversations,
+    hasLoadedConversations,
     errorConversations,
     refreshConversations,
     getOrCreateRoomConversation,

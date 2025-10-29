@@ -93,7 +93,10 @@ export function MessageComposer({
       : null;
 
     return (
-      <div className="flex items-start p-2 rounded-md bg-secondary mb-2">
+      <div
+        className="flex items-start p-2 rounded-md bg-secondary mb-2"
+        data-testid="reply-composer-preview"
+      >
         <div className="flex-1 text-sm">
           <div className="font-semibold">
             Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
@@ -105,6 +108,7 @@ export function MessageComposer({
           size="sm"
           className="h-6 w-6 p-0"
           onClick={onCancelReply}
+          data-testid="reply-preview-dismiss"
         >
           <X className="h-4 w-4" />
         </Button>
@@ -136,6 +140,7 @@ export function MessageComposer({
               className="h-8 w-8"
               onClick={handleFileUpload}
               disabled={disabled}
+              data-testid="composer-attach-button"
             >
               <Paperclip className="h-4 w-4" />
             </Button>
@@ -145,6 +150,7 @@ export function MessageComposer({
               size="icon"
               className="h-8 w-8"
               disabled={disabled}
+              data-testid="composer-image-button"
             >
               <Image className="h-4 w-4" />
             </Button>
@@ -154,6 +160,7 @@ export function MessageComposer({
               size="icon"
               className="h-8 w-8"
               disabled={disabled}
+              data-testid="composer-emoji-button"
             >
               <Smile className="h-4 w-4" />
             </Button>
@@ -162,6 +169,7 @@ export function MessageComposer({
               ref={fileInputRef}
               className="hidden"
               disabled={disabled}
+              data-testid="composer-file-input"
             />
             <Button
               type="submit"
