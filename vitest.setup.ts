@@ -1,5 +1,6 @@
 // vitest.setup.ts
 import '@testing-library/react';
+import '@testing-library/jest-dom';
 import { vi, expect } from 'vitest';
 
 // Mock Supabase client for realtime testing
@@ -265,29 +266,11 @@ vi.mock('@/lib/auth/session', () => {
   };
 });
 
-// Mock repositories
-vi.mock('@/repositories/getSupabaseRepositories', () => {
-  return {
-    getSupabaseRepositories: vi.fn().mockResolvedValue({
-      messageRepository: {
-        findById: vi.fn().mockResolvedValue({
-          id: 'message-123',
-          conversationId: 'conversation-123',
-          senderId: 'user-123',
-          content: 'Test message',
-          attachments: [],
-          reactions: [],
-        }),
-        addAttachment: vi.fn().mockResolvedValue({
-          id: 'attachment-123',
-          name: 'test.jpg',
-          type: 'image/jpeg',
-          size: 1024,
-          url: 'https://example.com/test.jpg',
-          thumbnailUrl: null,
-        }),
-        updateStatus: vi.fn().mockResolvedValue(true),
-      },
-    }),
-  };
-});
+// Mock debug logger
+vi.mock('@/utils/debug-logger', () => ({
+  debugLogger: {
+    messaging: {
+      event: vi.fn(),
+    },
+  },
+}));
