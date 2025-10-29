@@ -378,8 +378,21 @@ export function useMessages(activeConversationId: string | null) {
   const addReaction = useCallback(
     async (messageId: string, emoji: string) => {
       if (!currentUserProfile?.id || !activeConversationId) return;
+      
+      const instrumentationEnabled = debugLogger.messaging.enabled();
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useMessages.addReaction', 'toggle-start', {
+          messageId,
+          emoji,
+          conversationId: activeConversationId,
+        });
+      }
+      
+      // Snapshot current state for rollback
+      const previousData = queryClient.getQueryData(['messages', activeConversationId]);
+      
       try {
-        // Optimistic add
+        // Optimistic toggle
         queryClient.setQueryData(
           ['messages', activeConversationId],
           (oldData:
@@ -391,10 +404,14 @@ export function useMessages(activeConversationId: string | null) {
               messages: page.messages.map((m) => {
                 if (m.id !== messageId) return m;
                 const reactions = [...(m.reactions || [])];
-                const exists = reactions.find(
+                const existingIndex = reactions.findIndex(
                   (r) => r.userId === currentUserProfile.id && r.emoji === emoji
                 );
-                if (!exists) {
+                if (existingIndex >= 0) {
+                  // Remove reaction
+                  reactions.splice(existingIndex, 1);
+                } else {
+                  // Add reaction
                   reactions.push({ userId: currentUserProfile.id, emoji, timestamp: new Date() });
                 }
                 return { ...m, reactions };
@@ -404,10 +421,27 @@ export function useMessages(activeConversationId: string | null) {
           }
         );
 
-        await messagingApi.addReaction(messageId, emoji, currentUserProfile.id);
+        const result = await messagingApi.toggleReaction(messageId, emoji);
+        
+        if (instrumentationEnabled) {
+          debugLogger.messaging.event('useMessages.addReaction', 'toggle-success', {
+            messageId,
+            emoji,
+            action: result.action,
+          });
+        }
       } catch (error) {
-        // On error, we could revert, but for now just log
-        console.error('Error adding reaction:', error);
+        // Rollback optimistic update
+        queryClient.setQueryData(['messages', activeConversationId], previousData);
+        
+        debugLogger.messaging.error('useMessages.addReaction', 'toggle-error', {
+          messageId,
+          emoji,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        
+        console.error('Error toggling reaction:', error);
+        throw error;
       }
     },
     [activeConversationId, currentUserProfile?.id, queryClient]
@@ -415,35 +449,10 @@ export function useMessages(activeConversationId: string | null) {
 
   const removeReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      if (!currentUserProfile?.id || !activeConversationId) return;
-      try {
-        // Optimistic remove
-        queryClient.setQueryData(
-          ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
-            if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((m) => {
-                if (m.id !== messageId) return m;
-                const reactions = (m.reactions || []).filter(
-                  (r) => !(r.userId === currentUserProfile.id && r.emoji === emoji)
-                );
-                return { ...m, reactions };
-              }),
-            }));
-            return { ...oldData, pages: updatedPages };
-          }
-        );
-
-        await messagingApi.removeReaction(messageId, emoji, currentUserProfile.id);
-      } catch (error) {
-        console.error('Error removing reaction:', error);
-      }
+      // Delegate to addReaction since the API handles toggle logic
+      return addReaction(messageId, emoji);
     },
-    [activeConversationId, currentUserProfile?.id, queryClient]
+    [addReaction]
   );
 
   const uploadAttachment = useCallback(

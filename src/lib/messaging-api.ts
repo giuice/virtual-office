@@ -414,53 +414,78 @@ export const messagingApi = {
   },
 
   /**
-   * Add a reaction to a message
+   * Toggle a reaction on a message (add if not present, remove if present)
+   * The API endpoint automatically determines whether to add or remove based on current state
    */
-  async addReaction(messageId: string, reaction: string, userId: string): Promise<void> {
+  async toggleReaction(messageId: string, emoji: string): Promise<{ action: 'added' | 'removed' }> {
+    const scope = 'messagingApi.toggleReaction';
+    const requestId = createRequestId('react-toggle');
+    const start = getTimestamp();
+    
+    debugLogger.messaging.event(scope, 'fetch:start', {
+      requestId,
+      messageId,
+      emoji,
+    });
+
     try {
       const response = await fetch('/api/messages/react', {
-        method: 'POST', // Assuming POST adds a reaction
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messageId, reaction, userId }),
+        body: JSON.stringify({ messageId, emoji }),
+      });
+
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add reaction');
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || 'Failed to toggle reaction');
       }
-      // No specific data expected on success for adding reaction
+
+      const data = await response.json();
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        messageId,
+        emoji,
+        action: data.action,
+      });
+      
+      return { action: data.action };
     } catch (error) {
-      console.error('Error adding reaction:', error);
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
+      console.error('Error toggling reaction:', error);
       throw error;
     }
   },
 
   /**
-   * Remove a reaction from a message
+   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
    */
-  async removeReaction(messageId: string, reaction: string, userId: string): Promise<void> {
-    try {
-      // Assuming DELETE method or a flag in body distinguishes removal.
-      // Let's try DELETE first, adjust if backend expects differently.
-      const response = await fetch('/api/messages/react', {
-        method: 'POST', // Backend handles add/remove logic via POST based on current state
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, reaction, userId }),
-      });
+  async addReaction(messageId: string, emoji: string): Promise<void> {
+    await this.toggleReaction(messageId, emoji);
+  },
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to remove reaction');
-      }
-      // No specific data expected on success for removing reaction
-    } catch (error) {
-      console.error('Error removing reaction:', error);
-      throw error;
-    }
+  /**
+   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
+   */
+  async removeReaction(messageId: string, emoji: string): Promise<void> {
+    await this.toggleReaction(messageId, emoji);
   },
 
   /**

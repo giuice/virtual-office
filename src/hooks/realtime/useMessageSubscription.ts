@@ -147,6 +147,60 @@ const updateMessageInCache = (queryClient: QueryClient, conversationId: string, 
   );
 };
 
+const handleReactionUpdate = (
+  queryClient: QueryClient,
+  messageId: string,
+  userId: string,
+  emoji: string,
+  eventType: 'INSERT' | 'DELETE'
+) => {
+  if (debugLogger.messaging.enabled()) {
+    debugLogger.messaging.event('useMessageSubscription', 'reaction-event', {
+      messageId,
+      emoji,
+      eventType,
+    });
+  }
+
+  // Update all conversation caches that might contain this message
+  const allMessagesQueries = queryClient.getQueriesData<MessagesInfiniteData>({
+    queryKey: ['messages'],
+  });
+
+  allMessagesQueries.forEach(([queryKey, oldData]) => {
+    if (!oldData?.pages) return;
+
+    const updated = {
+      ...oldData,
+      pages: oldData.pages.map((page) => ({
+        ...page,
+        messages: page.messages.map((msg) => {
+          if (msg.id !== messageId) return msg;
+
+          const reactions = [...(msg.reactions || [])];
+          const existingIndex = reactions.findIndex(
+            (r) => r.userId === userId && r.emoji === emoji
+          );
+
+          if (eventType === 'INSERT' && existingIndex < 0) {
+            reactions.push({
+              userId,
+              emoji,
+              timestamp: new Date(),
+            });
+          } else if (eventType === 'DELETE' && existingIndex >= 0) {
+            reactions.splice(existingIndex, 1);
+          }
+
+          return { ...msg, reactions };
+        }),
+      })),
+    };
+
+    queryClient.setQueryData(queryKey, updated);
+  });
+};
+
 const removeMessageFromCache = (queryClient: QueryClient, conversationId: string, row: any) => {
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', conversationId],
@@ -359,6 +413,33 @@ export function useMessageSubscription(
         )
       );
     });
+
+    // Subscribe to reaction changes globally to handle reactions across all visible messages
+    const handleReactionChange = (
+      payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    ) => {
+      const eventType = payload.eventType;
+      
+      if (eventType === 'INSERT' && payload.new) {
+        const messageId = payload.new.message_id as string;
+        const userId = payload.new.user_id as string;
+        const emoji = payload.new.emoji as string;
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT');
+      } else if (eventType === 'DELETE' && payload.old) {
+        const messageId = payload.old.message_id as string;
+        const userId = payload.old.user_id as string;
+        const emoji = payload.old.emoji as string;
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'DELETE');
+      }
+    };
+
+    teardownFns.push(
+      subscribeWithRetry(
+        'message_reactions:all',
+        { event: '*', schema: 'public', table: 'message_reactions' },
+        handleReactionChange
+      )
+    );
 
     return () => {
       isMounted = false;

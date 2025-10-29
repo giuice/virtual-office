@@ -17,7 +17,6 @@ import {
   AlertCircle,
   File,
   Reply,
-  Smile,
   MoreHorizontal,
   ChevronDown,
 } from 'lucide-react';
@@ -25,6 +24,8 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { AvatarUser } from '@/lib/avatar-utils';
 import type { User } from '@/types/database';
+import { EmojiPicker } from '@/components/messaging/EmojiPicker';
+import { ReactionChips } from '@/components/messaging/ReactionChips';
 
 const isDatabaseUser = (value: User | AvatarUser | null | undefined): value is User => {
   return !!value && typeof value === 'object' && 'supabase_uid' in value;
@@ -195,24 +196,11 @@ export function MessageItem({
     if (!message.reactions || message.reactions.length === 0) return null;
     
     return (
-      <div className="flex flex-wrap gap-1 mt-1">
-        {/* Group reactions by emoji and show count */}
-        {Object.entries(
-          message.reactions.reduce((acc, reaction) => {
-            acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        ).map(([emoji, count]) => (
-          <div 
-            key={emoji} 
-            className="flex items-center bg-secondary rounded-full px-2 py-0.5 text-xs"
-            onClick={() => onReaction?.(message.id, emoji)}
-          >
-            <span>{emoji}</span>
-            <span className="ml-1">{count}</span>
-          </div>
-        ))}
-      </div>
+      <ReactionChips
+        reactions={message.reactions}
+        currentUserId={currentUserProfile?.id}
+        onReactionToggle={(emoji) => onReaction?.(message.id, emoji)}
+      />
     );
   };
   
@@ -221,27 +209,31 @@ export function MessageItem({
     if (!showActions) return null;
     
     return (
-      <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1">
+      <div 
+        className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1"
+        data-avatar-interactive
+      >
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          onClick={() => onReply?.(message)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onReply?.(message);
+          }}
+          data-avatar-interactive
         >
           <Reply className="h-4 w-4" />
         </Button>
+        <EmojiPicker
+          onEmojiSelect={(emoji) => onReaction?.(message.id, emoji)}
+        />
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          onClick={() => onReaction?.(message.id, '👍')}
-        >
-          <Smile className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
+          data-avatar-interactive
+          onClick={(e) => e.stopPropagation()}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
