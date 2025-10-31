@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment } from '@/types/messaging';
+import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -18,6 +18,42 @@ const createRequestId = (prefix: string): string => {
     // Ignore crypto errors and fallback to timestamp-based identifier
   }
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
+const normalizeDate = (value: unknown): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return new Date(0);
+};
+
+const normalizeReactions = (reactions: unknown): MessageReaction[] => {
+  if (!Array.isArray(reactions)) {
+    return [];
+  }
+
+  return reactions
+    .filter((reaction): reaction is MessageReaction => {
+      return Boolean(
+        reaction &&
+          typeof reaction === 'object' &&
+          'emoji' in reaction &&
+          'userId' in reaction &&
+          'timestamp' in reaction
+      );
+    })
+    .map((reaction) => ({
+      ...reaction,
+      timestamp: normalizeDate(reaction.timestamp),
+    }));
 };
 
 function normalizeConversation(raw: any): Conversation {
@@ -169,9 +205,10 @@ export const messagingApi = {
       });
       // Normalize timestamps to Date for client cache consistency
       if (Array.isArray(data.messages)) {
-        data.messages = data.messages.map((m: any) => ({
+        data.messages = data.messages.map((m: Message) => ({
           ...m,
-          timestamp: new Date(m.timestamp),
+          timestamp: normalizeDate(m.timestamp),
+          reactions: normalizeReactions(m.reactions),
         }));
       }
       return data;

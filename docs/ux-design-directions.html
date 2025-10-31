@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Office · Design Direction Showcase</title>
+    <style>
+      :root {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color-scheme: light dark;
+        background: #10141f;
+        color: #f4f5fb;
+      }
+
+      body {
+        margin: 0;
+        padding: 2.5rem 3rem 4rem;
+        background: radial-gradient(circle at top, rgba(47, 123, 255, 0.18), transparent 60%),
+          #10141f;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: 2.3rem;
+        margin-bottom: 0.25rem;
+      }
+
+      h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      h3 {
+        font-size: 1.15rem;
+      }
+
+      p {
+        margin: 0 0 1rem;
+        max-width: 900px;
+        color: rgba(244, 245, 251, 0.78);
+      }
+
+      header {
+        margin-bottom: 2.5rem;
+      }
+
+      .directions-grid {
+        display: grid;
+        gap: 2rem;
+      }
+
+      @media (min-width: 1200px) {
+        .directions-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .direction-card {
+        border-radius: 24px;
+        padding: 2rem;
+        background: linear-gradient(180deg, rgba(12, 16, 28, 0.75), rgba(16, 20, 32, 0.94));
+        border: 1px solid rgba(118, 142, 217, 0.25);
+        box-shadow: 0 40px 80px rgba(4, 7, 18, 0.35);
+        display: flex;
+        flex-direction: column;
+        gap: 1.4rem;
+      }
+
+      .direction-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .direction-meta {
+        font-size: 0.85rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .mockup {
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 0 0 1px rgba(14, 19, 29, 0.42);
+        background: rgba(11, 15, 28, 0.85);
+      }
+
+      .mockup iframe {
+        width: 100%;
+        border: 0;
+        border-radius: 20px;
+        height: 320px;
+        background: transparent;
+      }
+
+      .characteristics {
+        display: grid;
+        gap: 0.75rem;
+        font-size: 0.92rem;
+      }
+
+      .cta-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+      }
+
+      .btn {
+        padding: 0.65rem 1.1rem;
+        border-radius: 12px;
+        border: 1px solid rgba(143, 182, 255, 0.28);
+        background: rgba(26, 34, 58, 0.65);
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        transition: transform 120ms ease, border 120ms ease, background 120ms ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(143, 182, 255, 0.55);
+        background: rgba(43, 60, 108, 0.85);
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .tag {
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        background: rgba(93, 126, 211, 0.22);
+        color: rgba(241, 244, 255, 0.88);
+        text-transform: uppercase;
+      }
+
+      .notes {
+        background: rgba(21, 25, 40, 0.72);
+        border-radius: 18px;
+        padding: 1.15rem 1.4rem;
+        border: 1px dashed rgba(132, 156, 222, 0.35);
+      }
+
+      .notes textarea {
+        width: 100%;
+        min-height: 120px;
+        border-radius: 14px;
+        border: 1px solid rgba(120, 148, 221, 0.28);
+        padding: 0.9rem 1rem;
+        background: rgba(12, 16, 29, 0.85);
+        color: #ebeeff;
+        resize: vertical;
+        font-family: inherit;
+      }
+
+      /* Simulation of mockups */
+      .mockup-preview {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        min-height: 320px;
+      }
+
+      .sidebar,
+      .main {
+        padding: 1.4rem;
+      }
+
+      .sidebar {
+        background: rgba(24, 31, 52, 0.92);
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        border-right: 1px solid rgba(90, 112, 186, 0.25);
+      }
+
+      .sidebar h4 {
+        margin: 0;
+        font-size: 0.78rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        opacity: 0.58;
+      }
+
+      .space-card {
+        border-radius: 16px;
+        padding: 0.9rem 0.75rem;
+        background: linear-gradient(125deg, rgba(255, 138, 92, 0.28), rgba(255, 214, 194, 0.18));
+        color: #1e2330;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .space-card strong {
+        color: #1e2330;
+      }
+
+      .space-pill {
+        font-size: 0.65rem;
+        color: rgba(30, 35, 48, 0.75);
+        background: rgba(255, 255, 255, 0.6);
+        padding: 0.25rem 0.5rem;
+        border-radius: 999px;
+        align-self: flex-start;
+        font-weight: 600;
+      }
+
+      .main {
+        background: rgba(16, 22, 38, 0.82);
+        display: grid;
+        gap: 1rem;
+      }
+
+      .main-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+
+      .main-header h4 {
+        margin: 0;
+        color: rgba(245, 247, 255, 0.9);
+      }
+
+      .avatars {
+        display: flex;
+        gap: 0.35rem;
+      }
+
+      .avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 0 0 3px rgba(16, 22, 38, 0.85);
+        position: relative;
+      }
+
+      .avatar::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 138, 92, 0.55);
+        animation: pulse 1.6s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.8;
+          transform: scale(1);
+        }
+        60% {
+          opacity: 0;
+          transform: scale(1.35);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.35);
+        }
+      }
+
+      .log-panel {
+        border-radius: 14px;
+        padding: 1.1rem;
+        background: rgba(11, 16, 29, 0.88);
+        border: 1px solid rgba(133, 156, 220, 0.22);
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
+      .log-panel span {
+        display: block;
+        opacity: 0.72;
+        font-size: 0.78rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .transcript {
+        border-radius: 12px;
+        padding: 0.9rem 1rem;
+        background: rgba(47, 123, 255, 0.12);
+        border: 1px solid rgba(47, 123, 255, 0.28);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .phase-tracker {
+        display: flex;
+        gap: 0.4rem;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .phase-pill {
+        padding: 0.35rem 0.6rem;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 138, 92, 0.45);
+        background: rgba(255, 138, 92, 0.18);
+        color: rgba(255, 226, 210, 0.95);
+      }
+
+      .phase-pill.secondary {
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .comparison {
+        margin-top: 3rem;
+      }
+
+      .comparison-grid {
+        display: grid;
+        gap: 1.2rem;
+      }
+
+      @media (min-width: 1100px) {
+        .comparison-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Design Direction Showcase</h1>
+      <p>
+        Explore six interaction and layout concepts for Virtual Office. Each direction reflects a different balance of control, warmth, density, and motion. Pick a favorite, combine attributes, or note what to refine.
+      </p>
+    </header>
+
+    <section class="directions-grid">
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 01</div>
+          <h2>Command Atrium</h2>
+          <div class="tags">
+            <span class="tag">Balanced</span>
+            <span class="tag">Leadership</span>
+            <span class="tag">Now Board</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview">
+            <aside class="sidebar">
+              <h4>FOCUS</h4>
+              <div class="space-card">
+                <span class="space-pill">Strategy War</span>
+                <strong>Phase 2 · Alignment</strong>
+                <small>6 participants, beacon live</small>
+              </div>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(111, 183, 165, 0.28), rgba(250, 246, 239, 0.3))">
+                <span class="space-pill">Sprint Launch</span>
+                <strong>Phase 1 · Discover</strong>
+                <small>8 participants, transcripts streaming</small>
+              </div>
+            </aside>
+            <main class="main">
+              <div class="main-header">
+                <h4>Now Board · Live Agenda View</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill">DISCOVER</span>
+                  <span class="phase-pill secondary">ALIGN</span>
+                  <span class="phase-pill secondary">DECIDE</span>
+                </div>
+              </div>
+              <div class="avatars">
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80')"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=60'); border-color: rgba(111, 183, 165, 0.4)"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=40'); border-color: rgba(241, 197, 80, 0.45)"></div>
+              </div>
+              <div class="log-panel">
+                <span>Activity Log · Updated 2 min ago</span>
+                Alignment checkpoint completed — Maria summarized blockers. Risk review scheduled for 14:30. Transcript highlights flagged for dashboard sync.
+              </div>
+              <div class="transcript">
+                «If we lock scope on the async onboarding, we earn capacity for the live whiteboarding sessions next week.»
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Sidebar filters + flexible main canvas<br />
+          <strong>Density:</strong> Balanced — leadership can scan and dive deeper<br />
+          <strong>Navigation:</strong> Now board header, quick filters, beacon log stream
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Command Atrium</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 02</div>
+          <h2>Orbit Gallery</h2>
+          <div class="tags">
+            <span class="tag">High Energy</span>
+            <span class="tag">Cosmic</span>
+            <span class="tag">Motion</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview" style="grid-template-columns: 1fr">
+            <main class="main" style="background: rgba(14, 20, 40, 0.93)">
+              <div class="main-header">
+                <h4>Orbit Overview</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill" style="border-color: rgba(96, 233, 249, 0.5); background: rgba(96, 233, 249, 0.2); color: rgba(214, 249, 255, 0.95)">Scrum</span>
+                  <span class="phase-pill secondary">Strategy</span>
+                  <span class="phase-pill secondary">Sessions</span>
+                </div>
+              </div>
+              <div class="component-row" style="display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem">
+                <div class="log-panel" style="background: rgba(30, 32, 68, 0.85); border-color: rgba(95, 109, 255, 0.35)">
+                  <span>Space Pulse · War Room</span>
+                  Agenda surge detected · 92% engagement · Speakers rotating every 3 min.
+                </div>
+                <div class="log-panel" style="background: rgba(30, 32, 68, 0.85); border-color: rgba(96, 233, 249, 0.38)">
+                  <span>Space Pulse · Sprint Hub</span>
+                  Daily stand-up in final cadence · Transcript indexing in real-time.
+                </div>
+              </div>
+              <div class="avatars">
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80'); border-color: rgba(96, 233, 249, 0.55)"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=70'); border-color: rgba(87, 98, 255, 0.55)"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=60'); border-color: rgba(244, 199, 89, 0.55)"></div>
+              </div>
+              <div class="transcript" style="background: rgba(95, 109, 255, 0.2); border-color: rgba(95, 109, 255, 0.45)">
+                «Beacon set to auto-escalate if risk remains unresolved by next phase. Telemetry logs synced.»
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Single canvas with floating control ribbon<br />
+          <strong>Density:</strong> High-impact, motion-rich panels for power users<br />
+          <strong>Navigation:</strong> Edge strip cursor, motion cues, keyboard shortcuts
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Orbit Gallery</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 03</div>
+          <h2>Neighborhood Bands</h2>
+          <div class="tags">
+            <span class="tag">Cohort</span>
+            <span class="tag">Calm</span>
+            <span class="tag">Clarity</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview" style="grid-template-columns: 280px 1fr">
+            <aside class="sidebar" style="background: rgba(248, 245, 236, 0.92); color: #1e2330; border-right-color: rgba(30, 35, 48, 0.12)">
+              <h4 style="color: rgba(30, 35, 48, 0.55)">Neighborhoods</h4>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(134, 165, 246, 0.25), rgba(207, 223, 255, 0.35)); color: #1e2330">
+                <span class="space-pill" style="background: rgba(17, 23, 44, 0.08); color: rgba(17, 23, 44, 0.75)">Product Org</span>
+                <strong>Strategy War Space</strong>
+                <small>Phase 2 · 6 people</small>
+              </div>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(255, 210, 173, 0.3), rgba(255, 239, 221, 0.45))">
+                <span class="space-pill" style="background: rgba(17, 23, 44, 0.08); color: rgba(17, 23, 44, 0.65)">Culture</span>
+                <strong>Pine Lounge</strong>
+                <small>Phase 0 · 4 people</small>
+              </div>
+            </aside>
+            <main class="main" style="background: rgba(250, 246, 239, 0.85); color: #1e2330">
+              <div class="main-header">
+                <h4 style="color: #1e2330">Company Pulse Timeline</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill" style="color: #1e2330; border-color: rgba(241, 197, 80, 0.5); background: rgba(241, 197, 80, 0.22)">Discuss</span>
+                  <span class="phase-pill secondary" style="color: rgba(30, 35, 48, 0.58)">Align</span>
+                  <span class="phase-pill secondary" style="color: rgba(30, 35, 48, 0.58)">Decide</span>
+                </div>
+              </div>
+              <div class="log-panel" style="background: rgba(255, 255, 255, 0.9); border-color: rgba(30, 35, 48, 0.12); color: #1e2330">
+                <span style="color: rgba(30, 35, 48, 0.55)">Hover Reveal · Strategy War Space</span>
+                Participants: Giuliano, Lena, Arjun, Maya, Helene, Omar. Agenda: Risks → Priorities. Transcript: “Shift focus to customer migration path before pitching AI co-pilot.”
+              </div>
+              <div class="transcript" style="background: rgba(175, 208, 193, 0.22); border-color: rgba(175, 208, 193, 0.35); color: #1e2330">
+                «Frame today’s outcome around the leadership summit—highlight the decision gates we cleared.»
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Neighborhood sidebar + soft gradient canvas<br />
+          <strong>Density:</strong> Spacious storytelling for calm scanning<br />
+          <strong>Navigation:</strong> Neighborhood filters, hover trails, summary bar
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Neighborhood Bands</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 04</div>
+          <h2>Beacon Spine</h2>
+          <div class="tags">
+            <span class="tag">Timeline</span>
+            <span class="tag">Attention</span>
+            <span class="tag">Exec Ready</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview" style="grid-template-columns: 280px 1fr">
+            <aside class="sidebar" style="background: rgba(16, 19, 35, 0.92); border-right-color: rgba(47, 123, 255, 0.25)">
+              <h4>Beacon Queue</h4>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(47, 123, 255, 0.32), rgba(47, 123, 255, 0.18)); color: #f4f6ff">
+                <span class="space-pill" style="background: rgba(10, 20, 40, 0.4); color: rgba(255, 255, 255, 0.75)">Live</span>
+                <strong>Strategy War Space</strong>
+                <small>Phase shift detected</small>
+              </div>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(104, 208, 182, 0.32), rgba(33, 121, 102, 0.24)); color: #f4f6ff">
+                <span class="space-pill" style="background: rgba(10, 20, 40, 0.4); color: rgba(255, 255, 255, 0.75)">Upcoming</span>
+                <strong>Compliance Review</strong>
+                <small>Starts in 11 min</small>
+              </div>
+            </aside>
+            <main class="main" style="background: rgba(15, 21, 36, 0.82)">
+              <div class="main-header">
+                <h4>Beacon Timeline</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill">Align</span>
+                  <span class="phase-pill secondary">Decide</span>
+                  <span class="phase-pill secondary">Execute</span>
+                </div>
+              </div>
+              <div class="log-panel" style="background: rgba(15, 21, 36, 0.92); border-color: rgba(47, 123, 255, 0.35); color: #f4f6ff">
+                <span>Event Log · 14:10</span>
+                Beacon escalated · Strategy War Space moved to Phase 2 (Alignment). Participants flagged for summary digest. Transcript snippet pinned.
+              </div>
+              <div class="component-row" style="display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 0.9rem">
+                <div class="transcript" style="background: rgba(47, 123, 255, 0.14); border-color: rgba(47, 123, 255, 0.35); color: #f4f6ff">
+                  «We have consensus on the launch date. Need final sign-off on success metrics.»
+                </div>
+                <div class="transcript" style="background: rgba(255, 138, 92, 0.18); border-color: rgba(255, 138, 92, 0.32); color: rgba(255, 233, 222, 0.95)">
+                  «Secure funding conversation for next sprint; prep narrative for investor sync.»
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Beacon spine with timeline cards<br />
+          <strong>Density:</strong> Focused — executive snapshots in chronological order<br />
+          <strong>Navigation:</strong> Beacon queue, timeline scrubbing, alert snooze
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Beacon Spine</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 05</div>
+          <h2>Cozy Hub</h2>
+          <div class="tags">
+            <span class="tag">Hospitality</span>
+            <span class="tag">Lounge</span>
+            <span class="tag">Hybrid</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview" style="grid-template-columns: 320px 1fr">
+            <aside class="sidebar" style="background: rgba(252, 247, 240, 0.95); color: #1e2330; border-right-color: rgba(30, 35, 48, 0.12)">
+              <h4 style="color: rgba(30, 35, 48, 0.58)">Hospitality Panel</h4>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(255, 209, 188, 0.45), rgba(255, 242, 232, 0.75))">
+                <span class="space-pill" style="background: rgba(255, 255, 255, 0.6); color: rgba(30, 35, 48, 0.65)">Kitchen</span>
+                <strong>Lunch &amp; Learn</strong>
+                <small>Avatar circles show real faces with gentle glow states.</small>
+              </div>
+              <div class="space-card" style="background: linear-gradient(125deg, rgba(223, 238, 231, 0.45), rgba(200, 219, 233, 0.65))">
+                <span class="space-pill" style="background: rgba(255, 255, 255, 0.6); color: rgba(30, 35, 48, 0.65)">Mentorship</span>
+                <strong>Pine Lounge</strong>
+                <small>Soft status ribbons announce when mentors join.</small>
+              </div>
+            </aside>
+            <main class="main" style="background: rgba(255, 255, 255, 0.92); color: #1e2330">
+              <div class="main-header">
+                <h4>Company Comfort View</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill" style="color: #1e2330; border-color: rgba(255, 195, 80, 0.5); background: rgba(255, 195, 80, 0.25)">ENGAGE</span>
+                  <span class="phase-pill secondary" style="color: rgba(30, 35, 48, 0.58)">SHARE</span>
+                  <span class="phase-pill secondary" style="color: rgba(30, 35, 48, 0.58)">WRAP</span>
+                </div>
+              </div>
+              <div class="avatars">
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80'); border-color: rgba(255, 138, 92, 0.35)"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=65'); border-color: rgba(106, 176, 147, 0.35)"></div>
+                <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=55'); border-color: rgba(140, 177, 220, 0.35)"></div>
+              </div>
+              <div class="log-panel" style="background: rgba(255, 250, 244, 0.95); border-color: rgba(30, 35, 48, 0.12)">
+                <span style="color: rgba(30, 35, 48, 0.55)">Hospitality Notes</span>
+                Kitchen session captured · Chef Sasha leading · Transcript snippet added to culture recap doc.
+              </div>
+              <div class="transcript" style="background: rgba(255, 214, 194, 0.45); border-color: rgba(255, 138, 92, 0.32); color: #1e2330">
+                «Lunch crew wants a weekly “demo &amp; dine” rotation. Mentors will sponsor topics.»
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Hospitality sidebar + airy canvas for team well-being<br />
+          <strong>Density:</strong> Relaxed, softer states for culture tracking<br />
+          <strong>Navigation:</strong> Warm filters, casual log feed, invite overlays
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Cozy Hub</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+
+      <article class="direction-card">
+        <div class="direction-header">
+          <div class="direction-meta">Direction 06</div>
+          <h2>Analyst Matrix</h2>
+          <div class="tags">
+            <span class="tag">Data</span>
+            <span class="tag">Grid</span>
+            <span class="tag">Power User</span>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-preview" style="grid-template-columns: 1fr">
+            <main class="main" style="background: rgba(14, 17, 28, 0.9)">
+              <div class="main-header">
+                <h4>Analyst Matrix · Space Grid</h4>
+                <div class="phase-tracker">
+                  <span class="phase-pill" style="border-color: rgba(92, 175, 157, 0.55); background: rgba(92, 175, 157, 0.22)">LIVE</span>
+                  <span class="phase-pill secondary">LOGGED</span>
+                  <span class="phase-pill secondary">ARCHIVE</span>
+                </div>
+              </div>
+              <div class="component-row" style="display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 0.85rem">
+                <div class="log-panel" style="background: rgba(16, 20, 32, 0.92); border-color: rgba(111, 183, 165, 0.32); color: #f4f6ff">
+                  <span>Strategy War Space</span>
+                  Phase: Align · Leader: Giuliano · Transcript length: 18 min · Action items: 5
+                </div>
+                <div class="log-panel" style="background: rgba(16, 20, 32, 0.92); border-color: rgba(47, 123, 255, 0.35); color: #f4f6ff">
+                  <span>Scrum Lessons</span>
+                  Phase: Share · Leader: Maya · Participants: 13 · Notes flagged: 3
+                </div>
+                <div class="log-panel" style="background: rgba(16, 20, 32, 0.92); border-color: rgba(241, 197, 80, 0.35); color: #f4f6ff">
+                  <span>Strategy Debrief</span>
+                  Phase: Decide · Leader: Helene · Transcript highlights queued
+                </div>
+              </div>
+              <div class="transcript" style="background: rgba(104, 208, 182, 0.18); border-color: rgba(104, 208, 182, 0.35); color: #f4f6ff">
+                «Update dashboards to flag cross-org participation spikes—finance joined strategy war space without a formal invite.»
+              </div>
+            </main>
+          </div>
+        </div>
+        <div class="characteristics">
+          <strong>Layout:</strong> Data grid with hover expansions<br />
+          <strong>Density:</strong> High-density insights for operations teams<br />
+          <strong>Navigation:</strong> Column filters, quick search, keyboard-first flows
+        </div>
+        <div class="cta-group">
+          <button class="btn">Select Analyst Matrix</button>
+          <button class="btn">Compare</button>
+          <button class="btn">Request Variant</button>
+        </div>
+        <div class="notes">
+          <h3>Notes</h3>
+          <textarea placeholder="What resonates? What should change?"></textarea>
+        </div>
+      </article>
+    </section>
+
+    <section class="comparison">
+      <h2>Comparison Snapshot</h2>
+      <div class="comparison-grid">
+        <div class="notes">
+          <strong>Command Atrium vs Neighborhood Bands</strong><br /><br />
+          • Atrium emphasizes leadership summary and quick action.<br />
+          • Neighborhood Bands leans into calm storytelling and cultural clarity.<br />
+          • Combine? Atrium layout with Band gradients.
+        </div>
+        <div class="notes">
+          <strong>Orbit Gallery vs Beacon Spine</strong><br /><br />
+          • Orbit brings energy and motion for power users.<br />
+          • Beacon Spine prioritizes chronological executive oversight.<br />
+          • Combine? Orbit’s motion in Beacon’s timeline.
+        </div>
+        <div class="notes">
+          <strong>Cozy Hub vs Analyst Matrix</strong><br /><br />
+          • Cozy Hub celebrates human presence and culture.<br />
+          • Analyst Matrix powers metrics-driven ops reviews.<br />
+          • Combine? Cozy avatars layered over matrix metrics.
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

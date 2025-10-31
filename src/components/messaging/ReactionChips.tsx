@@ -26,6 +26,21 @@ interface AggregatedReaction {
   latestTimestamp: Date;
 }
 
+const toDate = (value: unknown): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return new Date(0);
+};
+
 export function ReactionChips({
   reactions,
   currentUserId,
@@ -36,6 +51,7 @@ export function ReactionChips({
     const map = new Map<string, AggregatedReaction>();
 
     reactions.forEach((reaction) => {
+      const reactionTimestamp = toDate(reaction.timestamp);
       const existing = map.get(reaction.emoji);
       if (existing) {
         existing.count++;
@@ -43,8 +59,8 @@ export function ReactionChips({
         if (reaction.userId === currentUserId) {
           existing.userReacted = true;
         }
-        if (reaction.timestamp > existing.latestTimestamp) {
-          existing.latestTimestamp = reaction.timestamp;
+        if (reactionTimestamp > existing.latestTimestamp) {
+          existing.latestTimestamp = reactionTimestamp;
         }
       } else {
         map.set(reaction.emoji, {
@@ -52,7 +68,7 @@ export function ReactionChips({
           count: 1,
           userIds: [reaction.userId],
           userReacted: reaction.userId === currentUserId,
-          latestTimestamp: reaction.timestamp,
+          latestTimestamp: reactionTimestamp,
         });
       }
     });

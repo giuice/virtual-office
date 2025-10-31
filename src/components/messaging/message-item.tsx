@@ -203,6 +203,32 @@ export function MessageItem({
       />
     );
   };
+
+  const handleMouseEnter = () => {
+    setShowActions(true);
+  };
+
+  const handleMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof document !== 'undefined') {
+      const activeElement = document.activeElement;
+      if (activeElement && event.currentTarget.contains(activeElement)) {
+        return;
+      }
+    }
+    setShowActions(false);
+  };
+
+  const handleFocusWithin = () => {
+    setShowActions(true);
+  };
+
+  const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const related = event.relatedTarget as Node | null;
+    if (related && event.currentTarget.contains(related)) {
+      return;
+    }
+    setShowActions(false);
+  };
   
   // Message actions menu
   const renderActions = () => {
@@ -259,8 +285,10 @@ export function MessageItem({
         'relative flex items-start mb-4 px-4 group',
         isCurrentUser ? 'justify-end' : 'justify-start'
       )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocusWithin}
+      onBlur={handleBlur}
       data-thread-depth={depth}
     >
       {showAvatar && (
