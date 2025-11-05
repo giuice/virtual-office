@@ -1,7 +1,7 @@
 // src/components/messaging/EmojiPicker.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, type ReactElement } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,9 +41,11 @@ const ALL_EMOJIS = [
   '✅', '❌', '⭕', '🔴', '🟠', '🟡', '🟢', '🔵'
 ];
 
+const EMOJI_BUTTON_SELECTOR = '[data-emoji-button="true"]';
+
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
-  trigger?: React.ReactNode;
+  trigger?: ReactElement | null;
   className?: string;
   disabled?: boolean;
 }
@@ -56,37 +58,83 @@ export function EmojiPicker({
 }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const filteredEmojis = useMemo(() => {
     if (!search) return ALL_EMOJIS;
     return ALL_EMOJIS.filter(emoji => emoji.includes(search));
   }, [search]);
 
-  const handleEmojiClick = (emoji: string) => {
-    debugLogger.messaging.event('emoji-picker', 'emoji-selected', { emoji });
-    onEmojiSelect(emoji);
-    setOpen(false);
-    setSearch('');
-  };
+  const focusTrigger = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const node = triggerRef.current;
+    if (!node) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      node.focus({ preventScroll: true });
+    });
+  }, []);
 
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (newOpen) {
-      debugLogger.messaging.event('emoji-picker', 'opened', {});
-    } else {
+  const closePicker = useCallback(() => {
+    setOpen((prev) => {
+      if (!prev) {
+        return prev;
+      }
       debugLogger.messaging.event('emoji-picker', 'closed', {});
       setSearch('');
-    }
-  };
+      focusTrigger();
+      return false;
+    });
+  }, [focusTrigger]);
 
-  const handleContentInteraction = (e: React.MouseEvent | React.KeyboardEvent | React.PointerEvent) => {
-    e.stopPropagation();
-  };
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    debugLogger.messaging.event('emoji-picker', 'emoji-selected', { emoji });
+    onEmojiSelect(emoji);
+    closePicker();
+  }, [closePicker, onEmojiSelect]);
+
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    if (newOpen) {
+      setOpen(true);
+      debugLogger.messaging.event('emoji-picker', 'opened', {});
+      return;
+    }
+    closePicker();
+  }, [closePicker]);
+
+  const handleContentPointerDown = useCallback((event: React.PointerEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(EMOJI_BUTTON_SELECTOR)) {
+      return;
+    }
+    event.stopPropagation();
+  }, []);
+
+  const handleContentClick = useCallback((event: React.MouseEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(EMOJI_BUTTON_SELECTOR)) {
+      return;
+    }
+    event.stopPropagation();
+  }, []);
+
+  const handleContentKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(EMOJI_BUTTON_SELECTOR)) {
+      return;
+    }
+    event.stopPropagation();
+  }, []);
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
-        {trigger || (
+        {trigger ? (
+          trigger
+        ) : (
           <Button
             variant="ghost"
             size="icon"
@@ -94,6 +142,8 @@ export function EmojiPicker({
             data-testid="message-reaction-trigger"
             data-avatar-interactive
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            ref={triggerRef}
           >
             <Smile className="h-4 w-4" />
           </Button>
@@ -102,10 +152,10 @@ export function EmojiPicker({
       <PopoverContent
         className="w-80 p-2"
         data-avatar-interactive
-        onPointerDown={handleContentInteraction}
-        onClick={handleContentInteraction}
-        onKeyDown={handleContentInteraction}
-        onEscapeKeyDown={() => setOpen(false)}
+        onPointerDown={handleContentPointerDown}
+        onClick={handleContentClick}
+        onKeyDown={handleContentKeyDown}
+        onEscapeKeyDown={closePicker}
       >
         <div className="space-y-2">
           <div>
@@ -118,7 +168,13 @@ export function EmojiPicker({
                   key={emoji}
                   type="button"
                   className="text-2xl hover:bg-accent rounded p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
-                  onClick={() => handleEmojiClick(emoji)}
+                  data-emoji-button="true"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleEmojiSelect(emoji);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
                   aria-label={`React with ${emoji}`}
                 >
                   {emoji}
@@ -144,7 +200,13 @@ export function EmojiPicker({
                   key={`${emoji}-${index}`}
                   type="button"
                   className="text-2xl hover:bg-accent rounded p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
-                  onClick={() => handleEmojiClick(emoji)}
+                  data-emoji-button="true"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleEmojiSelect(emoji);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
                   aria-label={`React with ${emoji}`}
                 >
                   {emoji}

@@ -80,11 +80,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Backward-compatible offset-based flow, but emulate last-N initial window
-    const offset = cursor ? parseInt(cursor, 10) : 0;
+    // Initial load without cursor - use keyset pagination with no cursorBefore
+    // This fetches the most recent messages
     const paginationOptions: PaginationOptions = {
-      limit: limit + 1, // Fetch one extra to determine hasMore
-      cursor: offset,
+      limit,
+      cursorBefore: undefined,
+      cursorAfter: undefined,
     };
 
     const result: PaginatedResult<Message> = await messageRepository.findByConversation(
@@ -92,17 +93,26 @@ export async function GET(request: NextRequest) {
       paginationOptions
     );
 
-    // Extract messages array from PaginatedResult
     const messages = result.items;
 
-    const hasMore = messages.length > limit;
-    const actualMessages = hasMore ? messages.slice(0, limit) : messages;
-    const nextCursor = hasMore ? offset + limit : undefined;
+    // Compute next cursors for keyset pagination
+    let nextCursorBefore: string | undefined;
+    let hasMoreOlder = false;
+
+    if (messages.length > 0) {
+      nextCursorBefore = messages[0].timestamp.toISOString(); // oldest in returned window
+      // Probe to see if there are older messages
+      const probeResult = await messageRepository.findByConversation(conversationId, {
+        limit: 1,
+        cursorBefore: nextCursorBefore,
+      });
+      hasMoreOlder = probeResult.items.length > 0;
+    }
 
     return NextResponse.json({
-      messages: actualMessages,
-      nextCursor: nextCursor?.toString(),
-      hasMore,
+      messages,
+      nextCursorBefore,
+      hasMoreOlder,
     });
   } catch (error) {
     console.error('Error getting messages:', error);

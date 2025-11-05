@@ -1,6 +1,6 @@
 # Story 4A.2: Reaction Chips and Emoji Picker
 
-Status: done
+Status: in-progress
 
 ## Story
 
@@ -56,15 +56,22 @@ so that I can acknowledge posts quickly without writing a full reply.
 - [x] 3.1 Enhance `useMessageSubscription.ts` to listen for `message_reactions` channel events; emit structured payload consumed by `useMessages` cache updater.  
 - [x] 3.2 Ensure subscription readiness flag (`data-messaging-realtime-ready`) from Story 4A.1 remains accurate; add new `data-messaging-reaction-event` debug attribute for tests.  
 - [x] 3.3 Implement cache reconciliation helper that merges remote reaction payloads without disrupting pagination, thread expansion, or typing states.  
-- [ ] 3.4 Validate multi-tab/device behaviour by simulating reactions across two contexts (reuse Playwright helpers) and confirming consistent chip counts.  
-- [ ] 3.5 Add resiliency: if Realtime disconnects, queue diff for replay after reconnection (prework for Epic 4B typing/resilience stories).
+- [~] 3.4 Validate multi-tab/device behaviour by simulating reactions across two contexts (reuse Playwright helpers) and confirming consistent chip counts. **[SKIPPED - User testing only]**
+- [~] 3.5 Add resiliency: if Realtime disconnects, queue diff for replay after reconnection (prework for Epic 4B typing/resilience stories). **[SKIPPED - Defer to Epic 4B]**
 
 ### Task 4: Testing & instrumentation (AC1-AC5)
-- [x] 4.1 Add Vitest coverage for reaction reducer utilities, optimistic updates, and error handling using mocked Supabase client.  
-- [ ] 4.2 Extend existing Playwright drawer helpers to support `reactToMessage` and `toggleReaction` operations; add specs validating hover trigger, picker selection, chip toggle, and realtime sync across two pages.  
-- [ ] 4.3 Update `__tests__/api/playwright/README.md` with required env vars for emoji picker assets and reaction test instructions.  
-- [ ] 4.4 Capture accessibility audit via Testing Library axe checks focusing on popover semantics and keyboard flow.  
-- [ ] 4.5 Record manual testing checklist (CI currently manual per course correction) covering browsers (Chrome, Firefox, Safari), mobile viewport sanity, and slow network conditions.
+- [x] 4.1 Add Vitest coverage for reaction reducer utilities, optimistic updates, and error handling using mocked Supabase client.
+- [~] 4.2 Extend existing Playwright drawer helpers to support `reactToMessage` and `toggleReaction` operations; add specs validating hover trigger, picker selection, chip toggle, and realtime sync across two pages. **[SKIPPED - No Playwright, user testing only]**
+- [~] 4.3 Update `__tests__/api/playwright/README.md` with required env vars for emoji picker assets and reaction test instructions. **[SKIPPED - No Playwright]**
+- [~] 4.4 Capture accessibility audit via Testing Library axe checks focusing on popover semantics and keyboard flow. **[SKIPPED - User testing only]**
+- [~] 4.5 Record manual testing checklist (CI currently manual per course correction) covering browsers (Chrome, Firefox, Safari), mobile viewport sanity, and slow network conditions. **[SKIPPED - User testing only]**
+
+### Task 5: Bug Fixes (Post-Implementation Issues)
+- [x] 5.1 Fixed messages showing oldest instead of newest (Repository query order)
+- [x] 5.2 Fixed API pagination response format inconsistency
+- [x] 5.3 Added localStorage persistence for activeConversation
+- [ ] 5.4 **UNSOLVED:** Emoji picker button clicks not firing onClick handlers - See REACTION_BUG_REPORT.md
+- [ ] 5.5 Validate all fixes with user testing after emoji picker is resolved
 
 ## Dev Notes
 

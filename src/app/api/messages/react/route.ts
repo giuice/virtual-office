@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ error: 'Error processing reaction' }, { status: 500 });
     }
 
-    console.log(`API: Reaction ${action} for message ${messageId} by user ${userRecord.id}`);
     return NextResponse.json({ message: `Reaction ${action} successfully`, action }, { status: 200 });
 
   } catch (error) {

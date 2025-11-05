@@ -204,14 +204,43 @@ export function MessageItem({
     );
   };
 
+  const containsTarget = (
+    container: HTMLElement,
+    target: EventTarget | null
+  ): boolean => {
+    return target instanceof Node && container.contains(target);
+  };
+
+  const isInteractiveTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+    return Boolean(
+      target.closest('[data-avatar-interactive]') ||
+      target.closest('a, button, [role="button"], [data-space-action]')
+    );
+  };
+
   const handleMouseEnter = () => {
     setShowActions(true);
   };
 
   const handleMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget) {
+      if (containsTarget(event.currentTarget, nextTarget)) {
+        return;
+      }
+      if (isInteractiveTarget(nextTarget)) {
+        return;
+      }
+    }
     if (typeof document !== 'undefined') {
       const activeElement = document.activeElement;
-      if (activeElement && event.currentTarget.contains(activeElement)) {
+      if (activeElement && containsTarget(event.currentTarget, activeElement)) {
+        return;
+      }
+      if (isInteractiveTarget(activeElement)) {
         return;
       }
     }
@@ -224,7 +253,10 @@ export function MessageItem({
 
   const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     const related = event.relatedTarget as Node | null;
-    if (related && event.currentTarget.contains(related)) {
+    if (related && containsTarget(event.currentTarget, related)) {
+      return;
+    }
+    if (isInteractiveTarget(related)) {
       return;
     }
     setShowActions(false);

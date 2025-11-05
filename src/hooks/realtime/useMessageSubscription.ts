@@ -6,6 +6,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
 import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
+import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import {
   REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
@@ -152,7 +153,8 @@ const handleReactionUpdate = (
   messageId: string,
   userId: string,
   emoji: string,
-  eventType: 'INSERT' | 'DELETE'
+  eventType: 'INSERT' | 'DELETE',
+  timestamp: Date
 ) => {
   if (debugLogger.messaging.enabled()) {
     debugLogger.messaging.event('useMessageSubscription', 'reaction-event', {
@@ -170,34 +172,30 @@ const handleReactionUpdate = (
   allMessagesQueries.forEach(([queryKey, oldData]) => {
     if (!oldData?.pages) return;
 
-    const updated = {
+    const currentPages = oldData.pages;
+    const nextPages = eventType === 'INSERT'
+      ? toggleReactionInPages({
+          pages: currentPages,
+          messageId,
+          emoji,
+          userId,
+          timestamp,
+        })
+      : toggleReactionInPages({
+          pages: currentPages,
+          messageId,
+          emoji,
+          userId,
+        });
+
+    if (nextPages === currentPages) {
+      return;
+    }
+
+    queryClient.setQueryData(queryKey, {
       ...oldData,
-      pages: oldData.pages.map((page) => ({
-        ...page,
-        messages: page.messages.map((msg) => {
-          if (msg.id !== messageId) return msg;
-
-          const reactions = [...(msg.reactions || [])];
-          const existingIndex = reactions.findIndex(
-            (r) => r.userId === userId && r.emoji === emoji
-          );
-
-          if (eventType === 'INSERT' && existingIndex < 0) {
-            reactions.push({
-              userId,
-              emoji,
-              timestamp: new Date(),
-            });
-          } else if (eventType === 'DELETE' && existingIndex >= 0) {
-            reactions.splice(existingIndex, 1);
-          }
-
-          return { ...msg, reactions };
-        }),
-      })),
-    };
-
-    queryClient.setQueryData(queryKey, updated);
+      pages: nextPages,
+    });
   });
 };
 
@@ -424,12 +422,14 @@ export function useMessageSubscription(
         const messageId = payload.new.message_id as string;
         const userId = payload.new.user_id as string;
         const emoji = payload.new.emoji as string;
-        handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT');
+        const timestampValue = payload.new.created_at ?? payload.new.timestamp;
+        const timestamp = timestampValue ? new Date(timestampValue as string) : new Date();
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT', timestamp);
       } else if (eventType === 'DELETE' && payload.old) {
         const messageId = payload.old.message_id as string;
         const userId = payload.old.user_id as string;
         const emoji = payload.old.emoji as string;
-        handleReactionUpdate(queryClient, messageId, userId, emoji, 'DELETE');
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'DELETE', new Date());
       }
     };
 

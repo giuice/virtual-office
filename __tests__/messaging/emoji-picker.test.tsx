@@ -8,7 +8,17 @@ import { EmojiPicker } from '@/components/messaging/EmojiPicker';
 vi.mock('@/utils/debug-logger', () => ({
   debugLogger: {
     messaging: {
-      info: vi.fn(),
+      event: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      metric: vi.fn(),
+      enabled: () => false,
+      featureEnabled: () => false,
+      storageKeys: {
+        debug: 'vo:debug:messaging',
+        flag: 'vo:flag:messaging_v2',
+      },
     },
   },
 }));

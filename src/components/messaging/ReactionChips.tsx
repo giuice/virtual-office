@@ -54,10 +54,11 @@ export function ReactionChips({
       const reactionTimestamp = toDate(reaction.timestamp);
       const existing = map.get(reaction.emoji);
       if (existing) {
-        existing.count++;
-        existing.userIds.push(reaction.userId);
-        if (reaction.userId === currentUserId) {
-          existing.userReacted = true;
+        const alreadyReacted = existing.userIds.includes(reaction.userId);
+        existing.userReacted = existing.userReacted || reaction.userId === currentUserId;
+        if (!alreadyReacted) {
+          existing.count++;
+          existing.userIds.push(reaction.userId);
         }
         if (reactionTimestamp > existing.latestTimestamp) {
           existing.latestTimestamp = reactionTimestamp;
@@ -86,16 +87,32 @@ export function ReactionChips({
     return null;
   }
 
-  const handleClick = (e: React.MouseEvent, emoji: string) => {
-    e.stopPropagation();
+  const handleClick = (event: React.MouseEvent, emoji: string) => {
+    event.stopPropagation();
+    if (event.detail === 0) {
+      // Keyboard activation is handled in onKeyDown to avoid double toggles.
+      return;
+    }
     onReactionToggle(emoji);
   };
 
+  const handlePointerDown = (event: React.PointerEvent) => {
+    event.stopPropagation();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent, emoji: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      onReactionToggle(emoji);
+    }
+  };
+
   return (
-    <div className={cn('flex flex-wrap gap-1 mt-1', className)}>
-      {aggregatedReactions.map(({ emoji, count, userReacted, userIds }) => (
-        <TooltipProvider key={emoji} delayDuration={300}>
-          <Tooltip>
+    <TooltipProvider delayDuration={300}>
+      <div className={cn('flex flex-wrap gap-1 mt-1', className)}>
+        {aggregatedReactions.map(({ emoji, count, userReacted }) => (
+          <Tooltip key={emoji}>
             <TooltipTrigger asChild>
               <button
                 type="button"
@@ -106,7 +123,9 @@ export function ReactionChips({
                     ? 'bg-primary/20 border border-primary'
                     : 'bg-secondary border border-transparent'
                 )}
-                onClick={(e) => handleClick(e, emoji)}
+                onClick={(event) => handleClick(event, emoji)}
+                onPointerDown={handlePointerDown}
+                onKeyDown={(event) => handleKeyDown(event, emoji)}
                 data-avatar-interactive
                 data-testid={`reaction-chip-${emoji}`}
                 aria-label={`${userReacted ? 'Remove' : 'Add'} ${emoji} reaction`}
@@ -125,8 +144,8 @@ export function ReactionChips({
               </p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-      ))}
-    </div>
+        ))}
+      </div>
+    </TooltipProvider>
   );
 }

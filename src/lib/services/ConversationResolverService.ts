@@ -105,6 +105,7 @@ export class ConversationResolverService {
         isArchived: false,
         name: undefined,
         lastActivity: new Date(),
+        visibility: ConversationVisibility.DIRECT,
         participantsFingerprint: fingerprint,
       });
 

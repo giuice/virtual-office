@@ -9,6 +9,7 @@ import {
   FileAttachment,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
+import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -99,8 +100,9 @@ export function useMessages(activeConversationId: string | null) {
   const messages: Message[] = useMemo(() => {
     if (!data?.pages) return [];
     // Pages represent windows from older->newer already; flatten preserves order
-    return data.pages.flatMap((p) => p.messages);
-  }, [data]);
+    const flattened = data.pages.flatMap((p) => p.messages);
+    return flattened;
+  }, [data, activeConversationId]);
 
   const loadingMessages = isLoading || isFetching;
   const errorMessages = error ? (error as Error).message : null;
@@ -378,7 +380,7 @@ export function useMessages(activeConversationId: string | null) {
   const addReaction = useCallback(
     async (messageId: string, emoji: string) => {
       if (!currentUserProfile?.id || !activeConversationId) return;
-      
+
       const instrumentationEnabled = debugLogger.messaging.enabled();
       if (instrumentationEnabled) {
         debugLogger.messaging.event('useMessages.addReaction', 'toggle-start', {
@@ -399,25 +401,20 @@ export function useMessages(activeConversationId: string | null) {
             | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
             | undefined) => {
             if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((m) => {
-                if (m.id !== messageId) return m;
-                const reactions = [...(m.reactions || [])];
-                const existingIndex = reactions.findIndex(
-                  (r) => r.userId === currentUserProfile.id && r.emoji === emoji
-                );
-                if (existingIndex >= 0) {
-                  // Remove reaction
-                  reactions.splice(existingIndex, 1);
-                } else {
-                  // Add reaction
-                  reactions.push({ userId: currentUserProfile.id, emoji, timestamp: new Date() });
-                }
-                return { ...m, reactions };
-              }),
-            }));
-            return { ...oldData, pages: updatedPages };
+
+            const nextPages = toggleReactionInPages({
+              pages: oldData.pages,
+              messageId,
+              emoji,
+              userId: currentUserProfile.id,
+              timestamp: new Date(),
+            });
+
+            if (nextPages === oldData.pages) {
+              return oldData;
+            }
+
+            return { ...oldData, pages: nextPages };
           }
         );
 

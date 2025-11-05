@@ -18,6 +18,7 @@ import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
 const DRAWER_STORAGE_KEYS = {
   IS_MINIMIZED: 'messaging_drawer_minimized',
   ACTIVE_VIEW: 'messaging_drawer_active_view',
+  ACTIVE_CONVERSATION_ID: 'messaging_active_conversation_id',
 } as const;
 
 // Create the context with a default undefined value
@@ -65,6 +66,17 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_VIEW, activeView);
     }
   }, [activeView]);
+
+  // Persist active conversation ID to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (activeConversation?.id) {
+        localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID, activeConversation.id);
+      } else {
+        localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+      }
+    }
+  }, [activeConversation?.id]);
 
   // Drawer control functions
   const openDrawer = useCallback(() => {
@@ -118,6 +130,34 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [isMessagingV2Enabled]);
+
+  // Restore active conversation from localStorage on mount
+  useEffect(() => {
+    // Only restore if we have conversations loaded and no active conversation yet
+    if (
+      typeof window !== 'undefined' &&
+      conversationsManager.conversations.length > 0 &&
+      !activeConversation
+    ) {
+      const storedConversationId = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+      if (storedConversationId) {
+        const conversation = conversationsManager.conversations.find(
+          (c) => c.id === storedConversationId
+        );
+        if (conversation) {
+          if (debugLogger.messaging.enabled()) {
+            debugLogger.messaging.event('MessagingContext', 'restore-active-conversation', {
+              conversationId: conversation.id,
+            });
+          }
+          setActiveConversation(conversation);
+        } else {
+          // Conversation not found, clear from localStorage
+          localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+        }
+      }
+    }
+  }, [conversationsManager.conversations, activeConversation, setActiveConversation]);
 
   const getLastActivityMs = useCallback((conversation: (typeof conversationsManager.conversations)[number]) => {
     const value = conversation?.lastActivity;

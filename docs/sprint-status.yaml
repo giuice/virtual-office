@@ -55,7 +55,7 @@ development_status:
   epic-3-retrospective: optional
   epic-4a: backlog
   4a-1-render-reply-indicators-and-thread-ui: done
-  4a-2-reaction-chips-and-emoji-picker: done
+  4a-2-reaction-chips-and-emoji-picker: in-progress
   4a-3-pinned-and-starred-message-indicators: backlog
   4a-4-read-receipts-display: backlog
   4a-5-infinite-scroll-with-pagination: backlog

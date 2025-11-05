@@ -2,10 +2,12 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Message, MessageReaction } from '@/types/messaging';
+import { useRef } from 'react';
+import { Message } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
+import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 
 type MessagesInfiniteData = {
   pages: Array<{
@@ -29,9 +31,7 @@ interface ReactionResponse {
 export function useMessageReactions() {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
-  
-  // Track pending mutations to prevent duplicates
-  const pendingMutations = new Map<string, boolean>();
+  const pendingMutationsRef = useRef<Map<string, boolean>>(new Map());
 
   const addReactionMutation = useMutation<
     ReactionResponse,
@@ -73,42 +73,23 @@ export function useMessageReactions() {
       queryClient.setQueriesData<MessagesInfiniteData>(
         { queryKey: ['messages'] },
         (oldData) => {
-          if (!oldData?.pages) return oldData;
+          if (!oldData?.pages || !currentUserProfile?.id) return oldData;
+
+          const nextPages = toggleReactionInPages({
+            pages: oldData.pages,
+            messageId,
+            emoji,
+            userId: currentUserProfile.id,
+            timestamp: new Date(),
+          });
+
+          if (nextPages === oldData.pages) {
+            return oldData;
+          }
 
           return {
             ...oldData,
-            pages: oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((msg) => {
-                if (msg.id !== messageId) return msg;
-
-                const reactions = [...msg.reactions];
-                const currentUserId = currentUserProfile?.id;
-                
-                if (!currentUserId) return msg;
-                
-                const existingIndex = reactions.findIndex(
-                  (r) => r.emoji === emoji && r.userId === currentUserId
-                );
-
-                if (existingIndex >= 0) {
-                  // Remove reaction
-                  reactions.splice(existingIndex, 1);
-                } else {
-                  // Add reaction
-                  reactions.push({
-                    emoji,
-                    userId: currentUserId,
-                    timestamp: new Date(),
-                  });
-                }
-
-                return {
-                  ...msg,
-                  reactions,
-                };
-              }),
-            })),
+            pages: nextPages,
           };
         }
       );
@@ -151,6 +132,7 @@ export function useMessageReactions() {
 
   const toggleReaction = (messageId: string, emoji: string) => {
     const key = `${messageId}-${emoji}`;
+    const pendingMutations = pendingMutationsRef.current;
     
     // Prevent duplicate mutations for the same message/emoji combination
     if (pendingMutations.get(key)) {

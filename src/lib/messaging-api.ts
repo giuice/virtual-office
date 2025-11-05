@@ -454,7 +454,7 @@ export const messagingApi = {
    * Toggle a reaction on a message (add if not present, remove if present)
    * The API endpoint automatically determines whether to add or remove based on current state
    */
-  async toggleReaction(messageId: string, emoji: string): Promise<{ action: 'added' | 'removed' }> {
+  async toggleReaction(messageId: string, emoji: string): Promise<{ action: 'added' | 'removed'; message: string }> {
     const scope = 'messagingApi.toggleReaction';
     const requestId = createRequestId('react-toggle');
     const start = getTimestamp();
@@ -497,8 +497,11 @@ export const messagingApi = {
         emoji,
         action: data.action,
       });
-      
-      return { action: data.action };
+
+      return {
+        action: data.action,
+        message: data.message ?? '',
+      };
     } catch (error) {
       const duration = getTimestamp() - start;
       debugLogger.messaging.error(scope, 'fetch:error', {

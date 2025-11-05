@@ -215,22 +215,22 @@ export class SupabaseMessageRepository implements IMessageRepository {
         data = [...data].reverse();
       }
     } else {
-      // Backward-compatible path: offset-based pagination
-      // Supabase range is inclusive [from, to] - fetch limit + 1 to check for more results
-      const from = typeof options?.cursor === 'number' ? options.cursor : 0;
-      const to = from + limit; // Fetch one extra to determine hasMore
-
+      // Initial load: fetch most recent messages, newest first
       const res = await this.supabaseClient
         .from(this.MSG_TABLE_NAME)
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('timestamp', { ascending: true })
-        .range(from, to);
+        .order('timestamp', { ascending: false })
+        .limit(limit + 1);
       data = res.data as any[] | null;
       error = res.error;
       if (error) {
-        console.error('Error fetching messages by conversation (offset):', error);
+        console.error('Error fetching messages by conversation (initial):', error);
         throw error;
+      }
+      // Reverse to oldest-first for UI rendering
+      if (data) {
+        data = [...data].reverse();
       }
     }
 

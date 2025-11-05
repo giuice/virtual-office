@@ -47,7 +47,7 @@ Craft a palette that balances efficiency, coziness, and inspiration:
 - **Soft Pine Mist (#6FB7A5)** for collaborative spaces—fresh, breathable, and reinforces calm focus.
 - **Golden Thread (#F1C550)** as the accent for phase trackers and success states—sparks optimism and strategic momentum.
 - **Ivory Glow (#FAF6EF)** for card surfaces and log panels—keeps the interface cozy and legible.
-Each color ships with Tailwind tokens (e.g., `--vo-slate-900`, `--vo-ember-500`) plus semantic aliases like `--vo-signal-critical` to keep implementation consistent. Northstar Balance anchors the dark theme (executive focus mode), while Warm Control carries the light theme (daytime leadership scans). Theme switches reuse the same semantic token names so components inherit the correct mood automatically.
+Each color ships with Tailwind tokens (e.g., `--vo-slate-900`, `--vo-ember-500`) plus semantic aliases like `--vo-signal-critical` to keep implementation consistent. Warm Control anchors the light theme (daytime leadership scans) and Cosmic Efficiency anchors the dark theme (executive focus mode); Orbit Gallery toggles reuse the same semantic token names so components inherit the correct mood automatically.
 
 ### 3.2 Typography
 
@@ -95,6 +95,65 @@ Blend modern control center clarity with cozy hospitality cues, anchored in the 
 2. **Team Sync Loop:** Product squad enters Sprint Launch space → agenda auto-advances phases → log captures key decisions → summary pushes to admin dashboard.
 3. **Ad-hoc Coaching:** Mentor notices Pine Lounge chatter → hover to preview conversation → joins if needed → leaves note for async follow-up → log records for later review.
 
+**Ad-hoc Coaching — Presence Without Micromanaging**
+- Entry: Pine Lounge sits in the Culture neighborhood, often without alerts; mentor glances at the avatar constellation and soft status ribbons as part of a routine sweep.
+- Hover intel: Transcript snippet and log reveal whether the chat is casual or beginning to touch sensitive topics; mentor identifies if guidance is needed.
+- Branches:
+  - Observe quietly when the team is bonding or resolving issues without help.
+  - Drop in briefly when mentorship is useful, ensuring hover intel signaled confusion or escalation.
+  - Leave async notes if timing isn’t right, tagging takeaways in the log for later follow-up.
+- Success: Mentor sees the log capturing their guidance or observes that the group progressed unaided; Supabase record ensures the interaction informs later coaching.
+
+```mermaid
+flowchart LR
+    A[Scan Pine Lounge] --> B[Hover Lounge Card]
+    B --> C{Needs Mentorship?}
+    C -->|No| D[Observe · Let team continue]
+    C -->|Yes| E{Timing Right?}
+    E -->|Yes| F[Join Briefly]
+    E -->|No| G[Leave Async Note]
+    F --> H[Guidance captured in log]
+    G --> H
+    D --> I[Log shows organic progress]
+```
+
+**Leader Command Path — Adaptive Presence**
+- Entry: Orbit Gallery overview with attention beacons; Sarah scans for Aurora Ember pulses.
+- Hover intel: Avatar constellation, agenda phase tracker, transcript snippet, and activity log determine whether to observe, delegate, or join.
+- Success: Delegated teammate appears in the constellation or log shows progress without intervention; if Sarah joins, a captured decision follows her clarification.
+
+```mermaid
+flowchart LR
+    A[Orbit Gallery Grid] --> B[Hover Space Card]
+    B --> C{Decision}
+    C -->|On Track| D[Observe]
+    C -->|Needs Support| E[Delegate]
+    C -->|Join Now| F[Enter Space]
+    D --> G[Log shows progress]
+    E --> H[Delegate joins · Phase advances]
+    F --> I[Decision captured in log]
+```
+
+**Team Sync Loop — Auto-Advancing Cadence**
+- Entry: Sprint Launch space highlights collaborative status; avatar constellation fills as teammates arrive.
+- Input: Agenda auto-starts when quorum is detected; animated status rings follow speakers while transcript and log capture notes automatically.
+- Feedback: Phase tracker shows current agenda item, log records decisions, and attention beacon fires if a blocker stalls progress; team can acknowledge and advance the tracker once resolved.
+- Success: Phase tracker completes final agenda stage, logs sync to admin dashboard, and Supabase stores transcript for asynchronous follow-up.
+
+```mermaid
+flowchart LR
+    A[Enter Sprint Launch Space] --> B[Agenda Phase 1]
+    B --> C{Blocker?}
+    C -->|No| D[Agenda Phase 2]
+    D --> E{Further Items?}
+    E -->|Yes| B
+    E -->|No| F[Phase Complete]
+    C -->|Yes| G[Attention Beacon Pulses]
+    G --> H[Log Blocker · Seek Help]
+    H --> D
+    F --> I[Logs & Transcript Sync]
+```
+
 ---
 
 ## 6. Component Library
@@ -110,6 +169,57 @@ Blend modern control center clarity with cozy hospitality cues, anchored in the 
   - `AttentionBeacon` micro-component providing pulse animations and logging hooks for admin systems.
   - `SpaceGridOverview` responsive mosaic that preserves full-office visibility (15+ spaces) while retaining per-space status ribbons and beacon cues.
 
+**Reuse & Build Notes**
+- `SpaceElement.tsx` already powers individual rooms; we will refactor it into the Orbit Gallery `SpaceCard` by swapping the color utility for token-driven gradients, adding agenda/phase ribbons, hover transcript panels, and attention beacon slots.
+- `UserAvatarPresence.tsx` and related avatar helpers form the base of `AvatarConstellation`; enhancements include animated status rings, speaker/observer variants, and clustering for 8+ participants.
+- `floor-plan.tsx` and `NowBoard` logic (currently implicit in dashboard headers) will surface as the dedicated `NowBoard` module with filters and attention summaries.
+- `message-dialog` and log utilities plug into `ActivityLogPanel` / `TranscriptPeek`; we’ll expose them as reusable panels that stream Supabase data.
+- Attention beacon behavior lives today in highlight flags—upgrade this into a dedicated `useAttentionBeacon` hook feeding both Orbit Gallery cards and the grid overview.
+- `space-debug-panel.tsx` already lists rooms; it becomes the scaffold for `SpaceGridOverview`, sharing data loaders while adopting the new Orbit layout styles.
+
+**Component Specs**
+- `SpaceCard` (extends `src/components/floor-plan/SpaceElement.tsx`)
+  - Purpose: Showcase a single space with agenda phase, participants, and attention state in Orbit Gallery.
+  - Anatomy: Title + org badge, status ribbon, phase tracker pill, avatar cluster, hover panel (roster, log, transcript), beacon slot.
+  - States: Default, hover reveal, live beacon (animated border), focus (keyboard), loading (skeleton), empty (no participants).
+  - Behavior: Click enters space, double-click opens detailed dialog, hover fetches log/transcript snapshot, beacon pulses when attention rule triggers.
+  - Accessibility: `role="button"`, label announced as “Space ‹name›, ‹phase›, ‹participants count›”; keyboard activation via Enter/Space.
+
+- `AvatarConstellation` (extends `src/components/floor-plan/UserAvatarPresence.tsx`)
+  - Purpose: Visualize up to 12 active participants with photo avatars, speaker emphasis, and overflow handling.
+  - Anatomy: Primary ring (speaker), secondary ring (listener), stacked overflow badge, tooltip with presence details.
+  - States: Speaking (glow/pulse), listening, observer (dimmed), offline (gray silhouette), overflow collapsed.
+  - Behavior: Auto-sorts by activity timestamp, animates transitions, exposes data attributes for hover analytics.
+  - Accessibility: Announce name + role via tooltip/screen reader; ensure 44px touch target on responsive breakpoints.
+
+- `NowBoard` (implemented in `src/components/floor-plan/floor-plan.tsx` header region)
+  - Purpose: Provide leadership with instant metrics—active beacons, top spaces, filters.
+  - Anatomy: Title, filter chips, beacon queue list, quick actions (delegate, join), timestamp.
+  - States: Default, filter applied, empty (no beacons), high-alert (critical events prioritized).
+  - Behavior: Selecting a beacon focuses the corresponding `SpaceCard`; filters persist per session via Supabase profile settings.
+  - Accessibility: Sections labelled by `aria-labelledby`; live region for new beacon announcements.
+
+- `AttentionBeacon` (new utility hook + badge)
+  - Purpose: Normalize the rules that raise attention states (phase stalls, attendance spikes, blockers logged).
+  - Anatomy: Hook `useAttentionBeacon(spaceId)` returning status, severity, last change; badge component renders color ring + label.
+  - States: Idle, info, warning, critical; includes snoozed state for dismissed alerts.
+  - Behavior: Debounces duplicate pings, syncs to Supabase logs, feeds HUD notifications.
+  - Accessibility: Screen reader announces severity + reason when badge appears; provide keyboard action to snooze.
+
+- `ActivityLogPanel` / `TranscriptPeek` (extend existing log dialog components)
+  - Purpose: Surface the latest decisions and transcript lines inline with each space.
+  - Anatomy: Timestamp, author, summary chip, transcript snippet with highlight.
+  - States: Default list, loading (skeleton rows), empty (prompt to start logging), error (retry CTA).
+  - Behavior: Fetches on hover with caching; supports scroll for deeper history; writes to Supabase when mentoring notes added.
+  - Accessibility: Ensure list items read “‹time› — ‹author› — ‹summary›”; transcripts exposed via aria-describedby.
+
+- `SpaceGridOverview` (enhances `space-debug-panel.tsx`)
+  - Purpose: Show 15+ spaces simultaneously with Orbit Gallery styling, theme toggles, and layout switches.
+  - Anatomy: Theme/layout controls, Masonry grid, compact `SpaceCard` variant, footer guidance.
+  - States: Default (Warm Control), dark mode (Cosmic Efficiency), command vs orbit vs analyst layouts, loading (skeleton cards).
+  - Behavior: Auto-activates when active space count > 15, inherits filter state from `NowBoard`, exposes keyboard grid navigation.
+  - Accessibility: Grid implements roving tabindex; theme/layout buttons grouped with `aria-pressed` updates.
+
 ---
 
 ## 7. UX Pattern Decisions
@@ -122,6 +232,16 @@ Blend modern control center clarity with cozy hospitality cues, anchored in the 
 - Summon beams only activate for company-wide or exec-flagged spaces and include a dismiss + snooze control to avoid interrupt overload.
 - Avatar constellations maintain minimum 8px separation, prioritize speaker prominence, and collapse gracefully under 360px width.
 - All logs and transcripts stream to Supabase tables with metadata timestamps for admin dashboards and meeting summaries.
+- Button hierarchy: Primary buttons use Aurora Ember background with dark text; secondary surface is Ivory Glow outline; tertiary is ghost link. Destructive actions adopt deep rose (`--vo-destructive-500`) with confirmation tooltip when triggered from Orbit Gallery.
+- Feedback patterns: Success uses inline badges within ActivityLogPanel plus optional toast; errors surface inline with retry CTA; loading employs skeleton cards for SpaceCard and progress shimmer for transcript peek.
+- Form patterns: Labels sit above fields, required fields marked with `*` and aria-required, validation on blur for text inputs and on submit for multi-step flows, inline error helper text.
+- Modal patterns: Large modal for room management, medium for mentoring notes, small for confirmations; all support escape and explicit close, focus trap with first actionable element autofocus.
+- Navigation patterns: Active routes highlighted in NowBoard filters with pill treatment; browser back honored, app-level back buttons only when context differs from history.
+- Empty states: First-use surfaces coaching copy plus CTA, no-results provide suggestions, cleared content offers undo for 10 seconds via toast.
+- Confirmation patterns: Deletions require confirm dialog (unless undo available), leaving unsaved settings prompts modal, irreversible actions double-confirm with typed keyword for safety.
+- Notification patterns: Toast stack top-right, success auto-dismiss 4s, warnings linger until dismissed, critical beacons escalate to NowBoard list.
+- Search patterns: Orbit Gallery search triggers on enter with highlighted matches; filters live in NowBoard chips; zero results show alternative spaces and ability to create new.
+- Date/time patterns: Default to relative (“5 min ago”) with tooltip absolute timestamp; system stores UTC, displays in user locale.
 
 ---
 
@@ -129,12 +249,24 @@ Blend modern control center clarity with cozy hospitality cues, anchored in the 
 
 ### 8.1 Responsive Strategy
 
-{{responsive_accessibility_strategy}}
-- Responsive ladders: 1440px (desktop control center), 1024px (compressed panels), 768px (stacked filters, single-column space list), 480px (mobile preview mode with quick actions).
-- Keyboard navigation ensures focus order hits now board → filters → space cards → hover panels; quick keys (e.g., `G` go-to space) accelerate leadership workflows.
-- Screen reader labels announce space name, activity level, attendee count, lead speaker, and agenda phase in one sentence.
-- High contrast and reduced motion modes toggle via settings; attention beacons respect user preferences.
-- Live transcripts expose captions with ARIA live regions for real-time accessibility.
+Device priorities:
+- **Desktop ≥1440px:** Orbit Gallery spans 3–4 columns; NowBoard and beacon queue stay pinned; ActivityLogPanel can remain open alongside grid.
+- **Tablet 1024–1439px:** Grid collapses to two columns with stacked hover sheets; filters condense into horizontal chips; tap targets expand to 48px.
+- **Mobile ≤1023px:** Single-column feed of compact SpaceCards, bottom sheet reveals hover intel, bottom navigation surfaces quick join/delegate actions.
+
+Breakpoints & layout:
+- `≥1440px`: 12-column grid, persistent sidebar filters, inline log/transcript panel.
+- `1024–1439px`: 8-column grid, collapsible filter drawer, modal log/transcript.
+- `768–1023px`: 6-column grid, stacked cards, tap-to-expand hover intel.
+- `<768px`: 4-column base, single-card list, floating action button for join/delegate.
+
+Interaction & accessibility:
+- Keyboard order always runs NowBoard → filters → space grid → hover details → footer; shortcuts (`G` go-to grid, `B` toggle beacons) accelerate leadership tasks.
+- Space grid implements roving tabindex with arrow-key navigation; focus ring uses Orbit highlight token.
+- Screen reader announcement: “Space ‹name›, agenda ‹phase›, ‹count› participants, beacon ‹status›” with `aria-live="polite"` updates on beacons and log changes.
+- Reduced motion setting disables beacon pulses and swaps avatar animations for subtle opacity changes; high contrast swaps gradients for solid tokens.
+- Transcript and decision updates stream to `aria-live` regions inside ActivityLogPanel; captions available for all transcript snippets.
+- WCAG target: 2.1 Level AA. Contrast ratio ≥4.5:1 for text, ≥3:1 for UI components; 44px minimum touch targets. Automated checks via Lighthouse + axe DevTools, manual keyboard sweeps, and VoiceOver/NVDA smoke tests in QA.
 
 ---
 
@@ -181,6 +313,9 @@ This UX Design Specification was created through visual collaboration:
   - Toggle between Warm Control (light default) and Cosmic Efficiency (dark default) while viewing 16 concurrent spaces
   - Orbit Gallery layout showcased as the primary condensed view; Command Atrium and Analyst Matrix remain as comparison toggles
   - Highlights avatars, agenda phases, beacons, and log snippets in condensed view
+- **Orbit Gallery Showcase**: [ux-final-app-showcase.html](./ux-final-app-showcase.html)
+  - Six Warm Control vs Cosmic Efficiency screens covering NowBoard, grid, delegation, sprint cadence, admin settings, and empty states
+  - Theme toggle baked in for stakeholders to preview both palettes alongside the Orbit layout decisions
 
 ### Optional Enhancement Deliverables
 

@@ -1,8 +1,20 @@
 // __tests__/messaging/reaction-chips.test.tsx
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ReactionChips } from '@/components/messaging/ReactionChips';
 import { MessageReaction } from '@/types/messaging';
+
+vi.mock('@/components/ui/tooltip', () => {
+  const Stub = ({ children }: { children: ReactNode }) => <>{children}</>;
+  return {
+    TooltipProvider: Stub,
+    Tooltip: Stub,
+    TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+    TooltipContent: ({ children }: { children: ReactNode }) => <>{children}</>,
+  };
+});
 
 describe('ReactionChips', () => {
   const mockReactions: MessageReaction[] = [
@@ -41,7 +53,8 @@ describe('ReactionChips', () => {
     expect(thumbsUp).toHaveClass('border-primary');
   });
 
-  it('calls onReactionToggle when chip is clicked', () => {
+  it('calls onReactionToggle when chip is clicked', async () => {
+    const user = userEvent.setup();
     const onToggle = vi.fn();
     render(
       <ReactionChips
@@ -52,16 +65,17 @@ describe('ReactionChips', () => {
     );
 
     const chip = screen.getByTestId('reaction-chip-👍');
-    fireEvent.click(chip);
+    await user.click(chip);
 
     expect(onToggle).toHaveBeenCalledWith('👍');
   });
 
-  it('stops propagation on chip click', () => {
+  it('stops propagation on chip click', async () => {
+    const user = userEvent.setup();
     const onToggle = vi.fn();
     const onParentClick = vi.fn();
     
-    const { container } = render(
+    render(
       <div onClick={onParentClick}>
         <ReactionChips
           reactions={mockReactions}
@@ -72,9 +86,30 @@ describe('ReactionChips', () => {
     );
 
     const chip = screen.getByTestId('reaction-chip-👍');
-    fireEvent.click(chip);
+    await user.click(chip);
 
     expect(onToggle).toHaveBeenCalledWith('👍');
+    expect(onParentClick).not.toHaveBeenCalled();
+  });
+
+  it('stops propagation on pointer down', () => {
+    const onToggle = vi.fn();
+    const onParentClick = vi.fn();
+
+    render(
+      <div onPointerDown={onParentClick}>
+        <ReactionChips
+          reactions={mockReactions}
+          currentUserId="user1"
+          onReactionToggle={onToggle}
+        />
+      </div>
+    );
+
+    const chip = screen.getByTestId('reaction-chip-👍');
+    fireEvent.pointerDown(chip);
+
+    expect(onToggle).not.toHaveBeenCalled();
     expect(onParentClick).not.toHaveBeenCalled();
   });
 
@@ -129,6 +164,75 @@ describe('ReactionChips', () => {
 
     expect(screen.getByTestId('reaction-chip-👍')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('deduplicates repeated reactions from the same user', () => {
+    const reactions: MessageReaction[] = [
+      { emoji: '👍', userId: 'user1', timestamp: new Date('2024-01-01') },
+      { emoji: '👍', userId: 'user1', timestamp: new Date('2024-01-02') },
+      { emoji: '👍', userId: 'user2', timestamp: new Date('2024-01-03') },
+    ];
+
+    const onToggle = vi.fn();
+    render(
+      <ReactionChips
+        reactions={reactions}
+        currentUserId="user1"
+        onReactionToggle={onToggle}
+      />
+    );
+
+    expect(screen.getByTestId('reaction-chip-👍')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('supports keyboard activation without bubbling to parent containers', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const onParentKeyDown = vi.fn();
+
+    render(
+      <div onKeyDown={onParentKeyDown}>
+        <ReactionChips
+          reactions={mockReactions}
+          currentUserId="user1"
+          onReactionToggle={onToggle}
+        />
+      </div>
+    );
+
+    const chip = screen.getByTestId('reaction-chip-👍');
+    chip.focus();
+    await act(async () => {
+      await user.keyboard('{Enter}');
+    });
+
+    expect(onToggle).toHaveBeenCalledWith('👍');
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onParentKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('handles Space key activation exactly once', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+
+    render(
+      <ReactionChips
+        reactions={mockReactions}
+        currentUserId="user1"
+        onReactionToggle={onToggle}
+      />
+    );
+
+    const chip = screen.getByTestId('reaction-chip-👍');
+    chip.focus();
+
+    await act(async () => {
+      await user.keyboard(' ');
+    });
+
+    expect(onToggle).toHaveBeenCalledWith('👍');
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
   it('applies data-avatar-interactive attribute', () => {
