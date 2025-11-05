@@ -244,8 +244,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Check if we have more results
     const hasMore = data.length > limit;
-    // Trim to actual limit
-    const trimmedData = hasMore ? data.slice(0, limit) : data;
+    // Trim to actual limit, preserving chronological (oldest->newest) order
+    const trimmedData = hasMore
+      ? (hasCursorAfter ? data.slice(0, limit) : data.slice(data.length - limit))
+      : data;
 
     // Map core message data
     const messages = mapMessageArrayToCamelCase(trimmedData);

@@ -8,6 +8,7 @@ import { EmojiPicker } from '@/components/messaging/EmojiPicker';
 vi.mock('@/utils/debug-logger', () => ({
   debugLogger: {
     messaging: {
+      info: vi.fn(),
       event: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
@@ -154,6 +155,50 @@ describe('EmojiPicker', () => {
 
     // Parent should not receive click
     expect(onParentClick).toHaveBeenCalledTimes(0);
+  });
+
+  it('supports keyboard activation and returns focus on close', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<EmojiPicker onEmojiSelect={onSelect} />);
+
+    const trigger = screen.getByTestId('message-reaction-trigger');
+    trigger.focus();
+
+    await user.keyboard('{Enter}');
+
+    const searchInput = await screen.findByPlaceholderText('Search emojis...');
+    expect(searchInput).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Search emojis...')).not.toBeInTheDocument();
+    });
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('prevents parent key handlers when navigating picker with keyboard', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const onParentKeyDown = vi.fn();
+
+    render(
+      <div onKeyDown={onParentKeyDown}>
+        <EmojiPicker onEmojiSelect={onSelect} />
+      </div>
+    );
+
+    const trigger = screen.getByTestId('message-reaction-trigger');
+    await user.click(trigger);
+
+    const searchInput = await screen.findByPlaceholderText('Search emojis...');
+    searchInput.focus();
+
+    await user.keyboard('ArrowDown');
+    await user.keyboard('{Enter}');
+
+    expect(onParentKeyDown).not.toHaveBeenCalled();
   });
 
   it('is disabled when disabled prop is true', () => {

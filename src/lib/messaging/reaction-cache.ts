@@ -7,6 +7,7 @@ interface ToggleReactionOptions {
   emoji: string;
   userId: string;
   timestamp?: Date;
+  mode?: 'toggle' | 'add' | 'remove';
 }
 
 interface TogglePagesOptions<TPage extends { messages: Message[] }> {
@@ -15,6 +16,7 @@ interface TogglePagesOptions<TPage extends { messages: Message[] }> {
   emoji: string;
   userId: string;
   timestamp?: Date;
+  mode?: 'toggle' | 'add' | 'remove';
 }
 
 const ensureDate = (value: Date | string | number): Date => {
@@ -39,6 +41,7 @@ export const toggleReactionOnMessage = ({
   emoji,
   userId,
   timestamp = new Date(),
+  mode = 'toggle',
 }: ToggleReactionOptions): Message => {
   if (message.id !== messageId) {
     return message;
@@ -60,7 +63,11 @@ export const toggleReactionOnMessage = ({
     }
   }
 
-  if (dedupMap.has(targetKey)) {
+  if (mode === 'remove') {
+    dedupMap.delete(targetKey);
+  } else if (mode === 'add') {
+    dedupMap.set(targetKey, { emoji, userId, timestamp });
+  } else if (dedupMap.has(targetKey)) {
     dedupMap.delete(targetKey);
   } else {
     dedupMap.set(targetKey, { emoji, userId, timestamp });
@@ -96,6 +103,7 @@ export const toggleReactionInPages = <TPage extends { messages: Message[] }>({
   emoji,
   userId,
   timestamp,
+  mode = 'toggle',
 }: TogglePagesOptions<TPage>): TPage[] => {
   let hasChanges = false;
 
@@ -109,6 +117,7 @@ export const toggleReactionInPages = <TPage extends { messages: Message[] }>({
         emoji,
         userId,
         timestamp,
+        mode,
       });
 
       if (updated !== message) {

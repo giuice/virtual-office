@@ -56,10 +56,12 @@ export function useMessageReactions() {
       return response.json();
     },
     onMutate: async ({ messageId, emoji }) => {
-      debugLogger.messaging.event('reaction-mutation', 'optimistic-update', {
-        messageId,
-        emoji,
-      });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.info('reaction-mutation', 'optimistic:start', {
+          messageId,
+          emoji,
+        });
+      }
 
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['messages'] });
@@ -81,6 +83,7 @@ export function useMessageReactions() {
             emoji,
             userId: currentUserProfile.id,
             timestamp: new Date(),
+            mode: 'toggle',
           });
 
           if (nextPages === oldData.pages) {
@@ -119,11 +122,13 @@ export function useMessageReactions() {
       });
     },
     onSuccess: (data, { messageId, emoji }) => {
-      debugLogger.messaging.event('reaction-mutation', 'success', {
-        messageId,
-        emoji,
-        action: data.action,
-      });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.info('reaction-mutation', 'optimistic:success', {
+          messageId,
+          emoji,
+          action: data.action,
+        });
+      }
 
       // Invalidate to sync with server state
       queryClient.invalidateQueries({ queryKey: ['messages'] });
@@ -136,7 +141,9 @@ export function useMessageReactions() {
     
     // Prevent duplicate mutations for the same message/emoji combination
     if (pendingMutations.get(key)) {
-      debugLogger.messaging.event('reaction-mutation', 'debounced', { messageId, emoji });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('reaction-mutation', 'debounced', { messageId, emoji });
+      }
       return;
     }
     

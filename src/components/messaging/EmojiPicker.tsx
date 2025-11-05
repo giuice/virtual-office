@@ -83,7 +83,11 @@ export function EmojiPicker({
       if (!prev) {
         return prev;
       }
-      debugLogger.messaging.event('emoji-picker', 'closed', {});
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.info('emoji-picker', 'close', {
+          reason: 'programmatic',
+        });
+      }
       setSearch('');
       focusTrigger();
       return false;
@@ -91,7 +95,9 @@ export function EmojiPicker({
   }, [focusTrigger]);
 
   const handleEmojiSelect = useCallback((emoji: string) => {
-    debugLogger.messaging.event('emoji-picker', 'emoji-selected', { emoji });
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.info('emoji-picker', 'select', { emoji });
+    }
     onEmojiSelect(emoji);
     closePicker();
   }, [closePicker, onEmojiSelect]);
@@ -99,7 +105,9 @@ export function EmojiPicker({
   const handleOpenChange = useCallback((newOpen: boolean) => {
     if (newOpen) {
       setOpen(true);
-      debugLogger.messaging.event('emoji-picker', 'opened', {});
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.info('emoji-picker', 'open', {});
+      }
       return;
     }
     closePicker();

@@ -157,7 +157,7 @@ const handleReactionUpdate = (
   timestamp: Date
 ) => {
   if (debugLogger.messaging.enabled()) {
-    debugLogger.messaging.event('useMessageSubscription', 'reaction-event', {
+    debugLogger.messaging.trace('useMessageSubscription', 'reaction:event', {
       messageId,
       emoji,
       eventType,
@@ -173,20 +173,14 @@ const handleReactionUpdate = (
     if (!oldData?.pages) return;
 
     const currentPages = oldData.pages;
-    const nextPages = eventType === 'INSERT'
-      ? toggleReactionInPages({
-          pages: currentPages,
-          messageId,
-          emoji,
-          userId,
-          timestamp,
-        })
-      : toggleReactionInPages({
-          pages: currentPages,
-          messageId,
-          emoji,
-          userId,
-        });
+    const nextPages = toggleReactionInPages({
+      pages: currentPages,
+      messageId,
+      emoji,
+      userId,
+      timestamp: eventType === 'INSERT' ? timestamp : undefined,
+      mode: eventType === 'INSERT' ? 'add' : 'remove',
+    });
 
     if (nextPages === currentPages) {
       return;
@@ -270,9 +264,9 @@ export function useMessageSubscription(
         }
         if (channel) {
           if (debugLogger.messaging.enabled()) {
-            debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
-              channel: channelName,
-            });
+        debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
+          channel: channelName,
+        });
           }
           void channel.unsubscribe();
           supabase.removeChannel(channel);
@@ -288,7 +282,7 @@ export function useMessageSubscription(
         channel = supabase.channel(channelName);
 
         if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.event('useMessageSubscription', 'subscribe:attempt', {
+          debugLogger.messaging.trace('useMessageSubscription', 'subscribe:attempt', {
             channel: channelName,
             attempt,
           });

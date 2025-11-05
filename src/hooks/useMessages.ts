@@ -11,6 +11,7 @@ import {
 import { messagingApi } from '@/lib/messaging-api';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import { debugLogger } from '@/utils/debug-logger';
+import { toast } from 'sonner';
 
 const getTimestamp = (): number => {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -408,6 +409,7 @@ export function useMessages(activeConversationId: string | null) {
               emoji,
               userId: currentUserProfile.id,
               timestamp: new Date(),
+              mode: 'toggle',
             });
 
             if (nextPages === oldData.pages) {
@@ -438,6 +440,13 @@ export function useMessages(activeConversationId: string | null) {
         });
         
         console.error('Error toggling reaction:', error);
+        toast.error('Failed to update reaction', {
+          description: error instanceof Error ? error.message : String(error),
+          action: {
+            label: 'Retry',
+            onClick: () => addReaction(messageId, emoji),
+          },
+        });
         throw error;
       }
     },

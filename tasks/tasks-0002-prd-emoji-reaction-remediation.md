@@ -17,6 +17,13 @@
 - Run `npm run test -- --runInBand __tests__/messaging/reaction-chips.test.tsx __tests__/messaging/emoji-picker.test.tsx` to validate unit coverage.
 - Run `npm run type-check` after implementation to ensure strict TypeScript compliance.
 - Manual QA: verify hover trigger, emoji selection toggle, optimistic rollback on failure, and realtime sync across two sessions.
+- Manual QA checklist (documented 2024-03-18):
+  - [ ] Two logged-in sessions reflect reaction add/remove in realtime.
+  - [ ] Hover/focus reveals emoji trigger without moving layout.
+  - [ ] Failed reaction toggle shows retry toast and rolls back state.
+- Latest validation (2024-03-18):
+  - `npm run test:messaging-reactions`
+  - `npm run type-check`
 
 ## Tasks
 
@@ -36,11 +43,11 @@
   - [x] 3.3 Ensure `/api/messages/react` and `messagingApi.toggleReaction` return the correct action for telemetry and rollback logic.
   - [x] 3.4 Confirm `useMessageSubscription` merges realtime INSERT/DELETE events into all cached pages without breaking pagination.
 - [ ] 4.0 Reinforce telemetry, error handling, and user feedback surfaces
-  - [ ] 4.1 Add or update `debugLogger.messaging` traces for popover open/close, optimistic start/success, and realtime reaction events.
-  - [ ] 4.2 Propagate API errors to Sonner toast with retry affordance and roll back optimistic updates on failure.
-  - [ ] 4.3 Guard against missing logger mocks in tests to avoid runtime TypeErrors under Vitest.
-- [ ] 5.0 Deliver accessibility, testing, and manual QA coverage per PRD
-  - [ ] 5.1 Add a new `__tests__/messaging/emoji-picker.test.tsx` suite covering trigger focus, keyboard navigation, selection, and guard behaviour.
-  - [ ] 5.2 Extend `reaction-chips` tests to verify stopPropagation, aggregation order, and current-user styling regressions.
-  - [ ] 5.3 Document manual QA checklist steps (two-session realtime, optimistic rollback, hover affordance) in task notes or existing QA doc.
-  - [ ] 5.4 Run `npm run type-check` and targeted Vitest suites, recording outcomes for handoff.
+  - [x] 4.1 Add or update `debugLogger.messaging` traces for popover open/close, optimistic start/success, and realtime reaction events.
+  - [x] 4.2 Propagate API errors to Sonner toast with retry affordance and roll back optimistic updates on failure.
+  - [x] 4.3 Guard against missing logger mocks in tests to avoid runtime TypeErrors under Vitest.
+- [x] 5.0 Deliver accessibility, testing, and manual QA coverage per PRD
+  - [x] 5.1 Add a new `__tests__/messaging/emoji-picker.test.tsx` suite covering trigger focus, keyboard navigation, selection, and guard behaviour.
+  - [x] 5.2 Extend `reaction-chips` tests to verify stopPropagation, aggregation order, and current-user styling regressions.
+  - [x] 5.3 Document manual QA checklist steps (two-session realtime, optimistic rollback, hover affordance) in task notes or existing QA doc.
+  - [x] 5.4 Run `npm run type-check` and targeted Vitest suites, recording outcomes for handoff.
