@@ -12,14 +12,14 @@ import { useCompany } from '@/contexts/CompanyContext';
  */
 export const useProtectedRoute = (requireCompany: boolean = true) => {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAuthReady } = useAuth();
   const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
   const [isReady, setIsReady] = useState(false);
   const [redirectAttempted, setRedirectAttempted] = useState(false);
 
   useEffect(() => {
     // Skip checks during loading to avoid flicker
-    if (authLoading || (requireCompany && companyLoading)) {
+    if (!isAuthReady || authLoading || (requireCompany && companyLoading)) {
       return;
     }
 
@@ -61,12 +61,12 @@ export const useProtectedRoute = (requireCompany: boolean = true) => {
     }
 
     setIsReady(true);
-  }, [authLoading, companyLoading, user, currentUserProfile, router, requireCompany, redirectAttempted]);
+  }, [authLoading, companyLoading, user, currentUserProfile, router, requireCompany, redirectAttempted, isAuthReady]);
 
   return {
     isAuthenticated: !!user,
     isReady,
-    loading: authLoading || companyLoading,
+    loading: authLoading || !isAuthReady || (requireCompany && companyLoading),
     user,
     company,
     userProfile: currentUserProfile,

@@ -6,7 +6,7 @@ import { Space, User, RoomTemplate } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter } from 'lucide-react';
+import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog/index'
 import { RoomManagement } from './room-management'
@@ -24,6 +24,7 @@ import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { ConversationType } from '@/types/messaging';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
@@ -55,6 +56,19 @@ export function FloorPlan() {
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   const [useModernUI, setUseModernUI] = useState(false);
+
+  const { isAuthReady } = useAuth();
+
+  if (!isAuthReady || isCompanyLoading) {
+    return (
+      <div className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          Preparing your floor plan...
+        </p>
+      </div>
+    );
+  }
 
   // Filter spaces from context based on type and search query
   const filteredSpaces = spaces.filter(space => {

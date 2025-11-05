@@ -1,0 +1,468 @@
+<story-context id="story-4A.1" v="1.0">
+  <metadata>
+    <epicId>4A</epicId>
+    <storyId>4A.1</storyId>
+    <title>Playwright E2E Tests for Drawer Interactions</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-23</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-4A.1.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>QA engineer</asA>
+    <iWant>end-to-end tests validating drawer interactions</iWant>
+    <soThat>we ensure the messaging drawer works correctly across different scenarios</soThat>
+    <tasks>
+      <task id="1" title="Set up Playwright Test Infrastructure" acs="AC6">
+        <subtask id="1.1">Review existing Playwright configuration at playwright.config.ts</subtask>
+        <subtask id="1.2">Create test fixtures for authenticated user contexts (2 users minimum)</subtask>
+        <subtask id="1.3">Set up test database seeding script for conversations and messages</subtask>
+        <subtask id="1.4">Create helper functions for common drawer interactions</subtask>
+        <subtask id="1.5">Configure test reporter for CI/CD integration</subtask>
+      </task>
+      <task id="2" title="Test Open Drawer → Select DM → Send Message → Realtime Delivery" acs="AC1">
+        <subtask id="2.1">Write test to open messaging drawer from floor plan</subtask>
+        <subtask id="2.2">Assert drawer renders with conversation list visible</subtask>
+        <subtask id="2.3">Select a DM conversation from the list</subtask>
+        <subtask id="2.4">Send a test message via composer</subtask>
+        <subtask id="2.5">Verify message appears in sender's view immediately</subtask>
+        <subtask id="2.6">Verify message appears in recipient's view (realtime subscription)</subtask>
+        <subtask id="2.7">Refresh page and verify message persists in conversation</subtask>
+      </task>
+      <task id="3" title="Test Filter Conversations by Pinned" acs="AC2">
+        <subtask id="3.1">Seed test data with pinned and unpinned conversations</subtask>
+        <subtask id="3.2">Toggle "Pinned Only" filter in conversation list</subtask>
+        <subtask id="3.3">Assert only pinned conversations are displayed</subtask>
+        <subtask id="3.4">Unpin a conversation via context menu</subtask>
+        <subtask id="3.5">Verify conversation immediately disappears from filtered view</subtask>
+        <subtask id="3.6">Disable filter and verify all conversations reappear</subtask>
+      </task>
+      <task id="4" title="Test Tab Switching (Room/DM)" acs="AC3">
+        <subtask id="4.1">Seed test data with both room and DM conversations</subtask>
+        <subtask id="4.2">Open drawer and verify default tab (Rooms or DMs)</subtask>
+        <subtask id="4.3">Switch to opposite tab and verify correct list loads</subtask>
+        <subtask id="4.4">Apply filter in one tab, switch tabs, return, verify filter persists</subtask>
+        <subtask id="4.5">Scroll in conversation list, switch tabs, return, verify scroll position maintained</subtask>
+      </task>
+      <task id="5" title="Test Space Navigation → Drawer Stability" acs="AC4">
+        <subtask id="5.1">Open drawer and select a conversation</subtask>
+        <subtask id="5.2">Navigate to different space on floor plan</subtask>
+        <subtask id="5.3">Assert drawer remains open and visible</subtask>
+        <subtask id="5.4">Verify active conversation is maintained (no unexpected switches)</subtask>
+        <subtask id="5.5">Monitor for visual flickering or re-rendering issues</subtask>
+        <subtask id="5.6">Test with multiple rapid space navigation actions</subtask>
+      </task>
+      <task id="6" title="Test Archive Conversation Flow" acs="AC5">
+        <subtask id="6.1">Open drawer and locate a conversation to archive</subtask>
+        <subtask id="6.2">Open context menu (right-click or kebab menu)</subtask>
+        <subtask id="6.3">Click "Archive" option</subtask>
+        <subtask id="6.4">Verify conversation disappears from main list</subtask>
+        <subtask id="6.5">Navigate to "Archived" section</subtask>
+        <subtask id="6.6">Verify archived conversation appears in archived list</subtask>
+        <subtask id="6.7">Unarchive conversation and verify it returns to main list</subtask>
+      </task>
+      <task id="7" title="CI/CD Integration and Flakiness Testing" acs="AC6">
+        <subtask id="7.1">Run test suite 3 times consecutively locally</subtask>
+        <subtask id="7.2">Identify and fix any flaky tests (race conditions, timing issues)</subtask>
+        <subtask id="7.3">Add explicit waits for async operations (drawer open, message send, realtime updates)</subtask>
+        <subtask id="7.4">Implement test data cleanup in afterEach/afterAll hooks</subtask>
+        <subtask id="7.5">Configure CI pipeline to run tests on pre-merge</subtask>
+        <subtask id="7.6">Add test performance monitoring (flag if > 5 minutes)</subtask>
+      </task>
+      <task id="8" title="Documentation and Test Maintenance" acs="AC6">
+        <subtask id="8.1">Document test data seeding requirements</subtask>
+        <subtask id="8.2">Create README for running tests locally</subtask>
+        <subtask id="8.3">Document common test failures and troubleshooting steps</subtask>
+        <subtask id="8.4">Add test coverage report generation</subtask>
+        <subtask id="8.5">Create test maintenance guide for future story tests</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Open Drawer → Select DM → Send Message → Verify Realtime Delivery</title>
+      <items>
+        <item>User can open messaging drawer from floor plan</item>
+        <item>User can select a DM conversation from the list</item>
+        <item>User can send a message in the selected conversation</item>
+        <item>Message appears in real-time for both sender and recipient</item>
+        <item>Message persists after page refresh</item>
+      </items>
+    </criterion>
+    <criterion id="AC2">
+      <title>Filter Conversations by Pinned</title>
+      <items>
+        <item>User can toggle "Pinned Only" filter in conversation list</item>
+        <item>Only pinned conversations are displayed when filter is active</item>
+        <item>Filter state persists during drawer session</item>
+        <item>Unpinning a conversation removes it from filtered view immediately</item>
+      </items>
+    </criterion>
+    <criterion id="AC3">
+      <title>Switch Between Room and DM Tabs</title>
+      <items>
+        <item>User can switch between "Rooms" and "DMs" tabs in drawer</item>
+        <item>Correct conversation lists load for each tab</item>
+        <item>Tab state persists during drawer session</item>
+        <item>Switching tabs does not lose scroll position or filter state</item>
+      </items>
+    </criterion>
+    <criterion id="AC4">
+      <title>Navigate Space → Drawer Stays Open and Stable</title>
+      <items>
+        <item>User can navigate to different spaces on floor plan</item>
+        <item>Messaging drawer remains open during navigation</item>
+        <item>Active conversation is maintained unless explicitly changed</item>
+        <item>No flickering or re-rendering of drawer content</item>
+      </items>
+    </criterion>
+    <criterion id="AC5">
+      <title>Archive Conversation → Moves to Archived Section</title>
+      <items>
+        <item>User can archive a conversation via context menu</item>
+        <item>Archived conversation disappears from main list</item>
+        <item>Archived conversation appears in "Archived" section</item>
+        <item>Unarchiving returns conversation to main list</item>
+      </items>
+    </criterion>
+    <criterion id="AC6">
+      <title>All Tests Pass in CI/CD Pipeline</title>
+      <items>
+        <item>Test suite runs without flakiness (3 consecutive successful runs)</item>
+        <item>Tests complete within reasonable time (< 5 minutes total)</item>
+        <item>Test failures provide clear error messages</item>
+        <item>Tests clean up test data after execution</item>
+      </items>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4A.md</path>
+        <title>Technical Specification: Real-Time Messaging - Timeline &amp; Composer</title>
+        <section>Test Strategy Summary</section>
+        <snippet>E2E Tests (Playwright): Target all 12 acceptance criteria scenarios. Focus: Drawer interactions, realtime message delivery, attachment upload, thread navigation. Environment: Test database with seeded data. Run: npm run test:api (CI: pre-merge, nightly). Location: __tests__/api/playwright/epic-4A-*.spec.ts</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Virtual Office - Epic Breakdown</title>
+        <section>Epic 4A Story 4A.1</section>
+        <snippet>Story 4A.1: Playwright E2E Tests for Drawer Interactions. Prerequisites: Tasks 1.0 + 2.0 complete (drawer and conversation list). Test: Open drawer → Select DM → Send message → Verify realtime delivery, filter, tabs, navigation, archive workflows.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Virtual Office Architecture</title>
+        <section>Testing Strategy</section>
+        <snippet>Testing pyramid: E2E tests (Playwright) focus on critical user journeys. Repository Pattern enforcement in tests. Tests use API routes for data setup (not direct DB access). RLS policies tested via authenticated requests.</snippet>
+      </doc>
+      <doc>
+        <path>tasks/tasks-0001-prd-unified-messaging-system.md</path>
+        <title>Unified Messaging System Tasks</title>
+        <section>Task 2.5</section>
+        <snippet>Task 2.5: Update Playwright flow __tests__/api/playwright/messages-api.spec.ts to validate drawer interactions, filtering, and cross-room switching. Foundation: MessagingDrawer.tsx and ConversationList.tsx complete.</snippet>
+      </doc>
+      <doc>
+        <path>tasks/task-2.0-session-handoff.md</path>
+        <title>Task 2.0 Session Handoff</title>
+        <section>Task 2.5 - Update Playwright Tests</section>
+        <snippet>Test Scenarios: Drawer operations (open/close, minimize/restore), Conversation list (group, pins, unread), Search/start (DM creation, room joining), Navigation sync (room switching without closing drawer). File: __tests__/api/playwright/messages-api.spec.ts</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/components/messaging/MessagingDrawer.tsx</path>
+        <kind>component</kind>
+        <symbol>MessagingDrawer</symbol>
+        <lines>1-300</lines>
+        <reason>Main drawer component to test - handles open/close, minimize, view switching, conversation selection</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/messaging/ConversationList.tsx</path>
+        <kind>component</kind>
+        <symbol>ConversationList</symbol>
+        <lines>1-200</lines>
+        <reason>Conversation list with grouping, pins, and filters - core to AC2 and AC3</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/messaging/EnhancedMessageComposer.tsx</path>
+        <kind>component</kind>
+        <symbol>EnhancedMessageComposer</symbol>
+        <lines>1-150</lines>
+        <reason>Message input component used in AC1 (send message test)</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/messaging/EnhancedMessageFeed.tsx</path>
+        <kind>component</kind>
+        <symbol>EnhancedMessageFeed</symbol>
+        <lines>1-200</lines>
+        <reason>Message timeline display - verify messages appear in realtime</reason>
+      </artifact>
+      <artifact>
+        <path>src/contexts/messaging/MessagingContext.tsx</path>
+        <kind>context</kind>
+        <symbol>MessagingProvider</symbol>
+        <lines>1-400</lines>
+        <reason>State management for drawer, conversations, active view - critical for AC4 (navigation stability)</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/floor-plan/floor-plan.tsx</path>
+        <kind>component</kind>
+        <symbol>FloorPlan</symbol>
+        <lines>1-500</lines>
+        <reason>Floor plan integration - starting point for opening drawer (AC1) and navigation tests (AC4)</reason>
+      </artifact>
+      <artifact>
+        <path>__tests__/api/playwright/messages-api.spec.ts</path>
+        <kind>test</kind>
+        <symbol>existing tests</symbol>
+        <lines>1-100</lines>
+        <reason>Reference patterns for Playwright API tests - authentication, assertions, error handling</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/conversations/get/route.ts</path>
+        <kind>api</kind>
+        <symbol>GET handler</symbol>
+        <lines>1-100</lines>
+        <reason>API for fetching conversations - used in test data verification</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/conversations/archive/route.ts</path>
+        <kind>api</kind>
+        <symbol>POST handler</symbol>
+        <lines>1-80</lines>
+        <reason>Archive endpoint for AC5 testing</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/conversations/preferences/route.ts</path>
+        <kind>api</kind>
+        <symbol>PATCH handler</symbol>
+        <lines>1-100</lines>
+        <reason>Pin/unpin conversations endpoint for AC2 testing</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/messages/create/route.ts</path>
+        <kind>api</kind>
+        <symbol>POST handler</symbol>
+        <lines>1-150</lines>
+        <reason>Message send endpoint for AC1 (realtime delivery test)</reason>
+      </artifact>
+      <artifact>
+        <path>src/repositories/implementations/supabase/SupabaseConversationRepository.ts</path>
+        <kind>repository</kind>
+        <symbol>SupabaseConversationRepository</symbol>
+        <lines>1-400</lines>
+        <reason>Conversation data access - reference for test data seeding patterns</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>playwright config</symbol>
+        <lines>1-50</lines>
+        <reason>Playwright configuration - timeouts, retry settings, base URL</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <npm>
+        <package name="@playwright/test" version="^1.51.1">E2E test framework</package>
+        <package name="@supabase/supabase-js" version="^2.49.4">Database client for test data seeding</package>
+        <package name="@supabase/ssr" version="^0.7.0">Auth for authenticated test contexts</package>
+        <package name="next" version="^15.5.2">Framework - test server</package>
+        <package name="react" version="^19.1.0">UI library</package>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="1" category="architecture">
+      <title>Repository Pattern Enforcement</title>
+      <description>Tests must NOT directly access Supabase client. Use API routes for test data setup via authenticated requests to respect RLS policies.</description>
+    </constraint>
+    <constraint id="2" category="authentication">
+      <title>RLS Policy Compliance</title>
+      <description>Tests must authenticate as specific users to respect Row-Level Security. Use Playwright's storageState for persistent auth across tests.</description>
+    </constraint>
+    <constraint id="3" category="realtime">
+      <title>Realtime Subscription Timing</title>
+      <description>Wait for Supabase Realtime subscriptions to establish before assertions. Use page.waitForSelector with data attributes. Realtime may take 1-2 seconds to connect.</description>
+    </constraint>
+    <constraint id="4" category="test-isolation">
+      <title>Test Data Isolation</title>
+      <description>Each test creates its own test data (conversations, messages). Clean up in afterEach/afterAll hooks. Use unique identifiers (UUIDs, timestamps) to prevent cross-contamination.</description>
+    </constraint>
+    <constraint id="5" category="naming">
+      <title>Test File Naming</title>
+      <description>Test files: epic-4A-*.spec.ts pattern. Test descriptions: BDD-style (Given/When/Then). Test data: Prefix with test_ to distinguish from production.</description>
+    </constraint>
+    <constraint id="6" category="performance">
+      <title>Test Performance Targets</title>
+      <description>Individual test < 30 seconds. Full suite (Epic 4A.1) < 5 minutes. CI pipeline timeout: 10 minutes.</description>
+    </constraint>
+    <constraint id="7" category="flakiness">
+      <title>Flakiness Prevention</title>
+      <description>Avoid fixed delays (setTimeout). Use conditional waits (waitForSelector, waitForResponse). Handle race conditions explicitly. Use stable locators (data-testid > text > CSS).</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>MessagingDrawer Props</name>
+      <kind>React Component Props</kind>
+      <signature>interface MessagingDrawerProps { className?: string; }</signature>
+      <path>src/components/messaging/MessagingDrawer.tsx</path>
+    </interface>
+    <interface>
+      <name>ConversationList Props</name>
+      <kind>React Component Props</kind>
+      <signature>interface ConversationListProps { onSelectConversation: (id: string) => void; conversations: Conversation[]; showPinnedOnly?: boolean; }</signature>
+      <path>src/components/messaging/ConversationList.tsx</path>
+    </interface>
+    <interface>
+      <name>GET /api/conversations/get</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/conversations/get?grouped=true&amp;pinned=true&amp;summary=true
+Response: { conversations: Conversation[], groupedConversations: GroupedConversations, unreadSummary: UnreadSummary }</signature>
+      <path>src/app/api/conversations/get/route.ts</path>
+    </interface>
+    <interface>
+      <name>POST /api/conversations/archive</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /api/conversations/archive
+Body: { conversationId: string, archived: boolean }
+Response: { success: boolean }</signature>
+      <path>src/app/api/conversations/archive/route.ts</path>
+    </interface>
+    <interface>
+      <name>PATCH /api/conversations/preferences</name>
+      <kind>REST endpoint</kind>
+      <signature>PATCH /api/conversations/preferences
+Body: { conversationId: string, preferences: { pinned?: boolean, archived?: boolean } }
+Response: { success: boolean, preferences: ConversationPreferences }</signature>
+      <path>src/app/api/conversations/preferences/route.ts</path>
+    </interface>
+    <interface>
+      <name>POST /api/messages/create</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /api/messages/create
+Body: { conversation_id: string, content: string, sender_id: string, type: MessageType }
+Response: { message_id: string, status: string }</signature>
+      <path>src/app/api/messages/create/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      E2E tests focus on critical user journeys using Playwright. Tests must authenticate as real users to respect RLS. Use Page Object Model for complex UI interactions. Avoid arbitrary setTimeout - use Playwright's auto-waiting (waitForSelector, waitForResponse). Tests should be readable by non-technical stakeholders with clear BDD-style descriptions. Location: __tests__/api/playwright/ directory. Test naming: epic-4A-*.spec.ts pattern.
+    </standards>
+    
+    <locations>
+      <location>__tests__/api/playwright/</location>
+      <pattern>epic-4A-*.spec.ts</pattern>
+    </locations>
+    
+    <ideas>
+      <idea ac="AC1">
+        <title>Open Drawer and Send DM Test</title>
+        <description>
+          1. Authenticate as user1 in browser context
+          2. Navigate to floor plan page
+          3. Click messaging drawer toggle button (data-testid="messaging-drawer-toggle")
+          4. Wait for drawer to render (waitForSelector data-testid="messaging-drawer")
+          5. Assert conversation list is visible
+          6. Click first DM conversation
+          7. Wait for composer to appear
+          8. Type message in composer input
+          9. Click send button
+          10. Assert message appears in feed (waitForSelector with message content)
+          11. Open second browser context as user2
+          12. Navigate to same conversation
+          13. Assert message from user1 appears (realtime delivery)
+          14. Refresh page in both contexts
+          15. Assert message persists in conversation
+        </description>
+      </idea>
+      <idea ac="AC2">
+        <title>Filter Pinned Conversations Test</title>
+        <description>
+          1. Seed test data: 3 pinned conversations, 2 unpinned
+          2. Open messaging drawer
+          3. Assert all 5 conversations visible initially
+          4. Click "Pinned Only" filter toggle
+          5. Assert only 3 pinned conversations displayed
+          6. Right-click first pinned conversation → Unpin
+          7. Wait for API call to complete (waitForResponse /api/conversations/preferences)
+          8. Assert conversation disappears from filtered list (now 2 pinned shown)
+          9. Click filter toggle to disable
+          10. Assert all 4 conversations reappear (3 pinned + 2 unpinned - 1 unpinned)
+        </description>
+      </idea>
+      <idea ac="AC3">
+        <title>Tab Switching Test</title>
+        <description>
+          1. Seed test data: 2 room conversations, 3 DM conversations
+          2. Open messaging drawer
+          3. Assert default tab is "Rooms" (or verify initial state)
+          4. Assert 2 room conversations visible
+          5. Click "DMs" tab
+          6. Wait for tab content to load
+          7. Assert 3 DM conversations visible
+          8. Apply "Pinned Only" filter in DMs tab
+          9. Switch to Rooms tab
+          10. Assert Rooms list loaded, no filter applied
+          11. Switch back to DMs tab
+          12. Assert filter still active (pinned only)
+          13. Scroll conversation list to specific position
+          14. Switch tabs and return
+          15. Assert scroll position maintained
+        </description>
+      </idea>
+      <idea ac="AC4">
+        <title>Space Navigation Stability Test</title>
+        <description>
+          1. Open messaging drawer
+          2. Select a specific conversation (DM or room)
+          3. Assert active conversation displayed in drawer
+          4. Navigate to different space on floor plan (click space element)
+          5. Wait for space change (URL or state update)
+          6. Assert drawer still open and visible
+          7. Assert same conversation still active (no unexpected switch)
+          8. Monitor for visual flicker (take screenshots before/after navigation)
+          9. Perform 5 rapid space navigation actions
+          10. Assert drawer remains stable throughout
+        </description>
+      </idea>
+      <idea ac="AC5">
+        <title>Archive Conversation Flow Test</title>
+        <description>
+          1. Open messaging drawer with 3 conversations visible
+          2. Right-click (or click kebab menu) on second conversation
+          3. Click "Archive" option from context menu
+          4. Wait for API call (waitForResponse /api/conversations/archive)
+          5. Assert conversation disappears from main list (2 conversations remain)
+          6. Click "Archived" section/filter
+          7. Assert archived conversation appears in archived list
+          8. Click "Unarchive" option
+          9. Wait for API call completion
+          10. Assert conversation returns to main list (3 conversations total)
+        </description>
+      </idea>
+      <idea ac="AC6">
+        <title>CI/CD Integration and Stability Test</title>
+        <description>
+          1. Run full test suite 3 times consecutively (npm run test:api)
+          2. Track test execution time for each run
+          3. Log any flaky tests (tests that fail intermittently)
+          4. Ensure all tests pass in all 3 runs (0% flakiness)
+          5. Assert total execution time < 5 minutes
+          6. Verify test cleanup: Check database for orphaned test data after suite
+          7. Verify clear error messages on intentional failure (inject failing assertion)
+          8. Configure CI pipeline YAML to run tests on pre-merge
+        </description>
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

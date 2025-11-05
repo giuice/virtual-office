@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment } from '@/types/messaging';
+import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -18,6 +18,42 @@ const createRequestId = (prefix: string): string => {
     // Ignore crypto errors and fallback to timestamp-based identifier
   }
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
+const normalizeDate = (value: unknown): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return new Date(0);
+};
+
+const normalizeReactions = (reactions: unknown): MessageReaction[] => {
+  if (!Array.isArray(reactions)) {
+    return [];
+  }
+
+  return reactions
+    .filter((reaction): reaction is MessageReaction => {
+      return Boolean(
+        reaction &&
+          typeof reaction === 'object' &&
+          'emoji' in reaction &&
+          'userId' in reaction &&
+          'timestamp' in reaction
+      );
+    })
+    .map((reaction) => ({
+      ...reaction,
+      timestamp: normalizeDate(reaction.timestamp),
+    }));
 };
 
 function normalizeConversation(raw: any): Conversation {
@@ -169,9 +205,10 @@ export const messagingApi = {
       });
       // Normalize timestamps to Date for client cache consistency
       if (Array.isArray(data.messages)) {
-        data.messages = data.messages.map((m: any) => ({
+        data.messages = data.messages.map((m: Message) => ({
           ...m,
-          timestamp: new Date(m.timestamp),
+          timestamp: normalizeDate(m.timestamp),
+          reactions: normalizeReactions(m.reactions),
         }));
       }
       return data;
@@ -414,53 +451,81 @@ export const messagingApi = {
   },
 
   /**
-   * Add a reaction to a message
+   * Toggle a reaction on a message (add if not present, remove if present)
+   * The API endpoint automatically determines whether to add or remove based on current state
    */
-  async addReaction(messageId: string, reaction: string, userId: string): Promise<void> {
+  async toggleReaction(messageId: string, emoji: string): Promise<{ action: 'added' | 'removed'; message: string }> {
+    const scope = 'messagingApi.toggleReaction';
+    const requestId = createRequestId('react-toggle');
+    const start = getTimestamp();
+    
+    debugLogger.messaging.event(scope, 'fetch:start', {
+      requestId,
+      messageId,
+      emoji,
+    });
+
     try {
       const response = await fetch('/api/messages/react', {
-        method: 'POST', // Assuming POST adds a reaction
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messageId, reaction, userId }),
+        body: JSON.stringify({ messageId, emoji }),
+      });
+
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.metric(scope, 'fetch', duration, {
+        requestId,
+        status: response.status,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add reaction');
+        debugLogger.messaging.warn(scope, 'fetch:non-ok', {
+          requestId,
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || 'Failed to toggle reaction');
       }
-      // No specific data expected on success for adding reaction
+
+      const data = await response.json();
+      debugLogger.messaging.event(scope, 'fetch:success', {
+        requestId,
+        messageId,
+        emoji,
+        action: data.action,
+      });
+
+      return {
+        action: data.action,
+        message: data.message ?? '',
+      };
     } catch (error) {
-      console.error('Error adding reaction:', error);
+      const duration = getTimestamp() - start;
+      debugLogger.messaging.error(scope, 'fetch:error', {
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : error,
+      });
+      console.error('Error toggling reaction:', error);
       throw error;
     }
   },
 
   /**
-   * Remove a reaction from a message
+   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
    */
-  async removeReaction(messageId: string, reaction: string, userId: string): Promise<void> {
-    try {
-      // Assuming DELETE method or a flag in body distinguishes removal.
-      // Let's try DELETE first, adjust if backend expects differently.
-      const response = await fetch('/api/messages/react', {
-        method: 'POST', // Backend handles add/remove logic via POST based on current state
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, reaction, userId }),
-      });
+  async addReaction(messageId: string, emoji: string): Promise<void> {
+    await this.toggleReaction(messageId, emoji);
+  },
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to remove reaction');
-      }
-      // No specific data expected on success for removing reaction
-    } catch (error) {
-      console.error('Error removing reaction:', error);
-      throw error;
-    }
+  /**
+   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
+   */
+  async removeReaction(messageId: string, emoji: string): Promise<void> {
+    await this.toggleReaction(messageId, emoji);
   },
 
   /**

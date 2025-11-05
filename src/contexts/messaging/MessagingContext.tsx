@@ -18,6 +18,7 @@ import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
 const DRAWER_STORAGE_KEYS = {
   IS_MINIMIZED: 'messaging_drawer_minimized',
   ACTIVE_VIEW: 'messaging_drawer_active_view',
+  ACTIVE_CONVERSATION_ID: 'messaging_active_conversation_id',
 } as const;
 
 // Create the context with a default undefined value
@@ -50,13 +51,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return (stored as DrawerView) || 'list';
   });
 
-  // Drawer is open ONLY when there's an ACTIVE conversation
-  // lastActiveConversation is just for memory, not for auto-opening
-  // Drawer should only open when:
-  // 1. User enters a space (sets activeConversation)
-  // 2. User clicks a conversation in the list (sets activeConversation)
-  // 3. User creates new conversation from search (sets activeConversation)
-  const isDrawerOpen = Boolean(activeConversation);
+  // Drawer explicit open state (decoupled from activeConversation)
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
   // Persist drawer state to localStorage
   useEffect(() => {
@@ -71,8 +67,25 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeView]);
 
+  // Persist active conversation ID to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (activeConversation?.id) {
+        localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID, activeConversation.id);
+      } else {
+        localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+      }
+    }
+  }, [activeConversation?.id]);
+
   // Drawer control functions
   const openDrawer = useCallback(() => {
+    setIsDrawerOpen(true);
+    // Default to list view when no active conversation
+    if (!activeConversation) {
+      setActiveView('list');
+    }
+    // Optionally restore last active conversation
     if (!activeConversation && lastActiveConversation) {
       setActiveConversation(lastActiveConversation);
     }
@@ -117,6 +130,34 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [isMessagingV2Enabled]);
+
+  // Restore active conversation from localStorage on mount
+  useEffect(() => {
+    // Only restore if we have conversations loaded and no active conversation yet
+    if (
+      typeof window !== 'undefined' &&
+      conversationsManager.conversations.length > 0 &&
+      !activeConversation
+    ) {
+      const storedConversationId = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+      if (storedConversationId) {
+        const conversation = conversationsManager.conversations.find(
+          (c) => c.id === storedConversationId
+        );
+        if (conversation) {
+          if (debugLogger.messaging.enabled()) {
+            debugLogger.messaging.event('MessagingContext', 'restore-active-conversation', {
+              conversationId: conversation.id,
+            });
+          }
+          setActiveConversation(conversation);
+        } else {
+          // Conversation not found, clear from localStorage
+          localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
+        }
+      }
+    }
+  }, [conversationsManager.conversations, activeConversation, setActiveConversation]);
 
   const getLastActivityMs = useCallback((conversation: (typeof conversationsManager.conversations)[number]) => {
     const value = conversation?.lastActivity;
@@ -293,6 +334,33 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       onInsert: handleConversationInsert,
     }
   );
+
+  const realtimeStatus = allConversationStatus ?? focusedConversationStatus ?? null;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const root = document.documentElement;
+    if (!root) {
+      return;
+    }
+
+    if (!realtimeStatus) {
+      root.removeAttribute('data-messaging-realtime-status');
+      root.removeAttribute('data-messaging-realtime-ready');
+      return;
+    }
+
+    root.setAttribute('data-messaging-realtime-status', realtimeStatus);
+
+    if (realtimeStatus === 'SUBSCRIBED') {
+      root.setAttribute('data-messaging-realtime-ready', 'true');
+    } else {
+      root.removeAttribute('data-messaging-realtime-ready');
+    }
+  }, [realtimeStatus]);
   
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
@@ -307,6 +375,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, [activeConversation, messagesManager.sendMessage]);
 
   const closeDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
     setActiveConversation(null);
     clearLastActiveConversation();
     setIsMinimized(false);
@@ -329,12 +398,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     activeConversation: conversationsManager.activeConversation,
     lastActiveConversation: conversationsManager.lastActiveConversation,
     loadingConversations: conversationsManager.loadingConversations,
+    refreshingConversations: conversationsManager.refreshingConversations,
+    hasLoadedConversations: conversationsManager.hasLoadedConversations,
     errorConversations: conversationsManager.errorConversations,
     setActiveConversation: conversationsManager.setActiveConversation,
     getOrCreateRoomConversation: conversationsManager.getOrCreateRoomConversation,
     getOrCreateUserConversation: conversationsManager.getOrCreateUserConversation,
     archiveConversation: conversationsManager.archiveConversation,
     unarchiveConversation: conversationsManager.unarchiveConversation,
+    pinConversation: conversationsManager.pinConversation,
+    unpinConversation: conversationsManager.unpinConversation,
     markConversationAsRead: conversationsManager.markConversationAsRead,
     totalUnreadCount: conversationsManager.totalUnreadCount,
     refreshConversations: conversationsManager.refreshConversations,
@@ -351,7 +424,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     removeReaction: messagesManager.removeReaction,
     uploadAttachment: messagesManager.uploadAttachment,
     // Realtime
-    connectionStatus: allConversationStatus ?? focusedConversationStatus,
+    connectionStatus: realtimeStatus,
     isMessagingV2Enabled,
   };
   

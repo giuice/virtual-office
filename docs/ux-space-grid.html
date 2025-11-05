@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Office · Space Grid Overview Mock</title>
+    <style>
+      :root {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 2.5rem 3rem 4rem;
+        background: var(--page-bg);
+        color: var(--text-primary);
+        transition: background 150ms ease, color 150ms ease;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.2;
+        color: var(--text-primary);
+      }
+
+      h1 {
+        font-size: 2.15rem;
+        margin-bottom: 0.3rem;
+      }
+
+      p {
+        margin: 0 0 1.25rem;
+        max-width: 980px;
+        color: var(--text-secondary);
+      }
+
+      header {
+        margin-bottom: 2.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.2rem;
+      }
+
+      .theme-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .layout-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .theme-button {
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        border: 1px solid var(--button-border);
+        background: var(--button-bg);
+        color: var(--button-color);
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background 120ms ease, border 120ms ease, color 120ms ease, transform 120ms ease;
+      }
+
+      .theme-button:hover {
+        background: var(--button-hover-bg);
+        border-color: var(--button-hover-border);
+        transform: translateY(-1px);
+      }
+
+      .theme-button:focus-visible {
+        outline: 2px solid rgba(52, 144, 255, 0.6);
+        outline-offset: 3px;
+      }
+
+      .theme-button.active {
+        background: var(--button-active-bg);
+        border-color: var(--button-active-border);
+        color: var(--button-active-color);
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .filter {
+        padding: 0.45rem 0.9rem;
+        border-radius: 10px;
+        border: 1px solid var(--filter-border);
+        background: var(--filter-bg);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--filter-text);
+      }
+
+      .filter.active {
+        background: var(--filter-active-bg);
+        border-color: var(--filter-active-border);
+        color: var(--filter-active-text);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.4rem;
+      }
+
+      .space-card {
+        border-radius: 18px;
+        padding: 1.25rem;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        position: relative;
+      }
+
+      .space-card[data-status="live"]::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: 20px;
+        padding: 1px;
+        background: var(--live-outline);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+      }
+
+      .space-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+      }
+
+      .space-title {
+        font-weight: 600;
+        font-size: 1.05rem;
+      }
+
+      .beacon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.76rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        background: var(--beacon-bg);
+        border: 1px solid var(--beacon-border);
+        color: var(--beacon-color);
+      }
+
+      .beacon[data-type="risk"] {
+        background: var(--beacon-risk-bg);
+        border-color: var(--beacon-risk-border);
+        color: var(--beacon-risk-color);
+      }
+
+      .space-metadata {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--metadata-color);
+      }
+
+      .phase {
+        padding: 0.22rem 0.55rem;
+        border-radius: 8px;
+        background: var(--phase-bg);
+        border: 1px solid var(--phase-border);
+        color: var(--phase-color);
+      }
+
+      .phase[data-state="decision"] {
+        background: var(--phase-decision-bg);
+        border-color: var(--phase-decision-border);
+        color: var(--phase-decision-color);
+      }
+
+      .phase[data-state="mentor"] {
+        background: var(--phase-mentor-bg);
+        border-color: var(--phase-mentor-border);
+        color: var(--phase-mentor-color);
+      }
+
+      .space-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+        font-size: 0.92rem;
+        color: var(--text-secondary);
+      }
+
+      .avatars {
+        display: flex;
+        gap: 0.35rem;
+      }
+
+      .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        border: 3px solid var(--avatar-border);
+        box-shadow: var(--avatar-shadow);
+        position: relative;
+      }
+
+      .avatar[data-role="speaker"]::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        border: 2px solid var(--speaker-ring);
+        animation: pulse 1.6s infinite;
+      }
+
+      .avatar[data-role="observer"] {
+        opacity: 0.65;
+        border-color: var(--avatar-observer-border);
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.8;
+          transform: scale(1);
+        }
+        60% {
+          opacity: 0;
+          transform: scale(1.35);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.35);
+        }
+      }
+
+      .log-snippet {
+        font-size: 0.78rem;
+        line-height: 1.6;
+        color: var(--log-color);
+        background: var(--log-bg);
+        border-radius: 12px;
+        padding: 0.65rem 0.85rem;
+        border: 1px solid var(--log-border);
+      }
+
+      footer {
+        margin-top: 2.8rem;
+        font-size: 0.9rem;
+        color: var(--footer-color);
+      }
+
+      .theme-dark {
+        color-scheme: dark;
+        --page-bg: radial-gradient(circle at top, rgba(47, 123, 255, 0.22), transparent 60%),
+          #10141f;
+        --text-primary: #f4f5fb;
+        --text-secondary: rgba(244, 245, 251, 0.8);
+        --filter-bg: rgba(24, 31, 52, 0.75);
+        --filter-border: rgba(118, 142, 217, 0.25);
+        --filter-text: rgba(244, 245, 251, 0.85);
+        --filter-active-bg: rgba(47, 123, 255, 0.35);
+        --filter-active-border: rgba(47, 123, 255, 0.65);
+        --filter-active-text: rgba(243, 247, 255, 0.95);
+        --card-bg: linear-gradient(180deg, rgba(17, 22, 36, 0.92), rgba(12, 17, 28, 0.88));
+        --card-border: rgba(120, 148, 221, 0.22);
+        --card-shadow: 0 26px 52px rgba(6, 9, 18, 0.35);
+        --live-outline: linear-gradient(135deg, rgba(47, 123, 255, 0.65), rgba(241, 197, 80, 0.55));
+        --beacon-bg: rgba(47, 123, 255, 0.16);
+        --beacon-border: rgba(47, 123, 255, 0.45);
+        --beacon-color: rgba(214, 229, 255, 0.9);
+        --beacon-risk-bg: rgba(255, 138, 92, 0.18);
+        --beacon-risk-border: rgba(255, 138, 92, 0.35);
+        --beacon-risk-color: rgba(255, 224, 210, 0.85);
+        --metadata-color: rgba(244, 245, 251, 0.72);
+        --phase-bg: rgba(47, 123, 255, 0.25);
+        --phase-border: rgba(47, 123, 255, 0.45);
+        --phase-color: rgba(224, 236, 255, 0.95);
+        --phase-decision-bg: rgba(241, 197, 80, 0.25);
+        --phase-decision-border: rgba(241, 197, 80, 0.48);
+        --phase-decision-color: rgba(255, 235, 196, 0.95);
+        --phase-mentor-bg: rgba(111, 183, 165, 0.22);
+        --phase-mentor-border: rgba(111, 183, 165, 0.42);
+        --phase-mentor-color: rgba(209, 239, 228, 0.92);
+        --avatar-border: rgba(47, 123, 255, 0.35);
+        --avatar-shadow: 0 0 0 3px rgba(15, 21, 36, 0.95);
+        --avatar-observer-border: rgba(255, 255, 255, 0.22);
+        --speaker-ring: rgba(241, 197, 80, 0.6);
+        --log-bg: rgba(22, 29, 46, 0.92);
+        --log-border: rgba(118, 142, 217, 0.25);
+        --log-color: rgba(244, 245, 251, 0.7);
+        --footer-color: rgba(244, 245, 251, 0.6);
+        --button-bg: rgba(24, 31, 52, 0.75);
+        --button-border: rgba(118, 142, 217, 0.25);
+        --button-color: rgba(244, 245, 251, 0.85);
+        --button-hover-bg: rgba(47, 123, 255, 0.28);
+        --button-hover-border: rgba(47, 123, 255, 0.55);
+        --button-active-bg: rgba(47, 123, 255, 0.4);
+        --button-active-border: rgba(47, 123, 255, 0.75);
+        --button-active-color: rgba(243, 247, 255, 0.98);
+      }
+
+      .theme-light {
+        color-scheme: light;
+        --page-bg: linear-gradient(180deg, rgba(255, 214, 194, 0.3), rgba(250, 246, 239, 0.95)),
+          #faf6ef;
+        --text-primary: #1e2330;
+        --text-secondary: rgba(30, 35, 48, 0.75);
+        --filter-bg: rgba(250, 246, 239, 0.9);
+        --filter-border: rgba(30, 35, 48, 0.18);
+        --filter-text: rgba(30, 35, 48, 0.75);
+        --filter-active-bg: rgba(255, 138, 92, 0.28);
+        --filter-active-border: rgba(255, 138, 92, 0.55);
+        --filter-active-text: #1e2330;
+        --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(250, 246, 239, 0.9));
+        --card-border: rgba(30, 35, 48, 0.12);
+        --card-shadow: 0 22px 36px rgba(30, 35, 48, 0.14);
+        --live-outline: linear-gradient(135deg, rgba(255, 138, 92, 0.65), rgba(241, 197, 80, 0.55));
+        --beacon-bg: rgba(255, 138, 92, 0.18);
+        --beacon-border: rgba(255, 138, 92, 0.42);
+        --beacon-color: #1e2330;
+        --beacon-risk-bg: rgba(217, 82, 82, 0.16);
+        --beacon-risk-border: rgba(217, 82, 82, 0.35);
+        --beacon-risk-color: #1e2330;
+        --metadata-color: rgba(30, 35, 48, 0.55);
+        --phase-bg: rgba(47, 123, 255, 0.18);
+        --phase-border: rgba(47, 123, 255, 0.45);
+        --phase-color: rgba(17, 23, 44, 0.85);
+        --phase-decision-bg: rgba(241, 197, 80, 0.25);
+        --phase-decision-border: rgba(241, 197, 80, 0.5);
+        --phase-decision-color: rgba(17, 23, 44, 0.85);
+        --phase-mentor-bg: rgba(111, 183, 165, 0.18);
+        --phase-mentor-border: rgba(111, 183, 165, 0.4);
+        --phase-mentor-color: rgba(17, 23, 44, 0.85);
+        --avatar-border: rgba(255, 138, 92, 0.35);
+        --avatar-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95);
+        --avatar-observer-border: rgba(30, 35, 48, 0.2);
+        --speaker-ring: rgba(255, 138, 92, 0.55);
+        --log-bg: rgba(255, 250, 244, 0.95);
+        --log-border: rgba(30, 35, 48, 0.14);
+        --log-color: rgba(30, 35, 48, 0.7);
+        --footer-color: rgba(30, 35, 48, 0.6);
+        --button-bg: rgba(255, 255, 255, 0.85);
+        --button-border: rgba(30, 35, 48, 0.12);
+        --button-color: rgba(30, 35, 48, 0.75);
+        --button-hover-bg: rgba(255, 214, 194, 0.35);
+        --button-hover-border: rgba(255, 138, 92, 0.45);
+        --button-active-bg: rgba(255, 138, 92, 0.4);
+        --button-active-border: rgba(255, 138, 92, 0.65);
+        --button-active-color: #1e2330;
+      }
+
+      .theme-cosmic {
+        color-scheme: dark;
+        --page-bg: radial-gradient(circle at top, rgba(87, 98, 255, 0.32), rgba(18, 21, 51, 1));
+        --text-primary: #f8f9ff;
+        --text-secondary: rgba(248, 249, 255, 0.74);
+        --filter-bg: rgba(30, 32, 68, 0.85);
+        --filter-border: rgba(95, 109, 255, 0.35);
+        --filter-text: rgba(248, 249, 255, 0.85);
+        --filter-active-bg: rgba(96, 233, 249, 0.22);
+        --filter-active-border: rgba(96, 233, 249, 0.45);
+        --filter-active-text: rgba(248, 249, 255, 0.98);
+        --card-bg: linear-gradient(195deg, rgba(18, 21, 51, 0.92), rgba(20, 36, 82, 0.88));
+        --card-border: rgba(95, 109, 255, 0.38);
+        --card-shadow: 0 30px 55px rgba(5, 8, 24, 0.45);
+        --live-outline: linear-gradient(155deg, rgba(87, 98, 255, 0.75), rgba(96, 233, 249, 0.65));
+        --beacon-bg: rgba(87, 98, 255, 0.22);
+        --beacon-border: rgba(87, 98, 255, 0.5);
+        --beacon-color: rgba(248, 249, 255, 0.92);
+        --beacon-risk-bg: rgba(244, 199, 89, 0.22);
+        --beacon-risk-border: rgba(244, 199, 89, 0.45);
+        --beacon-risk-color: rgba(255, 245, 218, 0.95);
+        --metadata-color: rgba(248, 249, 255, 0.68);
+        --phase-bg: rgba(87, 98, 255, 0.28);
+        --phase-border: rgba(87, 98, 255, 0.5);
+        --phase-color: rgba(237, 240, 255, 0.9);
+        --phase-decision-bg: rgba(244, 199, 89, 0.28);
+        --phase-decision-border: rgba(244, 199, 89, 0.5);
+        --phase-decision-color: rgba(255, 245, 218, 0.92);
+        --phase-mentor-bg: rgba(96, 233, 249, 0.25);
+        --phase-mentor-border: rgba(96, 233, 249, 0.45);
+        --phase-mentor-color: rgba(214, 249, 255, 0.92);
+        --avatar-border: rgba(87, 98, 255, 0.55);
+        --avatar-shadow: 0 0 0 3px rgba(18, 21, 51, 0.95);
+        --avatar-observer-border: rgba(255, 255, 255, 0.28);
+        --speaker-ring: rgba(96, 233, 249, 0.65);
+        --log-bg: rgba(30, 32, 68, 0.85);
+        --log-border: rgba(96, 233, 249, 0.28);
+        --log-color: rgba(248, 249, 255, 0.74);
+        --footer-color: rgba(248, 249, 255, 0.58);
+        --button-bg: rgba(30, 32, 68, 0.85);
+        --button-border: rgba(95, 109, 255, 0.35);
+        --button-color: rgba(248, 249, 255, 0.85);
+        --button-hover-bg: rgba(96, 233, 249, 0.22);
+        --button-hover-border: rgba(96, 233, 249, 0.45);
+        --button-active-bg: rgba(87, 98, 255, 0.42);
+        --button-active-border: rgba(87, 98, 255, 0.65);
+        --button-active-color: rgba(248, 249, 255, 0.98);
+      }
+
+      .layout-command .grid {
+        gap: 1.4rem;
+      }
+
+      .layout-command .space-card {
+        transform: none;
+      }
+
+      .layout-orbit .grid {
+        gap: 1.1rem;
+      }
+
+      .layout-orbit .space-card {
+        border-radius: 20px;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        box-shadow: 0 28px 60px rgba(7, 12, 28, 0.5);
+        overflow: hidden;
+      }
+
+      .layout-orbit .space-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(96, 233, 249, 0.18), transparent 60%);
+        pointer-events: none;
+      }
+
+      .layout-orbit .space-body {
+        gap: 0.5rem;
+      }
+
+      .layout-orbit .beacon {
+        transform: translateY(-2px);
+      }
+
+      .layout-analyst .grid {
+        gap: 1rem;
+      }
+
+      .layout-analyst .space-card {
+        border-radius: 14px;
+        padding: 1rem;
+      }
+
+      .layout-analyst .space-metadata {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+      }
+
+      .layout-analyst .log-snippet {
+        background: var(--log-bg);
+        border-radius: 8px;
+        font-family: "JetBrains Mono", monospace;
+      }
+    </style>
+  </head>
+  <body class="theme-dark layout-command">
+    <header>
+      <h1>
+        Space Grid Overview · <span id="theme-label">Northstar Balance</span>
+      </h1>
+      <p>
+        When more than fifteen spaces are live, the floor plan adapts into this overview. Every space stays readable—title, phase, leadership, avatars, attention beacons, and log snippet—so executives skim the company pulse without drilling in. Inspired by Sococo’s one-shot visibility, reimagined with richer cues and modern motion.
+      </p>
+      <div class="theme-switch" role="group" aria-label="Theme toggle">
+        <button class="theme-button active" data-theme="dark">Northstar Balance</button>
+        <button class="theme-button" data-theme="light">Warm Control</button>
+        <button class="theme-button" data-theme="cosmic">Cosmic Efficiency</button>
+      </div>
+      <div class="layout-switch" role="group" aria-label="Layout toggle">
+        <button class="theme-button active" data-layout="command">Command Atrium</button>
+        <button class="theme-button" data-layout="orbit">Orbit Gallery</button>
+        <button class="theme-button" data-layout="analyst">Analyst Matrix</button>
+      </div>
+      <div class="filters">
+        <span class="filter active">All Spaces</span>
+        <span class="filter">Strategy</span>
+        <span class="filter">Sprint</span>
+        <span class="filter">Mentorship</span>
+        <span class="filter">Support</span>
+        <span class="filter">Culture</span>
+        <span class="filter">Alerts</span>
+      </div>
+    </header>
+
+    <section class="grid">
+      <article class="space-card" data-status="live">
+        <div class="space-header">
+          <span class="space-title">Strategy War Space</span>
+          <span class="beacon">Beacon · Phase Shift</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="decision">Phase 2 · Align</span>
+          <span>6 Participants</span>
+          <span>Lead: Giuliano</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=80')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=60')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=50')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+          </div>
+          <div class="log-snippet">
+            «Consensus forming around launch path—pending risk mitigation sign-off.» Logged 2 min ago.
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Scrum Lessons</span>
+          <span class="beacon" data-type="risk">Beacon · Overload</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 1 · Discover</span>
+          <span>12 Participants</span>
+          <span>Lead: Maya</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=120&q=80')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=60')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Team requesting second session to cover async tooling.» Flagged for ops review.
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Pine Lounge Mentorship</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="mentor">Mentor Drop-In</span>
+          <span>5 Participants</span>
+          <span>Mentor: Sasha</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=80')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=55')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=65')"></div>
+          </div>
+          <div class="log-snippet">
+            «Weekly “demo & dine” mentorship pilot. Transcript saved to culture doc.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card" data-status="live">
+        <div class="space-header">
+          <span class="space-title">Compliance Review</span>
+          <span class="beacon">Beacon · Live Audit</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 3 · Decision</span>
+          <span>4 Participants</span>
+          <span>Lead: Helene</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=75')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=55')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=55')"></div>
+          </div>
+          <div class="log-snippet">
+            «Action items locked · compliance transcript syncing to dashboard.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Product Brainstorm</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 0 · Ideate</span>
+          <span>9 Participants</span>
+          <span>Lead: Lena</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=60')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=50')"></div>
+          </div>
+          <div class="log-snippet">
+            «Feedback loops mapped · marketing invited for alignment.» Logged 5 min ago.
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">AI Co-Pilot Sync</span>
+          <span class="beacon">Beacon · Innovation</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="decision">Phase 1 · Discovery</span>
+          <span>7 Participants</span>
+          <span>Lead: Arjun</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=120&q=75')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=55')"></div>
+          </div>
+          <div class="log-snippet">
+            «Prototype demo underway · CTO observing. Notebook clipped to summary queue.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Announcements Prep</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 0 · Draft</span>
+          <span>3 Participants</span>
+          <span>Lead: Omar</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Quarterly announcement draft ready for review. Transcript pinned.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Finance Standup</span>
+          <span class="beacon" data-type="risk">Beacon · Cross-Org</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 1 · Discover</span>
+          <span>5 Participants</span>
+          <span>Lead: Priya</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=120&q=80')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=50')"></div>
+          </div>
+          <div class="log-snippet">
+            «Budget realignment flagged. Strategy team looped in.» Logged 3 min ago.
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card" data-status="live">
+        <div class="space-header">
+          <span class="space-title">Ops Desk</span>
+          <span class="beacon">Beacon · Incident</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="decision">Phase 2 · Align</span>
+          <span>6 Participants</span>
+          <span>Lead: Marta</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=60')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=55')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Incident triage underway. Engineering paging updates to dashboard.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Creative Studio</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="mentor">Inspiration Session</span>
+          <span>8 Participants</span>
+          <span>Lead: Nia</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=60')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&q=70')"></div>
+          </div>
+          <div class="log-snippet">
+            «Moodboards shared. Designers tagging concepts for next sprint.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Customer Support Hub</span>
+          <span class="beacon" data-type="risk">Beacon · Escalation</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 2 · Align</span>
+          <span>10 Participants</span>
+          <span>Lead: Devon</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=55')"></div>
+          </div>
+          <div class="log-snippet">
+            «Enterprise outage triaged. Resolution ETA 30 min.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Investor Lounge</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 1 · Brief</span>
+          <span>4 Participants</span>
+          <span>Lead: Helene</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=75')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Prep run-through for investor sync. Key metrics highlighted.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Async Library</span>
+          <span class="beacon" style="display: none">Beacon</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase ∞ · Archive</span>
+          <span>18 Viewers</span>
+          <span>Curator: Daniel</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=55')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Highlights from strategy, compliance, and mentorship auto-posted for async review.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Sales Pipeline Review</span>
+          <span class="beacon">Beacon · Forecast</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 3 · Decide</span>
+          <span>5 Participants</span>
+          <span>Lead: Marco</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=120&q=75')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Forecast confidence at 88%. Follow-ups assigned.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Growth Lab</span>
+          <span class="beacon">Beacon · Experiment</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase" data-state="decision">Phase 1 · Explore</span>
+          <span>6 Participants</span>
+          <span>Lead: Nova</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Experiment backlog reprioritized. Marketing notified.»
+          </div>
+        </div>
+      </article>
+
+      <article class="space-card">
+        <div class="space-header">
+          <span class="space-title">Engineering Hive</span>
+          <span class="beacon" data-type="risk">Beacon · Merge Freeze</span>
+        </div>
+        <div class="space-metadata">
+          <span class="phase">Phase 2 · Align</span>
+          <span>14 Participants</span>
+          <span>Lead: Julian</span>
+        </div>
+        <div class="space-body">
+          <div class="avatars">
+            <div class="avatar" data-role="speaker" style="background-image: url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=120&q=65')"></div>
+            <div class="avatar" style="background-image: url('https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=120&q=70')"></div>
+            <div class="avatar" data-role="observer" style="background-image: url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=60')"></div>
+          </div>
+          <div class="log-snippet">
+            «Critical bug triaged. Merge freeze communicated company-wide.»
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      High-density tiles remain interactive: hover reveals full logs, transcript peeks, and deep links
+      to join or delegate. Avatar constellations reflow at 320px width, preserving human presence even in
+      compact views.
+    </footer>
+    <script>
+      const body = document.body;
+      const themeLabel = document.getElementById("theme-label");
+      const themeButtons = document.querySelectorAll(".theme-button[data-theme]");
+      const layoutButtons = document.querySelectorAll(".theme-button[data-layout]");
+
+      const THEME_MAP = {
+        dark: { className: "theme-dark", label: "Northstar Balance" },
+        light: { className: "theme-light", label: "Warm Control" },
+        cosmic: { className: "theme-cosmic", label: "Cosmic Efficiency" }
+      };
+
+      const LAYOUT_MAP = {
+        command: { className: "layout-command" },
+        orbit: { className: "layout-orbit" },
+        analyst: { className: "layout-analyst" }
+      };
+
+      themeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const themeKey = button.dataset.theme;
+          const themeConfig = THEME_MAP[themeKey];
+          if (!themeConfig) {
+            return;
+          }
+
+          body.classList.remove("theme-dark", "theme-light", "theme-cosmic");
+          body.classList.add(themeConfig.className);
+          themeLabel.textContent = themeConfig.label;
+
+          themeButtons.forEach((btn) => {
+            btn.classList.toggle("active", btn === button);
+          });
+        });
+      });
+
+      layoutButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const layoutKey = button.dataset.layout;
+          const layoutConfig = LAYOUT_MAP[layoutKey];
+          if (!layoutConfig) {
+            return;
+          }
+
+          body.classList.remove("layout-command", "layout-orbit", "layout-analyst");
+          body.classList.add(layoutConfig.className);
+
+          layoutButtons.forEach((btn) => {
+            btn.classList.toggle("active", btn === button);
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

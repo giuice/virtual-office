@@ -1,7 +1,6 @@
 // src/lib/services/SystemMessageService.ts
 import { messagingApi } from '@/lib/messaging-api';
 import { MessageStatus, MessageType } from '@/types/messaging';
-import { M } from 'vitest/dist/chunks/reporters.d.BFLkQcL6.js';
 
 /**
  * Service for creating and managing system messages for space events

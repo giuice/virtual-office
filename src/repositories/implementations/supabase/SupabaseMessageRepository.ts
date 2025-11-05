@@ -215,22 +215,22 @@ export class SupabaseMessageRepository implements IMessageRepository {
         data = [...data].reverse();
       }
     } else {
-      // Backward-compatible path: offset-based pagination
-      // Supabase range is inclusive [from, to] - fetch limit + 1 to check for more results
-      const from = typeof options?.cursor === 'number' ? options.cursor : 0;
-      const to = from + limit; // Fetch one extra to determine hasMore
-
+      // Initial load: fetch most recent messages, newest first
       const res = await this.supabaseClient
         .from(this.MSG_TABLE_NAME)
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('timestamp', { ascending: true })
-        .range(from, to);
+        .order('timestamp', { ascending: false })
+        .limit(limit + 1);
       data = res.data as any[] | null;
       error = res.error;
       if (error) {
-        console.error('Error fetching messages by conversation (offset):', error);
+        console.error('Error fetching messages by conversation (initial):', error);
         throw error;
+      }
+      // Reverse to oldest-first for UI rendering
+      if (data) {
+        data = [...data].reverse();
       }
     }
 
@@ -244,8 +244,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Check if we have more results
     const hasMore = data.length > limit;
-    // Trim to actual limit
-    const trimmedData = hasMore ? data.slice(0, limit) : data;
+    // Trim to actual limit, preserving chronological (oldest->newest) order
+    const trimmedData = hasMore
+      ? (hasCursorAfter ? data.slice(0, limit) : data.slice(data.length - limit))
+      : data;
 
     // Map core message data
     const messages = mapMessageArrayToCamelCase(trimmedData);

@@ -67,8 +67,6 @@ export async function PATCH(request: Request) {
       }
     }
 
-    console.log(`API: Updating status for message ${messageId} to ${status}`);
-
     // Call the repository update method
     await messageRepository.update(messageId, { status });
 
@@ -76,7 +74,6 @@ export async function PATCH(request: Request) {
     if (status === MessageStatus.READ) {
       try {
         await messageRepository.addReadReceipt(messageId, userDbId);
-        console.log(`API: Created read receipt for message ${messageId} by user ${userDbId}`);
       } catch (receiptError) {
         console.error('Error creating read receipt:', receiptError);
         // Don't fail the request if read receipt creation fails

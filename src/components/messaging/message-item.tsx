@@ -13,17 +13,19 @@ import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAva
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  CheckCheck, 
-  AlertCircle, 
+  CheckCheck,
+  AlertCircle,
   File,
   Reply,
-  Smile,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { AvatarUser } from '@/lib/avatar-utils';
 import type { User } from '@/types/database';
+import { EmojiPicker } from '@/components/messaging/EmojiPicker';
+import { ReactionChips } from '@/components/messaging/ReactionChips';
 
 const isDatabaseUser = (value: User | AvatarUser | null | undefined): value is User => {
   return !!value && typeof value === 'object' && 'supabase_uid' in value;
@@ -34,17 +36,28 @@ interface MessageItemProps {
   sender?: User | AvatarUser | null;
   onReply?: (message: Message) => void;
   onReaction?: (messageId: string, emoji: string) => void;
+  replyCount?: number;
+  onToggleThread?: () => void;
+  isThreadExpanded?: boolean;
+  depth?: number;
+  parentMessage?: Message | null;
 }
 
 export function MessageItem({
   message,
   sender,
   onReply,
-  onReaction
+  onReaction,
+  replyCount = 0,
+  onToggleThread,
+  isThreadExpanded = false,
+  depth = 0,
+  parentMessage,
 }: MessageItemProps) {
   const { users } = usePresence();
   const { companyUsers, currentUserProfile } = useCompany();
   const [showActions, setShowActions] = useState(false);
+  const showReplyIndicator = replyCount > 0;
 
   // Get sender presence information
   const senderPresence = users?.find(u => u.id === message.senderId);
@@ -162,10 +175,18 @@ export function MessageItem({
   // Render reply badge if this is a reply to another message
   const renderReplyBadge = () => {
     if (!message.replyToId) return null;
-    
+
+    const previewText = parentMessage?.content ?? 'Original message';
+
     return (
-      <div className="bg-secondary/50 p-2 rounded-t-md text-xs text-muted-foreground">
-        Replying to a message
+      <div
+        className="bg-secondary/50 p-2 rounded-t-md text-xs text-muted-foreground"
+        data-testid={`reply-context-${message.id}`}
+      >
+        <div className="font-semibold mb-0.5">Replying to {parentMessage ? 'this thread' : 'a message'}</div>
+        <div className="text-muted-foreground/80 truncate" title={previewText}>
+          {previewText}
+        </div>
       </div>
     );
   };
@@ -175,25 +196,70 @@ export function MessageItem({
     if (!message.reactions || message.reactions.length === 0) return null;
     
     return (
-      <div className="flex flex-wrap gap-1 mt-1">
-        {/* Group reactions by emoji and show count */}
-        {Object.entries(
-          message.reactions.reduce((acc, reaction) => {
-            acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        ).map(([emoji, count]) => (
-          <div 
-            key={emoji} 
-            className="flex items-center bg-secondary rounded-full px-2 py-0.5 text-xs"
-            onClick={() => onReaction?.(message.id, emoji)}
-          >
-            <span>{emoji}</span>
-            <span className="ml-1">{count}</span>
-          </div>
-        ))}
-      </div>
+      <ReactionChips
+        reactions={message.reactions}
+        currentUserId={currentUserProfile?.id}
+        onReactionToggle={(emoji) => onReaction?.(message.id, emoji)}
+      />
     );
+  };
+
+  const containsTarget = (
+    container: HTMLElement,
+    target: EventTarget | null
+  ): boolean => {
+    return target instanceof Node && container.contains(target);
+  };
+
+  const isInteractiveTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+    return Boolean(
+      target.closest('[data-avatar-interactive]') ||
+      target.closest('a, button, [role="button"], [data-space-action]')
+    );
+  };
+
+  const handleMouseEnter = () => {
+    setShowActions(true);
+  };
+
+  const handleMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget) {
+      if (containsTarget(event.currentTarget, nextTarget)) {
+        return;
+      }
+      if (isInteractiveTarget(nextTarget)) {
+        return;
+      }
+    }
+    if (typeof document !== 'undefined') {
+      const activeElement = document.activeElement;
+      if (activeElement && containsTarget(event.currentTarget, activeElement)) {
+        return;
+      }
+      if (isInteractiveTarget(activeElement)) {
+        return;
+      }
+    }
+    setShowActions(false);
+  };
+
+  const handleFocusWithin = () => {
+    setShowActions(true);
+  };
+
+  const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const related = event.relatedTarget as Node | null;
+    if (related && containsTarget(event.currentTarget, related)) {
+      return;
+    }
+    if (isInteractiveTarget(related)) {
+      return;
+    }
+    setShowActions(false);
   };
   
   // Message actions menu
@@ -201,27 +267,31 @@ export function MessageItem({
     if (!showActions) return null;
     
     return (
-      <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1">
+      <div 
+        className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1"
+        data-avatar-interactive
+      >
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          onClick={() => onReply?.(message)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onReply?.(message);
+          }}
+          data-avatar-interactive
         >
           <Reply className="h-4 w-4" />
         </Button>
+        <EmojiPicker
+          onEmojiSelect={(emoji) => onReaction?.(message.id, emoji)}
+        />
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          onClick={() => onReaction?.(message.id, '👍')}
-        >
-          <Smile className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
+          data-avatar-interactive
+          onClick={(e) => e.stopPropagation()}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
@@ -242,12 +312,16 @@ export function MessageItem({
   
   return (
     <div
+      data-testid={`message-${message.id}`}
       className={cn(
-        "relative flex items-start mb-4 px-4 group",
-        isCurrentUser ? "justify-end" : "justify-start"
+        'relative flex items-start mb-4 px-4 group',
+        isCurrentUser ? 'justify-end' : 'justify-start'
       )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocusWithin}
+      onBlur={handleBlur}
+      data-thread-depth={depth}
     >
       {showAvatar && (
         interactiveUser ? (
@@ -284,10 +358,10 @@ export function MessageItem({
         
         <div
           className={cn(
-            "p-3 rounded-md",
-            isCurrentUser 
-              ? "bg-primary text-primary-foreground" 
-              : "bg-secondary text-secondary-foreground"
+            'p-3 rounded-md',
+            isCurrentUser
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground'
           )}
         >
           {renderMessageContent()}
@@ -300,6 +374,34 @@ export function MessageItem({
           {isCurrentUser && message.status && (
             <span className="ml-2">{getMessageStatusIcon(message.status)}</span>
           )}
+        </div>
+
+        <div className="flex items-center gap-2 mt-2">
+          {showReplyIndicator && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onToggleThread?.()}
+              data-testid={`reply-count-${message.id}`}
+            >
+              <ChevronDown
+                className={cn('h-3 w-3 mr-1 transition-transform', {
+                  'rotate-180': isThreadExpanded,
+                })}
+              />
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => onReply?.(message)}
+            data-testid={`reply-button-${message.id}`}
+          >
+            Reply
+          </Button>
         </div>
       </div>
       

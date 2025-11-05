@@ -243,6 +243,10 @@ export const debugLogger = {
       flag: MESSAGING_FLAG_STORAGE_KEY,
     },
 
+    info: (scope: string, message: string, payload?: unknown) => {
+      logMessaging('log', `${scope}:info`, message, payload);
+    },
+
     trace: (scope: string, message: string, payload?: unknown) => {
       logMessaging('log', `${scope}:trace`, message, payload);
     },

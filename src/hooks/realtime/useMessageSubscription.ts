@@ -6,6 +6,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
 import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
+import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import {
   REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
@@ -147,6 +148,51 @@ const updateMessageInCache = (queryClient: QueryClient, conversationId: string, 
   );
 };
 
+const handleReactionUpdate = (
+  queryClient: QueryClient,
+  messageId: string,
+  userId: string,
+  emoji: string,
+  eventType: 'INSERT' | 'DELETE',
+  timestamp: Date
+) => {
+  if (debugLogger.messaging.enabled()) {
+    debugLogger.messaging.trace('useMessageSubscription', 'reaction:event', {
+      messageId,
+      emoji,
+      eventType,
+    });
+  }
+
+  // Update all conversation caches that might contain this message
+  const allMessagesQueries = queryClient.getQueriesData<MessagesInfiniteData>({
+    queryKey: ['messages'],
+  });
+
+  allMessagesQueries.forEach(([queryKey, oldData]) => {
+    if (!oldData?.pages) return;
+
+    const currentPages = oldData.pages;
+    const nextPages = toggleReactionInPages({
+      pages: currentPages,
+      messageId,
+      emoji,
+      userId,
+      timestamp: eventType === 'INSERT' ? timestamp : undefined,
+      mode: eventType === 'INSERT' ? 'add' : 'remove',
+    });
+
+    if (nextPages === currentPages) {
+      return;
+    }
+
+    queryClient.setQueryData(queryKey, {
+      ...oldData,
+      pages: nextPages,
+    });
+  });
+};
+
 const removeMessageFromCache = (queryClient: QueryClient, conversationId: string, row: any) => {
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', conversationId],
@@ -218,9 +264,9 @@ export function useMessageSubscription(
         }
         if (channel) {
           if (debugLogger.messaging.enabled()) {
-            debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
-              channel: channelName,
-            });
+        debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
+          channel: channelName,
+        });
           }
           void channel.unsubscribe();
           supabase.removeChannel(channel);
@@ -236,7 +282,7 @@ export function useMessageSubscription(
         channel = supabase.channel(channelName);
 
         if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.event('useMessageSubscription', 'subscribe:attempt', {
+          debugLogger.messaging.trace('useMessageSubscription', 'subscribe:attempt', {
             channel: channelName,
             attempt,
           });
@@ -359,6 +405,35 @@ export function useMessageSubscription(
         )
       );
     });
+
+    // Subscribe to reaction changes globally to handle reactions across all visible messages
+    const handleReactionChange = (
+      payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    ) => {
+      const eventType = payload.eventType;
+      
+      if (eventType === 'INSERT' && payload.new) {
+        const messageId = payload.new.message_id as string;
+        const userId = payload.new.user_id as string;
+        const emoji = payload.new.emoji as string;
+        const timestampValue = payload.new.created_at ?? payload.new.timestamp;
+        const timestamp = timestampValue ? new Date(timestampValue as string) : new Date();
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT', timestamp);
+      } else if (eventType === 'DELETE' && payload.old) {
+        const messageId = payload.old.message_id as string;
+        const userId = payload.old.user_id as string;
+        const emoji = payload.old.emoji as string;
+        handleReactionUpdate(queryClient, messageId, userId, emoji, 'DELETE', new Date());
+      }
+    };
+
+    teardownFns.push(
+      subscribeWithRetry(
+        'message_reactions:all',
+        { event: '*', schema: 'public', table: 'message_reactions' },
+        handleReactionChange
+      )
+    );
 
     return () => {
       isMounted = false;

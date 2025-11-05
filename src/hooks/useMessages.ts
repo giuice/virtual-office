@@ -9,7 +9,9 @@ import {
   FileAttachment,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
+import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import { debugLogger } from '@/utils/debug-logger';
+import { toast } from 'sonner';
 
 const getTimestamp = (): number => {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -99,8 +101,9 @@ export function useMessages(activeConversationId: string | null) {
   const messages: Message[] = useMemo(() => {
     if (!data?.pages) return [];
     // Pages represent windows from older->newer already; flatten preserves order
-    return data.pages.flatMap((p) => p.messages);
-  }, [data]);
+    const flattened = data.pages.flatMap((p) => p.messages);
+    return flattened;
+  }, [data, activeConversationId]);
 
   const loadingMessages = isLoading || isFetching;
   const errorMessages = error ? (error as Error).message : null;
@@ -278,7 +281,7 @@ export function useMessages(activeConversationId: string | null) {
             error: err instanceof Error ? err.message : err,
           });
         }
-        // Mark optimistic as failed
+        // Remove the optimistic message on failure so UI does not show a failed temp message
         queryClient.setQueryData(
           ['messages', activeConversationId],
           (oldData:
@@ -287,9 +290,7 @@ export function useMessages(activeConversationId: string | null) {
             if (!oldData || !oldData.pages) return oldData;
             const updatedPages = oldData.pages.map((page) => ({
               ...page,
-              messages: page.messages.map((m) =>
-                m.id === optimisticMessage.id ? { ...m, status: MessageStatus.FAILED } : m
-              ),
+              messages: page.messages.filter((m) => m.id !== optimisticMessage.id),
             }));
             return { ...oldData, pages: updatedPages };
           }
@@ -380,36 +381,73 @@ export function useMessages(activeConversationId: string | null) {
   const addReaction = useCallback(
     async (messageId: string, emoji: string) => {
       if (!currentUserProfile?.id || !activeConversationId) return;
+
+      const instrumentationEnabled = debugLogger.messaging.enabled();
+      if (instrumentationEnabled) {
+        debugLogger.messaging.event('useMessages.addReaction', 'toggle-start', {
+          messageId,
+          emoji,
+          conversationId: activeConversationId,
+        });
+      }
+      
+      // Snapshot current state for rollback
+      const previousData = queryClient.getQueryData(['messages', activeConversationId]);
+      
       try {
-        // Optimistic add
+        // Optimistic toggle
         queryClient.setQueryData(
           ['messages', activeConversationId],
           (oldData:
             | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
             | undefined) => {
             if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((m) => {
-                if (m.id !== messageId) return m;
-                const reactions = [...(m.reactions || [])];
-                const exists = reactions.find(
-                  (r) => r.userId === currentUserProfile.id && r.emoji === emoji
-                );
-                if (!exists) {
-                  reactions.push({ userId: currentUserProfile.id, emoji, timestamp: new Date() });
-                }
-                return { ...m, reactions };
-              }),
-            }));
-            return { ...oldData, pages: updatedPages };
+
+            const nextPages = toggleReactionInPages({
+              pages: oldData.pages,
+              messageId,
+              emoji,
+              userId: currentUserProfile.id,
+              timestamp: new Date(),
+              mode: 'toggle',
+            });
+
+            if (nextPages === oldData.pages) {
+              return oldData;
+            }
+
+            return { ...oldData, pages: nextPages };
           }
         );
 
-        await messagingApi.addReaction(messageId, emoji, currentUserProfile.id);
+        const result = await messagingApi.toggleReaction(messageId, emoji);
+        
+        if (instrumentationEnabled) {
+          debugLogger.messaging.event('useMessages.addReaction', 'toggle-success', {
+            messageId,
+            emoji,
+            action: result.action,
+          });
+        }
       } catch (error) {
-        // On error, we could revert, but for now just log
-        console.error('Error adding reaction:', error);
+        // Rollback optimistic update
+        queryClient.setQueryData(['messages', activeConversationId], previousData);
+        
+        debugLogger.messaging.error('useMessages.addReaction', 'toggle-error', {
+          messageId,
+          emoji,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        
+        console.error('Error toggling reaction:', error);
+        toast.error('Failed to update reaction', {
+          description: error instanceof Error ? error.message : String(error),
+          action: {
+            label: 'Retry',
+            onClick: () => addReaction(messageId, emoji),
+          },
+        });
+        throw error;
       }
     },
     [activeConversationId, currentUserProfile?.id, queryClient]
@@ -417,35 +455,10 @@ export function useMessages(activeConversationId: string | null) {
 
   const removeReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      if (!currentUserProfile?.id || !activeConversationId) return;
-      try {
-        // Optimistic remove
-        queryClient.setQueryData(
-          ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
-            if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.map((m) => {
-                if (m.id !== messageId) return m;
-                const reactions = (m.reactions || []).filter(
-                  (r) => !(r.userId === currentUserProfile.id && r.emoji === emoji)
-                );
-                return { ...m, reactions };
-              }),
-            }));
-            return { ...oldData, pages: updatedPages };
-          }
-        );
-
-        await messagingApi.removeReaction(messageId, emoji, currentUserProfile.id);
-      } catch (error) {
-        console.error('Error removing reaction:', error);
-      }
+      // Delegate to addReaction since the API handles toggle logic
+      return addReaction(messageId, emoji);
     },
-    [activeConversationId, currentUserProfile?.id, queryClient]
+    [addReaction]
   );
 
   const uploadAttachment = useCallback(

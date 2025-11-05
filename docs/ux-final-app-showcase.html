@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Office · Orbit Gallery Showcase</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --slate-900: #1e2330;
+        --slate-700: #3f4659;
+        --slate-400: #a0a6b5;
+        --ember-500: #ff8a5c;
+        --pine-400: #6fb7a5;
+        --gold-400: #f1c550;
+        --badge-text: #1e2330;
+        --page-bg: linear-gradient(180deg, rgba(255, 214, 194, 0.35), rgba(250, 246, 239, 0.95));
+        --text-primary: #1e2330;
+        --text-secondary: #3f4659;
+        --muted-border: rgba(31, 35, 45, 0.15);
+        --muted-border-strong: rgba(30, 35, 48, 0.08);
+        --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 246, 239, 0.92));
+        --card-border: rgba(30, 35, 48, 0.08);
+        --card-shadow: 0 32px 60px rgba(23, 29, 47, 0.15);
+        --log-bg: rgba(255, 255, 255, 0.9);
+        --log-border: rgba(30, 35, 48, 0.08);
+        --log-color: #3f4659;
+        --beacon-border: rgba(255, 138, 92, 0.55);
+        --beacon-glow: rgba(255, 138, 92, 0.18);
+        --pill-bg: rgba(255, 255, 255, 0.85);
+        --pill-text: #1e2330;
+        --pill-active-bg: var(--ember-500);
+        --pill-active-text: #1e2330;
+        --pill-active-shadow: rgba(255, 138, 92, 0.3);
+      }
+
+      body[data-theme="cosmic"] {
+        color-scheme: dark;
+        --slate-900: #f8f9ff;
+        --slate-700: rgba(248, 249, 255, 0.82);
+        --slate-400: rgba(143, 147, 255, 0.75);
+        --ember-500: #5762ff;
+        --pine-400: #60e9f9;
+        --gold-400: #f4c759;
+        --badge-text: #10141f;
+        --page-bg: radial-gradient(circle at top, rgba(87, 98, 255, 0.32), rgba(18, 21, 51, 1));
+        --text-primary: #f8f9ff;
+        --text-secondary: rgba(248, 249, 255, 0.74);
+        --muted-border: rgba(95, 109, 255, 0.35);
+        --muted-border-strong: rgba(95, 109, 255, 0.38);
+        --card-bg: linear-gradient(190deg, rgba(18, 21, 51, 0.95), rgba(15, 21, 44, 0.88));
+        --card-border: rgba(95, 109, 255, 0.32);
+        --card-shadow: 0 40px 80px rgba(4, 7, 18, 0.45);
+        --log-bg: rgba(14, 18, 38, 0.88);
+        --log-border: rgba(96, 233, 249, 0.28);
+        --log-color: rgba(248, 249, 255, 0.78);
+        --beacon-border: rgba(96, 233, 249, 0.55);
+        --beacon-glow: rgba(96, 233, 249, 0.22);
+        --pill-bg: rgba(30, 32, 68, 0.85);
+        --pill-text: rgba(248, 249, 255, 0.85);
+        --pill-active-bg: rgba(96, 233, 249, 0.35);
+        --pill-active-text: rgba(248, 249, 255, 0.98);
+        --pill-active-shadow: rgba(96, 233, 249, 0.32);
+      }
+
+      body {
+        margin: 0;
+        padding: 2.5rem 3rem 4rem;
+        background: var(--page-bg);
+        color: var(--text-primary);
+        transition: background 200ms ease, color 200ms ease;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 2.5rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin: 0;
+      }
+
+      p.description {
+        max-width: 900px;
+        margin: 0;
+        line-height: 1.6;
+        color: var(--text-secondary);
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .pill {
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        border: 1px solid var(--muted-border);
+        background: var(--pill-bg);
+        color: var(--pill-text);
+        font-weight: 600;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, color 120ms ease;
+      }
+
+      .pill:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 22px rgba(31, 35, 45, 0.12);
+      }
+
+      .pill[aria-pressed="true"] {
+        background: var(--pill-active-bg);
+        color: var(--pill-active-text);
+        box-shadow: 0 14px 28px var(--pill-active-shadow);
+      }
+
+      main {
+        display: grid;
+        gap: 2rem;
+      }
+
+      section.screen {
+        border-radius: 26px;
+        padding: 2rem;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--card-shadow);
+        color: var(--text-secondary);
+        transition: background 200ms ease, border 200ms ease, color 200ms ease;
+      }
+
+      h2.screen-title {
+        font-size: 1.6rem;
+        margin: 0 0 1.25rem;
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+      }
+
+      h2.screen-title span.tag {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--slate-400);
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .card {
+        border-radius: 18px;
+        padding: 1.25rem;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+        color: var(--text-secondary);
+      }
+
+      .card h3 {
+        margin: 0 0 0.5rem;
+        font-size: 1.05rem;
+        color: var(--text-primary);
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 0.92rem;
+        color: var(--text-secondary);
+      }
+
+      .badge {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: var(--gold-400);
+        color: var(--badge-text);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .beacon {
+        position: absolute;
+        inset: 0;
+        border-radius: 22px;
+        border: 2px solid var(--beacon-border);
+        pointer-events: none;
+        box-shadow: 0 0 0 6px var(--beacon-glow);
+        animation: pulse 2s ease infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.9;
+          transform: scale(0.98);
+        }
+        50% {
+          opacity: 0.35;
+          transform: scale(1.02);
+        }
+        100% {
+          opacity: 0.9;
+          transform: scale(0.98);
+        }
+      }
+
+      .pill-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+
+      .phase-pill {
+        padding: 0.35rem 0.65rem;
+        border-radius: 10px;
+        background: rgba(255, 138, 92, 0.2);
+        color: #1e2330;
+        border: 1px solid rgba(255, 138, 92, 0.45);
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .avatars {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        border: 3px solid rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+        position: relative;
+      }
+
+      .avatar::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 138, 92, 0.6);
+        animation: pulse 2.6s ease infinite;
+      }
+
+      .avatar.listener::after {
+        border-color: rgba(111, 183, 165, 0.5);
+      }
+
+      .avatar.observer {
+        opacity: 0.45;
+        box-shadow: 0 0 0 3px rgba(30, 35, 48, 0.25);
+      }
+
+      .log-panel {
+        margin-top: 1.25rem;
+        border-radius: 16px;
+        padding: 1rem 1.2rem;
+        background: var(--log-bg);
+        border: 1px solid var(--log-border);
+        font-size: 0.92rem;
+        line-height: 1.6;
+        color: var(--log-color);
+        position: relative;
+      }
+
+      .log-panel span.time {
+        display: block;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--slate-400);
+        margin-bottom: 0.25rem;
+      }
+
+      footer {
+        margin-top: 3rem;
+        font-size: 0.9rem;
+        color: var(--slate-400);
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Orbit Gallery · Virtual Office</h1>
+      <p class="description">
+        Six key screens demonstrate the Warm Control (light) and Cosmic Efficiency (dark) experiences for leadership and teams.
+        Explore the NowBoard, Orbit Gallery grid, attention beacons, mentoring flow, admin settings, and empty states—each reflecting
+        the design decisions captured in the UX specification.
+      </p>
+      <div class="controls">
+        <button class="pill" data-toggle="theme" data-value="light" aria-pressed="true">Warm Control</button>
+        <button class="pill" data-toggle="theme" data-value="cosmic" aria-pressed="false">Cosmic Efficiency</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="screen" id="screen-nowboard">
+        <h2 class="screen-title">Leadership NowBoard <span class="tag">Executive Pulse</span></h2>
+        <div class="grid two">
+          <div class="card">
+            <span class="badge">Live</span>
+            <h3>Beacon Queue</h3>
+            <div class="pill-strip">
+              <span class="phase-pill">Strategy War Room · Alignment</span>
+              <span class="phase-pill">Ops Desk · Incident</span>
+              <span class="phase-pill">Growth Lab · Experiment</span>
+            </div>
+            <div class="log-panel">
+              <span class="time">2 min ago · Strategy War Room</span>
+              Consensus forming around launch path. Pending risk mitigation sign-off before phase shifts to Decide. Transcript snippet captured for async review.
+            </div>
+            <div class="pill-strip" style="margin-top: 1.2rem;">
+              <span class="phase-pill">Filters: All Spaces</span>
+              <span class="phase-pill">Show Attention Only</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Presence Snapshot</h3>
+            <p>26 active spaces · 11 beacons · 6 mentoring sessions</p>
+            <div class="avatars">
+              <div class="avatar" style="background-image:url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80');"></div>
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=70');"></div>
+              <div class="avatar observer" style="background-image:url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=65');"></div>
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=200&q=75');"></div>
+            </div>
+            <div class="log-panel">
+              <span class="time">Mentorship · Pine Lounge</span>
+              Weekly "demo & dine" mentorship captured automatically. Follow-up note scheduled for tomorrow's async digest.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-grid">
+        <h2 class="screen-title">Orbit Gallery Grid <span class="tag">15+ Spaces</span></h2>
+        <div class="grid three">
+          <div class="card" style="padding-bottom:3.5rem;">
+            <div class="beacon"></div>
+            <h3>Strategy War Space</h3>
+            <p>Phase 2 · Align · 6 participants</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Agenda · Risks</span>
+              <span class="phase-pill">Beacon · Phase Shift</span>
+            </div>
+            <div class="avatars">
+              <div class="avatar" style="background-image:url('https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=200&q=80');"></div>
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=60');"></div>
+              <div class="avatar observer" style="background-image:url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=55');"></div>
+            </div>
+            <div class="log-panel">
+              <span class="time">Latest decision</span>
+              Prioritize migration narrative before AI co-pilot pitch. Delegate Helene added to follow-up.
+            </div>
+          </div>
+          <div class="card">
+            <h3>Ops Desk</h3>
+            <p>Phase 2 · Align · 6 participants</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Beacon · Incident</span>
+            </div>
+            <div class="log-panel">
+              <span class="time">5 min ago</span>
+              Incident triage underway. Engineering paging updates to dashboard; ETA 30 min to resolve.
+            </div>
+          </div>
+          <div class="card">
+            <h3>Pine Lounge Mentoring</h3>
+            <p>Mentor drop-in · 5 participants</p>
+            <div class="avatars">
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=70');"></div>
+              <div class="avatar observer" style="background-image:url('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=75');"></div>
+            </div>
+            <div class="log-panel">
+              <span class="time">Mentor note</span>
+              Encouraged lunch crew to rotate knowledge shares. Follow-up scheduled with culture team.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-hover">
+        <h2 class="screen-title">Hover Reveal & Delegation <span class="tag">Sarah Chen Flow</span></h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>Hover Insights</h3>
+            <p>Sarah hovers “Strategy War Space” to review roster, agenda phase, and transcript snippet before intervening.</p>
+            <div class="log-panel">
+              <span class="time">Hover snapshot</span>
+              Giuliano, Lena, Arjun, Maya, Helene, Omar · Agenda: Risks → Priorities · Transcript “Shift focus to customer migration path…”
+            </div>
+          </div>
+          <div class="card">
+            <h3>Delegation Panel</h3>
+            <p>Quick delegate CTA highlights recommended teammate. Once sent, the avatar cluster updates instantly.</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Delegate Arjun</span>
+              <span class="phase-pill">Recommend: Helene</span>
+            </div>
+            <div class="log-panel">
+              <span class="time">Auto log</span>
+              Delegation ping sent to Helene. Monitoring for phase advancement.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-sprint">
+        <h2 class="screen-title">Sprint Launch · Team View <span class="tag">Auto Cadence</span></h2>
+        <div class="grid two">
+          <div class="card">
+            <span class="badge">Phase 1</span>
+            <h3>Agenda Tracker</h3>
+            <p>Agenda auto-advances as soon as quorum joins. Animated rings show current speaker.</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Kickoff</span>
+              <span class="phase-pill">Review Goals</span>
+              <span class="phase-pill">Risks</span>
+              <span class="phase-pill">Decisions</span>
+            </div>
+            <div class="avatars">
+              <div class="avatar" style="background-image:url('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=70');"></div>
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=65');"></div>
+              <div class="avatar listener" style="background-image:url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=200&q=75');"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Decision Log</h3>
+            <div class="log-panel">
+              <span class="time">Phase 2 · Review Goals</span>
+              Documenting goal change for sprint: Shift focus to async onboarding. Action items assigned to Maya & Omar.
+            </div>
+            <div class="log-panel" style="margin-top:0.75rem;">
+              <span class="time">Beacon Recovery</span>
+              Blocker noted: API rate limit. Beacon fired for Ops Desk; team refocused after recording mitigation.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-settings">
+        <h2 class="screen-title">Admin & Accessibility <span class="tag">Governance</span></h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>Theme Controls</h3>
+            <p>Org admins can set Warm Control as default while allowing executives to opt into Cosmic Efficiency.</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Warm Control (Default)</span>
+              <span class="phase-pill">Cosmic Efficiency</span>
+              <span class="phase-pill">Respect User Preference</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Accessibility Settings</h3>
+            <p>Adjust reduced motion, high-contrast, and transcript preview verbosity. WCAG 2.1 AA enforced.</p>
+            <div class="pill-strip">
+              <span class="phase-pill">Reduced Motion</span>
+              <span class="phase-pill">High Contrast</span>
+              <span class="phase-pill">Transcript Detail</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-empty">
+        <h2 class="screen-title">Empty & Async States <span class="tag">Cohesion</span></h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>First-Time Space</h3>
+            <p>Guided copy welcomes new teams, offering quick actions to create rooms and schedule mentorship.</p>
+            <div class="log-panel">
+              <span class="time">Guidance</span>
+              Invite your team to create the first Sprint Launch space. Need help? Start with the Collaboration template.
+            </div>
+          </div>
+          <div class="card">
+            <h3>Async Digest</h3>
+            <p>When teams leave, summaries stream to the admin dashboard; Sarah can re-hover later and confirm success.</p>
+            <div class="log-panel">
+              <span class="time">Digest Preview</span>
+              Strategy War Room resolved blockers without intervention. Decision captured; next sync scheduled Friday.
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Toggle Cosmic Efficiency to preview the Orbit Gallery at night. All screens adhere to Warm Control / Cosmic Efficiency tokens, Orbit layout, mentor flow, attention beacon rules, and WCAG 2.1 Level AA requirements documented in the UX specification.
+    </footer>
+
+    <script>
+      const body = document.body;
+      const controls = document.querySelectorAll('[data-toggle="theme"]');
+      controls.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const value = btn.getAttribute('data-value');
+          controls.forEach((control) => control.setAttribute('aria-pressed', control === btn ? 'true' : 'false'));
+          if (value === 'cosmic') {
+            body.setAttribute('data-theme', 'cosmic');
+          } else {
+            body.removeAttribute('data-theme');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

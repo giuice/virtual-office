@@ -12,7 +12,20 @@ vi.mock('@/utils/debug-logger', () => ({
     log: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    trace: vi.fn()
+    trace: vi.fn(),
+    messaging: {
+      enabled: () => false,
+      featureEnabled: () => false,
+      info: vi.fn(),
+      event: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      storageKeys: {
+        debug: 'vo:debug:messaging',
+        flag: 'vo:flag:messaging_v2',
+      },
+    },
   }
 }));
 

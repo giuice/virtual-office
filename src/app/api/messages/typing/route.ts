@@ -38,9 +38,7 @@ export async function POST(request: Request) {
     if (!conversation.participants.includes(userDbId)) {
       return NextResponse.json({ error: 'Not authorized to send typing indicators in this conversation' }, { status: 403 });
     }
-    
-  console.log(`API: User ${userDbId} is ${isTyping ? 'typing' : 'stopped typing'} in conversation ${conversationId}`);
-    
+
     // Send real-time typing indicator via Supabase Realtime
     // This approach broadcasts the typing status to all participants in the conversation
     const { error: broadcastError } = await supabase

@@ -75,6 +75,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         compact ? "min-h-[120px]" : "min-h-[160px]",
         className
       )}
+      data-testid={`space-${space.id}`}
+      data-selected={isHighlighted ? 'true' : 'false'}
+      data-user-in-space={isUserInSpace ? 'true' : 'false'}
+      data-space-id={space.id}
       onPointerDownCapture={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('[data-avatar-interactive]')) {
@@ -87,6 +91,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       onMouseLeave={() => setHovered(false)}
       aria-label={`Enter space ${space.name}`}
       role="button"
+      aria-current={isHighlighted ? 'true' : undefined}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

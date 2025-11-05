@@ -1,0 +1,126 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4A</epicId>
+    <storyId>2</storyId>
+    <title>Reaction Chips and Emoji Picker</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/giuice/apps/virtual-office/docs/stories/story-4A.2.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a user</asA>
+    <iWant>to add emoji reactions to messages</iWant>
+    <soThat>I can acknowledge posts quickly without writing a full reply</soThat>
+    <tasks>
+      <task id="1" title="Harden existing reaction trigger & picker UX (AC1, AC2)">
+        <subtask id="1.1">Review the existing hover action popover in message-item.tsx/MessageActionBar to confirm the reaction trigger exposes data-testid="message-reaction-trigger", keeps layout stable, and remains keyboard reachable.</subtask>
+        <subtask id="1.2">Refine the current Radix popover + emoji picker implementation (already rendered on hover) to share a lazy-loaded entrypoint and reuse current emoji dataset; no new component should be created.</subtask>
+        <subtask id="1.3">Ensure click-stop protocol is honoured by marking the trigger and popover content with data-avatar-interactive and stopping pointer/keyboard events inside the Radix portal.</subtask>
+        <subtask id="1.4">Verify close semantics (escape, outside press, selection) return focus to the originating trigger and update focus outlines for accessibility.</subtask>
+        <subtask id="1.5">Capture telemetry (debugLogger.messaging.info) on popover open/close using the existing logging pipeline to support future Epic 4B analytics.</subtask>
+      </task>
+      <task id="2" title="Reaction mutation plumbing (AC3, AC4)">
+        <subtask id="2.1">Extend SupabaseMessageRepository + /api/messages/react handler to upsert/delete reactions with RLS-safe queries; ensure idempotency by (message_id, user_id, emoji) unique constraint.</subtask>
+        <subtask id="2.2">Update useMessageActions (or create dedicated useMessageReactions) hook to expose addReaction/removeReaction mutations with optimistic cache writes using TanStack Query.</subtask>
+        <subtask id="2.3">Normalize reaction aggregates in useMessages response to include userReacted flag and sorted reaction arrays.</subtask>
+        <subtask id="2.4">Surface backend errors through Sonner toasts + rollback optimistic state; log failures via debugLogger.messaging.error including Supabase request ID.</subtask>
+        <subtask id="2.5">Guarantee click toggles debounced per message to avoid duplicate API calls on rapid users (e.g., disable button until mutation settles).</subtask>
+      </task>
+      <task id="3" title="Realtime fan-out & cache updates (AC5)">
+        <subtask id="3.1">Enhance useMessageSubscription.ts to listen for message_reactions channel events; emit structured payload consumed by useMessages cache updater.</subtask>
+        <subtask id="3.2">Ensure subscription readiness flag (data-messaging-realtime-ready) from Story 4A.1 remains accurate; add new data-messaging-reaction-event debug attribute for tests.</subtask>
+        <subtask id="3.3">Implement cache reconciliation helper that merges remote reaction payloads without disrupting pagination, thread expansion, or typing states.</subtask>
+        <subtask id="3.4">Validate multi-tab/device behaviour by simulating reactions across two contexts (reuse Playwright helpers) and confirming consistent chip counts.</subtask>
+        <subtask id="3.5">Add resiliency: if Realtime disconnects, queue diff for replay after reconnection (prework for Epic 4B typing/resilience stories).</subtask>
+      </task>
+      <task id="4" title="Testing & instrumentation (AC1-AC5)">
+        <subtask id="4.1">Add Vitest coverage for reaction reducer utilities, optimistic updates, and error handling using mocked Supabase client.</subtask>
+        <subtask id="4.2">Extend existing Playwright drawer helpers to support reactToMessage and toggleReaction operations; add specs validating hover trigger, picker selection, chip toggle, and realtime sync across two pages.</subtask>
+        <subtask id="4.3">Update __tests__/api/playwright/README.md with required env vars for emoji picker assets and reaction test instructions.</subtask>
+        <subtask id="4.4">Capture accessibility audit via Testing Library axe checks focusing on popover semantics and keyboard flow.</subtask>
+        <subtask id="4.5">Record manual testing checklist (CI currently manual per course correction) covering browsers (Chrome, Firefox, Safari), mobile viewport sanity, and slow network conditions.</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Reaction affordance on hover">
+      Hovering over any message reveals a reaction trigger control (e.g., "+" icon) that is keyboard-focusable and accessible. Reaction trigger placement must not shift message layout when hidden or revealed. Control honours click-stop standards to avoid hijacking parent space navigation.
+    </criterion>
+    <criterion id="AC2" title="Emoji picker popover UX">
+      Selecting the trigger opens an emoji picker popover that lists frequently used reactions and an "All emojis" search with instant filtering. Picker closes on escape, outside click, or selection, and traps focus while open. Picker uses shadcn/Radix primitives and data-avatar-interactive guards so space cards ignore the interaction.
+    </criterion>
+    <criterion id="AC3" title="Reaction chips rendering">
+      Choosing an emoji adds or toggles a chip beneath the message showing emoji, count, and selection state, with counts aggregating per emoji. Tooltips expose a11y labels and the hovered user list when counts > 1. Chips remain ordered by most recent interaction then emoji codepoint for determinism.
+    </criterion>
+    <criterion id="AC4" title="Toggle semantics and cancellation">
+      Clicking a chip that the current user has already reacted with removes their vote; the chip disappears when count reaches zero. Optimistic UI updates roll back on API failure with toast + retry CTA. Multi-device usage reflects chip state consistently within 2 seconds.
+    </criterion>
+    <criterion id="AC5" title="Realtime propagation">
+      All participants in the conversation receive reaction updates through Supabase Realtime without manual refresh. Reaction updates preserve scroll position and respect ongoing thread expansion. Realtime payloads deduplicate user entries for each emoji.
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="Real-Time Messaging" snippet="System shall enable message threads, replies, reactions, and file attachments with real-time delivery via Supabase Realtime. Click-stop guards prevent unintended space navigation." />
+      <doc path="docs/tech-spec-epic-4A.md" title="Epic 4A Technical Specification" section="Services and Modules" snippet="EnhancedMessageFeed.tsx renders message timeline with reactions, message-item.tsx handles individual message renderer with reaction callbacks, /api/messages/react provides emoji reaction endpoint." />
+      <doc path="docs/architecture.md" title="System Architecture" section="UI Interaction" snippet="Click-stop guards ensure interactive elements (avatars, dropdowns) prevent unintended space navigation. Radix/shadcn primitives provide accessible UI components." />
+      <doc path="docs/stories/story-context-4A.1.xml" title="Story 4A.1 Context" section="Testing Infrastructure" snippet="Playwright configuration exists at playwright.config.ts with drawer interaction helpers and messaging test infrastructure established." />
+      <doc path="docs/epics.md" title="Epic Definitions" section="story-4a2-reaction-chips-and-emoji-picker" snippet="Emoji reactions provide quick acknowledgement flows for Slack/Teams parity, building on existing hover popover infrastructure." />
+    </docs>
+    <code>
+      <artifact path="src/components/messaging/message-item.tsx" kind="component" symbol="MessageItem" lines="193-217" reason="Contains existing reaction rendering logic and structure for reaction chips that needs enhancement" />
+      <artifact path="src/components/messaging/message-item.tsx" kind="component" symbol="renderActions" lines="219-251" reason="Contains existing hover action menu with reaction trigger placeholder that needs proper emoji picker integration" />
+      <artifact path="src/app/api/messages/react/route.ts" kind="api" symbol="POST" lines="1-67" reason="Complete reaction API endpoint with toggle logic already implemented" />
+      <artifact path="src/repositories/implementations/supabase/SupabaseMessageRepository.ts" kind="service" symbol="SupabaseMessageRepository" lines="1-100" reason="Repository with reaction data mapping and database operations" />
+      <artifact path="src/types/messaging.ts" kind="types" symbol="MessageReaction" lines="38-43" reason="Complete MessageReaction interface with emoji, userId, timestamp" />
+      <artifact path="src/hooks/realtime/useMessageSubscription.ts" kind="hook" symbol="useMessageSubscription" lines="1-50" reason="Realtime subscription hook that needs extension for reaction events" />
+      <artifact path="src/components/ui/popover.tsx" kind="component" symbol="Popover" lines="1-34" reason="Radix popover primitives available for emoji picker implementation" />
+    </code>
+    <dependencies>
+      <node>
+        @radix-ui/react-popover: "^1.1.0" # Accessible popover primitives for emoji picker
+        @radix-ui/react-portal: "^1.1.0" # Portal for emoji picker overlay
+        lucide-react: "^0.546.0" # Smile icon for reaction trigger
+        date-fns: "^2.30.0" # Date formatting utilities
+        @tanstack/react-query: "^5.0.0" # Query and mutation state management
+        sonner: "^2.0.3" # Toast notifications for error handling
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Use existing Repository Pattern: All data access via IMessageRepository interface
+    - Use Supabase Server Client in API routes with createSupabaseServerClient() for RLS context
+    - Follow click-stop protocol: Mark interactive elements with data-avatar-interactive
+    - Preserve existing hover action mechanism in message-item.tsx without layout shifts
+    - Reuse existing shadcn/Radix primitives instead of creating new components
+    - Maintain accessibility: focus trap, keyboard navigation, escape/outside click handling
+    - Use existing debugLogger.messaging pipeline for telemetry
+    - Ensure optimistic updates with rollback on API failure
+    - Respect virtualization boundaries for future infinite scroll (Epic 4A.6)
+  </constraints>
+  <interfaces>
+    <interface name="/api/messages/react" kind="REST endpoint" signature="POST { messageId: string, emoji: string } → { message: string, action: 'added'|'removed' }" path="src/app/api/messages/react/route.ts" />
+    <interface name="IMessageRepository.addReaction" kind="function signature" signature="addReaction(messageId: string, reaction: { userId: string, emoji: string }) → Promise<void>" path="src/repositories/interfaces/IMessageRepository.ts" />
+    <interface name="IMessageRepository.removeReaction" kind="function signature" signature="removeReaction(messageId: string, userId: string, emoji: string) → Promise<void>" path="src/repositories/interfaces/IMessageRepository.ts" />
+    <interface name="MessageItem.onReaction" kind="component prop" signature="onReaction?: (messageId: string, emoji: string) => void" path="src/components/messaging/message-item.tsx" />
+    <interface name="useMessageSubscription" kind="React hook" signature="useMessageSubscription(options: { isActive?: boolean, onInsert?: (message: Message) => void }) → subscription state" path="src/hooks/realtime/useMessageSubscription.ts" />
+  </interfaces>
+  <tests>
+    <standards>Unit tests with Vitest + Testing Library for component logic. Integration tests for repository layer with mocked Supabase client. E2E tests with Playwright for user interactions. Manual testing for browser compatibility. Use existing drawer helper functions from Story 4A.1.</standards>
+    <locations>__tests__/messaging/ for unit tests, __tests__/api/playwright/ for E2E specs, __tests__/api/playwright/helpers/ for shared utilities</locations>
+    <ideas>
+      <test-idea ac="AC1">Test hover trigger reveals reaction control without layout shift</test-idea>
+      <test-idea ac="AC2">Test emoji picker opens on trigger click, closes on escape/outside click, traps focus</test-idea>
+      <test-idea ac="AC3">Test reaction chip appears with correct emoji and count after selection</test-idea>
+      <test-idea ac="AC4">Test clicking existing reaction chip removes user's vote and decrements count</test-idea>
+      <test-idea ac="AC5">Test reaction updates appear in real-time across two browser contexts</test-idea>
+      <test-idea ac="AC1-AC5">Test optimistic updates rollback on API failure with toast notification</test-idea>
+      <test-idea ac="accessibility">Test keyboard navigation and screen reader support with axe checks</test-idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -50,7 +50,6 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply
 
   // Function for handling reaction selection
   const handleSelectReaction = (messageId: string, emoji: string) => {
-    console.log(`Selected reaction '${emoji}' for message: ${messageId}`);
     addReaction(messageId, emoji); // Call context function
     // TODO: Close popover after selection?
   };

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Office — Color Theme Explorer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background-color: #f5f6fb;
+        color: #1e2330;
+      }
+
+      body {
+        margin: 0;
+        padding: 2.5rem 3rem 4rem;
+        line-height: 1.6;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        margin: 0 0 0.75rem;
+      }
+
+      h1 {
+        font-size: 2.25rem;
+      }
+
+      h2 {
+        font-size: 1.5rem;
+        margin-top: 2.5rem;
+      }
+
+      h3 {
+        font-size: 1.15rem;
+        margin-top: 1.5rem;
+      }
+
+      p {
+        margin: 0 0 1rem;
+        max-width: 900px;
+      }
+
+      .theme-grid {
+        display: grid;
+        gap: 2rem;
+        margin-top: 1.5rem;
+      }
+
+      @media (min-width: 980px) {
+        .theme-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .theme-card {
+        border-radius: 20px;
+        padding: 2rem;
+        background: white;
+        box-shadow: 0 22px 45px rgba(10, 17, 29, 0.12);
+        border: 1px solid rgba(30, 35, 48, 0.12);
+      }
+
+      .theme-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 1.4rem;
+      }
+
+      .theme-meta {
+        font-size: 0.9rem;
+        opacity: 0.72;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.6rem;
+      }
+
+      .swatch {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(30, 35, 48, 0.07);
+        background: rgba(255, 255, 255, 0.4);
+      }
+
+      .swatch-color {
+        height: 64px;
+      }
+
+      .swatch-info {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        background: rgba(255, 255, 255, 0.85);
+      }
+
+      .component-demo {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .component-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .theme-description {
+        background: rgba(30, 35, 48, 0.05);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .token-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+      }
+
+      .token-table th,
+      .token-table td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid rgba(30, 35, 48, 0.08);
+        text-align: left;
+      }
+
+      .token-table th {
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        opacity: 0.7;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: linear-gradient(120deg, rgba(30, 35, 48, 0.08), rgba(30, 35, 48, 0.03));
+        color: #1e2330;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.7rem 1.25rem;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: transform 120ms ease, box-shadow 120ms ease;
+      }
+
+      .btn:focus-visible {
+        outline: 2px solid rgba(33, 150, 243, 0.45);
+        outline-offset: 2px;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 28px rgba(0, 0, 0, 0.08);
+      }
+
+      .input {
+        padding: 0.65rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(30, 35, 48, 0.18);
+        background: rgba(255, 255, 255, 0.95);
+        font-size: 0.95rem;
+        width: 220px;
+      }
+
+      .card {
+        padding: 1.25rem;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 18px 32px rgba(20, 24, 36, 0.16);
+        border: 1px solid rgba(30, 35, 48, 0.15);
+        flex: 1 1 280px;
+      }
+
+      .alert {
+        padding: 1rem 1.2rem;
+        border-radius: 12px;
+        font-weight: 500;
+      }
+
+      /* Theme tokens */
+      [data-theme="cosmic-efficiency"] {
+        --primary: #5762ff;
+        --primary-text: #ffffff;
+        --secondary: #8f93ff;
+        --accent: #60e9f9;
+        --success: #4acf81;
+        --warning: #f4c759;
+        --error: #ff6f91;
+        --surface: rgba(18, 21, 51, 0.8);
+        --surface-strong: rgba(18, 21, 51, 0.92);
+        --surface-border: rgba(96, 118, 255, 0.28);
+        --text-primary: #f8f9ff;
+        --text-secondary: rgba(248, 249, 255, 0.72);
+        --gradient: linear-gradient(135deg, rgba(87, 98, 255, 0.85), rgba(96, 233, 249, 0.55));
+      }
+
+      [data-theme="warm-control"] {
+        --primary: #ff8a5c;
+        --primary-text: #1e2330;
+        --secondary: #ffd6c2;
+        --accent: #6fb7a5;
+        --success: #57c78f;
+        --warning: #f1c550;
+        --error: #d9534f;
+        --surface: rgba(250, 246, 239, 0.92);
+        --surface-strong: rgba(255, 255, 255, 0.88);
+        --surface-border: rgba(30, 35, 48, 0.12);
+        --text-primary: #1e2330;
+        --text-secondary: rgba(30, 35, 48, 0.7);
+        --gradient: linear-gradient(135deg, rgba(255, 138, 92, 0.85), rgba(255, 214, 194, 0.9));
+      }
+
+      [data-theme="northstar-balance"] {
+        --primary: #2f7bff;
+        --primary-text: #f9fbff;
+        --secondary: #8fb6ff;
+        --accent: #8de1ff;
+        --success: #68d0b6;
+        --warning: #fbc252;
+        --error: #f06a6a;
+        --surface: rgba(15, 28, 54, 0.85);
+        --surface-strong: rgba(16, 23, 36, 0.92);
+        --surface-border: rgba(143, 182, 255, 0.25);
+        --text-primary: #f9fbff;
+        --text-secondary: rgba(249, 251, 255, 0.72);
+        --gradient: linear-gradient(140deg, rgba(47, 123, 255, 0.88), rgba(141, 225, 255, 0.6));
+      }
+
+      .theme-preview {
+        border-radius: 18px;
+        padding: 1.4rem;
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+        gap: 1.2rem;
+      }
+
+      .nav {
+        display: flex;
+        gap: 0.6rem;
+      }
+
+      .nav a {
+        padding: 0.55rem 0.85rem;
+        border-radius: 10px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .nav a.active {
+        background: rgba(255, 255, 255, 0.22);
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .feedback-grid {
+        display: grid;
+        gap: 0.85rem;
+      }
+
+      .token-preview {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        background: rgba(30, 35, 48, 0.08);
+        padding: 0.75rem;
+        border-radius: 12px;
+        color: #1e2330;
+      }
+
+      .compare-grid {
+        display: grid;
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      @media (min-width: 1180px) {
+        .compare-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Virtual Office · Color Theme Explorer</h1>
+      <p>
+        Explore three visual directions crafted around our emotional targets: efficient, cozy, inspired.
+        Each theme includes palette swatches, live component previews, semantic token mapping, and a
+        personality snapshot.
+      </p>
+    </header>
+
+    <section>
+      <div class="theme-grid">
+        <article class="theme-card" data-theme="warm-control">
+          <div class="theme-banner">
+            <h2>Warm Control</h2>
+            <span class="pill">Professional · Cozy</span>
+          </div>
+          <p>
+            Anchored in Midnight Slate with Aurora Ember accents, ideal for leadership visibility and calm collaboration.
+          </p>
+
+          <h3>Palette</h3>
+          <div class="swatch-grid">
+            <div class="swatch">
+              <div class="swatch-color" style="background: #1e2330"></div>
+              <div class="swatch-info">
+                <strong>Midnight Slate</strong><br />
+                #1E2330 · Base
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #ff8a5c"></div>
+              <div class="swatch-info">
+                <strong>Aurora Ember</strong><br />
+                #FF8A5C · Signal
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #6fb7a5"></div>
+              <div class="swatch-info">
+                <strong>Soft Pine Mist</strong><br />
+                #6FB7A5 · Collaboration
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #f1c550"></div>
+              <div class="swatch-info">
+                <strong>Golden Thread</strong><br />
+                #F1C550 · Success
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #faf6ef"></div>
+              <div class="swatch-info">
+                <strong>Ivory Glow</strong><br />
+                #FAF6EF · Surface
+              </div>
+            </div>
+          </div>
+
+          <h3>Component Preview</h3>
+          <div class="theme-preview">
+            <nav class="nav">
+              <a class="active" href="#">Now Board</a>
+              <a href="#">Spaces</a>
+              <a href="#">Dashboards</a>
+              <a href="#">Logs</a>
+            </nav>
+            <div class="component-row">
+              <button class="btn" style="background: #ff8a5c; color: #1e2330">
+                Start Beacon
+              </button>
+              <button class="btn" style="background: #ffd6c2; color: #1e2330">
+                Join Space
+              </button>
+              <button class="btn" style="background: rgba(255, 255, 255, 0.16); color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.26)">
+                Observe
+              </button>
+            </div>
+            <div class="component-row">
+              <div class="card" style="background: rgba(250, 246, 239, 0.95); color: #1e2330">
+                <strong>Strategy War Space</strong>
+                <p>Phase 2 · Alignment | 6 participants | Live transcript captures every decision.</p>
+              </div>
+              <div class="card" style="background: rgba(250, 246, 239, 0.85); color: #1e2330">
+                <strong>Pine Lounge</strong>
+                <p>Ambient chatter · 4 participants · Mentorship moments flagged for recap.</p>
+              </div>
+            </div>
+            <div class="feedback-grid">
+              <div
+                class="alert"
+                style="background: rgba(255, 138, 92, 0.18); color: #1e2330; border: 1px solid rgba(255, 138, 92, 0.32)"
+              >
+                Attention beacon fired · Strategy War Space · Agenda shift to Risk Planning.
+              </div>
+              <div
+                class="alert"
+                style="background: rgba(111, 183, 165, 0.16); color: #1e2330; border: 1px solid rgba(111, 183, 165, 0.28)"
+              >
+                Transcript synced · Sprint Launch Space · Highlights ready for dashboard.
+              </div>
+            </div>
+          </div>
+
+          <h3>Tokens</h3>
+          <table class="token-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Value</th>
+                <th>Usage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>--vo-base-900</td>
+                <td>#1E2330</td>
+                <td>Main background, nav</td>
+              </tr>
+              <tr>
+                <td>--vo-signal-critical</td>
+                <td>#FF8A5C</td>
+                <td>Beacons, primary CTAs</td>
+              </tr>
+              <tr>
+                <td>--vo-collaboration</td>
+                <td>#6FB7A5</td>
+                <td>Collaborative zones</td>
+              </tr>
+              <tr>
+                <td>--vo-success</td>
+                <td>#F1C550</td>
+                <td>Agenda success, completion</td>
+              </tr>
+              <tr>
+                <td>--vo-surface</td>
+                <td>#FAF6EF</td>
+                <td>Cards, logs, panels</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="theme-description">
+            <strong>Personality:</strong> Efficient, welcoming, confident.<br />
+            <strong>Best for:</strong> Executive dashboards, leadership scans, strategic alignment.
+          </div>
+        </article>
+
+        <article class="theme-card" data-theme="cosmic-efficiency">
+          <div class="theme-banner">
+            <h2>Cosmic Efficiency</h2>
+            <span class="pill">Futuristic · Electric</span>
+          </div>
+          <p>
+            A sci-fi control center vibe that pours energy into decision making. Perfect for teams that thrive on momentum.
+          </p>
+
+          <h3>Palette</h3>
+          <div class="swatch-grid">
+            <div class="swatch">
+              <div class="swatch-color" style="background: #121533"></div>
+              <div class="swatch-info">
+                <strong>Deep Nebula</strong><br />
+                #121533 · Base
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #5762ff"></div>
+              <div class="swatch-info">
+                <strong>Pulse Indigo</strong><br />
+                #5762FF · Primary
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #8f93ff"></div>
+              <div class="swatch-info">
+                <strong>Orbit Lilac</strong><br />
+                #8F93FF · Secondary
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #60e9f9"></div>
+              <div class="swatch-info">
+                <strong>Ion Surge</strong><br />
+                #60E9F9 · Accent
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #f4c759"></div>
+              <div class="swatch-info">
+                <strong>Solar Flare</strong><br />
+                #F4C759 · Success
+              </div>
+            </div>
+          </div>
+
+          <h3>Component Preview</h3>
+          <div class="theme-preview">
+            <nav class="nav">
+              <a class="active" href="#">Trajectory</a>
+              <a href="#">Spaces</a>
+              <a href="#">Signals</a>
+              <a href="#">Logs</a>
+            </nav>
+            <div class="component-row">
+              <button class="btn" style="background: #5762ff; color: #ffffff">
+                Launch Briefing
+              </button>
+              <button class="btn" style="background: rgba(95, 109, 255, 0.25); color: #f8f9ff; border: 1px solid rgba(143, 147, 255, 0.5)">
+                Observe Orbit
+              </button>
+              <button class="btn" style="background: rgba(96, 233, 249, 0.16); color: #60e9f9">
+                Set Alert
+              </button>
+            </div>
+            <div class="component-row">
+              <div class="card" style="background: rgba(18, 21, 51, 0.8); border: 1px solid rgba(143, 147, 255, 0.4); color: #f8f9ff">
+                <strong>Mission Control</strong>
+                <p>Phase 3 · Decision | 8 participants | Heatmap reveals activity spikes.</p>
+              </div>
+              <div class="card" style="background: rgba(18, 21, 51, 0.72); border: 1px solid rgba(96, 233, 249, 0.35); color: #f8f9ff">
+                <strong>Telemetry Hub</strong>
+                <p>Live dashboards syncing | 5 participants | Beacon triggers at anomaly.</p>
+              </div>
+            </div>
+            <div class="feedback-grid">
+              <div class="alert" style="background: rgba(96, 233, 249, 0.18); border: 1px solid rgba(96, 233, 249, 0.38); color: #f8f9ff">
+                Trajectory recalibrated · Mission Control · Phase shift to Execution.
+              </div>
+              <div class="alert" style="background: rgba(244, 199, 89, 0.16); border: 1px solid rgba(244, 199, 89, 0.36); color: #f8f9ff">
+                Transcript synced · Telemetry Hub · Ready for post-analysis.
+              </div>
+            </div>
+          </div>
+
+          <h3>Tokens</h3>
+          <table class="token-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Value</th>
+                <th>Usage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>--vo-base-900</td>
+                <td>#121533</td>
+                <td>Background</td>
+              </tr>
+              <tr>
+                <td>--vo-primary-500</td>
+                <td>#5762FF</td>
+                <td>Primary CTA</td>
+              </tr>
+              <tr>
+                <td>--vo-secondary-400</td>
+                <td>#8F93FF</td>
+                <td>Secondary CTA</td>
+              </tr>
+              <tr>
+                <td>--vo-accent-400</td>
+                <td>#60E9F9</td>
+                <td>Highlights, motion trails</td>
+              </tr>
+              <tr>
+                <td>--vo-success</td>
+                <td>#4ACF81</td>
+                <td>Success states</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="theme-description">
+            <strong>Personality:</strong> Exciting, high-energy, inspiring.<br />
+            <strong>Best for:</strong> High-performance teams, innovation hubs, adrenaline campaigns.
+          </div>
+        </article>
+
+        <article class="theme-card" data-theme="northstar-balance">
+          <div class="theme-banner">
+            <h2>Northstar Balance</h2>
+            <span class="pill">Focused · Executive</span>
+          </div>
+          <p>
+            Cool blues and luminous accents provide clarity and focus for strategic leadership rituals and data storytelling.
+          </p>
+
+          <h3>Palette</h3>
+          <div class="swatch-grid">
+            <div class="swatch">
+              <div class="swatch-color" style="background: #101724"></div>
+              <div class="swatch-info">
+                <strong>Deep Tundra</strong><br />
+                #101724 · Base
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #2f7bff"></div>
+              <div class="swatch-info">
+                <strong>Northstar Blue</strong><br />
+                #2F7BFF · Primary
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #8fb6ff"></div>
+              <div class="swatch-info">
+                <strong>Skylight</strong><br />
+                #8FB6FF · Secondary
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #8de1ff"></div>
+              <div class="swatch-info">
+                <strong>Horizon Tint</strong><br />
+                #8DE1FF · Accent
+              </div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: #68d0b6"></div>
+              <div class="swatch-info">
+                <strong>Polar Evergreen</strong><br />
+                #68D0B6 · Calm
+              </div>
+            </div>
+          </div>
+
+          <h3>Component Preview</h3>
+          <div class="theme-preview">
+            <nav class="nav">
+              <a class="active" href="#">Overview</a>
+              <a href="#">Spaces</a>
+              <a href="#">Analytics</a>
+              <a href="#">Summaries</a>
+            </nav>
+            <div class="component-row">
+              <button class="btn" style="background: #2f7bff; color: #f9fbff">
+                Spotlight Space
+              </button>
+              <button class="btn" style="background: rgba(143, 182, 255, 0.24); color: #f9fbff; border: 1px solid rgba(143, 182, 255, 0.45)">
+                Monitor Transcript
+              </button>
+              <button class="btn" style="background: rgba(141, 225, 255, 0.15); color: #8de1ff">
+                Flag Insight
+              </button>
+            </div>
+            <div class="component-row">
+              <div class="card" style="background: rgba(15, 28, 54, 0.85); border: 1px solid rgba(143, 182, 255, 0.35); color: #f9fbff">
+                <strong>Executive Strategy</strong>
+                <p>Phase 4 · Decision | 7 participants | Confidence index: 92%</p>
+              </div>
+              <div class="card" style="background: rgba(15, 28, 54, 0.78); border: 1px solid rgba(104, 208, 182, 0.35); color: #f9fbff">
+                <strong>Compliance Review</strong>
+                <p>Phase 1 · Discovery | 4 participants | Transcript streaming live.</p>
+              </div>
+            </div>
+            <div class="feedback-grid">
+              <div class="alert" style="background: rgba(47, 123, 255, 0.22); border: 1px solid rgba(47, 123, 255, 0.45); color: #f9fbff">
+                Strategy War Space · Phase advanced to Alignment · Agenda notes updated.
+              </div>
+              <div class="alert" style="background: rgba(104, 208, 182, 0.18); border: 1px solid rgba(104, 208, 182, 0.32); color: #f9fbff">
+                Compliance Review · Action items captured · Dashboard sync scheduled.
+              </div>
+            </div>
+          </div>
+
+          <h3>Tokens</h3>
+          <table class="token-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Value</th>
+                <th>Usage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>--vo-base-900</td>
+                <td>#101724</td>
+                <td>Main background</td>
+              </tr>
+              <tr>
+                <td>--vo-primary-500</td>
+                <td>#2F7BFF</td>
+                <td>Primary CTAs, headers</td>
+              </tr>
+              <tr>
+                <td>--vo-secondary-400</td>
+                <td>#8FB6FF</td>
+                <td>Secondary emphasis</td>
+              </tr>
+              <tr>
+                <td>--vo-accent-300</td>
+                <td>#8DE1FF</td>
+                <td>Charts, highlights</td>
+              </tr>
+              <tr>
+                <td>--vo-calm</td>
+                <td>#68D0B6</td>
+                <td>Compliance &amp; support</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="theme-description">
+            <strong>Personality:</strong> Stable, confident, strategic.<br />
+            <strong>Best for:</strong> Executive command centers, analytics-focused teams, compliance scenarios.
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Side-by-Side Comparison</h2>
+      <p>
+        Compare the three directions across palette energy, focus level, and recommended use cases.
+      </p>
+      <div class="compare-grid">
+        <div class="theme-description">
+          <strong>Warm Control</strong><br />
+          • Emotional tone: warm, grounded, welcoming<br />
+          • Best for leadership scans, daily command rituals<br />
+          • Balance of calm surfaces and energizing beacons
+        </div>
+        <div class="theme-description">
+          <strong>Cosmic Efficiency</strong><br />
+          • Emotional tone: electric, high-energy, futuristic<br />
+          • Best for rapid-fire teams, hack weeks, product pushes<br />
+          • High contrast and accent motion for excitement
+        </div>
+        <div class="theme-description">
+          <strong>Northstar Balance</strong><br />
+          • Emotional tone: focused, executive, trustworthy<br />
+          • Best for strategic reviews, compliance storytelling<br />
+          • Cool control with luminous highlights
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
