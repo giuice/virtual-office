@@ -59,3 +59,12 @@ cline_utils
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
 .augment/rules/byterover-rules.md
+
+# BMAD framework files
+# BMAD framework files
+bmad/
+
+# Claude-specific files
+.claude/
+bmad-bak/
+.bmad/
