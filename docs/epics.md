@@ -22,6 +22,7 @@ Each epic includes:
 - Subsequent epics build progressively, each delivering significant end-to-end value
 - Stories within epics are vertically sliced and sequentially ordered
 - No forward dependencies - each story builds only on previous work
+- Epic 10 introduces the "Unleashed" UX/UI overhaul, transforming the visual experience
 
 ---
 
@@ -1671,6 +1672,174 @@ So that we comply with GDPR and company policies.
 - **Estimated Effort:** 36-48 hours
 - **Dependencies:** Analytics infrastructure, data aggregation jobs, charting library (Recharts/Chart.js)
 - **Key Risks:** Performance with large datasets - need efficient database queries and caching
+
+---
+
+## Epic 10: Advanced UX & Theming (Unleashed) ⏳ PLANNED
+
+**Expanded Goal:**
+Implement the "Reality Distortion" design system and "Unleashed" UX patterns to transform Virtual Office into a visually stunning, highly adaptable workspace. This epic delivers the Orbit Gallery, Analyst Matrix, and Cinema Mode layouts, along with the Neon, Zen, and Obsidian themes, ensuring the interface is not just functional but emotionally resonant and role-adaptive.
+
+**Value Delivery:**
+This epic elevates the product from a utility to a premium experience. It provides specific views for specific roles (Analyst for ops, Orbit for leaders, Cinema for lobbies) and allows users to personalize their environment (Themes), increasing engagement and satisfaction.
+
+**Dependencies:** Epic 3 (Basic Floor Plan)
+
+### Stories (8 total)
+
+**Story 10.1: Reality Distortion Engine (Theme System)**
+
+As a user,
+I want to switch between different visual themes (Neon, Zen, Obsidian, Warm, Cosmic),
+So that I can align the workspace with my current mood or lighting conditions.
+
+**Acceptance Criteria:**
+1. Theme switcher UI (dropdown or palette selector) in settings/header
+2. Implementation of CSS variable tokens for all themes (colors, gradients, shadows)
+3. "Neon Cyberpunk" theme: High contrast, neon accents, dark base
+4. "Zen Garden" theme: Soft earth tones, paper textures, calming green
+5. "Obsidian Stealth" theme: Monochrome dark, minimal distractions
+6. Theme preference persists in user profile (`users.preferences.theme`)
+7. Instant theme switching without page reload
+
+**Prerequisites:** None
+
+---
+
+**Story 10.2: Space Card V2 (Orbit Gallery Component)**
+
+As a user,
+I want rich, interactive space cards that reveal details on hover,
+So that I can see what's happening inside a room without entering it.
+
+**Acceptance Criteria:**
+1. New `SpaceCard` component implementing the Orbit Gallery design
+2. Gradient backgrounds based on space type/neighborhood
+3. Status ribbons (Agenda Phase, Meeting Type) visible on card face
+4. Hover interaction expands card to reveal:
+   - Full participant roster
+   - Current agenda phase/topic
+   - Latest activity log entry
+   - Live transcript snippet (if active)
+5. Smooth transition animations for hover state (200ms)
+
+**Prerequisites:** Story 10.1
+
+---
+
+**Story 10.3: Avatar Constellation V2**
+
+As a user,
+I want to see my colleagues' photos with clear status indicators,
+So that I can instantly recognize who is speaking or listening.
+
+**Acceptance Criteria:**
+1. `AvatarConstellation` component replacing simple avatar stacks
+2. Photo-first design (large circular avatars)
+3. Animated status rings:
+   - Pulse/Glow for "Speaking"
+   - Solid color for "Presenting"
+   - Dimmed/Ghost for "Observer/Muted"
+4. Smart clustering for 8+ participants (primary ring + overflow badge)
+5. Tooltips show name, role, and status duration
+
+**Prerequisites:** Story 10.2
+
+---
+
+**Story 10.4: Attention Beacon System**
+
+As a leader,
+I want to see visual pulses on spaces that need attention,
+So that I can quickly identify blockers or active discussions.
+
+**Acceptance Criteria:**
+1. `AttentionBeacon` component (animated pulse ring/halo)
+2. Logic to trigger beacons based on:
+   - "Blocker" logged in meeting
+   - Occupancy > 80%
+   - "Help Requested" signal
+3. Visual severity levels: Info (Blue), Warning (Yellow), Critical (Red)
+4. Beacons visible in both Orbit Gallery and Grid Overview
+5. Admin log of beacon activations
+
+**Prerequisites:** Story 10.2
+
+---
+
+**Story 10.5: Orbit Gallery Layout (Default View)**
+
+As a user,
+I want the default floor plan to use the Orbit Gallery layout,
+So that I have a balanced view of space and detail.
+
+**Acceptance Criteria:**
+1. Implement Orbit Gallery grid system (responsive 12-column)
+2. Integrate `SpaceCard` V2 into the grid
+3. "Now Board" header showing active beacons and summary metrics
+4. Responsive behavior: 3 columns (desktop), 2 columns (tablet), 1 column (mobile)
+5. Replace existing Konva.js canvas view (or offer as alternative) with this DOM-based grid for better accessibility and text rendering
+
+**Prerequisites:** Story 10.2, 10.3
+
+---
+
+**Story 10.6: Analyst Matrix Layout (Dense View)**
+
+As an operations manager,
+I want a dense, data-rich view of all spaces,
+So that I can monitor 20+ rooms simultaneously without scrolling.
+
+**Acceptance Criteria:**
+1. "Analyst Matrix" layout option in view switcher
+2. Compact row/tile design (minimized height)
+3. Sparklines or mini-bars for occupancy/activity history
+4. Text-heavy display: Room Name, Phase, Occupancy (Numbers), Last Log
+5. Maximum density: show 30+ spaces on a 1080p screen
+
+**Prerequisites:** Story 10.5
+
+---
+
+**Story 10.7: Cinema Mode Layout (Immersive View)**
+
+As a user in a lobby or public screen,
+I want a large-scale, immersive view of key spaces,
+So that the office activity looks beautiful on a big screen.
+
+**Acceptance Criteria:**
+1. "Cinema Mode" layout option
+2. Full-screen cards for active spaces only
+3. Auto-rotate/carousel feature (cycle through active rooms every 15s)
+4. High-fidelity visuals: larger avatars, full background gradients, motion backgrounds
+5. Hide UI chrome (headers, sidebars) in this mode
+
+**Prerequisites:** Story 10.5
+
+---
+
+**Story 10.8: Space Grid Overview (Masonry)**
+
+As a user in a large company,
+I want a view that handles 15+ spaces gracefully,
+So that the interface doesn't break as the company grows.
+
+**Acceptance Criteria:**
+1. Auto-switch to "Grid Overview" when space count > 15 (configurable)
+2. Masonry or dense-packing algorithm to fit cards efficiently
+3. "Neighborhood" grouping (visual bands/sections for Depts)
+4. Zoom controls to scale grid density
+5. Search/Filter bar remains pinned and accessible
+
+**Prerequisites:** Story 10.5
+
+---
+
+**Epic 10 Summary:**
+- **Total Stories:** 8
+- **Estimated Effort:** 40-60 hours
+- **Dependencies:** Epic 3 (for basic space data structure)
+- **Key Risks:** CSS complexity for themes, performance of many animated DOM elements
 
 ---
 

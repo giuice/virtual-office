@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virtual Office · Space Grid Unleashed</title>
+    <style>
+      :root {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --transition-speed: 0.4s;
+        --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      /* Reset & Base */
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        background: var(--bg-color);
+        color: var(--text-main);
+        transition: background var(--transition-speed) ease, color var(--transition-speed) ease;
+        overflow-x: hidden;
+      }
+
+      /* Background Effects */
+      .ambient-mesh {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background: var(--mesh-gradient);
+        filter: blur(80px);
+        opacity: 0.6;
+        transition: opacity var(--transition-speed) ease;
+        animation: mesh-drift 20s infinite alternate ease-in-out;
+      }
+
+      @keyframes mesh-drift {
+        0% { transform: scale(1) translate(0, 0); }
+        100% { transform: scale(1.1) translate(-2%, -2%); }
+      }
+
+      /* Layout */
+      .app-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 2rem;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 2rem;
+      }
+
+      /* Header */
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin: 0;
+        background: var(--text-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+        color: var(--text-muted);
+        max-width: 600px;
+        margin-top: 0.5rem;
+        line-height: 1.5;
+      }
+
+      /* Controls */
+      .controls-bar {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        padding: 1rem;
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+      }
+
+      .control-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-right: 0.5rem;
+        font-weight: 600;
+      }
+
+      button {
+        background: transparent;
+        border: 1px solid var(--border-subtle);
+        color: var(--text-main);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s var(--ease-elastic);
+      }
+
+      button:hover {
+        background: var(--hover-bg);
+        transform: translateY(-2px);
+      }
+
+      button.active {
+        background: var(--active-bg);
+        color: var(--active-text);
+        border-color: var(--active-border);
+        box-shadow: 0 4px 12px var(--active-shadow);
+      }
+
+      /* Grid System */
+      .grid-canvas {
+        display: grid;
+        gap: 1.5rem;
+        transition: all 0.5s ease;
+      }
+
+      /* Layout Variants */
+      .layout-orbit .grid-canvas {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      }
+      
+      .layout-analyst .grid-canvas {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+
+      .layout-cinema .grid-canvas {
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      }
+
+      /* Space Card */
+      .space-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        backdrop-filter: blur(10px);
+      }
+
+      .space-card:hover {
+        transform: translateY(-5px) scale(1.01);
+        box-shadow: var(--card-hover-shadow);
+        border-color: var(--card-hover-border);
+        z-index: 10;
+      }
+
+      /* Card Internals */
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+
+      .space-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+      }
+
+      .space-meta {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+      }
+
+      .beacon-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--beacon-color);
+        box-shadow: 0 0 10px var(--beacon-glow);
+        animation: pulse 2s infinite;
+      }
+
+      .beacon-indicator.critical {
+        --beacon-color: #ff4d4d;
+        --beacon-glow: rgba(255, 77, 77, 0.6);
+        animation: pulse-fast 1s infinite;
+      }
+
+      @keyframes pulse { 0% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(1); } }
+      @keyframes pulse-fast { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+
+      .phase-pill {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 99px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: var(--pill-bg);
+        color: var(--pill-text);
+        border: 1px solid var(--pill-border);
+      }
+
+      .avatars-row {
+        display: flex;
+        align-items: center;
+        margin-left: 0.5rem;
+      }
+
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 2px solid var(--card-bg);
+        margin-left: -10px;
+        background-size: cover;
+        background-position: center;
+        transition: transform 0.2s ease;
+        position: relative;
+      }
+
+      .avatar:hover {
+        transform: translateY(-3px) scale(1.1);
+        z-index: 5;
+      }
+
+      .avatar.speaking {
+        box-shadow: 0 0 0 2px var(--accent-color);
+      }
+
+      .log-stream {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        background: var(--log-bg);
+        padding: 0.75rem;
+        border-radius: 8px;
+        border-left: 2px solid var(--accent-color);
+        line-height: 1.4;
+      }
+
+      /* Sparkline for Analyst View */
+      .sparkline {
+        height: 4px;
+        width: 100%;
+        background: var(--border-subtle);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: auto;
+        display: none;
+      }
+      
+      .sparkline-bar {
+        height: 100%;
+        background: var(--accent-color);
+        width: 65%;
+      }
+
+      .layout-analyst .sparkline { display: block; }
+      .layout-analyst .avatars-row { display: none; } /* Hide avatars in dense view */
+      .layout-analyst .space-card { padding: 1rem; gap: 0.5rem; }
+
+      /* Themes */
+      
+      /* 1. Neon Cyberpunk */
+      [data-theme="neon"] {
+        --bg-color: #050505;
+        --text-main: #ffffff;
+        --text-muted: #8b9bb4;
+        --text-gradient: linear-gradient(to right, #00f2ff, #ff00ff);
+        --mesh-gradient: radial-gradient(circle at 20% 20%, #2b00ff44, transparent 40%), radial-gradient(circle at 80% 80%, #ff009944, transparent 40%);
+        --glass-bg: rgba(10, 10, 16, 0.7);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --border-subtle: rgba(255, 255, 255, 0.15);
+        --hover-bg: rgba(255, 255, 255, 0.1);
+        --active-bg: rgba(0, 242, 255, 0.15);
+        --active-text: #00f2ff;
+        --active-border: #00f2ff;
+        --active-shadow: rgba(0, 242, 255, 0.4);
+        --card-bg: rgba(20, 20, 25, 0.6);
+        --card-border: rgba(255, 255, 255, 0.05);
+        --card-hover-border: #ff00ff;
+        --card-hover-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+        --accent-color: #00f2ff;
+        --pill-bg: rgba(0, 242, 255, 0.1);
+        --pill-text: #00f2ff;
+        --pill-border: rgba(0, 242, 255, 0.3);
+        --log-bg: rgba(0, 0, 0, 0.5);
+        --beacon-color: #00f2ff;
+        --beacon-glow: rgba(0, 242, 255, 0.8);
+      }
+
+      /* 2. Zen Garden */
+      [data-theme="zen"] {
+        --bg-color: #f4f1ea;
+        --text-main: #3d4c41;
+        --text-muted: #7a8c7e;
+        --text-gradient: linear-gradient(to right, #3d4c41, #5c7a66);
+        --mesh-gradient: radial-gradient(circle at 50% 50%, #dce6d5, transparent 60%);
+        --glass-bg: rgba(255, 255, 255, 0.6);
+        --glass-border: rgba(61, 76, 65, 0.1);
+        --glass-shadow: 0 4px 20px rgba(61, 76, 65, 0.05);
+        --border-subtle: rgba(61, 76, 65, 0.1);
+        --hover-bg: rgba(61, 76, 65, 0.05);
+        --active-bg: #3d4c41;
+        --active-text: #f4f1ea;
+        --active-border: #3d4c41;
+        --active-shadow: rgba(61, 76, 65, 0.2);
+        --card-bg: rgba(255, 255, 255, 0.7);
+        --card-border: rgba(255, 255, 255, 0.8);
+        --card-hover-border: #8fa896;
+        --card-hover-shadow: 0 10px 30px rgba(61, 76, 65, 0.1);
+        --accent-color: #6b8c76;
+        --pill-bg: #e8e4dc;
+        --pill-text: #3d4c41;
+        --pill-border: transparent;
+        --log-bg: rgba(61, 76, 65, 0.05);
+        --beacon-color: #d48c70;
+        --beacon-glow: rgba(212, 140, 112, 0.4);
+      }
+
+      /* 3. Obsidian Stealth */
+      [data-theme="obsidian"] {
+        --bg-color: #000000;
+        --text-main: #e0e0e0;
+        --text-muted: #666666;
+        --text-gradient: linear-gradient(to bottom, #ffffff, #999999);
+        --mesh-gradient: none;
+        --glass-bg: rgba(20, 20, 20, 0.8);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-shadow: 0 20px 50px rgba(0,0,0,0.9);
+        --border-subtle: rgba(255, 255, 255, 0.1);
+        --hover-bg: rgba(255, 255, 255, 0.05);
+        --active-bg: #ffffff;
+        --active-text: #000000;
+        --active-border: #ffffff;
+        --active-shadow: rgba(255, 255, 255, 0.2);
+        --card-bg: #0a0a0a;
+        --card-border: #1a1a1a;
+        --card-hover-border: #333333;
+        --card-hover-shadow: 0 0 0 1px #333333;
+        --accent-color: #ffffff;
+        --pill-bg: #1a1a1a;
+        --pill-text: #ffffff;
+        --pill-border: #333333;
+        --log-bg: #050505;
+        --beacon-color: #ffffff;
+        --beacon-glow: rgba(255, 255, 255, 0.3);
+      }
+
+      /* 4. Paper White */
+      [data-theme="paper"] {
+        --bg-color: #ffffff;
+        --text-main: #111111;
+        --text-muted: #555555;
+        --text-gradient: none;
+        --mesh-gradient: none;
+        --glass-bg: rgba(255, 255, 255, 0.9);
+        --glass-border: #eeeeee;
+        --glass-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        --border-subtle: #eeeeee;
+        --hover-bg: #f5f5f5;
+        --active-bg: #111111;
+        --active-text: #ffffff;
+        --active-border: #111111;
+        --active-shadow: rgba(0,0,0,0.1);
+        --card-bg: #ffffff;
+        --card-border: #eeeeee;
+        --card-hover-border: #111111;
+        --card-hover-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        --accent-color: #111111;
+        --pill-bg: #f5f5f5;
+        --pill-text: #111111;
+        --pill-border: #e0e0e0;
+        --log-bg: #f9f9f9;
+        --beacon-color: #ff3b30;
+        --beacon-glow: rgba(255, 59, 48, 0.2);
+      }
+
+    </style>
+  </head>
+  <body class="layout-orbit" data-theme="neon">
+    <div class="ambient-mesh"></div>
+    
+    <div class="app-container">
+      <header>
+        <div>
+          <h1>Virtual Office Unleashed</h1>
+          <div class="subtitle">Next-generation spatial awareness. Select a reality distortion field below.</div>
+        </div>
+      </header>
+
+      <div class="controls-bar">
+        <div class="control-group">
+          <span class="label">Reality</span>
+          <button class="theme-btn active" onclick="setTheme('neon')">Neon Cyberpunk</button>
+          <button class="theme-btn" onclick="setTheme('zen')">Zen Garden</button>
+          <button class="theme-btn" onclick="setTheme('obsidian')">Obsidian Stealth</button>
+          <button class="theme-btn" onclick="setTheme('paper')">Paper White</button>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <div class="control-group">
+          <span class="label">Perspective</span>
+          <button class="layout-btn active" onclick="setLayout('orbit')">Orbit</button>
+          <button class="layout-btn" onclick="setLayout('analyst')">Analyst</button>
+          <button class="layout-btn" onclick="setLayout('cinema')">Cinema</button>
+        </div>
+      </div>
+
+      <div class="grid-canvas">
+        <!-- Generated by JS for demo purposes -->
+      </div>
+
+      <footer>
+        <div class="subtitle" style="text-align: center; font-size: 0.8rem;">
+          Interactive Prototype v2.0 · "Unleashed" Edition
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const spaces = [
+        { name: "Strategy War Room", phase: "Decide", users: 6, critical: true, log: "Consensus reached on Q4 targets. Risk assessment pending." },
+        { name: "Engineering Hive", phase: "Build", users: 14, critical: false, log: "Merge freeze in effect. Deploying hotfix to prod." },
+        { name: "Design Studio", phase: "Ideate", users: 8, critical: false, log: "Moodboards updated. Reviewing typography assets." },
+        { name: "Customer Success", phase: "Support", users: 12, critical: true, log: "Escalation: Enterprise client outage. War room active." },
+        { name: "Zen Lounge", phase: "Rest", users: 3, critical: false, log: "Meditation session starting in 5m." },
+        { name: "Executive Suite", phase: "Align", users: 4, critical: false, log: "Board deck review. Financials locked." },
+        { name: "Marketing Hub", phase: "Launch", users: 9, critical: false, log: "Campaign assets live. Monitoring CTR." },
+        { name: "Data Lab", phase: "Analyze", users: 5, critical: false, log: "Query optimization complete. Dashboard refreshing." },
+        { name: "Sales Floor", phase: "Close", users: 18, critical: false, log: "End of quarter push. Leaderboard updated." },
+        { name: "Legal Office", phase: "Review", users: 2, critical: false, log: "Contract redlines sent. Awaiting counter-sign." },
+        { name: "Product Sync", phase: "Plan", users: 7, critical: false, log: "Roadmap grooming. Q1 features prioritized." },
+        { name: "All-Hands Hall", phase: "Present", users: 45, critical: false, log: "Town hall setup. Mic check complete." }
+      ];
+
+      const avatars = [
+        "https://i.pravatar.cc/100?img=1", "https://i.pravatar.cc/100?img=2", 
+        "https://i.pravatar.cc/100?img=3", "https://i.pravatar.cc/100?img=4",
+        "https://i.pravatar.cc/100?img=5", "https://i.pravatar.cc/100?img=8"
+      ];
+
+      function renderGrid() {
+        const container = document.querySelector('.grid-canvas');
+        container.innerHTML = spaces.map(space => `
+          <div class="space-card">
+            <div class="card-header">
+              <div>
+                <h3 class="space-name">${space.name}</h3>
+                <div class="space-meta">${space.users} Active · ${space.phase}</div>
+              </div>
+              <div class="beacon-indicator ${space.critical ? 'critical' : ''}"></div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="phase-pill">${space.phase}</span>
+              <div class="avatars-row">
+                ${Array(Math.min(4, space.users)).fill(0).map((_, i) => 
+                  `<div class="avatar ${i===0 ? 'speaking' : ''}" style="background-image: url('${avatars[i % avatars.length]}')"></div>`
+                ).join('')}
+                ${space.users > 4 ? `<div class="avatar" style="background: var(--pill-bg); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold;">+${space.users-4}</div>` : ''}
+              </div>
+            </div>
+
+            <div class="log-stream">
+              > ${space.log}
+            </div>
+            
+            <div class="sparkline">
+              <div class="sparkline-bar" style="width: ${Math.random() * 100}%"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+      }
+
+      function setLayout(layout) {
+        document.body.className = `layout-${layout}`;
+        document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+      }
+
+      // Init
+      renderGrid();
+    </script>
+  </body>
+</html>
