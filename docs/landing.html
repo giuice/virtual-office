@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Office | Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            black: '#050505',
+                            dark: '#0a0a0a',
+                            cyan: '#00F2FF',
+                            magenta: '#FF00FF',
+                            purple: '#bc13fe',
+                            dim: 'rgba(255,255,255,0.1)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 242, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(0, 242, 255, 0.5);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.1);
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+        }
+
+        .glitch-text {
+            position: relative;
+        }
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .glitch-text::before {
+            color: #00F2FF;
+            z-index: -1;
+            transform: translate(-2px, 0);
+            clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+            animation: glitch-anim-1 3s infinite linear alternate-reverse;
+        }
+        .glitch-text::after {
+            color: #FF00FF;
+            z-index: -2;
+            transform: translate(2px, 0);
+            clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+            animation: glitch-anim-2 2s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim-1 {
+            0% { clip-path: inset(20% 0 80% 0); }
+            20% { clip-path: inset(60% 0 10% 0); }
+            40% { clip-path: inset(40% 0 50% 0); }
+            60% { clip-path: inset(80% 0 5% 0); }
+            80% { clip-path: inset(10% 0 70% 0); }
+            100% { clip-path: inset(30% 0 20% 0); }
+        }
+        @keyframes glitch-anim-2 {
+            0% { clip-path: inset(10% 0 60% 0); }
+            20% { clip-path: inset(30% 0 10% 0); }
+            40% { clip-path: inset(70% 0 20% 0); }
+            60% { clip-path: inset(20% 0 50% 0); }
+            80% { clip-path: inset(50% 0 30% 0); }
+            100% { clip-path: inset(0% 0 80% 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div class="grid-bg"></div>
+
+    <!-- Header -->
+    <header class="p-6 border-b border-white/10 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 bg-cyber-cyan rounded-full shadow-[0_0_10px_#00F2FF] animate-pulse"></div>
+                <span class="font-display font-bold text-xl tracking-wider">VIRTUAL OFFICE</span>
+            </div>
+            <nav class="hidden md:flex gap-8 text-sm font-mono text-gray-400">
+                <a href="#vision" class="hover:text-cyber-cyan transition-colors">VISION</a>
+                <a href="#features" class="hover:text-cyber-cyan transition-colors">FEATURES</a>
+                <a href="#admin" class="hover:text-cyber-magenta transition-colors">ADMIN INTELLIGENCE</a>
+                <a href="#artifacts" class="hover:text-cyber-purple transition-colors">ARTIFACTS</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow">
+        
+        <!-- Hero Section -->
+        <section class="py-24 px-6 relative overflow-hidden">
+            <div class="max-w-7xl mx-auto text-center relative z-10">
+                <div class="inline-block px-4 py-1 rounded-full border border-cyber-cyan/30 bg-cyber-cyan/5 text-cyber-cyan font-mono text-xs mb-6">
+                    SYSTEM STATUS: ONLINE // PHASE 4
+                </div>
+                <h1 class="text-6xl md:text-8xl font-display font-black mb-6 glitch-text" data-text="THE OS FOR WORK">THE OS FOR WORK</h1>
+                <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-12">
+                    Recreating the ambient awareness and serendipity of physical offices in a digital-first world. 
+                    <span class="text-white">Spatial. Intelligent. Real-time.</span>
+                </p>
+                
+                <div class="flex flex-col md:flex-row justify-center gap-6">
+                    <a href="investor-presentation-v2.html" class="group relative px-8 py-4 bg-cyber-cyan/10 border border-cyber-cyan overflow-hidden hover:bg-cyber-cyan/20 transition-all">
+                        <div class="absolute inset-0 w-1 bg-cyber-cyan group-hover:w-full transition-all duration-300 opacity-20"></div>
+                        <span class="relative font-display font-bold text-cyber-cyan group-hover:text-white flex items-center gap-2">
+                            LAUNCH INVESTOR DECK V2
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </span>
+                    </a>
+                    <a href="ux-space-grid-v2.html" class="group relative px-8 py-4 bg-cyber-magenta/10 border border-cyber-magenta overflow-hidden hover:bg-cyber-magenta/20 transition-all">
+                        <div class="absolute inset-0 w-1 bg-cyber-magenta group-hover:w-full transition-all duration-300 opacity-20"></div>
+                        <span class="relative font-display font-bold text-cyber-magenta group-hover:text-white flex items-center gap-2">
+                            INSPECT UX SPACE GRID
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Intelligence Section -->
+        <section id="admin" class="py-20 bg-white/5 border-y border-white/10">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="flex items-center gap-4 mb-12">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-cyber-magenta"></div>
+                    <h2 class="text-3xl font-display font-bold text-white text-center">COMMAND & CONTROL</h2>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-cyber-magenta"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Card 1 -->
+                    <div class="glass-panel p-6 rounded-xl relative group overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-12 h-12 text-cyber-magenta" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Time Intelligence</h3>
+                        <p class="text-sm text-gray-400 mb-4">Granular visibility into work patterns. Track deep work vs. meeting overhead.</p>
+                        <ul class="text-xs font-mono text-cyber-magenta space-y-1">
+                            <li>> Meeting Duration Analysis</li>
+                            <li>> Focus Block Tracking</li>
+                            <li>> Overwork Alerts</li>
+                        </ul>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="glass-panel p-6 rounded-xl relative group overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">War Rooms</h3>
+                        <p class="text-sm text-gray-400 mb-4">Dedicated high-bandwidth spaces for critical incidents and swarming.</p>
+                        <ul class="text-xs font-mono text-red-400 space-y-1">
+                            <li>> Instant "All-Hands" Mode</li>
+                            <li>> Incident Timeline Recording</li>
+                            <li>> Priority Audio Channels</li>
+                        </ul>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="glass-panel p-6 rounded-xl relative group overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-12 h-12 text-cyber-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Audit & Compliance</h3>
+                        <p class="text-sm text-gray-400 mb-4">Full audit trails of presence, access, and communication for regulated industries.</p>
+                        <ul class="text-xs font-mono text-cyber-cyan space-y-1">
+                            <li>> SOC2 Ready Logs</li>
+                            <li>> Access History</li>
+                            <li>> Chat Retention Policies</li>
+                        </ul>
+                    </div>
+
+                    <!-- Card 4 -->
+                    <div class="glass-panel p-6 rounded-xl relative group overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-12 h-12 text-cyber-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Executive Stats</h3>
+                        <p class="text-sm text-gray-400 mb-4">High-level analytics on team velocity, collaboration patterns, and engagement.</p>
+                        <ul class="text-xs font-mono text-cyber-purple space-y-1">
+                            <li>> Collaboration Heatmaps</li>
+                            <li>> Department Velocity</li>
+                            <li>> Engagement Scores</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PRD Summary Section -->
+        <section id="vision" class="py-20 px-6">
+            <div class="max-w-5xl mx-auto">
+                <h2 class="text-3xl font-display font-bold text-white mb-8 border-l-4 border-cyber-cyan pl-4">PRODUCT VISION (PRD)</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div class="space-y-6">
+                        <p class="text-gray-300 leading-relaxed">
+                            <strong class="text-white">The Problem:</strong> Remote work has stripped the "office" of its spatial context. Teams are isolated in vertical silos (Slack channels, Zoom links), losing the horizontal visibility that drives culture and serendipity.
+                        </p>
+                        <p class="text-gray-300 leading-relaxed">
+                            <strong class="text-white">The Solution:</strong> Virtual Office is a <span class="text-cyber-cyan">spatial operating system</span>. It visualizes the team on a floor plan, allowing for fluid movement between deep work, casual chat, and intense collaboration.
+                        </p>
+                        <div class="p-4 bg-white/5 rounded border border-white/10">
+                            <h4 class="font-mono text-sm text-cyber-cyan mb-2">CORE PILLARS</h4>
+                            <ul class="list-disc list-inside text-sm text-gray-400 space-y-1">
+                                <li><span class="text-white">Spatial Awareness:</span> See who is where and what they are doing.</li>
+                                <li><span class="text-white">Fluid Communication:</span> Zero-friction transition from text to voice.</li>
+                                <li><span class="text-white">AI-Augmented:</span> Meeting notes, summaries, and context are automatic.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="relative">
+                        <!-- Decorative visual for PRD -->
+                        <div class="absolute inset-0 bg-gradient-to-br from-cyber-cyan/20 to-cyber-magenta/20 blur-3xl"></div>
+                        <div class="relative glass-panel p-6 rounded-xl h-full flex flex-col justify-center">
+                            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                                <span class="font-mono text-xs text-gray-500">TARGET AUDIENCE</span>
+                                <span class="font-mono text-xs text-white">TECH / HYBRID</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                                <span class="font-mono text-xs text-gray-500">TEAM SIZE</span>
+                                <span class="font-mono text-xs text-white">5 - 50 USERS</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                                <span class="font-mono text-xs text-gray-500">TECH STACK</span>
+                                <span class="font-mono text-xs text-white">NEXT.JS 15 / SUPABASE</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-mono text-xs text-gray-500">STATUS</span>
+                                <span class="font-mono text-xs text-cyber-cyan">PHASE 4: IMPLEMENTATION</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Artifacts Links -->
+        <section id="artifacts" class="py-20 bg-black/50 border-t border-white/10">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <h2 class="text-2xl font-display font-bold text-white mb-12">PROJECT ARTIFACTS</h2>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="investor-presentation-v2.html" class="px-6 py-3 rounded bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyber-cyan transition-colors text-sm font-mono">
+                        📄 Investor Deck V2
+                    </a>
+                    <a href="ux-space-grid-v2.html" class="px-6 py-3 rounded bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyber-magenta transition-colors text-sm font-mono">
+                        🎨 UX Space Grid V2
+                    </a>
+                    <a href="prd.md" class="px-6 py-3 rounded bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white transition-colors text-sm font-mono">
+                        📝 Full PRD (Markdown)
+                    </a>
+                    <a href="architecture.md" class="px-6 py-3 rounded bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white transition-colors text-sm font-mono">
+                        🏗️ Architecture Spec
+                    </a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="py-8 border-t border-white/10 text-center text-gray-600 text-xs font-mono">
+        <p>VIRTUAL OFFICE // INTERNAL DOCUMENTATION // 2025</p>
+    </footer>
+
+</body>
+</html>

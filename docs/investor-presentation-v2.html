@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Office | The Future of Work</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            black: '#050505',
+                            dark: '#0a0a0a',
+                            cyan: '#00F2FF',
+                            magenta: '#FF00FF',
+                            purple: '#bc13fe',
+                            dim: 'rgba(255,255,255,0.1)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'scan': 'scan 4s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        scan: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100%)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --depth: 500px;
+        }
+        
+        body {
+            background-color: #050505;
+            color: #e0e0e0;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* 3D Scene Container */
+        #scene {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Slide Styles */
+        .slide {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backface-visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.5s, transform 1s;
+            pointer-events: none; /* Disabled by default */
+        }
+
+        .slide.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Custom Effects */
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 242, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .neon-border {
+            position: relative;
+        }
+        .neon-border::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            background: linear-gradient(45deg, #00F2FF, transparent, #FF00FF);
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .glitch-text {
+            position: relative;
+        }
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .glitch-text::before {
+            color: #00F2FF;
+            z-index: -1;
+            transform: translate(-2px, 0);
+            clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+            animation: glitch-anim-1 3s infinite linear alternate-reverse;
+        }
+        .glitch-text::after {
+            color: #FF00FF;
+            z-index: -2;
+            transform: translate(2px, 0);
+            clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+            animation: glitch-anim-2 2s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim-1 {
+            0% { clip-path: inset(20% 0 80% 0); }
+            20% { clip-path: inset(60% 0 10% 0); }
+            40% { clip-path: inset(40% 0 50% 0); }
+            60% { clip-path: inset(80% 0 5% 0); }
+            80% { clip-path: inset(10% 0 70% 0); }
+            100% { clip-path: inset(30% 0 20% 0); }
+        }
+        @keyframes glitch-anim-2 {
+            0% { clip-path: inset(10% 0 60% 0); }
+            20% { clip-path: inset(30% 0 10% 0); }
+            40% { clip-path: inset(70% 0 20% 0); }
+            60% { clip-path: inset(20% 0 50% 0); }
+            80% { clip-path: inset(50% 0 30% 0); }
+            100% { clip-path: inset(0% 0 80% 0); }
+        }
+
+        /* Background Canvas */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .nav-btn {
+            position: fixed;
+            bottom: 2rem;
+            z-index: 50;
+            background: transparent;
+            border: 1px solid #00F2FF;
+            color: #00F2FF;
+            padding: 0.5rem 1.5rem;
+            font-family: 'Orbitron';
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .nav-btn:hover {
+            background: rgba(0, 242, 255, 0.1);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        }
+        #prev-btn { left: 2rem; }
+        #next-btn { right: 2rem; }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: #00F2FF;
+            z-index: 100;
+            transition: width 0.5s;
+            box-shadow: 0 0 10px #00F2FF;
+        }
+
+        /* Grid Overlay */
+        .grid-overlay {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+            mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="grid-overlay"></div>
+    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+
+    <div id="scene">
+        
+        <!-- SLIDE 1: INTRO -->
+        <div class="slide active" data-index="0">
+            <div class="text-center z-10 relative">
+                <div class="mb-4 text-cyber-cyan font-mono text-sm tracking-[0.5em] uppercase opacity-70">Investor Deck 2025</div>
+                <h1 class="text-7xl md:text-9xl font-display font-black text-white mb-2 glitch-text" data-text="VIRTUAL OFFICE">VIRTUAL OFFICE</h1>
+                <h2 class="text-2xl md:text-3xl font-light text-cyber-magenta tracking-widest mt-4">THE FUTURE OF SPONTANEOUS COLLABORATION</h2>
+                
+                <div class="mt-12 flex justify-center gap-8">
+                    <div class="glass-panel p-4 rounded border-l-2 border-cyber-cyan">
+                        <div class="text-2xl font-display font-bold text-white">5-50</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">Target Users</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded border-l-2 border-cyber-magenta">
+                        <div class="text-2xl font-display font-bold text-white">SOC2</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">Ready</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded border-l-2 border-cyber-purple">
+                        <div class="text-2xl font-display font-bold text-white">AI</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">Native</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 2: PROBLEM -->
+        <div class="slide" data-index="1">
+            <div class="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h3 class="text-cyber-magenta font-mono mb-2">01 // THE PROBLEM</h3>
+                    <h2 class="text-5xl font-display font-bold mb-8">REMOTE WORK IS <span class="text-red-500 line-through decoration-2">BROKEN</span></h2>
+                    
+                    <div class="space-y-6">
+                        <div class="glass-panel p-6 border-l-4 border-red-500 transform hover:translate-x-2 transition-transform">
+                            <h4 class="text-xl font-bold text-white mb-1">Isolation</h4>
+                            <p class="text-gray-400">"Out of sight, out of mind." Teams feel disconnected and lonely.</p>
+                        </div>
+                        <div class="glass-panel p-6 border-l-4 border-red-500 transform hover:translate-x-2 transition-transform delay-75">
+                            <h4 class="text-xl font-bold text-white mb-1">Fragmentation</h4>
+                            <p class="text-gray-400">Context is scattered across Slack, Zoom, Email, and Jira.</p>
+                        </div>
+                        <div class="glass-panel p-6 border-l-4 border-red-500 transform hover:translate-x-2 transition-transform delay-100">
+                            <h4 class="text-xl font-bold text-white mb-1">Loss of Serendipity</h4>
+                            <p class="text-gray-400">Innovation suffers when spontaneous "water cooler" moments die.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative h-[400px] glass-panel rounded-xl flex items-center justify-center overflow-hidden">
+                    <!-- Abstract representation of broken connection -->
+                    <div class="absolute inset-0 bg-red-900/10"></div>
+                    <div class="text-center">
+                        <div class="text-6xl font-display font-bold text-red-500 mb-2">35%</div>
+                        <div class="text-xl text-white uppercase tracking-widest">Productivity Loss</div>
+                        <div class="text-sm text-gray-500 mt-2">in collaborative tasks</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 3: SOLUTION -->
+        <div class="slide" data-index="2">
+            <div class="max-w-7xl w-full">
+                <div class="text-center mb-12">
+                    <h3 class="text-cyber-cyan font-mono mb-2">02 // THE SOLUTION</h3>
+                    <h2 class="text-5xl font-display font-bold">BRING THE <span class="text-cyber-cyan">"PLACE"</span> BACK TO WORKPLACE</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <!-- Feature 1 -->
+                    <div class="glass-panel p-8 rounded-xl border border-cyber-cyan/30 hover:border-cyber-cyan transition-colors group">
+                        <div class="w-12 h-12 bg-cyber-cyan/20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-cyber-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Spatial Awareness</h3>
+                        <p class="text-sm text-gray-400">See where your team is and what they are doing in real-time.</p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="glass-panel p-8 rounded-xl border border-cyber-magenta/30 hover:border-cyber-magenta transition-colors group">
+                        <div class="w-12 h-12 bg-cyber-magenta/20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-cyber-magenta" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Fluid Comms</h3>
+                        <p class="text-sm text-gray-400">Move from a chat to a huddle to a meeting instantly.</p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="glass-panel p-8 rounded-xl border border-cyber-purple/30 hover:border-cyber-purple transition-colors group">
+                        <div class="w-12 h-12 bg-cyber-purple/20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-cyber-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Professional</h3>
+                        <p class="text-sm text-gray-400">Not a video game. Not just a list of text channels.</p>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div class="glass-panel p-8 rounded-xl border border-white/30 hover:border-white transition-colors group">
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">AI-Augmented</h3>
+                        <p class="text-sm text-gray-400">Built from ground up with AI for notes, summaries, and context.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 4: MARKET -->
+        <div class="slide" data-index="3">
+            <div class="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h3 class="text-cyber-cyan font-mono mb-2">03 // MARKET FIT</h3>
+                    <h2 class="text-5xl font-display font-bold mb-6">WHY NOW?</h2>
+                    <p class="text-xl text-gray-300 mb-8">The "Return to Office" mandates failed. Teams need better tools, not more commutes.</p>
+                    
+                    <div class="space-y-8">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-white font-bold">Permanent Hybrid Adoption</span>
+                                <span class="text-cyber-cyan font-mono">78%</span>
+                            </div>
+                            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-cyber-cyan w-[78%] shadow-[0_0_10px_#00F2FF]"></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-white font-bold">Productivity Gap</span>
+                                <span class="text-cyber-magenta font-mono">35%</span>
+                            </div>
+                            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-cyber-magenta w-[35%] shadow-[0_0_10px_#FF00FF]"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-12 p-6 glass-panel border border-cyber-cyan/20">
+                        <h4 class="text-cyber-cyan font-mono text-sm mb-2">PRIMARY TARGET</h4>
+                        <p class="text-2xl font-bold text-white">Remote/Hybrid Tech Teams</p>
+                        <p class="text-gray-400">(5-50 users)</p>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <!-- Decorative Chart -->
+                    <div class="glass-panel p-8 rounded-xl relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 text-cyber-cyan font-mono text-xs">MRR PROJECTION</div>
+                        <div class="flex items-end justify-between h-64 gap-4 mt-8">
+                            <div class="w-full bg-cyber-cyan/10 h-[20%] rounded-t relative group">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Q1</div>
+                            </div>
+                            <div class="w-full bg-cyber-cyan/20 h-[35%] rounded-t relative group">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Q2</div>
+                            </div>
+                            <div class="w-full bg-cyber-cyan/40 h-[55%] rounded-t relative group">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Q3</div>
+                            </div>
+                            <div class="w-full bg-cyber-cyan/60 h-[75%] rounded-t relative group">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Q4</div>
+                            </div>
+                            <div class="w-full bg-cyber-cyan h-[100%] rounded-t relative group shadow-[0_0_20px_#00F2FF]">
+                                <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-white font-bold">$100k</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 5: COMPETITION -->
+        <div class="slide" data-index="4">
+            <div class="max-w-6xl w-full">
+                <h3 class="text-cyber-magenta font-mono mb-2 text-center">04 // LANDSCAPE</h3>
+                <h2 class="text-5xl font-display font-bold mb-12 text-center">COMPETITIVE MATRIX</h2>
+
+                <div class="glass-panel rounded-xl overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-800 bg-white/5">
+                                <th class="p-6 font-mono text-gray-400">FEATURE</th>
+                                <th class="p-6 font-display text-cyber-cyan text-xl border-x border-cyber-cyan/30 bg-cyber-cyan/5">VIRTUAL OFFICE</th>
+                                <th class="p-6 font-mono text-gray-400">Slack / Teams</th>
+                                <th class="p-6 font-mono text-gray-400">Gather.town</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800">
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-6 font-bold">Spatial Context</td>
+                                <td class="p-6 text-cyber-cyan border-x border-cyber-cyan/30 font-bold text-center">✅ YES</td>
+                                <td class="p-6 text-gray-500 text-center">❌ No</td>
+                                <td class="p-6 text-white text-center">✅ Yes</td>
+                            </tr>
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-6 font-bold">Visual Style</td>
+                                <td class="p-6 text-cyber-cyan border-x border-cyber-cyan/30 font-bold text-center">PRO / MODERN</td>
+                                <td class="p-6 text-gray-500 text-center">Text-Based</td>
+                                <td class="p-6 text-white text-center">8-bit / Game</td>
+                            </tr>
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-6 font-bold">Enterprise Security</td>
+                                <td class="p-6 text-cyber-cyan border-x border-cyber-cyan/30 font-bold text-center">✅ SOC2 Ready</td>
+                                <td class="p-6 text-white text-center">✅ Yes</td>
+                                <td class="p-6 text-yellow-500 text-center">⚠️ Mixed</td>
+                            </tr>
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-6 font-bold">AI Integration</td>
+                                <td class="p-6 text-cyber-cyan border-x border-cyber-cyan/30 font-bold text-center">NATIVE CORE</td>
+                                <td class="p-6 text-gray-500 text-center">Add-on</td>
+                                <td class="p-6 text-gray-500 text-center">Limited</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <span class="inline-block px-4 py-2 rounded-full border border-cyber-magenta text-cyber-magenta font-mono text-sm">
+                        MOAT: Brownfield Architecture + "Unleashed" UX + AI-First Data Model
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 6: TRACTION & ROADMAP -->
+        <div class="slide" data-index="5">
+            <div class="max-w-7xl w-full">
+                <div class="flex justify-between items-end mb-12">
+                    <div>
+                        <h3 class="text-cyber-purple font-mono mb-2">05 // EXECUTION</h3>
+                        <h2 class="text-5xl font-display font-bold">ROADMAP</h2>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-cyber-cyan font-mono">STATUS: PHASE 4</div>
+                        <div class="text-sm text-gray-400">Implementation In Progress</div>
+                    </div>
+                </div>
+
+                <div class="relative border-t border-gray-800 mt-20">
+                    <!-- Timeline Line -->
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-cyan via-cyber-magenta to-cyber-purple transform -translate-y-1/2"></div>
+
+                    <div class="grid grid-cols-3 gap-8 pt-12">
+                        <!-- Q4 2025 -->
+                        <div class="relative group">
+                            <div class="absolute -top-[52px] left-0 w-4 h-4 bg-cyber-cyan rounded-full shadow-[0_0_10px_#00F2FF] group-hover:scale-150 transition-transform"></div>
+                            <h4 class="text-2xl font-display font-bold text-white mb-2">Q4 2025</h4>
+                            <h5 class="text-cyber-cyan font-mono text-sm mb-4">THE FOUNDATION (MVP)</h5>
+                            <ul class="space-y-2 text-gray-400 text-sm">
+                                <li class="flex items-center gap-2"><span class="text-cyber-cyan">►</span> Messaging Timeline</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-cyan">►</span> Floor Plan Polish</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-cyan">►</span> Meeting Notes</li>
+                                <li class="flex items-center gap-2 text-white"><span class="text-cyber-cyan">★</span> PUBLIC BETA LAUNCH</li>
+                            </ul>
+                        </div>
+
+                        <!-- Q1 2026 -->
+                        <div class="relative group">
+                            <div class="absolute -top-[52px] left-0 w-4 h-4 bg-cyber-magenta rounded-full shadow-[0_0_10px_#FF00FF] group-hover:scale-150 transition-transform"></div>
+                            <h4 class="text-2xl font-display font-bold text-white mb-2">Q1 2026</h4>
+                            <h5 class="text-cyber-magenta font-mono text-sm mb-4">THE INTELLIGENCE LAYER</h5>
+                            <ul class="space-y-2 text-gray-400 text-sm">
+                                <li class="flex items-center gap-2"><span class="text-cyber-magenta">►</span> AI Transcription</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-magenta">►</span> Semantic Search</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-magenta">►</span> Native Video (WebRTC)</li>
+                            </ul>
+                        </div>
+
+                        <!-- Q2 2026 -->
+                        <div class="relative group">
+                            <div class="absolute -top-[52px] left-0 w-4 h-4 bg-cyber-purple rounded-full shadow-[0_0_10px_#bc13fe] group-hover:scale-150 transition-transform"></div>
+                            <h4 class="text-2xl font-display font-bold text-white mb-2">Q2 2026</h4>
+                            <h5 class="text-cyber-purple font-mono text-sm mb-4">SCALE & EXPERIENCE</h5>
+                            <ul class="space-y-2 text-gray-400 text-sm">
+                                <li class="flex items-center gap-2"><span class="text-cyber-purple">►</span> Admin Analytics</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-purple">►</span> "Unleashed" UX Overhaul</li>
+                                <li class="flex items-center gap-2"><span class="text-cyber-purple">►</span> Enterprise Compliance</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 7: TEAM -->
+        <div class="slide" data-index="6">
+            <div class="text-center max-w-4xl w-full">
+                <h2 class="text-5xl font-display font-bold mb-12">THE <span class="text-cyber-cyan">AI-AUGMENTED</span> TEAM</h2>
+                
+                <div class="glass-panel p-12 rounded-2xl border border-white/10 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-20"></div>
+                    
+                    <div class="flex flex-col md:flex-row items-center gap-12">
+                        <div class="flex-1 text-right border-r border-gray-700 pr-12">
+                            <div class="text-3xl font-bold text-white mb-2">Giuliano</div>
+                            <div class="text-cyber-cyan font-mono text-sm mb-4">PROJECT LEAD</div>
+                            <p class="text-gray-400 text-sm">Product Vision, Architecture, & Execution.</p>
+                        </div>
+                        
+                        <div class="flex-1 text-left pl-4">
+                            <div class="text-xl font-bold text-cyber-magenta mb-4">THE AI WORKFORCE</div>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 bg-cyber-magenta rounded-full"></div>
+                                    <span class="text-gray-300">PM Agent <span class="text-gray-600 text-xs ml-2">// Strategy</span></span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 bg-cyber-magenta rounded-full"></div>
+                                    <span class="text-gray-300">Architect Agent <span class="text-gray-600 text-xs ml-2">// System Design</span></span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 bg-cyber-magenta rounded-full"></div>
+                                    <span class="text-gray-300">Dev Agents <span class="text-gray-600 text-xs ml-2">// High Velocity</span></span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 bg-cyber-magenta rounded-full"></div>
+                                    <span class="text-gray-300">UX Agent <span class="text-gray-600 text-xs ml-2">// Reality Distortion</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-12 pt-8 border-t border-gray-800">
+                        <p class="text-xl text-white italic">"Executing a 12-month roadmap in 3 months."</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 8: THE ASK -->
+        <div class="slide" data-index="7">
+            <div class="text-center z-10">
+                <h1 class="text-6xl md:text-8xl font-display font-black text-white mb-8 glitch-text" data-text="IT'S TIME TO ROCK">IT'S TIME TO ROCK</h1>
+                <p class="text-2xl text-gray-300 mb-12 max-w-2xl mx-auto">We are building the operating system for the future of work.</p>
+                
+                <button onclick="location.reload()" class="group relative px-8 py-4 bg-transparent overflow-hidden rounded-none">
+                    <div class="absolute inset-0 w-0 bg-cyber-cyan transition-all duration-[250ms] ease-out group-hover:w-full opacity-10"></div>
+                    <div class="absolute inset-0 border border-cyber-cyan"></div>
+                    <span class="relative text-cyber-cyan font-display tracking-widest group-hover:text-white transition-colors">REBOOT SYSTEM</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <button id="prev-btn" class="nav-btn">PREV</button>
+    <button id="next-btn" class="nav-btn">NEXT</button>
+
+    <script>
+        // --- 3D Scene Logic ---
+        const scene = document.getElementById('scene');
+        const slides = document.querySelectorAll('.slide');
+        const progressBar = document.getElementById('progressBar');
+        let currentIndex = 0;
+        const totalSlides = slides.length;
+        const Z_DEPTH = 1000; // Distance between slides
+
+        function updateScene() {
+            // Move the scene to position the current slide at Z=0
+            const zOffset = currentIndex * Z_DEPTH;
+            scene.style.transform = `translateZ(${zOffset}px)`;
+
+            // Update opacity and active state
+            slides.forEach((slide, index) => {
+                const distance = Math.abs(index - currentIndex);
+                
+                // Position slides in 3D space
+                slide.style.transform = `translateZ(${-index * Z_DEPTH}px)`;
+
+                if (index === currentIndex) {
+                    slide.classList.add('active');
+                    slide.style.opacity = 1;
+                } else {
+                    slide.classList.remove('active');
+                    // Fade out distant slides
+                    slide.style.opacity = distance > 1 ? 0 : 0.3;
+                }
+            });
+
+            // Update Progress Bar
+            const progress = ((currentIndex) / (totalSlides - 1)) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        // Initial Setup
+        updateScene();
+
+        // Navigation
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentIndex < totalSlides - 1) {
+                currentIndex++;
+                updateScene();
+            }
+        });
+
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateScene();
+            }
+        });
+
+        // Keyboard Nav
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                if (currentIndex < totalSlides - 1) {
+                    currentIndex++;
+                    updateScene();
+                }
+            } else if (e.key === 'ArrowLeft') {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updateScene();
+                }
+            }
+        });
+
+        // --- Background Particle System ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.z = Math.random() * 2; // Depth factor
+                this.size = Math.random() * 2;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.color = Math.random() > 0.5 ? '#00F2FF' : '#FF00FF';
+                this.opacity = Math.random() * 0.5;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 100; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw connecting lines
+            ctx.strokeStyle = 'rgba(0, 242, 255, 0.05)';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                // Connect nearby particles
+                for (let j = i; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // --- Parallax Effect ---
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 20;
+            const y = (e.clientY / window.innerHeight - 0.5) * 20;
+            
+            // Apply subtle rotation to active slide content
+            const activeSlide = document.querySelector('.slide.active > div');
+            if(activeSlide) {
+                activeSlide.style.transform = `perspective(1000px) rotateY(${x}deg) rotateX(${-y}deg)`;
+            }
+        });
+
+    </script>
+</body>
+</html>
