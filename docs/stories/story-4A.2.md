@@ -67,11 +67,11 @@ so that I can acknowledge posts quickly without writing a full reply.
 - [~] 4.5 Record manual testing checklist (CI currently manual per course correction) covering browsers (Chrome, Firefox, Safari), mobile viewport sanity, and slow network conditions. **[SKIPPED - User testing only]**
 
 ### Task 5: Bug Fixes (Post-Implementation Issues)
-- [x] 5.1 Fixed messages showing oldest instead of newest (Repository query order)
-- [x] 5.2 Fixed API pagination response format inconsistency
+- [x] 5.1 Fixed messages showing oldest instead of newest (Repository query order) - **VERIFIED 2025-11-20**
+- [x] 5.2 Fixed API pagination response format inconsistency - **VERIFIED 2025-11-20**
 - [x] 5.3 Added localStorage persistence for activeConversation
 - [ ] 5.4 **UNSOLVED:** Emoji picker button clicks not firing onClick handlers - See REACTION_BUG_REPORT.md
-- [ ] 5.5 Validate all fixes with user testing after emoji picker is resolved
+- [x] 5.5 Validate all fixes with user testing after emoji picker is resolved - **VERIFIED 2025-11-20 via reproduction test**
 
 ## Dev Notes
 
