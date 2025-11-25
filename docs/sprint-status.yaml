@@ -39,24 +39,30 @@ development_status:
   epic-1-retrospective: optional
   epic-2: backlog
   epic-2-retrospective: optional
-  epic-3: backlog
-  3-1-visual-design-overhaul: backlog
-  3-2-space-occupancy-visualization: backlog
-  3-3-customizable-space-styling: backlog
-  3-4-improved-space-selection-ux: backlog
-  3-5-space-grouping-and-zones: backlog
-  3-6-enhanced-zoom-and-pan-controls: backlog
-  3-7-space-templates-gallery: backlog
-  3-8-space-capacity-and-room-full-handling: backlog
-  3-9-real-time-presence-animation: backlog
-  3-10-space-detail-panel-redesign: backlog
-  3-11-drag-and-drop-space-positioning-polish: backlog
-  3-12-mobile-responsive-floor-plan-basic: backlog
+  
+  # Epic 3: Visual Experience & Floor Plan (Unleashed) - MERGED from Epic 3 + Epic 10
+  epic-3: contexted
+  3-1-reality-distortion-engine-theme-system: backlog
+  3-2-space-card-v2-orbit-gallery-component: backlog
+  3-3-avatar-constellation-v2: backlog
+  3-4-attention-beacon-system: backlog
+  3-5-orbit-gallery-layout-default-view: backlog
+  3-6-analyst-matrix-layout-dense-view: backlog
+  3-7-cinema-mode-layout-immersive-view: backlog
+  3-8-perspective-switcher-ui: backlog
+  3-9-space-grouping-and-neighborhoods: backlog
+  3-10-now-board-header: backlog
+  3-11-space-detail-hover-panel: backlog
+  3-12-space-capacity-and-room-full-handling: backlog
+  3-13-real-time-presence-animation: backlog
+  3-14-mobile-responsive-floor-plan: backlog
   epic-3-retrospective: optional
-  epic-4a: backlog
+  
+  # Epic 4A: Messaging Timeline & Composer
+  epic-4a: contexted
   4a-1-render-reply-indicators-and-thread-ui: done
-  4a-2-reaction-chips-and-emoji-picker: in-progress
-  4a-3-pinned-and-starred-message-indicators: backlog
+  4a-2-reaction-chips-and-emoji-picker: done
+  4a-3-pinned-and-starred-message-indicators: done
   4a-4-read-receipts-display: backlog
   4a-5-infinite-scroll-with-pagination: backlog
   4a-6-auto-scroll-to-new-messages-with-indicator: backlog

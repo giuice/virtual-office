@@ -1,6 +1,6 @@
-# {{project_name}} UX Design Specification
+# Virtual Office UX Design Specification
 
-_Created on {{date}} by {{user_name}}_
+_Created on 2025-10-29 by Giuliano_
 _Generated using BMad Method - Create UX Design Workflow v1.0_
 
 ---
@@ -15,7 +15,7 @@ Virtual Office is evolving into a modern, cozy spatial workspace where every spa
 
 ### 1.1 Design System Choice
 
-Double down on the current shadcn/ui + Radix stack, enriching it with a bespoke cozy theme and spatial components rather than introducing a new system. This keeps accessibility and headless flexibility intact while letting us craft organic space cards, avatar clusters, and ambient status indicators that wrap around photo-based avatars. We’ll extend Tailwind tokens (colors, elevation, gradients) to support the island-inspired moods and ensure every interactive element inherits consistent focus/hover treatments across web and future responsive breakpoints.
+Double down on the current shadcn/ui + Radix stack, but evolve it into a "Reality Distortion" engine. Instead of a single theme, we will support multiple "Realities" (Neon, Zen, Obsidian, Paper, Warm, Cosmic) and "Perspectives" (Orbit, Analyst, Cinema) that users can toggle instantly. This maximizes personalization and accessibility while keeping the core interaction model consistent. We’ll extend Tailwind tokens (colors, elevation, gradients) to support these diverse moods and ensure every interactive element inherits consistent focus/hover treatments across web and future responsive breakpoints.
 
 ---
 
@@ -41,13 +41,19 @@ Introduce spatial storytelling patterns that go beyond rectangular rooms:
 
 ### 3.1 Color System
 
-Craft a palette that balances efficiency, coziness, and inspiration:
-- **Midnight Slate (#1E2330)** as the base canvas—calming and professional, ideal for dimming background noise.
-- **Aurora Ember (#FF8A5C)** for high-priority attention beacons—warm energy that signals action without stress.
-- **Soft Pine Mist (#6FB7A5)** for collaborative spaces—fresh, breathable, and reinforces calm focus.
-- **Golden Thread (#F1C550)** as the accent for phase trackers and success states—sparks optimism and strategic momentum.
-- **Ivory Glow (#FAF6EF)** for card surfaces and log panels—keeps the interface cozy and legible.
-Each color ships with Tailwind tokens (e.g., `--vo-slate-900`, `--vo-ember-500`) plus semantic aliases like `--vo-signal-critical` to keep implementation consistent. Warm Control anchors the light theme (daytime leadership scans) and Cosmic Efficiency anchors the dark theme (executive focus mode); Orbit Gallery toggles reuse the same semantic token names so components inherit the correct mood automatically.
+Craft a palette that balances efficiency, coziness, and inspiration, now expanded into the "Reality Distortion" collection:
+
+**Core Themes (Default):**
+- **Warm Control (Light):** Midnight Slate (#1E2330) base, Aurora Ember (#FF8A5C) signals, Soft Pine Mist (#6FB7A5) collaboration.
+- **Cosmic Efficiency (Dark):** Deep Nebula (#121533) base, Pulse Indigo (#5762FF) primary, Ion Surge (#60E9F9) accents.
+
+**Unleashed Themes (Experimental):**
+- **Neon Cyberpunk:** Void Black (#050505) base, Cyan (#00F2FF) & Magenta (#FF00FF) high-contrast signals.
+- **Zen Garden:** Rice Paper (#F4F1EA) base, Moss Green (#3D4C41) text, Clay (#D48C70) accents.
+- **Obsidian Stealth:** True Black (#000000) base, Carbon (#1A1A1A) surfaces, White (#FFFFFF) text.
+- **Paper White:** Pure White (#FFFFFF) base, Ink Black (#111111) text, Red (#FF3B30) signals.
+
+Each color ships with Tailwind tokens (e.g., `--vo-slate-900`, `--vo-ember-500`) plus semantic aliases like `--vo-signal-critical` to keep implementation consistent.
 
 ### 3.2 Typography
 
@@ -73,16 +79,16 @@ Each color ships with Tailwind tokens (e.g., `--vo-slate-900`, `--vo-ember-500`)
 
 ### 4.1 Chosen Design Approach
 
-Blend modern control center clarity with cozy hospitality cues, anchored in the Orbit Gallery direction for everyday leadership scans and paired with the Space Grid overview (Orbit Gallery layout) when occupancy crosses 15 spaces. Command Atrium and Analyst Matrix remain reference variants in the grid lab:
-- Floor plan framed by a “now board” header and smart filters on the left, keeping the main canvas wide and breathable.
-- Spaces rendered as elevated cards with rounded geometry, soft drop shadows, and light gradient washes keyed to their neighborhood band. When 15+ spaces are active, the canvas auto-switches into a zoomed-out Orbit Gallery grid so leadership still sees every space in one glance (inspired by Sococo, but with richer cues and higher fidelity).
-- Avatars remain photo-forward, encircled by animated status rings (speaking, presenting, listening) and stacked in constellations that adapt to attendance.
-- Hover reveals expand gracefully: translucent overlays surface agenda phase, recent log entries, and the latest transcript snippet without blocking surrounding content.
-- Motion is purposeful: gentle pulses for live events, magnetic slides when people join/leave, and glowing trails when attention beacons fire for all-company moments.
+We are adopting a **Multi-Perspective Strategy**. Users can toggle between three distinct layout modes depending on their role and current task:
+
+1.  **Orbit Gallery (Default):** A refined grid with depth, motion, and rich ambient cues. Best for general team awareness and "feeling" the office pulse.
+2.  **Analyst Matrix:** A dense, data-rich view with sparklines, metrics, and compact rows. Best for operations, compliance, and rapid scanning of 20+ spaces.
+3.  **Cinema Mode:** Large-scale, immersive cards that take over the screen. Best for focused monitoring of a few key spaces or public display screens.
 
 **Interactive Mockups:**
 
 - Design Direction Showcase: [ux-design-directions.html](./ux-design-directions.html)
+- Space Grid Unleashed: [ux-space-grid-v2.html](./ux-space-grid-v2.html)
 
 ---
 
@@ -90,7 +96,6 @@ Blend modern control center clarity with cozy hospitality cues, anchored in the 
 
 ### 5.1 Critical User Paths
 
-{{user_journey_flows}}
 1. **Leader Command Path:** CEO opens Virtual Office → spots attention beacon on Strategy War Space → hover reveals roster, phase, transcript → click to join or delegate.
 2. **Team Sync Loop:** Product squad enters Sprint Launch space → agenda auto-advances phases → log captures key decisions → summary pushes to admin dashboard.
 3. **Ad-hoc Coaching:** Mentor notices Pine Lounge chatter → hover to preview conversation → joins if needed → leaves note for async follow-up → log records for later review.
@@ -160,14 +165,14 @@ flowchart LR
 
 ### 6.1 Component Strategy
 
-{{component_library_strategy}}
 - Extend shadcn/Radix primitives into a Virtual Office kit:
-  - `SpaceCard` component with gradient bands, status ribbons, hover reveal container, and configurable attention beacon slots.
+  - `SpaceCard` component with gradient bands, status ribbons, hover reveal container, and configurable attention beacon slots. **Must support `variant` prop for Orbit/Analyst/Cinema modes.**
   - `AvatarConstellation` layout that arranges real-photo avatars dynamically, layering animated status rings and tooltips for agenda roles.
   - `NowBoard` header module showing live priorities, filters, and key metrics.
   - `ActivityLogPanel` and `TranscriptPeek` components using Ivory Glow surfaces and timeline markers.
   - `AttentionBeacon` micro-component providing pulse animations and logging hooks for admin systems.
   - `SpaceGridOverview` responsive mosaic that preserves full-office visibility (15+ spaces) while retaining per-space status ribbons and beacon cues.
+  - `RealitySwitcher` and `PerspectiveSwitcher` controls for toggling themes and layouts.
 
 **Reuse & Build Notes**
 - `SpaceElement.tsx` already powers individual rooms; we will refactor it into the Orbit Gallery `SpaceCard` by swapping the color utility for token-driven gradients, adding agenda/phase ribbons, hover transcript panels, and attention beacon slots.
@@ -226,7 +231,6 @@ flowchart LR
 
 ### 7.1 Consistency Rules
 
-{{ux_pattern_decisions}}
 - Hover reveals must surface roster, agenda phase, activity log, and transcript snippet in a consistent hierarchy: roster first, phase tracker second, log entries third, transcript preview last.
 - Attention beacons trigger when >60% of a space seats fill or when agenda phases change unexpectedly; they log events automatically.
 - Summon beams only activate for company-wide or exec-flagged spaces and include a dismiss + snooze control to avoid interrupt overload.
@@ -274,7 +278,6 @@ Interaction & accessibility:
 
 ### 9.1 Completion Summary
 
-{{completion_summary}}
 - Floor plan UX centers on instant situational awareness for leaders and teammates through ambient cues, hover reveals, and attention beacons.
 - Cozy, inspired visuals come from a tailored shadcn/Radix theme with Midnight Slate base, Aurora Ember signals, and Ivory Glow surfaces.
 - Dual-theme support combines Warm Control (light default) and Cosmic Efficiency (dark default) so leadership can work in daylight or focused executive mode without losing semantic color meaning.
@@ -292,9 +295,9 @@ Interaction & accessibility:
 
 ### Related Documents
 
-- Product Requirements: `{{prd_file}}`
-- Product Brief: `{{brief_file}}`
-- Brainstorming: `{{brainstorm_file}}`
+- Product Requirements: `docs/prd.md`
+- Product Brief: `docs/product-brief-virtual-office-2025-10-21.md`
+- Brainstorming: `docs/archive/brainstorming.md`
 
 ### Core Interactive Deliverables
 
@@ -338,7 +341,7 @@ This UX Design Specification can serve as input to:
 
 | Date     | Version | Changes                         | Author        |
 | -------- | ------- | ------------------------------- | ------------- |
-| {{date}} | 1.0     | Initial UX Design Specification | {{user_name}} |
+| 2025-10-29 | 1.0     | Initial UX Design Specification | Giuliano |
 
 ---
 

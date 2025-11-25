@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Office | Investor Deck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Neon Cyberpunk Theme Variables */
+            --bg-color: #050505;
+            --text-color: #e0e0e0;
+            --primary-cyan: #00F2FF;
+            --primary-magenta: #FF00FF;
+            --accent-purple: #bc13fe;
+            --surface-dark: #0a0a0a;
+            --surface-light: #1a1a1a;
+            --grid-color: rgba(0, 242, 255, 0.1);
+            
+            /* Typography */
+            --font-heading: 'Orbitron', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-body);
+            overflow: hidden; /* Slide behavior */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Background Grid Effect */
+        .cyber-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200vw;
+            height: 200vh;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-100px) translateZ(-200px);
+            animation: grid-move 20s linear infinite;
+            z-index: -1;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        @keyframes grid-move {
+            0% { transform: perspective(500px) rotateX(60deg) translateY(0) translateZ(-200px); }
+            100% { transform: perspective(500px) rotateX(60deg) translateY(50px) translateZ(-200px); }
+        }
+
+        /* Vignette & Scanlines */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 60%, black 100%);
+            pointer-events: none;
+            z-index: 100;
+        }
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 101;
+            opacity: 0.3;
+        }
+
+        /* Slides Container */
+        .slides-container {
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        .slide {
+            height: 100vh;
+            width: 100vw;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out, transform 0.8s ease-out;
+            transform: scale(0.95);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Typography & Glitch Effects */
+        h1, h2, h3 {
+            font-family: var(--font-heading);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 4rem;
+            text-shadow: 0 0 10px var(--primary-cyan), 0 0 20px var(--primary-cyan);
+            background: linear-gradient(90deg, var(--primary-cyan), #fff, var(--primary-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            color: var(--primary-magenta);
+            text-shadow: 0 0 5px var(--primary-magenta);
+            border-bottom: 2px solid var(--primary-cyan);
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        p, li {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            max-width: 800px;
+            color: #ccc;
+        }
+
+        .highlight {
+            color: var(--primary-cyan);
+            font-weight: bold;
+        }
+
+        /* Cyberpunk UI Elements */
+        .card {
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid var(--primary-cyan);
+            padding: 2rem;
+            margin: 1rem;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-magenta), transparent);
+            animation: scan-line 3s infinite;
+        }
+
+        @keyframes scan-line {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .btn {
+            background: transparent;
+            border: 2px solid var(--primary-cyan);
+            color: var(--primary-cyan);
+            padding: 1rem 2rem;
+            font-family: var(--font-heading);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            margin-top: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            background: var(--primary-cyan);
+            color: black;
+            box-shadow: 0 0 20px var(--primary-cyan);
+        }
+
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            max-width: 900px;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            font-family: var(--font-mono);
+        }
+
+        .comparison-table th, .comparison-table td {
+            border: 1px solid #333;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .comparison-table th {
+            color: var(--primary-magenta);
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--primary-magenta);
+        }
+
+        .comparison-table td.check {
+            color: var(--primary-cyan);
+            text-shadow: 0 0 5px var(--primary-cyan);
+        }
+        
+        .comparison-table td.cross {
+            color: #ff3333;
+        }
+
+        /* Timeline */
+        .timeline {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1000px;
+            width: 100%;
+            margin-top: 3rem;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary-cyan);
+            z-index: -1;
+            transform: translateY(-50%);
+        }
+
+        .timeline-item {
+            background: var(--bg-color);
+            border: 1px solid var(--primary-magenta);
+            padding: 1rem;
+            width: 200px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s;
+        }
+
+        .timeline-item:hover {
+            transform: scale(1.1) translateY(-10px);
+            box-shadow: 0 0 15px var(--primary-magenta);
+            z-index: 10;
+        }
+
+        .timeline-date {
+            color: var(--primary-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        /* Navigation Dots */
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 200;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--primary-cyan);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .dot.active {
+            background: var(--primary-cyan);
+            box-shadow: 0 0 10px var(--primary-cyan);
+        }
+
+        /* Glitch Text Animation */
+        .glitch {
+            position: relative;
+        }
+        
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .glitch::before {
+            left: 2px;
+            text-shadow: -1px 0 red;
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim-1 5s infinite linear alternate-reverse;
+        }
+        
+        .glitch::after {
+            left: -2px;
+            text-shadow: -1px 0 blue;
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim-2 5s infinite linear alternate-reverse;
+        }
+        
+        @keyframes glitch-anim-1 {
+            0% { clip: rect(20px, 9999px, 10px, 0); }
+            20% { clip: rect(60px, 9999px, 80px, 0); }
+            40% { clip: rect(10px, 9999px, 50px, 0); }
+            60% { clip: rect(80px, 9999px, 20px, 0); }
+            80% { clip: rect(30px, 9999px, 70px, 0); }
+            100% { clip: rect(50px, 9999px, 40px, 0); }
+        }
+        
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(10px, 9999px, 80px, 0); }
+            20% { clip: rect(80px, 9999px, 10px, 0); }
+            40% { clip: rect(30px, 9999px, 60px, 0); }
+            60% { clip: rect(10px, 9999px, 20px, 0); }
+            80% { clip: rect(50px, 9999px, 90px, 0); }
+            100% { clip: rect(20px, 9999px, 60px, 0); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .stat-box {
+            text-align: center;
+            padding: 1.5rem;
+            border: 1px solid #333;
+            background: rgba(0,0,0,0.5);
+        }
+        
+        .stat-number {
+            font-family: var(--font-heading);
+            font-size: 3rem;
+            color: var(--primary-cyan);
+            display: block;
+        }
+        
+        .stat-label {
+            font-family: var(--font-mono);
+            color: #aaa;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="cyber-grid"></div>
+    <div class="overlay"></div>
+    <div class="scanlines"></div>
+
+    <div class="nav-dots" id="navDots">
+        <!-- Populated by JS -->
+    </div>
+
+    <div class="slides-container" id="slidesContainer">
+
+        <!-- Slide 1: Title -->
+        <section class="slide active" id="slide-1">
+            <h1 class="glitch" data-text="VIRTUAL OFFICE">VIRTUAL OFFICE</h1>
+            <h3 style="color: var(--primary-magenta); margin-top: 1rem;">The Future of Spontaneous Remote Collaboration</h3>
+            <p style="margin-top: 2rem; font-family: var(--font-mono);">[ INVESTOR DECK 2025 ]</p>
+            <button class="btn" onclick="nextSlide()">Enter The System</button>
+        </section>
+
+        <!-- Slide 2: The Problem -->
+        <section class="slide" id="slide-2">
+            <h2>SYSTEM ERROR: <span style="color: #ff3333">CONNECTION LOST</span></h2>
+            <div class="card">
+                <p>Remote work is here to stay, but it feels <strong>broken</strong>.</p>
+                <ul style="list-style: none; margin-top: 1.5rem;">
+                    <li style="margin-bottom: 1rem;">❌ <strong>Isolation:</strong> "Out of sight, out of mind."</li>
+                    <li style="margin-bottom: 1rem;">❌ <strong>Fragmentation:</strong> Context scattered across Slack, Zoom, Jira.</li>
+                    <li style="margin-bottom: 1rem;">❌ <strong>No Serendipity:</strong> Innovation dies without spontaneous moments.</li>
+                    <li style="margin-bottom: 1rem;">❌ <strong>Meeting Fatigue:</strong> Everything is a scheduled 30-min call.</li>
+                </ul>
+                <p style="margin-top: 1.5rem; border-top: 1px solid #333; padding-top: 1rem;">
+                    <span class="highlight">IMPACT:</span> 25-35% productivity loss in collaborative tasks.
+                </p>
+            </div>
+        </section>
+
+        <!-- Slide 3: The Solution -->
+        <section class="slide" id="slide-3">
+            <h2>THE PATCH: <span style="color: var(--primary-cyan)">VIRTUAL OFFICE</span></h2>
+            <p style="text-align: center; margin-bottom: 2rem;">A digital workspace that brings the "place" back to the workplace.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number">SPATIAL</span>
+                    <span class="stat-label">Real-time Awareness</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">FLUID</span>
+                    <span class="stat-label">Chat → Huddle Instantly</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">PRO</span>
+                    <span class="stat-label">Not a Game. Enterprise Ready.</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">AI</span>
+                    <span class="stat-label">Native Intelligence</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: Market -->
+        <section class="slide" id="slide-4">
+            <h2>MARKET OPPORTUNITY</h2>
+            <div class="card" style="width: 800px;">
+                <h3 style="color: var(--primary-cyan);">Why Now?</h3>
+                <p style="margin-bottom: 1.5rem;">The "Return to Office" mandates failed. Teams need better tools, not more commutes.</p>
+                
+                <div style="display: flex; justify-content: space-around; margin-top: 2rem;">
+                    <div style="text-align: center;">
+                        <span style="font-size: 4rem; color: var(--primary-magenta); font-weight: bold;">78%</span>
+                        <p style="font-family: var(--font-mono);">Companies Permanent Hybrid</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <span style="font-size: 4rem; color: var(--primary-cyan); font-weight: bold;">$100K</span>
+                        <p style="font-family: var(--font-mono);">Target MRR (18 Months)</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem; text-align: left;">
+                    <p><strong style="color: var(--primary-cyan)">Primary Target:</strong> Remote/Hybrid Tech Teams (5-50 users)</p>
+                    <p><strong style="color: var(--primary-magenta)">Secondary:</strong> Enterprise Depts in Regulated Industries</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: Competition -->
+        <section class="slide" id="slide-5">
+            <h2>COMPETITIVE MATRIX</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th style="color: var(--primary-cyan); border: 2px solid var(--primary-cyan);">VIRTUAL OFFICE</th>
+                        <th>Slack / Teams</th>
+                        <th>Gather.town</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Spatial Context</td>
+                        <td class="check" style="border-left: 2px solid var(--primary-cyan); border-right: 2px solid var(--primary-cyan);">✅ YES</td>
+                        <td class="cross">❌ No</td>
+                        <td class="check">✅ Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Visual Style</td>
+                        <td style="color: var(--primary-cyan); border-left: 2px solid var(--primary-cyan); border-right: 2px solid var(--primary-cyan);">PRO / MODERN</td>
+                        <td>Text-Based</td>
+                        <td>8-bit / Game</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise Security</td>
+                        <td class="check" style="border-left: 2px solid var(--primary-cyan); border-right: 2px solid var(--primary-cyan);">✅ SOC2 Ready</td>
+                        <td class="check">✅ Yes</td>
+                        <td style="color: orange">⚠️ Mixed</td>
+                    </tr>
+                    <tr>
+                        <td>AI Integration</td>
+                        <td style="color: var(--primary-cyan); border-left: 2px solid var(--primary-cyan); border-right: 2px solid var(--primary-cyan);">NATIVE CORE</td>
+                        <td>Add-on</td>
+                        <td>Limited</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="margin-top: 2rem; font-size: 0.9rem; color: #888;">Differentiation: "Unleashed" UX + Brownfield Architecture + AI-First Data Model</p>
+        </section>
+
+        <!-- Slide 6: Traction -->
+        <section class="slide" id="slide-6">
+            <h2>SYSTEM STATUS: <span style="color: var(--primary-cyan)">ONLINE</span></h2>
+            <div style="display: flex; gap: 2rem; margin-top: 2rem;">
+                <div class="card" style="width: 300px;">
+                    <h3 style="color: #00ff00">PHASE 1-3</h3>
+                    <p style="font-family: var(--font-mono); font-size: 0.9rem; margin-top: 1rem;">
+                        ✅ Product Brief<br>
+                        ✅ PRD & UX Spec<br>
+                        ✅ Architecture<br>
+                        ✅ Validation
+                    </p>
+                </div>
+                <div class="card" style="width: 300px; border-color: var(--primary-magenta); box-shadow: 0 0 15px rgba(255, 0, 255, 0.2);">
+                    <h3 style="color: var(--primary-magenta)">PHASE 4</h3>
+                    <p style="font-family: var(--font-mono); font-size: 0.9rem; margin-top: 1rem;">
+                        🚧 IMPLEMENTATION<br>
+                        ✅ Core Infra<br>
+                        ✅ Auth System<br>
+                        🔄 Messaging Engine
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: Roadmap -->
+        <section class="slide" id="slide-7">
+            <h2>EXECUTION PROTOCOL</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <span class="timeline-date">Q4 2025</span>
+                    <strong>FOUNDATION</strong>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Messaging Timeline<br>Floor Plan Polish<br>Meeting Notes</p>
+                </div>
+                <div class="timeline-item">
+                    <span class="timeline-date">Q1 2026</span>
+                    <strong>INTELLIGENCE</strong>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">AI Transcription<br>Semantic Search<br>Native Video</p>
+                </div>
+                <div class="timeline-item">
+                    <span class="timeline-date">Q2 2026</span>
+                    <strong>SCALE</strong>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Admin Analytics<br>"Unleashed" UX<br>Enterprise Compliance</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: Team -->
+        <section class="slide" id="slide-8">
+            <h2>THE UNIT</h2>
+            <div class="card" style="text-align: center;">
+                <h3 style="color: var(--primary-cyan);">AI-AUGMENTED ADVANTAGE</h3>
+                <p style="margin: 1rem 0;">Executing a 12-month roadmap in 3 months.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; text-align: left; margin-top: 2rem;">
+                    <div>
+                        <strong style="color: white; display: block; margin-bottom: 0.5rem;">HUMAN LEAD</strong>
+                        <p>Giuliano<br><span style="font-size: 0.8rem; color: #888;">Vision, Arch, Execution</span></p>
+                    </div>
+                    <div>
+                        <strong style="color: var(--primary-magenta); display: block; margin-bottom: 0.5rem;">AI AGENTS</strong>
+                        <ul style="font-size: 0.9rem; list-style: none; color: #aaa;">
+                            <li>> PM Agent (Strategy)</li>
+                            <li>> Arch Agent (System Design)</li>
+                            <li>> Dev Agents (Velocity)</li>
+                            <li>> UX Agent (Reality Distortion)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: The Ask -->
+        <section class="slide" id="slide-9">
+            <h1 class="glitch" data-text="IT'S TIME TO ROCK">IT'S TIME TO ROCK</h1>
+            <p style="margin-top: 2rem; font-size: 1.5rem;">We are building the operating system for the future of work.</p>
+            <div style="margin-top: 3rem;">
+                <p style="font-family: var(--font-mono); color: var(--primary-cyan);">[ INSERT INVESTMENT ASK HERE ]</p>
+            </div>
+            <button class="btn" style="margin-top: 3rem;" onclick="location.reload()">REBOOT SYSTEM</button>
+        </section>
+
+    </div>
+
+    <script>
+        // Slide Navigation Logic
+        const container = document.getElementById('slidesContainer');
+        const slides = document.querySelectorAll('.slide');
+        const navDots = document.getElementById('navDots');
+
+        // Create Dots
+        slides.forEach((slide, index) => {
+            const dot = document.createElement('div');
+            dot.classList.add('dot');
+            if (index === 0) dot.classList.add('active');
+            dot.onclick = () => {
+                slide.scrollIntoView({ behavior: 'smooth' });
+            };
+            navDots.appendChild(dot);
+        });
+
+        // Update Active State on Scroll
+        container.addEventListener('scroll', () => {
+            const scrollPos = container.scrollTop;
+            const windowHeight = window.innerHeight;
+            
+            slides.forEach((slide, index) => {
+                const slideTop = slide.offsetTop;
+                const slideBottom = slideTop + slide.offsetHeight;
+
+                if (scrollPos >= slideTop - windowHeight/2 && scrollPos < slideBottom - windowHeight/2) {
+                    // Update Slide Class
+                    slides.forEach(s => s.classList.remove('active'));
+                    slide.classList.add('active');
+
+                    // Update Dots
+                    const dots = document.querySelectorAll('.dot');
+                    dots.forEach(d => d.classList.remove('active'));
+                    dots[index].classList.add('active');
+                }
+            });
+        });
+
+        function nextSlide() {
+            const current = document.querySelector('.slide.active');
+            const next = current.nextElementSibling;
+            if (next) {
+                next.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    </script>
+</body>
+</html>

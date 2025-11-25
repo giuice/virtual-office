@@ -61,8 +61,8 @@ export function useMessages(activeConversationId: string | null) {
         });
       }
       // Optional: Remove queries for all other conversations to save memory
-      queryClient.removeQueries({ 
-        queryKey: ['messages'], 
+      queryClient.removeQueries({
+        queryKey: ['messages'],
         predicate: (query) => {
           const [, conversationId] = query.queryKey;
           return conversationId !== activeConversationId;
@@ -100,8 +100,10 @@ export function useMessages(activeConversationId: string | null) {
 
   const messages: Message[] = useMemo(() => {
     if (!data?.pages) return [];
-    // Pages represent windows from older->newer already; flatten preserves order
-    const flattened = data.pages.flatMap((p) => p.messages);
+    // Pages are returned Newest -> Oldest (Page 0 is newest)
+    // We want to display Oldest -> Newest
+    // So we reverse the pages array before flattening
+    const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
     return flattened;
   }, [data, activeConversationId]);
 
@@ -211,10 +213,10 @@ export function useMessages(activeConversationId: string | null) {
             return { pages: [{ messages: [optimisticMessage], hasMore: false }], pageParams: [undefined] };
           }
           const updatedPages = [...oldData.pages];
-          const lastIdx = updatedPages.length - 1;
-          updatedPages[lastIdx] = {
-            ...updatedPages[lastIdx],
-            messages: [...updatedPages[lastIdx].messages, optimisticMessage],
+          // Add to the FIRST page (Page 0), which contains the newest messages
+          updatedPages[0] = {
+            ...updatedPages[0],
+            messages: [...updatedPages[0].messages, optimisticMessage],
           };
           return { ...oldData, pages: updatedPages };
         }
@@ -366,10 +368,10 @@ export function useMessages(activeConversationId: string | null) {
             return { pages: [{ messages: [message], hasMore: false }], pageParams: [undefined] };
           }
           const updatedPages = [...oldData.pages];
-          const lastIdx = updatedPages.length - 1;
-          updatedPages[lastIdx] = {
-            ...updatedPages[lastIdx],
-            messages: [...updatedPages[lastIdx].messages, message],
+          // Add to the FIRST page (Page 0), which contains the newest messages
+          updatedPages[0] = {
+            ...updatedPages[0],
+            messages: [...updatedPages[0].messages, message],
           };
           return { ...oldData, pages: updatedPages };
         }
@@ -390,10 +392,10 @@ export function useMessages(activeConversationId: string | null) {
           conversationId: activeConversationId,
         });
       }
-      
+
       // Snapshot current state for rollback
       const previousData = queryClient.getQueryData(['messages', activeConversationId]);
-      
+
       try {
         // Optimistic toggle
         queryClient.setQueryData(
@@ -421,7 +423,7 @@ export function useMessages(activeConversationId: string | null) {
         );
 
         const result = await messagingApi.toggleReaction(messageId, emoji);
-        
+
         if (instrumentationEnabled) {
           debugLogger.messaging.event('useMessages.addReaction', 'toggle-success', {
             messageId,
@@ -432,13 +434,13 @@ export function useMessages(activeConversationId: string | null) {
       } catch (error) {
         // Rollback optimistic update
         queryClient.setQueryData(['messages', activeConversationId], previousData);
-        
+
         debugLogger.messaging.error('useMessages.addReaction', 'toggle-error', {
           messageId,
           emoji,
           error: error instanceof Error ? error.message : String(error),
         });
-        
+
         console.error('Error toggling reaction:', error);
         toast.error('Failed to update reaction', {
           description: error instanceof Error ? error.message : String(error),

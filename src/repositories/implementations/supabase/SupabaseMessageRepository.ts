@@ -29,7 +29,7 @@ function mapMessageToCamelCase(data: MessageRow): Message {
     timestamp: new Date(data.timestamp), // Convert DB timestamp string/obj to Date
     type: data.type as MessageType,
     status: data.status as MessageStatus,
-  replyToId: data.reply_to_id || undefined,
+    replyToId: data.reply_to_id || undefined,
     isEdited: data.is_edited,
     attachments: [], // Placeholder - fetch separately
     reactions: []    // Placeholder - fetch separately
@@ -38,26 +38,26 @@ function mapMessageToCamelCase(data: MessageRow): Message {
 
 // Map DB snake_case to FileAttachment type (camelCase)
 function mapAttachmentToCamelCase(data: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }): FileAttachment {
-    if (!data) return data;
-    return {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        size: data.size,
-        url: data.url,
-  thumbnailUrl: data.thumbnail_url || undefined
-    };
+  if (!data) return data;
+  return {
+    id: data.id,
+    name: data.name,
+    type: data.type,
+    size: data.size,
+    url: data.url,
+    thumbnailUrl: data.thumbnail_url || undefined
+  };
 }
 
 // Map DB snake_case to MessageReaction type (camelCase)
 function mapReactionToCamelCase(data: { emoji: string; user_id: string; timestamp: string }): MessageReaction {
-    if (!data) return data;
-    return {
-        // Assuming reaction table doesn't have its own ID in the type, or map data.id if it does
-        emoji: data.emoji,
-        userId: data.user_id,
-        timestamp: new Date(data.timestamp) // Convert DB timestamp string/obj to Date
-    };
+  if (!data) return data;
+  return {
+    // Assuming reaction table doesn't have its own ID in the type, or map data.id if it does
+    emoji: data.emoji,
+    userId: data.user_id,
+    timestamp: new Date(data.timestamp) // Convert DB timestamp string/obj to Date
+  };
 }
 
 // Map DB snake_case to ReadReceipt type (camelCase)
@@ -72,22 +72,24 @@ function mapReadReceiptToCamelCase(data: { id: string; message_id: string; user_
 }
 
 // Map DB snake_case to MessagePin type (camelCase)
-function mapMessagePinToCamelCase(data: { id: string; message_id: string; user_id: string; pinned_at: string }): MessagePin {
+function mapMessagePinToCamelCase(data: { id: string; message_id: string; conversation_id: string; pinned_by: string; pinned_at: string }): MessagePin {
   if (!data) return data;
   return {
     id: data.id,
     messageId: data.message_id,
-    userId: data.user_id,
+    conversationId: data.conversation_id,
+    userId: data.pinned_by, // mapped from pinned_by
     pinnedAt: new Date(data.pinned_at)
   };
 }
 
 // Map DB snake_case to MessageStar type (camelCase)
-function mapMessageStarToCamelCase(data: { id: string; message_id: string; user_id: string; starred_at: string }): MessageStar {
+function mapMessageStarToCamelCase(data: { id: string; message_id: string; conversation_id: string; user_id: string; starred_at: string }): MessageStar {
   if (!data) return data;
   return {
     id: data.id,
     messageId: data.message_id,
+    conversationId: data.conversation_id,
     userId: data.user_id,
     starredAt: new Date(data.starred_at)
   };
@@ -117,8 +119,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
   private REACTION_TABLE_NAME = 'message_reactions'; // Assuming separate table
   private ATTACHMENT_TABLE_NAME = 'message_attachments'; // Assuming separate table
   private READ_RECEIPT_TABLE_NAME = 'message_read_receipts'; // Read receipts table
-  private MESSAGE_PIN_TABLE_NAME = 'message_pins'; // Message pins table
-  private MESSAGE_STAR_TABLE_NAME = 'message_stars'; // Message stars table
+  private MESSAGE_PIN_TABLE_NAME = 'pinned_messages'; // Message pins table
+  private MESSAGE_STAR_TABLE_NAME = 'starred_messages'; // Message stars table
   private supabaseClient: SupabaseClient;
 
   constructor(supabaseClient: SupabaseClient) {
@@ -172,6 +174,36 @@ export class SupabaseMessageRepository implements IMessageRepository {
     } else {
       message.reactions = mapReactionArrayToCamelCase(reactionsData || []);
     }
+
+    // Fetch related pins
+    const { data: pinsData, error: pinsError } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .select('*')
+      .eq('message_id', message.id);
+
+    if (pinsError) {
+      console.error(`Error fetching pins for message ID ${message.id}:`, pinsError);
+      message.pins = [];
+    } else {
+      // Map pins
+      message.pins = (pinsData || []).map((p: any) => mapMessagePinToCamelCase(p));
+    }
+
+    // Fetch related stars
+    const { data: starsData, error: starsError } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .select('*')
+      .eq('message_id', message.id);
+
+    if (starsError) {
+      console.error(`Error fetching stars for message ID ${message.id}:`, starsError);
+      message.stars = [];
+    } else {
+      // Map stars
+      message.stars = (starsData || []).map((s: any) => mapMessageStarToCamelCase(s));
+    }
+
+
 
     return message;
   }
@@ -278,7 +310,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
       .select('*')
       .in('message_id', messageIds);
 
-     if (reactionsError) {
+    if (reactionsError) {
       console.error(`Error fetching reactions for conversation ${conversationId}:`, reactionsError);
       // Continue without reactions if error occurs
     }
@@ -290,10 +322,43 @@ export class SupabaseMessageRepository implements IMessageRepository {
       return acc;
     }, {} as Record<string, MessageReaction[]>);
 
+    // Fetch all pins for these messages in bulk
+    const { data: pinsData, error: pinsError } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (pinsError) {
+      console.error(`Error fetching pins for conversation ${conversationId}:`, pinsError);
+    }
+    const pinsByMessageId = (pinsData || []).reduce((acc: Record<string, MessagePin[]>, row: any) => {
+      const msgId = row.message_id;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapMessagePinToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessagePin[]>);
+
+    // Fetch all stars for these messages in bulk
+    const { data: starsData, error: starsError } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (starsError) {
+      console.error(`Error fetching stars for conversation ${conversationId}:`, starsError);
+    }
+    const starsByMessageId = (starsData || []).reduce((acc: Record<string, MessageStar[]>, row: any) => {
+      const msgId = row.message_id;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapMessageStarToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessageStar[]>);
 
     messages.forEach(message => {
-  message.attachments = attachmentsByMessageId[message.id] || [];
-  message.reactions = reactionsByMessageId[message.id] || [];
+      message.attachments = attachmentsByMessageId[message.id] || [];
+      message.reactions = reactionsByMessageId[message.id] || [];
+      message.pins = pinsByMessageId[message.id] || [];
+      message.stars = starsByMessageId[message.id] || [];
     });
 
     // Determine nextCursor based on pagination type
@@ -321,15 +386,15 @@ export class SupabaseMessageRepository implements IMessageRepository {
   async create(messageData: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'attachments' | 'isEdited'>): Promise<Message> {
     // Map Message type (camelCase) to DB schema (snake_case)
     const dbData = {
-        conversation_id: messageData.conversationId,
-        sender_id: messageData.senderId,
-        content: messageData.content,
-        type: messageData.type,
-        status: messageData.status,
-        reply_to_id: messageData.replyToId,
-        // timestamp handled by Supabase default value
-        // reactions/attachments handled separately
-        // is_edited defaults to false
+      conversation_id: messageData.conversationId,
+      sender_id: messageData.senderId,
+      content: messageData.content,
+      type: messageData.type,
+      status: messageData.status,
+      reply_to_id: messageData.replyToId,
+      // timestamp handled by Supabase default value
+      // reactions/attachments handled separately
+      // is_edited defaults to false
     };
 
     const { data, error } = await this.supabaseClient
@@ -353,15 +418,15 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   async update(id: string, updates: Partial<Pick<Message, 'content' | 'status' | 'isEdited'>>): Promise<Message | null> {
     // Map updates from camelCase to snake_case
-  const dbUpdates: Partial<{ content: string; status: MessageStatus; is_edited: boolean }> = {};
+    const dbUpdates: Partial<{ content: string; status: MessageStatus; is_edited: boolean }> = {};
     if (updates.content !== undefined) dbUpdates.content = updates.content;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.isEdited !== undefined) dbUpdates.is_edited = updates.isEdited;
 
     if (Object.keys(dbUpdates).length === 0) {
-        // If no fields to update, maybe fetch and return current? Or return null?
-        // For now, fetch and return current state if no actual update fields provided.
-        return this.findById(id);
+      // If no fields to update, maybe fetch and return current? Or return null?
+      // For now, fetch and return current state if no actual update fields provided.
+      return this.findById(id);
     }
 
     const { data, error } = await this.supabaseClient
@@ -380,10 +445,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
     // Note: attachments/reactions won't be populated here, similar to findById pre-fetch
     const updatedMessage = data ? mapMessageToCamelCase(data) : null;
     if (updatedMessage) {
-        // Fetch related data if needed, or rely on caller to re-fetch if necessary
-        // For simplicity, returning core message data only after update.
-        updatedMessage.attachments = []; // Reset placeholders
-        updatedMessage.reactions = [];
+      // Fetch related data if needed, or rely on caller to re-fetch if necessary
+      // For simplicity, returning core message data only after update.
+      updatedMessage.attachments = []; // Reset placeholders
+      updatedMessage.reactions = [];
     }
     return updatedMessage;
   }
@@ -392,7 +457,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     // Consider deleting related reactions/attachments as well (cascade or manual)
     const { error, count } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', id);
 
     if (error) {
@@ -410,12 +475,12 @@ export class SupabaseMessageRepository implements IMessageRepository {
   async addAttachment(messageId: string, attachmentData: Omit<FileAttachment, 'id'>): Promise<FileAttachment> {
     // Map camelCase to snake_case
     const dbData = {
-        message_id: messageId,
-        name: attachmentData.name,
-        type: attachmentData.type,
-        size: attachmentData.size,
-        url: attachmentData.url,
-        thumbnail_url: attachmentData.thumbnailUrl,
+      message_id: messageId,
+      name: attachmentData.name,
+      type: attachmentData.type,
+      size: attachmentData.size,
+      url: attachmentData.url,
+      thumbnail_url: attachmentData.thumbnailUrl,
     };
     const { data, error } = await this.supabaseClient
       .from(this.ATTACHMENT_TABLE_NAME)
@@ -437,24 +502,24 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   // Note: Input timestamp is Date object, Supabase handles conversion
   async addReaction(messageId: string, reactionData: Omit<MessageReaction, 'timestamp'>): Promise<MessageReaction> {
-     // Map camelCase to snake_case
-     const dbData = {
-        message_id: messageId,
-        user_id: reactionData.userId,
-        emoji: reactionData.emoji,
-        // timestamp handled by default value
-     };
+    // Map camelCase to snake_case
+    const dbData = {
+      message_id: messageId,
+      user_id: reactionData.userId,
+      emoji: reactionData.emoji,
+      // timestamp handled by default value
+    };
     const { data, error } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .upsert(dbData, { onConflict: 'message_id, user_id, emoji' }) // Specify conflict target
       .select()
       .single();
 
-     if (error || !data) {
+    if (error || !data) {
       console.error('Error adding reaction:', error);
       throw error || new Error('Failed to add reaction or retrieve created data.');
     }
-     // Map DB response back to MessageReaction type
+    // Map DB response back to MessageReaction type
     return mapReactionToCamelCase(data);
   }
 
@@ -462,7 +527,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     // Map camelCase input to snake_case query
     const { error, count } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('message_id', messageId)
       .eq('user_id', userId)
       .eq('emoji', emoji);
@@ -475,7 +540,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   async findReactions(messageId: string): Promise<MessageReaction[]> {
-     const { data, error } = await this.supabaseClient
+    const { data, error } = await this.supabaseClient
       .from(this.REACTION_TABLE_NAME)
       .select('*')
       .eq('message_id', messageId);
@@ -617,16 +682,17 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   // --- Message Pin Methods ---
 
-  async pinMessage(messageId: string, userId: string): Promise<MessagePin> {
+  async pinMessage(messageId: string, conversationId: string, userId: string): Promise<MessagePin> {
     const dbData = {
       message_id: messageId,
-      user_id: userId,
+      conversation_id: conversationId,
+      pinned_by: userId, // user_id renamed to pinned_by
       pinned_at: new Date().toISOString()
     };
 
     const { data, error } = await this.supabaseClient
       .from(this.MESSAGE_PIN_TABLE_NAME)
-      .upsert(dbData, { onConflict: 'message_id, user_id' })
+      .upsert(dbData, { onConflict: 'message_id, pinned_by' }) // Updated conflict target (was user_id)
       .select()
       .single();
 
@@ -641,9 +707,9 @@ export class SupabaseMessageRepository implements IMessageRepository {
   async unpinMessage(messageId: string, userId: string): Promise<boolean> {
     const { error, count } = await this.supabaseClient
       .from(this.MESSAGE_PIN_TABLE_NAME)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('message_id', messageId)
-      .eq('user_id', userId);
+      .eq('pinned_by', userId); // Ensure user owns the pinned_by
 
     if (error) {
       console.error('Error unpinning message:', error);
@@ -654,11 +720,12 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   async getPinnedMessages(conversationId: string, userId: string): Promise<Message[]> {
-    // First, get the pinned message IDs for this user in this conversation
+    // First, get the pinned message IDs for this conversation (shared pins)
     const { data: pinsData, error: pinsError } = await this.supabaseClient
       .from(this.MESSAGE_PIN_TABLE_NAME)
       .select('message_id')
-      .eq('user_id', userId);
+      .eq('conversation_id', conversationId);
+    // .eq('user_id', userId); // Removed user_id filter for shared pins
 
     if (pinsError) {
       console.error('Error fetching pinned message IDs:', pinsError);
@@ -729,9 +796,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   // --- Message Star Methods ---
 
-  async starMessage(messageId: string, userId: string): Promise<MessageStar> {
+  async starMessage(messageId: string, conversationId: string, userId: string): Promise<MessageStar> {
     const dbData = {
       message_id: messageId,
+      conversation_id: conversationId,
       user_id: userId,
       starred_at: new Date().toISOString()
     };
@@ -753,7 +821,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
   async unstarMessage(messageId: string, userId: string): Promise<boolean> {
     const { error, count } = await this.supabaseClient
       .from(this.MESSAGE_STAR_TABLE_NAME)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('message_id', messageId)
       .eq('user_id', userId);
 

@@ -54,7 +54,8 @@ export interface ReadReceipt {
 export interface MessagePin {
   id: string;
   messageId: string;
-  userId: string;
+  conversationId: string;
+  userId: string; // pinnedBy
   pinnedAt: Date;
 }
 
@@ -62,6 +63,7 @@ export interface MessagePin {
 export interface MessageStar {
   id: string;
   messageId: string;
+  conversationId: string;
   userId: string;
   starredAt: Date;
 }
