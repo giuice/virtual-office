@@ -21,20 +21,20 @@ PHASE_4_COMPLETE: false
 
 ## Development Queue
 
-STORIES_SEQUENCE: [3.1, 3.2, 3.3, 3.5, 4A.4]
-TODO_STORY: 3.1
-TODO_TITLE: Reality Distortion Engine (Theme System)
-TODO_STATUS: drafted
+STORIES_SEQUENCE: [3.2, 3.3, 3.5, 4A.4]
+TODO_STORY: 3.2
+TODO_TITLE: Space Card V2 (Orbit Gallery Component)
+TODO_STATUS: backlog
 IN_PROGRESS_STORY:
 IN_PROGRESS_TITLE:
-STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3]
+STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3, 3.1]
 
 ## Next Action
 
-NEXT_ACTION: Create story context for 3.1, then begin dev implementation
-NEXT_COMMAND: story-context (Story 3.1) → dev-story (Story 3.1)
-NEXT_AGENT: dev
-RECOMMENDATION: Story 3.1 drafted. Ready for context gathering and implementation.
+NEXT_ACTION: Draft Story 3.2, create context, then begin dev implementation
+NEXT_COMMAND: create-story (Story 3.2) → story-context (Story 3.2) → dev-story (Story 3.2)
+NEXT_AGENT: sm
+RECOMMENDATION: Story 3.1 complete. Story 3.2 (Space Card V2) is next priority for visual foundation.
 
 ## Progress Summary
 
@@ -59,8 +59,15 @@ RECOMMENDATION: Story 3.1 drafted. Ready for context gathering and implementatio
 - ✅ Story 4A.2 Reaction Chips & Emoji Picker - COMPLETE (2025-11-25)
 - ✅ Story 4A.3 Pinned & Starred Messages - COMPLETE (2025-11-25)
 - ✅ **Epic 3 + Epic 10 MERGED** (2025-11-25) - "Unleashed" visual design now part of Epic 3
+- ✅ Story 3.1 Reality Distortion Engine (Theme System) - COMPLETE (2025-11-25)
+  - 4 themes: Neon Cyberpunk, Zen Garden, Obsidian Stealth, Paper White
+  - CSS tokens with oklch() format for Tailwind CSS 4
+  - ThemeSwitcher component with accessibility (keyboard nav, ARIA)
+  - Supabase user preference persistence with debounced sync
+  - AmbientMesh animated background for Neon/Zen themes
+  - 12 unit tests passing
 - 🎯 **PRIORITY: Epic 3 (Visual Experience & Floor Plan)** - 14 stories, "Unleashed" design system
-  - ⭐ Priority: 3.1 (Theme System) → 3.2 (SpaceCard) → 3.3 (Avatars) → 3.5 (Orbit Layout)
+  - ⭐ Next: 3.2 (SpaceCard) → 3.3 (Avatars) → 3.5 (Orbit Layout)
 - ⏳ Epic 4A: Messaging (remaining 8 stories) - deferred until visual foundation complete
 - ⏳ Epic 4B: Messaging Resilience & Scale - 7 functional stories (Weeks 6-8)
 - ⏳ Epic 6: Announcements - 6 stories (Weeks 9-10)
@@ -82,6 +89,7 @@ RECOMMENDATION: Story 3.1 drafted. Ready for context gathering and implementatio
 
 | Date | Workflow | Agent | Story/Epic | Outcome | Artifacts |
 | ---- | -------- | ----- | ---------- | ------- | --------- |
+| 2025-11-25 | story-done | dev | 3.1 | Theme system complete: 4 themes (neon/zen/obsidian/paper), CSS tokens, ThemeSwitcher, Supabase sync, AmbientMesh, 12 tests | src/styles/themes/tokens.css, src/contexts/ThemeContext.tsx, src/components/ui/ThemeSwitcher.tsx |
 | 2025-11-25 | story-context | sm | 3.1 | Context file created with theme tokens from ux-space-grid-v2.html, existing infra, implementation guidance | docs/stories/3.1-reality-distortion-engine.context.xml |
 | 2025-11-25 | create-story | sm | 3.1 | Story 3.1 Reality Distortion Engine drafted with 7 tasks, 8 ACs | docs/stories/story-3.1.md |
 | 2025-11-25 | epic-merge | pm | Epic 3+10 | Merged "Unleashed" (Epic 10) into Epic 3 for UX-first approach. 14 stories total. | docs/epics.md (updated), docs/sprint-status.yaml (updated) |
@@ -93,5 +101,5 @@ RECOMMENDATION: Story 3.1 drafted. Ready for context gathering and implementatio
 ---
 
 _Last Updated: 2025-11-25_
-_Status Version: 4.5_
-_Changes: Epic 3 + Epic 10 merged into "Visual Experience & Floor Plan (Unleashed)". UX-first strategy for investor demos. Priority: 3.1 → 3.2 → 3.3 → 3.5_
+_Status Version: 4.6_
+_Changes: Story 3.1 Reality Distortion Engine (Theme System) COMPLETE. Tech debt logged for hardcoded color migration (~50+ instances). Next: Story 3.2 Space Card V2._

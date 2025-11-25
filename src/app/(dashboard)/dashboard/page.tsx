@@ -2,7 +2,6 @@
 
 import { useCompany } from '@/contexts/CompanyContext';
 import { DashboardShell } from '@/components/shell/dashboard-shell';
-import { DashboardHeader } from '@/components/shell/dashboard-header';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -24,11 +23,10 @@ export default function DashboardPage() {
   const isAdmin = company?.adminIds?.includes(currentUserProfile?.id || '') || false;
 
   return (
-    <DashboardShell>
-      <DashboardHeader
-        heading={`Welcome, ${currentUserProfile?.displayName || 'User'}!`}
-        description={`${company?.name || 'Your company'} virtual office dashboard`}
-      />
+    <DashboardShell
+      heading={`Welcome, ${currentUserProfile?.displayName || 'User'}!`}
+      description={`${company?.name || 'Your company'} virtual office dashboard`}
+    >
       <div className="flex-1 space-y-8"> {/* Added space-y-8 for consistent spacing */}
         {/* Moved Overview and QuickLinks Up */}
         <CompanyOverviewCard 
