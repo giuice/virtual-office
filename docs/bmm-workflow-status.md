@@ -24,16 +24,17 @@ PHASE_4_COMPLETE: false
 STORIES_SEQUENCE: [3.1, 3.2, 3.3, 3.5, 4A.4]
 TODO_STORY: 3.1
 TODO_TITLE: Reality Distortion Engine (Theme System)
+TODO_STATUS: drafted
 IN_PROGRESS_STORY:
 IN_PROGRESS_TITLE:
 STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3]
 
 ## Next Action
 
-NEXT_ACTION: Start Epic 3 "Unleashed" visual foundation - Theme System first, then SpaceCard V2
-NEXT_COMMAND: *create-story (Story 3.1 Reality Distortion Engine)
-NEXT_AGENT: sm
-RECOMMENDATION: UX-first approach for investor demos. Epic 3 priority stories: 3.1 → 3.2 → 3.3 → 3.5. Epic 4A deferred until visual foundation complete.
+NEXT_ACTION: Create story context for 3.1, then begin dev implementation
+NEXT_COMMAND: story-context (Story 3.1) → dev-story (Story 3.1)
+NEXT_AGENT: dev
+RECOMMENDATION: Story 3.1 drafted. Ready for context gathering and implementation.
 
 ## Progress Summary
 
@@ -81,6 +82,8 @@ RECOMMENDATION: UX-first approach for investor demos. Epic 3 priority stories: 3
 
 | Date | Workflow | Agent | Story/Epic | Outcome | Artifacts |
 | ---- | -------- | ----- | ---------- | ------- | --------- |
+| 2025-11-25 | story-context | sm | 3.1 | Context file created with theme tokens from ux-space-grid-v2.html, existing infra, implementation guidance | docs/stories/3.1-reality-distortion-engine.context.xml |
+| 2025-11-25 | create-story | sm | 3.1 | Story 3.1 Reality Distortion Engine drafted with 7 tasks, 8 ACs | docs/stories/story-3.1.md |
 | 2025-11-25 | epic-merge | pm | Epic 3+10 | Merged "Unleashed" (Epic 10) into Epic 3 for UX-first approach. 14 stories total. | docs/epics.md (updated), docs/sprint-status.yaml (updated) |
 | 2025-11-25 | story-done | dev | 4A.2 | Reaction Chips & Emoji Picker complete - EmojiPicker, ReactionChips, useMessageReactions, realtime sync | src/components/messaging/EmojiPicker.tsx, src/components/messaging/ReactionChips.tsx, src/hooks/mutations/useMessageReactions.ts |
 | 2025-11-25 | story-done | dev | 4A.3 | Pinned & Starred Messages complete - fixed RLS policies, repository queries, optimistic updates, normalizeConversation | docs/messaging-pitfalls-guide.md, src/migrations/20251124_fix_pinned_starred_rls.sql |

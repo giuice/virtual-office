@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context File: 3.1 Reality Distortion Engine (Theme System)
+  Generated: 2025-11-25
+  Purpose: Provide dev agent with relevant codebase context for implementation
+-->
+<story-context>
+  <metadata>
+    <story-id>3.1</story-id>
+    <story-title>Reality Distortion Engine (Theme System)</story-title>
+    <epic>Epic 3 - Visual Experience &amp; Floor Plan (Unleashed)</epic>
+    <generated>2025-11-25</generated>
+  </metadata>
+
+  <critical-reference>
+    <note>⚠️ SOURCE OF TRUTH: docs/ux-space-grid-v2.html contains the authoritative theme definitions</note>
+    <file>docs/ux-space-grid-v2.html</file>
+  </critical-reference>
+
+  <!-- ========================================== -->
+  <!-- THEME TOKEN DEFINITIONS FROM SOURCE OF TRUTH -->
+  <!-- ========================================== -->
+  <theme-tokens source="docs/ux-space-grid-v2.html">
+    <theme name="neon" display-name="Neon Cyberpunk">
+      <![CDATA[
+      [data-theme="neon"] {
+        --bg-color: #050505;
+        --text-main: #ffffff;
+        --text-muted: #8b9bb4;
+        --text-gradient: linear-gradient(to right, #00f2ff, #ff00ff);
+        --mesh-gradient: radial-gradient(circle at 20% 20%, #2b00ff44, transparent 40%), radial-gradient(circle at 80% 80%, #ff009944, transparent 40%);
+        --glass-bg: rgba(10, 10, 16, 0.7);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --border-subtle: rgba(255, 255, 255, 0.15);
+        --hover-bg: rgba(255, 255, 255, 0.1);
+        --active-bg: rgba(0, 242, 255, 0.15);
+        --active-text: #00f2ff;
+        --active-border: #00f2ff;
+        --active-shadow: rgba(0, 242, 255, 0.4);
+        --card-bg: rgba(20, 20, 25, 0.6);
+        --card-border: rgba(255, 255, 255, 0.05);
+        --card-hover-border: #ff00ff;
+        --card-hover-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+        --accent-color: #00f2ff;
+        --pill-bg: rgba(0, 242, 255, 0.1);
+        --pill-text: #00f2ff;
+        --pill-border: rgba(0, 242, 255, 0.3);
+        --log-bg: rgba(0, 0, 0, 0.5);
+        --beacon-color: #00f2ff;
+        --beacon-glow: rgba(0, 242, 255, 0.8);
+      }
+      ]]>
+    </theme>
+
+    <theme name="zen" display-name="Zen Garden">
+      <![CDATA[
+      [data-theme="zen"] {
+        --bg-color: #f4f1ea;
+        --text-main: #3d4c41;
+        --text-muted: #7a8c7e;
+        --text-gradient: linear-gradient(to right, #3d4c41, #5c7a66);
+        --mesh-gradient: radial-gradient(circle at 50% 50%, #dce6d5, transparent 60%);
+        --glass-bg: rgba(255, 255, 255, 0.6);
+        --glass-border: rgba(61, 76, 65, 0.1);
+        --glass-shadow: 0 4px 20px rgba(61, 76, 65, 0.05);
+        --border-subtle: rgba(61, 76, 65, 0.1);
+        --hover-bg: rgba(61, 76, 65, 0.05);
+        --active-bg: #3d4c41;
+        --active-text: #f4f1ea;
+        --active-border: #3d4c41;
+        --active-shadow: rgba(61, 76, 65, 0.2);
+        --card-bg: rgba(255, 255, 255, 0.7);
+        --card-border: rgba(255, 255, 255, 0.8);
+        --card-hover-border: #8fa896;
+        --card-hover-shadow: 0 10px 30px rgba(61, 76, 65, 0.1);
+        --accent-color: #6b8c76;
+        --pill-bg: #e8e4dc;
+        --pill-text: #3d4c41;
+        --pill-border: transparent;
+        --log-bg: rgba(61, 76, 65, 0.05);
+        --beacon-color: #d48c70;
+        --beacon-glow: rgba(212, 140, 112, 0.4);
+      }
+      ]]>
+    </theme>
+
+    <theme name="obsidian" display-name="Obsidian Stealth">
+      <![CDATA[
+      [data-theme="obsidian"] {
+        --bg-color: #000000;
+        --text-main: #e0e0e0;
+        --text-muted: #666666;
+        --text-gradient: linear-gradient(to bottom, #ffffff, #999999);
+        --mesh-gradient: none;
+        --glass-bg: rgba(20, 20, 20, 0.8);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-shadow: 0 20px 50px rgba(0,0,0,0.9);
+        --border-subtle: rgba(255, 255, 255, 0.1);
+        --hover-bg: rgba(255, 255, 255, 0.05);
+        --active-bg: #ffffff;
+        --active-text: #000000;
+        --active-border: #ffffff;
+        --active-shadow: rgba(255, 255, 255, 0.2);
+        --card-bg: #0a0a0a;
+        --card-border: #1a1a1a;
+        --card-hover-border: #333333;
+        --card-hover-shadow: 0 0 0 1px #333333;
+        --accent-color: #ffffff;
+        --pill-bg: #1a1a1a;
+        --pill-text: #ffffff;
+        --pill-border: #333333;
+        --log-bg: #050505;
+        --beacon-color: #ffffff;
+        --beacon-glow: rgba(255, 255, 255, 0.3);
+      }
+      ]]>
+    </theme>
+
+    <theme name="paper" display-name="Paper White">
+      <![CDATA[
+      [data-theme="paper"] {
+        --bg-color: #ffffff;
+        --text-main: #111111;
+        --text-muted: #555555;
+        --text-gradient: none;
+        --mesh-gradient: none;
+        --glass-bg: rgba(255, 255, 255, 0.9);
+        --glass-border: #eeeeee;
+        --glass-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        --border-subtle: #eeeeee;
+        --hover-bg: #f5f5f5;
+        --active-bg: #111111;
+        --active-text: #ffffff;
+        --active-border: #111111;
+        --active-shadow: rgba(0,0,0,0.1);
+        --card-bg: #ffffff;
+        --card-border: #eeeeee;
+        --card-hover-border: #111111;
+        --card-hover-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        --accent-color: #111111;
+        --pill-bg: #f5f5f5;
+        --pill-text: #111111;
+        --pill-border: #e0e0e0;
+        --log-bg: #f9f9f9;
+        --beacon-color: #ff3b30;
+        --beacon-glow: rgba(255, 59, 48, 0.2);
+      }
+      ]]>
+    </theme>
+
+    <css-utilities>
+      <![CDATA[
+      :root {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --transition-speed: 0.4s;
+        --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      /* Background Effects - for themes with mesh-gradient */
+      .ambient-mesh {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background: var(--mesh-gradient);
+        filter: blur(80px);
+        opacity: 0.6;
+        transition: opacity var(--transition-speed) ease;
+        animation: mesh-drift 20s infinite alternate ease-in-out;
+      }
+
+      @keyframes mesh-drift {
+        0% { transform: scale(1) translate(0, 0); }
+        100% { transform: scale(1.1) translate(-2%, -2%); }
+      }
+
+      /* Beacon animation */
+      @keyframes pulse { 
+        0% { opacity: 0.5; transform: scale(1); } 
+        50% { opacity: 1; transform: scale(1.2); } 
+        100% { opacity: 0.5; transform: scale(1); } 
+      }
+      ]]>
+    </css-utilities>
+  </theme-tokens>
+
+  <!-- ========================================== -->
+  <!-- EXISTING INFRASTRUCTURE -->
+  <!-- ========================================== -->
+  <existing-files>
+    <file path="src/providers/theme-provider.tsx" role="current-theme-provider">
+      <![CDATA[
+// src/providers/theme-provider.tsx
+"use client"
+
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { type ThemeProviderProps } from "next-themes"
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+      ]]>
+    </file>
+
+    <file path="src/app/layout.tsx" role="root-layout">
+      <![CDATA[
+// src/app/layout.tsx
+import { AuthProvider } from '@/contexts/AuthContext';
+import { CompanyProvider } from '@/contexts/CompanyContext';
+import { MessagingProvider } from '@/contexts/messaging/MessagingContext';
+import { ThemeProvider } from '@/providers/theme-provider';
+import { QueryProvider } from '@/providers/query-provider';
+import { Toaster } from 'sonner';
+import { PresenceProvider } from '@/contexts/PresenceContext';
+import { CallingProvider } from '@/contexts/CallingContext';
+import { CallNotifications } from '@/components/messaging/CallNotification';
+import { MessagingDrawer } from '@/components/messaging/MessagingDrawer';
+import { MessagingTrigger } from '@/components/messaging/MessagingTrigger';
+import './globals.css';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* ... providers ... */}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
+      ]]>
+      <note>Current ThemeProvider uses attribute="class" - need to change to attribute="data-theme" for VO themes</note>
+    </file>
+
+    <file path="src/components/theme-toggle.tsx" role="current-theme-toggle">
+      <![CDATA[
+// src/components/theme-toggle.tsx
+"use client"
+
+import * as React from "react"
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function ThemeToggle() {
+  const { setTheme, theme } = useTheme()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative" title={`Current theme: ${theme || "system"}`}>
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+      ]]>
+      <note>Replace this with ThemeSwitcher that shows VO themes (neon, zen, obsidian, paper)</note>
+    </file>
+
+    <file path="src/components/shell/dashboard-header.tsx" role="header-integration-point">
+      <![CDATA[
+// Key import and usage in dashboard-header.tsx
+import { ThemeToggle } from '@/components/theme-toggle';
+
+// In the render:
+<div className="ml-auto flex items-center gap-4">
+  {/* Theme Toggle */}
+  <ThemeToggle />
+  
+  {/* Notifications */}
+  <Button variant="ghost" size="icon" className="relative">
+    <Bell className="h-5 w-5" />
+  </Button>
+  
+  {/* User Menu */}
+  {USE_ENHANCED_USER_MENU ? (
+    <EnhancedUserMenu />
+  ) : (
+    // ... popover menu
+  )}
+</div>
+      ]]>
+      <note>Replace ThemeToggle with new ThemeSwitcher component here</note>
+    </file>
+
+    <file path="src/hooks/useLocalStorage.ts" role="localStorage-hook">
+      <![CDATA[
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    if (typeof window === 'undefined') {
+      return initialValue;
+    }
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      }
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const item = window.localStorage.getItem(key);
+      setStoredValue(item ? JSON.parse(item) : initialValue);
+    } catch (error) {
+      console.error(`Error updating localStorage key "${key}":`, error);
+    }
+  }, [key, initialValue]);
+
+  return [storedValue, setValue];
+}
+      ]]>
+      <note>Reuse this for theme persistence fallback for unauthenticated users</note>
+    </file>
+  </existing-files>
+
+  <!-- ========================================== -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ========================================== -->
+  <database-schema>
+    <user-preferences>
+      <![CDATA[
+// From src/types/database.ts
+export interface User {
+  id: string;
+  companyId: string | null;
+  supabase_uid: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+  status: UserStatus;
+  statusMessage?: string;
+  preferences: {
+    theme?: string;        // <-- Store VO theme here: 'neon' | 'zen' | 'obsidian' | 'paper'
+    notifications?: boolean;
+    defaultRoom?: string;
+  };
+  role: UserRole;
+  lastActive: TimeStampType;
+  createdAt: TimeStampType;
+  currentSpaceId: string | null;
+}
+      ]]>
+    </user-preferences>
+  </database-schema>
+
+  <!-- ========================================== -->
+  <!-- CURRENT CSS STRUCTURE -->
+  <!-- ========================================== -->
+  <css-structure>
+    <file path="src/app/globals.css" role="main-styles">
+      <![CDATA[
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@plugin 'tailwindcss-animate';
+
+@theme {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 142.1 76.2% 36.3%;
+  --primary-foreground: 355.7 100% 97.3%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 142.1 76.2% 36.3%;
+  --radius: 0.5rem;
+  /* ... more tokens ... */
+}
+
+@layer base {
+  [data-theme='dark'] {
+    /* Dark theme overrides */
+  }
+}
+
+/* ... oklch color definitions for :root and .dark ... */
+      ]]>
+      <note>Need to add VO theme data attributes that MAP to shadcn variables for compatibility</note>
+    </file>
+
+    <file path="tailwind.config.ts" role="tailwind-config">
+      <![CDATA[
+import type { Config } from "tailwindcss";
+
+export default {
+    darkMode: 'class',
+    content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+        colors: {
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            card: {
+                DEFAULT: 'hsl(var(--card))',
+                foreground: 'hsl(var(--card-foreground))'
+            },
+            // ... more color mappings ...
+        },
+        borderRadius: {
+            lg: 'var(--radius)',
+            md: 'calc(var(--radius) - 2px)',
+            sm: 'calc(var(--radius) - 4px)'
+        }
+    }
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
+      ]]>
+      <note>May need to add --vo-* color mappings for VO-specific utilities</note>
+    </file>
+  </css-structure>
+
+  <!-- ========================================== -->
+  <!-- DEPENDENCIES -->
+  <!-- ========================================== -->
+  <dependencies>
+    <package name="next-themes" version="^0.4.6" role="theme-management">
+      <note>Already installed - provides useTheme hook, ThemeProvider, system preference detection</note>
+    </package>
+    <package name="@radix-ui/react-dropdown-menu" version="^2.1.16" role="ui-component">
+      <note>Already installed - use for ThemeSwitcher dropdown</note>
+    </package>
+    <package name="lucide-react" version="^0.552.0" role="icons">
+      <note>Already installed - use for theme icons (Palette, Sun, Moon, etc.)</note>
+    </package>
+  </dependencies>
+
+  <!-- ========================================== -->
+  <!-- UI COMPONENTS REFERENCE -->
+  <!-- ========================================== -->
+  <ui-components>
+    <available-components>
+      <component name="DropdownMenu" path="src/components/ui/dropdown-menu.tsx" />
+      <component name="Button" path="src/components/ui/button.tsx" />
+      <component name="Popover" path="src/components/ui/popover.tsx" />
+      <component name="Tooltip" path="src/components/ui/tooltip.tsx" />
+    </available-components>
+  </ui-components>
+
+  <!-- ========================================== -->
+  <!-- IMPLEMENTATION GUIDANCE -->
+  <!-- ========================================== -->
+  <implementation-guidance>
+    <step order="1" task="CSS Token Foundation">
+      <description>Create theme CSS with tokens from ux-space-grid-v2.html</description>
+      <files-to-create>
+        <file>src/styles/themes/vo-themes.css</file>
+      </files-to-create>
+      <files-to-modify>
+        <file>src/app/globals.css - import theme CSS</file>
+      </files-to-modify>
+      <key-decisions>
+        <decision>Use [data-theme="X"] selectors to match next-themes attribute</decision>
+        <decision>Map --vo-* tokens to shadcn --background, --foreground, etc. for compatibility</decision>
+        <decision>Use CSS-only ambient mesh (no JS) with display:none for themes without gradient</decision>
+      </key-decisions>
+    </step>
+
+    <step order="2" task="Theme Provider Enhancement">
+      <description>Extend next-themes with VO themes</description>
+      <files-to-modify>
+        <file>src/providers/theme-provider.tsx - add themes array, change attribute to data-theme</file>
+        <file>src/app/layout.tsx - update ThemeProvider props</file>
+      </files-to-modify>
+      <key-decisions>
+        <decision>Change attribute="class" to attribute="data-theme"</decision>
+        <decision>Add themes={['neon', 'zen', 'obsidian', 'paper', 'system']}</decision>
+        <decision>Map system preference: light→paper, dark→obsidian</decision>
+      </key-decisions>
+    </step>
+
+    <step order="3" task="Theme Hook">
+      <description>Create useVOTheme hook for type-safe theme access</description>
+      <files-to-create>
+        <file>src/hooks/useVOTheme.ts</file>
+      </files-to-create>
+      <interface>
+        <![CDATA[
+type VOTheme = 'neon' | 'zen' | 'obsidian' | 'paper' | 'system';
+
+interface UseVOThemeReturn {
+  theme: VOTheme | undefined;
+  setTheme: (theme: VOTheme) => void;
+  resolvedTheme: VOTheme | undefined;
+  themes: VOTheme[];
+  systemTheme: 'light' | 'dark' | undefined;
+}
+        ]]>
+      </interface>
+    </step>
+
+    <step order="4" task="Theme Switcher Component">
+      <description>Create visual theme switcher with color swatches</description>
+      <files-to-create>
+        <file>src/components/ui/ThemeSwitcher.tsx</file>
+      </files-to-create>
+      <design-spec>
+        <![CDATA[
+- Dropdown trigger: Palette icon (from lucide-react)
+- Menu items: Theme name + color swatch preview
+- Swatches show: bg-color, accent-color, text-color as small circles
+- Active theme has checkmark
+- Keyboard accessible: arrow keys, Enter, Escape
+- Screen reader: announces "Theme: [name] selected"
+        ]]>
+      </design-spec>
+    </step>
+
+    <step order="5" task="Integration">
+      <description>Replace ThemeToggle with ThemeSwitcher in dashboard header</description>
+      <files-to-modify>
+        <file>src/components/shell/dashboard-header.tsx - swap ThemeToggle for ThemeSwitcher</file>
+      </files-to-modify>
+    </step>
+
+    <step order="6" task="User Preference Sync">
+      <description>Persist theme to Supabase for authenticated users</description>
+      <files-to-create>
+        <file>src/hooks/useUserPreferences.ts (optional - could extend useVOTheme)</file>
+      </files-to-create>
+      <api-endpoint>/api/users/update - PATCH preferences.theme</api-endpoint>
+      <logic>
+        <![CDATA[
+1. On mount: if user logged in, fetch preferences.theme from profile
+2. Apply fetched theme if exists, else use localStorage/system
+3. On theme change: debounce (500ms) and PATCH to API
+4. Fallback: localStorage for unauthenticated users
+        ]]>
+      </logic>
+    </step>
+  </implementation-guidance>
+
+  <!-- ========================================== -->
+  <!-- TESTING CHECKLIST -->
+  <!-- ========================================== -->
+  <testing-checklist>
+    <test category="visual">
+      <item>All 4 themes render correctly with expected colors</item>
+      <item>Neon theme shows ambient mesh gradient animation</item>
+      <item>Obsidian/Paper themes have no mesh gradient</item>
+      <item>shadcn components (Button, Card, Dialog) inherit theme colors</item>
+    </test>
+    <test category="functionality">
+      <item>Theme persists on page refresh (localStorage)</item>
+      <item>Theme syncs to Supabase for logged-in users</item>
+      <item>System preference maps correctly (light→paper, dark→obsidian)</item>
+      <item>No FOUC on page load</item>
+    </test>
+    <test category="accessibility">
+      <item>ThemeSwitcher navigable via keyboard</item>
+      <item>Screen reader announces theme changes</item>
+      <item>Contrast ratios meet WCAG AA (4.5:1 text)</item>
+    </test>
+  </testing-checklist>
+</story-context>
