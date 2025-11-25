@@ -198,11 +198,12 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       )}
       
       {/* User avatars - hidden in analyst mode per UX spec */}
+      {/* Story 3.3: Max 4 visible avatars in default Orbit view per spec */}
       {!isAnalyst && (
         <div className={floorPlanTokens.spaceCard.content.footer}>
           <AvatarGroup
             users={usersInSpace}
-            max={isCinema ? 8 : isCompact ? 4 : 6}
+            max={isCinema ? 6 : 4}
             size={isCinema ? 'md' : 'sm'}
             onUserClick={onUserClick}
             emptyText="Empty"

@@ -352,3 +352,99 @@ html[data-theme="paper"] .vo-ambient-mesh {
   --vo-beacon-glow: var(--vo-signal-critical);
   animation: vo-beacon-pulse-fast 1s infinite;
 }
+
+/* ============================================
+   AVATAR CONSTELLATION V2 (Story 3.3)
+   ============================================ */
+
+/* Avatar-specific tokens - inherit from theme tokens */
+:root {
+  --vo-avatar-size: 36px;
+  --vo-avatar-border-width: 2px;
+  --vo-avatar-overlap: -10px;
+  --vo-avatar-muted-opacity: 0.5;
+  --vo-avatar-hover-lift: -3px;
+  --vo-avatar-hover-scale: 1.1;
+}
+
+/* Avatar speaking pulse animation */
+@keyframes vo-avatar-speaking-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--vo-accent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--vo-accent) 40%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 var(--vo-accent);
+  }
+}
+
+/* Avatar constellation container */
+.vo-avatar-constellation {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+/* Individual avatar in constellation */
+.vo-avatar-item {
+  width: var(--vo-avatar-size);
+  height: var(--vo-avatar-size);
+  border-radius: 50%;
+  border: var(--vo-avatar-border-width) solid var(--vo-card-bg);
+  position: relative;
+  transition: transform 0.2s ease, z-index 0.2s ease;
+  cursor: pointer;
+}
+
+/* Stacking overlap for avatars after first */
+.vo-avatar-item:not(:first-child) {
+  margin-left: var(--vo-avatar-overlap);
+}
+
+/* Avatar hover state */
+.vo-avatar-item:hover {
+  transform: translateY(var(--vo-avatar-hover-lift)) scale(var(--vo-avatar-hover-scale));
+  z-index: 50;
+}
+
+/* Speaking state - animated glow ring */
+.vo-avatar-speaking {
+  animation: vo-avatar-speaking-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px var(--vo-accent);
+}
+
+/* Presenting state - solid accent border */
+.vo-avatar-presenting {
+  border: 2px solid var(--vo-accent) !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--vo-accent) 50%, transparent);
+}
+
+/* Muted/Observer state - dimmed */
+.vo-avatar-muted {
+  opacity: var(--vo-avatar-muted-opacity);
+  filter: grayscale(30%);
+}
+
+/* Overflow badge styling */
+.vo-avatar-overflow {
+  width: var(--vo-avatar-size);
+  height: var(--vo-avatar-size);
+  border-radius: 50%;
+  background: var(--vo-pill-bg);
+  color: var(--vo-pill-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: var(--vo-avatar-border-width) solid var(--vo-card-bg);
+  margin-left: var(--vo-avatar-overlap);
+  transition: transform 0.2s ease;
+}
+
+.vo-avatar-overflow:hover {
+  transform: translateY(var(--vo-avatar-hover-lift)) scale(var(--vo-avatar-hover-scale));
+  z-index: 50;
+}
