@@ -4,6 +4,8 @@ import { Space, SpaceType } from '@/types/database';
 import { UserPresenceData } from '@/types/database';
 import AvatarGroup from './AvatarGroup';
 import { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';
+import AttentionBeacon from './AttentionBeacon';
+import { useAttentionBeacon, SpaceBeaconData } from '@/hooks/useAttentionBeacon';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 
@@ -35,6 +37,8 @@ interface ModernSpaceCardProps {
   compact?: boolean;
   /** Perspective variant: orbit (default), analyst (dense with sparkline), cinema (large) */
   variant?: SpaceCardVariant;
+  /** Optional beacon data for attention triggers (blocker, help requested) */
+  spaceBeaconData?: SpaceBeaconData;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({ 
@@ -48,9 +52,18 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   isUserInSpace = false,
   className = '',
   compact = false,
-  variant = 'orbit'
+  variant = 'orbit',
+  spaceBeaconData
 }) => {
   const [hovered, setHovered] = useState(false);
+  
+  // Story 3.4: Attention Beacon integration
+  const beaconState = useAttentionBeacon(
+    space.id,
+    usersInSpace,
+    space.capacity,
+    spaceBeaconData
+  );
   
   // Determine if we're in analyst mode (dense view)
   const isAnalyst = variant === 'analyst';
@@ -147,8 +160,19 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     >
       {/* Header section */}
       <div className={floorPlanTokens.spaceCard.content.header}>
-        {/* Space badges at top right */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+        {/* Story 3.4: Attention Beacon - positioned absolute top-right */}
+        <AttentionBeacon
+          active={beaconState.active}
+          severity={beaconState.severity}
+          reason={beaconState.reason}
+          className="absolute top-2 right-2 z-20"
+        />
+        
+        {/* Space badges at top right - offset to accommodate beacon */}
+        <div className={cn(
+          "absolute flex flex-col gap-1 items-end",
+          beaconState.active ? "top-2 right-5" : "top-2 right-2"
+        )}>
           {/* Only show status badge if not compact/analyst mode */}
           {!isCompact && (
             <SpaceStatusBadge status={space.status} showIcon size="sm" />

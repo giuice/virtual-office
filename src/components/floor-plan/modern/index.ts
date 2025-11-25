@@ -7,5 +7,7 @@ export { default as ModernSpaceCard } from './ModernSpaceCard';
 export type { SpaceCardVariant } from './ModernSpaceCard';
 export { default as ModernUserAvatar } from './ModernUserAvatar';
 export { default as AvatarGroup } from './AvatarGroup';
+export { default as AttentionBeacon } from './AttentionBeacon';
+export type { AttentionBeaconProps, BeaconSeverity } from './AttentionBeacon';
 export { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';
 export { floorPlanTokens, floorPlanHelpers } from './designTokens';

@@ -324,8 +324,17 @@ html[data-theme="paper"] .vo-ambient-mesh {
 }
 
 /* ============================================
-   BEACON ANIMATIONS
+   BEACON SYSTEM (Story 3.4)
    ============================================ */
+
+/* Beacon tokens - size and critical colors */
+:root {
+  --vo-beacon-size: 10px;
+  --vo-beacon-critical: #ff4d4d;
+  --vo-beacon-critical-glow: rgba(255, 77, 77, 0.6);
+}
+
+/* Beacon animations */
 @keyframes vo-beacon-pulse {
   0% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.2); }
@@ -338,19 +347,36 @@ html[data-theme="paper"] .vo-ambient-mesh {
   100% { opacity: 0.3; }
 }
 
+/* Reduced motion: opacity fade only, no scale transform */
+@keyframes vo-beacon-fade {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* Base beacon class */
 .vo-beacon {
-  width: 10px;
-  height: 10px;
+  width: var(--vo-beacon-size);
+  height: var(--vo-beacon-size);
   border-radius: 50%;
   background: var(--vo-beacon-color);
   box-shadow: 0 0 10px var(--vo-beacon-glow);
   animation: vo-beacon-pulse 2s infinite;
 }
 
+/* Critical severity beacon */
 .vo-beacon-critical {
-  --vo-beacon-color: var(--vo-signal-critical);
-  --vo-beacon-glow: var(--vo-signal-critical);
+  background: var(--vo-beacon-critical);
+  box-shadow: 0 0 10px var(--vo-beacon-critical-glow);
   animation: vo-beacon-pulse-fast 1s infinite;
+}
+
+/* Reduced motion preference - replaces pulse with fade */
+@media (prefers-reduced-motion: reduce) {
+  .vo-beacon,
+  .vo-beacon-critical {
+    animation: vo-beacon-fade 2s infinite !important;
+    transform: none !important;
+  }
 }
 
 /* ============================================
