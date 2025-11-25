@@ -32,16 +32,18 @@ export const floorPlanTokens = {
       maintenance: "bg-rose-100 border-rose-500" // Spaces under maintenance
     },
     
-    // Space type colors (these could also be implemented as subtle background patterns)
+    // Space type colors - Story 3.2: Now using CSS variable gradients from tokens.css
+    // The actual gradient is applied via inline style in ModernSpaceCard
+    // These classes provide fallback/base styling only
     typeColors: {
-      workspace: "bg-emerald-50/80 border-emerald-400/50",
-      conference: "bg-blue-50/80 border-blue-400/50",
-      social: "bg-amber-50/80 border-amber-400/50",
-      breakout: "bg-violet-50/80 border-violet-400/50",
-      private_office: "bg-rose-50/80 border-rose-400/50",
-      open_space: "bg-cyan-50/80 border-cyan-400/50",
-      lounge: "bg-indigo-50/80 border-indigo-400/50",
-      lab: "bg-teal-50/80 border-teal-400/50"
+      workspace: "",  // Gradient applied via --vo-space-gradient-workspace
+      conference: "", // Gradient applied via --vo-space-gradient-conference
+      social: "",     // Gradient applied via --vo-space-gradient-social
+      breakout: "",   // Gradient applied via --vo-space-gradient-breakout
+      private_office: "", // Gradient applied via --vo-space-gradient-private_office
+      open_space: "", // Gradient applied via --vo-space-gradient-open_space
+      lounge: "",     // Gradient applied via --vo-space-gradient-lounge
+      lab: ""         // Gradient applied via --vo-space-gradient-lab
     },
     
     // Padding and spacing

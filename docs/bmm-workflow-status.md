@@ -21,20 +21,20 @@ PHASE_4_COMPLETE: false
 
 ## Development Queue
 
-STORIES_SEQUENCE: [3.2, 3.3, 3.5, 4A.4]
-TODO_STORY: 3.2
-TODO_TITLE: Space Card V2 (Orbit Gallery Component)
+STORIES_SEQUENCE: [3.3, 3.4, 3.9, 4A.4]
+TODO_STORY: 3.3
+TODO_TITLE: Avatar Constellation V2
 TODO_STATUS: backlog
 IN_PROGRESS_STORY:
 IN_PROGRESS_TITLE:
-STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3, 3.1]
+STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3, 3.1, 3.2, 3.5, 3.6, 3.7, 3.8]
 
 ## Next Action
 
-NEXT_ACTION: Draft Story 3.2, create context, then begin dev implementation
-NEXT_COMMAND: create-story (Story 3.2) → story-context (Story 3.2) → dev-story (Story 3.2)
+NEXT_ACTION: Draft Story 3.3 (Avatar Constellation V2) or Story 3.4 (Attention Beacon System)
+NEXT_COMMAND: create-story (Story 3.3) → story-context (Story 3.3) → dev-story (Story 3.3)
 NEXT_AGENT: sm
-RECOMMENDATION: Story 3.1 complete. Story 3.2 (Space Card V2) is next priority for visual foundation.
+RECOMMENDATION: Story 3.2 complete with bonus perspectives. Story 3.3 (Avatar Constellation V2) is next priority.
 
 ## Progress Summary
 
@@ -66,8 +66,18 @@ RECOMMENDATION: Story 3.1 complete. Story 3.2 (Space Card V2) is next priority f
   - Supabase user preference persistence with debounced sync
   - AmbientMesh animated background for Neon/Zen themes
   - 12 unit tests passing
+- ✅ Story 3.2 Space Card V2 (Orbit Gallery Component) - COMPLETE (2025-11-25)
+  - Gradient backgrounds per space type (8 types × 4 themes)
+  - Glass morphism with backdrop-blur
+  - Theme-aware styling via CSS variables
+  - Hover animations (translateY, scale, shadow)
+  - **BONUS: Full Perspective System implemented (originally 3.5-3.8)**
+    - Orbit View (standard grid layout)
+    - Analyst View (dense grid + sparklines, no avatars)
+    - Cinema View (large cards, bigger text)
+    - Perspective Switcher UI in floor plan controls
 - 🎯 **PRIORITY: Epic 3 (Visual Experience & Floor Plan)** - 14 stories, "Unleashed" design system
-  - ⭐ Next: 3.2 (SpaceCard) → 3.3 (Avatars) → 3.5 (Orbit Layout)
+  - ⭐ Next: 3.3 (Avatar Constellation) → 3.4 (Attention Beacons) → 3.9 (Neighborhoods)
 - ⏳ Epic 4A: Messaging (remaining 8 stories) - deferred until visual foundation complete
 - ⏳ Epic 4B: Messaging Resilience & Scale - 7 functional stories (Weeks 6-8)
 - ⏳ Epic 6: Announcements - 6 stories (Weeks 9-10)
@@ -89,6 +99,7 @@ RECOMMENDATION: Story 3.1 complete. Story 3.2 (Space Card V2) is next priority f
 
 | Date | Workflow | Agent | Story/Epic | Outcome | Artifacts |
 | ---- | -------- | ----- | ---------- | ------- | --------- |
+| 2025-11-25 | story-done | dev | 3.2 | Space Card V2 complete: Gradient backgrounds, glass morphism, theme-aware styling, hover animations. **BONUS:** Orbit/Analyst/Cinema perspectives + Perspective Switcher UI (merged stories 3.5-3.8) | src/components/floor-plan/modern/ModernSpaceCard.tsx, src/components/floor-plan/modern/ModernFloorPlan.tsx, src/components/floor-plan/floor-plan.tsx, src/styles/themes/tokens.css |
 | 2025-11-25 | story-done | dev | 3.1 | Theme system complete: 4 themes (neon/zen/obsidian/paper), CSS tokens, ThemeSwitcher, Supabase sync, AmbientMesh, 12 tests | src/styles/themes/tokens.css, src/contexts/ThemeContext.tsx, src/components/ui/ThemeSwitcher.tsx |
 | 2025-11-25 | story-context | sm | 3.1 | Context file created with theme tokens from ux-space-grid-v2.html, existing infra, implementation guidance | docs/stories/3.1-reality-distortion-engine.context.xml |
 | 2025-11-25 | create-story | sm | 3.1 | Story 3.1 Reality Distortion Engine drafted with 7 tasks, 8 ACs | docs/stories/story-3.1.md |
@@ -101,5 +112,5 @@ RECOMMENDATION: Story 3.1 complete. Story 3.2 (Space Card V2) is next priority f
 ---
 
 _Last Updated: 2025-11-25_
-_Status Version: 4.6_
-_Changes: Story 3.1 Reality Distortion Engine (Theme System) COMPLETE. Tech debt logged for hardcoded color migration (~50+ instances). Next: Story 3.2 Space Card V2._
+_Status Version: 4.7_
+_Changes: Story 3.2 Space Card V2 COMPLETE with BONUS perspectives (3.5-3.8 merged). Stories 3.5, 3.6, 3.7, 3.8 marked done. Next: Story 3.3 Avatar Constellation V2._

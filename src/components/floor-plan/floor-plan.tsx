@@ -28,7 +28,8 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import { ModernFloorPlan } from './modern';
+import { ModernFloorPlan, type FloorPlanPerspective } from './modern';
+import { Grid2X2, LayoutGrid, Monitor as MonitorIcon } from 'lucide-react';
 
 
 
@@ -56,6 +57,7 @@ export function FloorPlan() {
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   const [useModernUI, setUseModernUI] = useState(false);
+  const [perspective, setPerspective] = useState<FloorPlanPerspective>('orbit');
 
   const { isAuthReady } = useAuth();
 
@@ -356,6 +358,38 @@ export function FloorPlan() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Perspective Switcher */}
+          <div className="flex items-center gap-1 border rounded-lg p-1" style={{ backgroundColor: 'var(--vo-glass-bg)', borderColor: 'var(--vo-glass-border)' }}>
+            <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>
+            <Button
+              variant={perspective === 'orbit' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPerspective('orbit')}
+              className="h-7 px-2"
+              title="Orbit View - Standard layout"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={perspective === 'analyst' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPerspective('analyst')}
+              className="h-7 px-2"
+              title="Analyst View - Dense layout with sparklines"
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={perspective === 'cinema' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPerspective('cinema')}
+              className="h-7 px-2"
+              title="Cinema View - Large cards"
+            >
+              <MonitorIcon className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Button
             variant="default"
             size="sm"
@@ -394,6 +428,7 @@ export function FloorPlan() {
                   onOpenChat={handleOpenChat}
                   onSpaceDoubleClick={(space) => void handleOpenChat(space)}
                   highlightedSpaceId={highlightedSpaceId}
+                  perspective={perspective}
                 />
               
             )}

@@ -7,6 +7,9 @@ import ModernSpaceCard from './ModernSpaceCard';
 import { floorPlanTokens } from './designTokens';
 import { cn } from '@/lib/utils';
 
+// Perspective types matching UX spec
+export type FloorPlanPerspective = 'orbit' | 'analyst' | 'cinema';
+
 interface ModernFloorPlanProps {
   spaces: Space[];
   onSpaceSelect?: (space: Space) => void;
@@ -15,10 +18,21 @@ interface ModernFloorPlanProps {
   highlightedSpaceId?: string | null;
   isEditable?: boolean;
   onOpenChat?: (space: Space) => void;
+  /** @deprecated Use perspective instead */
   layout?: 'default' | 'compact' | 'spaced';
   className?: string;
+  /** @deprecated Use perspective instead */
   compactCards?: boolean;
+  /** Current perspective mode: orbit (default), analyst (dense), cinema (large) */
+  perspective?: FloorPlanPerspective;
 }
+
+// Grid classes for each perspective (from UX spec)
+const perspectiveGridClasses: Record<FloorPlanPerspective, string> = {
+  orbit: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6',
+  analyst: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4',
+  cinema: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8',
+};
 
 const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   spaces = [],
@@ -30,7 +44,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   onOpenChat,
   layout = 'default',
   className = '',
-  compactCards = false
+  compactCards = false,
+  perspective = 'orbit'
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
@@ -132,8 +147,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     }
   };
 
-  // Get grid layout based on selected layout type
-  const gridLayoutClass = floorPlanTokens.floorPlanLayout.grid[layout];
+  // Get grid layout based on perspective (new) or legacy layout prop
+  const gridLayoutClass = perspectiveGridClasses[perspective] || floorPlanTokens.floorPlanLayout.grid[layout];
 
   return (
     <div className={cn(
@@ -177,7 +192,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               onSpaceDoubleClick={onSpaceDoubleClick}
               isHighlighted={isHighlighted}
               isUserInSpace={userInSpace}
-              compact={compactCards}
+              compact={compactCards || perspective === 'analyst'}
+              variant={perspective}
             />
           );
         })}

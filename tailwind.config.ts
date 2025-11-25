@@ -67,8 +67,11 @@ export default {
                 'hover-bg': 'var(--vo-hover-bg)',
                 'card-bg': 'var(--vo-card-bg)',
                 'card-border': 'var(--vo-card-border)',
+                'card-hover-border': 'var(--vo-card-hover-border)',
                 'pill-bg': 'var(--vo-pill-bg)',
                 'pill-text': 'var(--vo-pill-text)',
+                'pill-border': 'var(--vo-pill-border)',
+                'log-bg': 'var(--vo-log-bg)',
                 'beacon': 'var(--vo-beacon-color)',
             }
         },

@@ -2,7 +2,9 @@
 // Export all modern floor plan components
 
 export { default as ModernFloorPlan } from './ModernFloorPlan';
+export type { FloorPlanPerspective } from './ModernFloorPlan';
 export { default as ModernSpaceCard } from './ModernSpaceCard';
+export type { SpaceCardVariant } from './ModernSpaceCard';
 export { default as ModernUserAvatar } from './ModernUserAvatar';
 export { default as AvatarGroup } from './AvatarGroup';
 export { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';

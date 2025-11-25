@@ -55,13 +55,13 @@ development_status:
   # MERGED from Epic 3 + Epic 10 - "Reality Distortion" design system
   epic-3: contexted
   3-1-reality-distortion-engine-theme-system: done  # ✅ COMPLETE - 2025-11-25 (4 themes, CSS tokens, ThemeSwitcher, Supabase sync)
-  3-2-space-card-v2-orbit-gallery-component: ready-for-dev  # ⭐ NEXT PRIORITY - context generated 2025-11-25
-  3-3-avatar-constellation-v2: backlog  # ⭐ PRIORITY
+  3-2-space-card-v2-orbit-gallery-component: done  # ✅ COMPLETE - 2025-11-25 (Gradients, glass morphism, Orbit/Analyst/Cinema perspectives)
+  3-3-avatar-constellation-v2: backlog  # ⭐ NEXT PRIORITY
   3-4-attention-beacon-system: backlog
-  3-5-orbit-gallery-layout-default-view: backlog  # ⭐ PRIORITY
-  3-6-analyst-matrix-layout-dense-view: backlog
-  3-7-cinema-mode-layout-immersive-view: backlog
-  3-8-perspective-switcher-ui: backlog
+  3-5-orbit-gallery-layout-default-view: done  # ✅ COMPLETE - Merged into 3.2 (perspective switcher implemented)
+  3-6-analyst-matrix-layout-dense-view: done  # ✅ COMPLETE - Merged into 3.2 (analyst variant with sparklines)
+  3-7-cinema-mode-layout-immersive-view: done  # ✅ COMPLETE - Merged into 3.2 (cinema variant with large cards)
+  3-8-perspective-switcher-ui: done  # ✅ COMPLETE - Merged into 3.2 (View buttons in floor plan controls)
   3-9-space-grouping-and-neighborhoods: backlog
   3-10-now-board-header: backlog
   3-11-space-detail-hover-panel: backlog
