@@ -1,0 +1,187 @@
+<story-context id="3-2-space-card-v2-orbit-gallery-component" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2</storyId>
+    <title>Space Card V2 (Orbit Gallery Component)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-2-space-card-v2-orbit-gallery-component.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>rich, interactive space cards that reveal details on hover</iWant>
+    <soThat>I can see what's happening inside a room without entering it</soThat>
+    <tasks>
+      <task id="1" acs="2,7">CSS Token Extensions for SpaceCard - Add card-specific tokens to tokens.css, define space type gradients, extend tailwind.config.ts</task>
+      <task id="2" acs="1,4">SpaceCard Component Skeleton - Create SpaceCard.tsx preserving SpaceElement props, add new props for phase/activityLog/variant</task>
+      <task id="3" acs="2">Gradient Backgrounds - Create getSpaceGradient utility, map space types to gradients, apply as overlay with occupancy-based intensity</task>
+      <task id="4" acs="3">Phase Pill Component - Create PhasePill.tsx reusable component with theme token styling</task>
+      <task id="5" acs="4">Card Header and Meta Display - Space name, "{N} Active · {Phase}" format, beacon indicator placeholder, PhasePill integration</task>
+      <task id="6" acs="5">Hover Expansion and Details - Expanded state on hover, full avatars row, ActivityLogEntry component with monospace styling</task>
+      <task id="7" acs="6">Transition Animations - CSS transitions, translateY(-5px) scale(1.01), ease-elastic timing, shadow/border animation, z-index bump</task>
+      <task id="8" acs="7">Theme Compatibility Testing - Test all 4 themes (Neon, Zen, Obsidian, Paper), verify glass morphism effects</task>
+      <task id="9" acs="1">Integration with Floor Plan - Update DomFloorPlan to use SpaceCard, pass phase/activityLog props, preserve click-stop protocol</task>
+      <task id="10" acs="1,2,3,4,5,6,7">Unit Tests - Test renders, hover state, click handlers, phase pill, gradient backgrounds</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1" source="docs/epics.md#story-3.2">New SpaceCard component implementing Orbit Gallery design, refactored from SpaceElement.tsx, supports all existing functionality</criterion>
+    <criterion id="2" source="docs/ux-space-grid-v2.html">Gradient backgrounds based on space type/neighborhood using --vo-* tokens, intensity adjusts by occupancy</criterion>
+    <criterion id="3" source="docs/ux-space-grid-v2.html">Phase pill displays agenda phase (Decide, Build, Ideate), styled with --vo-pill-* tokens</criterion>
+    <criterion id="4" source="docs/ux-design-specification.md#6.1">Card displays space name, occupancy count, phase pill with "{N} Active · {Phase}" format</criterion>
+    <criterion id="5" source="docs/ux-space-grid-v2.html">Hover expands card showing full participant roster, agenda phase, activity log entry (monospace, border-left accent)</criterion>
+    <criterion id="6" source="docs/ux-space-grid-v2.html">Smooth 200ms ease-elastic transitions, translateY(-5px) scale(1.01), shadow/border animation, no jarring changes</criterion>
+    <criterion id="7" source="docs/ux-space-grid-v2.html">Theme-aware styling: inherits CSS variables from Story 3.1, adapts to all 4 themes, glass morphism per theme</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-space-grid-v2.html" title="Space Grid Unleashed" section="CSS Theme Definitions" priority="critical">
+        Source of truth for SpaceCard styling. Contains .space-card, .phase-pill, .avatars-row, .log-stream CSS patterns and all [data-theme="*"] variable definitions.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Specification" section="6.1 Component Strategy" priority="high">
+        SpaceCard component spec including anatomy, states (default, hover, live beacon, focus, loading), behavior (click enters, double-click dialog, hover fetches log), and accessibility requirements.
+      </doc>
+      <doc path="docs/epics.md" title="Epic Breakdown" section="Story 3.2: Space Card V2" priority="high">
+        Original acceptance criteria and technical reference for SpaceCard V2.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Review" section="Component Structure" priority="medium">
+        Feature-based component organization pattern, floor-plan components in src/components/floor-plan/.
+      </doc>
+      <doc path="docs/stories/story-3.1.md" title="Story 3.1: Theme System" section="Dev Agent Record" priority="high">
+        Previous story learnings: theme token system, VOThemeProvider, --vo-* prefix convention, glass morphism base tokens.
+      </doc>
+      <doc path="AGENTS.md" title="Project Reference" section="UI Interaction - Click-Stop Standard" priority="high">
+        Click-stop protocol: data-avatar-interactive attributes, parent guard patterns, portal menu handling.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="src/components/floor-plan/SpaceElement.tsx" kind="component" symbol="SpaceElement" reason="Current implementation to refactor from. Contains props interface, click handling, space color logic, avatar display.">
+        <interface>
+          <prop name="space" type="Space" required="true"/>
+          <prop name="usersInSpace" type="UserPresenceData[]" required="true"/>
+          <prop name="onEnterSpace" type="(spaceId: string) => void" required="true"/>
+          <prop name="onOpenChat" type="(space: Space) => void" required="false"/>
+          <prop name="onSpaceDoubleClick" type="(space: Space) => void" required="false"/>
+          <prop name="isHighlighted" type="boolean" required="false"/>
+          <prop name="isUserInSpace" type="boolean" required="false"/>
+        </interface>
+      </file>
+      <file path="src/components/floor-plan/UserAvatarPresence.tsx" kind="component" symbol="UserAvatarPresence" reason="Avatar component to reuse for participant display. Uses EnhancedAvatarV2, handles click-stop protocol with data-avatar-interactive."/>
+      <file path="src/components/floor-plan/dom-floor-plan.tsx" kind="component" symbol="DomFloorPlan" reason="Parent component that renders SpaceElement grid. Must be updated to use SpaceCard instead."/>
+      <file path="src/styles/themes/tokens.css" kind="styles" symbol="CSS Custom Properties" reason="Theme token system from Story 3.1. Already contains --vo-card-*, --vo-pill-*, --vo-log-bg tokens for all 4 themes."/>
+      <file path="tailwind.config.ts" kind="config" symbol="Tailwind Config" reason="Already extended with vo-* color utilities, boxShadow, and transition timing. May need additional card-specific utilities."/>
+      <file path="src/components/ui/badge.tsx" kind="component" symbol="Badge" reason="Existing badge component for occupancy count display."/>
+      <file path="src/components/ui/tooltip.tsx" kind="component" symbol="Tooltip, TooltipProvider, TooltipTrigger, TooltipContent" reason="Existing tooltip components for avatar tooltips."/>
+      <file path="src/lib/utils.ts" kind="utility" symbol="cn" reason="Class name composition utility using clsx and tailwind-merge."/>
+      <file path="src/types/database.ts" kind="types" symbol="Space, SpaceType, SpaceStatus, UserPresenceData" reason="Type definitions for space and user presence data structures."/>
+      <file path="src/hooks/useVOTheme.ts" kind="hook" symbol="useVOTheme" reason="Theme hook exposing current theme, setTheme, themes array. Use for theme-aware styling decisions."/>
+      <file path="src/contexts/ThemeContext.tsx" kind="context" symbol="VOThemeProvider, useVOThemeContext, VO_THEMES" reason="Theme context with theme constants and metadata."/>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="^19.2.0"/>
+        <package name="next" version="^16.0.1"/>
+        <package name="next-themes" version="^0.4.6"/>
+        <package name="tailwindcss" version="^4.1.16"/>
+        <package name="class-variance-authority" version="^0.7.1"/>
+        <package name="clsx" version="^2.1.1"/>
+        <package name="tailwind-merge" version="^3.3.1"/>
+        <package name="lucide-react" version="^0.552.0"/>
+        <package name="@radix-ui/react-tooltip" version="^1.2.8"/>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface name="SpaceCardProps" kind="component-props" path="src/components/floor-plan/SpaceCard.tsx">
+      // Existing props from SpaceElement (backward compatible)
+      space: Space;
+      usersInSpace: UserPresenceData[];
+      onEnterSpace: (spaceId: string) => void;
+      onOpenChat?: (space: Space) => void;
+      onSpaceDoubleClick?: (space: Space) => void;
+      isHighlighted?: boolean;
+      isUserInSpace?: boolean;
+      // New props for SpaceCard V2
+      phase?: string;
+      activityLog?: string;
+      variant?: 'orbit' | 'analyst' | 'cinema';
+    </interface>
+    <interface name="PhasePillProps" kind="component-props" path="src/components/ui/PhasePill.tsx">
+      phase: string;
+      variant?: 'default' | 'compact';
+      className?: string;
+    </interface>
+    <interface name="Space" kind="database-type" path="src/types/database.ts">
+      id: string;
+      companyId: string;
+      name: string;
+      type: SpaceType;
+      status: SpaceStatus;
+      capacity: number;
+      features: string[];
+      position: Position;
+      // ... additional fields
+    </interface>
+    <interface name="SpaceType" kind="union-type" path="src/types/database.ts">
+      'workspace' | 'conference' | 'social' | 'breakout' | 'private_office' | 'open_space' | 'lounge' | 'lab'
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint source="AGENTS.md" priority="critical">
+      Click-Stop Protocol: Mark interactive children with data-avatar-interactive. Parent click handler must early-return if target.closest('[data-avatar-interactive]') matches.
+    </constraint>
+    <constraint source="AGENTS.md" priority="high">
+      Strict TypeScript: Provide explicit types for props, state, params, and returns.
+    </constraint>
+    <constraint source="AGENTS.md" priority="high">
+      Anti-Duplication: Reuse existing components (UserAvatarPresence, Badge, Tooltip). Do not create new avatar components.
+    </constraint>
+    <constraint source="docs/stories/story-3.1.md" priority="high">
+      Theme Token Naming: Use --vo-* prefix for all Virtual Office tokens. Extend tokens.css, do not recreate.
+    </constraint>
+    <constraint source="AGENTS.md" priority="medium">
+      File Size: Keep files under ~500 lines. Extract hooks or subcomponents if needed.
+    </constraint>
+    <constraint source="docs/ux-space-grid-v2.html" priority="high">
+      CSS Source of Truth: Extract styling patterns directly from ux-space-grid-v2.html. This file is authoritative for colors, gradients, shadows, and transitions.
+    </constraint>
+    <constraint source="docs/architecture.md" priority="medium">
+      Component Organization: New components go in src/components/floor-plan/ for floor-plan features, src/components/ui/ for reusable UI primitives.
+    </constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Use Vitest as the test framework with React Testing Library for component tests. Follow existing patterns in __tests__/theme-system.test.tsx. Mock contexts (AuthContext, ThemeContext) as needed. Use vi.fn() for mock functions. Wrap components in QueryClientProvider and ThemeProvider for proper context.
+    </standards>
+    <locations>
+      <location>__tests__/space-card.test.tsx</location>
+      <location>__tests__/phase-pill.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test SpaceCard renders with minimal required props (space, usersInSpace, onEnterSpace)</idea>
+      <idea ac="1">Test SpaceCard preserves all SpaceElement functionality (click to enter, double-click, highlight state)</idea>
+      <idea ac="2">Test gradient background changes based on space.type</idea>
+      <idea ac="2">Test gradient intensity increases with higher usersInSpace count</idea>
+      <idea ac="3">Test PhasePill renders phase text correctly</idea>
+      <idea ac="3">Test PhasePill applies theme token styles</idea>
+      <idea ac="4">Test card header displays space.name</idea>
+      <idea ac="4">Test meta shows "{N} Active" format with correct count</idea>
+      <idea ac="5">Test hover state adds 'expanded' class or shows expanded content</idea>
+      <idea ac="5">Test hover shows all avatars (not limited to 8)</idea>
+      <idea ac="5">Test activity log entry renders with monospace font</idea>
+      <idea ac="6">Test hover applies transform styles (translateY, scale)</idea>
+      <idea ac="7">Test SpaceCard renders correctly in each theme (neon, zen, obsidian, paper)</idea>
+      <idea ac="7">Test glass morphism styles are applied when expected</idea>
+      <idea ac="1">Test click-stop protocol: clicking avatar does not trigger onEnterSpace</idea>
+    </ideas>
+  </tests>
+</story-context>
