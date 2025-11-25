@@ -122,10 +122,24 @@ export class SupabaseConversationRepository implements IConversationRepository {
       const from = offset;
       const to = from + limit - 1;
 
-      // Query conversations where the user is a participant
+      // Query conversations where the user is a participant, including preferences
       let query = this.supabaseClient
         .from(this.TABLE_NAME)
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          conversation_preferences!left(
+            id,
+            conversation_id,
+            user_id,
+            is_pinned,
+            pinned_order,
+            is_starred,
+            is_archived,
+            notifications_enabled,
+            created_at,
+            updated_at
+          )
+        `, { count: 'exact' })
         .contains('participants', [userId])
         .order('last_activity', { ascending: false });
 
@@ -144,8 +158,23 @@ export class SupabaseConversationRepository implements IConversationRepository {
         throw error;
       }
 
-      // Map DB response array
-      const items = mapArrayToCamelCase((data as ConversationRow[]) || []);
+      // Map DB response array with preferences
+      const items: Conversation[] = [];
+      for (const row of (data || [])) {
+        const conversation = mapToCamelCase(row as ConversationRow);
+        
+        // Find the user's preference from the joined result
+        const userPrefs = Array.isArray(row.conversation_preferences)
+          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
+          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
+        
+        if (userPrefs) {
+          conversation.preferences = mapPreferencesToCamelCase(userPrefs);
+        }
+        
+        items.push(conversation);
+      }
+
       const nextCursor = items.length === limit ? (to + 1).toString() : null;
 
       return {

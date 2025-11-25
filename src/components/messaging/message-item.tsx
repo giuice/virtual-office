@@ -19,7 +19,15 @@ import {
   Reply,
   MoreHorizontal,
   ChevronDown,
+  Pin,
+  Star,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/contexts/CompanyContext';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { AvatarUser } from '@/lib/avatar-utils';
@@ -41,6 +49,10 @@ interface MessageItemProps {
   isThreadExpanded?: boolean;
   depth?: number;
   parentMessage?: Message | null;
+  onPin?: (messageId: string) => void;
+  onUnpin?: (messageId: string) => void;
+  onStar?: (messageId: string) => void;
+  onUnstar?: (messageId: string) => void;
 }
 
 export function MessageItem({
@@ -53,6 +65,10 @@ export function MessageItem({
   isThreadExpanded = false,
   depth = 0,
   parentMessage,
+  onPin,
+  onUnpin,
+  onStar,
+  onUnstar,
 }: MessageItemProps) {
   const { users } = usePresence();
   const { companyUsers, currentUserProfile } = useCompany();
@@ -99,13 +115,16 @@ export function MessageItem({
     } as User;
   }, [resolvedUser, senderPresence]);
 
+  const isPinned = message.pins && message.pins.length > 0;
+  const isStarred = message.stars && message.stars.some(s => s.userId === currentUserProfile?.id);
+
   // Format message timestamp
   const formatMessageTime = (timestamp: Date) => {
-    if( !timestamp )
+    if (!timestamp)
       return '';
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
   };
-  
+
   // Get message status icon
   const getMessageStatusIcon = (status: MessageStatus) => {
     switch (status) {
@@ -121,7 +140,7 @@ export function MessageItem({
         return null;
     }
   };
-  
+
   // Render message content based on type
   const renderMessageContent = () => {
     switch (message.type) {
@@ -133,8 +152,8 @@ export function MessageItem({
             <p className="mb-2">{message.content}</p>
             {message.attachments && message.attachments.length > 0 && (
               <div className="rounded-md overflow-hidden">
-                <img 
-                  src={message.attachments[0].url} 
+                <img
+                  src={message.attachments[0].url}
                   alt={message.attachments[0].name}
                   className="max-w-full h-auto"
                 />
@@ -149,7 +168,7 @@ export function MessageItem({
             {message.attachments && message.attachments.length > 0 && (
               <div className="flex items-center p-2 rounded-md bg-secondary">
                 <File className="h-5 w-5 mr-2" />
-                <a 
+                <a
                   href={message.attachments[0].url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -171,7 +190,7 @@ export function MessageItem({
         return <p>{message.content}</p>;
     }
   };
-  
+
   // Render reply badge if this is a reply to another message
   const renderReplyBadge = () => {
     if (!message.replyToId) return null;
@@ -190,11 +209,11 @@ export function MessageItem({
       </div>
     );
   };
-  
+
   // Render message reactions
   const renderReactions = () => {
     if (!message.reactions || message.reactions.length === 0) return null;
-    
+
     return (
       <ReactionChips
         reactions={message.reactions}
@@ -261,13 +280,13 @@ export function MessageItem({
     }
     setShowActions(false);
   };
-  
+
   // Message actions menu
   const renderActions = () => {
     if (!showActions) return null;
-    
+
     return (
-      <div 
+      <div
         className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1"
         data-avatar-interactive
       >
@@ -286,19 +305,47 @@ export function MessageItem({
         <EmojiPicker
           onEmojiSelect={(emoji) => onReaction?.(message.id, emoji)}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          data-avatar-interactive
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              data-avatar-interactive
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            align="end"
+            onPointerDownOutside={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                isPinned ? onUnpin?.(message.id) : onPin?.(message.id);
+              }}
+            >
+              <Pin className={cn("mr-2 h-4 w-4", isPinned && "fill-current")} />
+              {isPinned ? 'Unpin Message' : 'Pin Message'}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                isStarred ? onUnstar?.(message.id) : onStar?.(message.id);
+              }}
+            >
+              <Star className={cn("mr-2 h-4 w-4", isStarred && "fill-yellow-400 text-yellow-400")} />
+              {isStarred ? 'Unstar Message' : 'Star Message'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   };
-  
+
   // If this is a system message, render it differently
   if (message.type === MessageType.SYSTEM) {
     return (
@@ -309,7 +356,7 @@ export function MessageItem({
       </div>
     );
   }
-  
+
   return (
     <div
       data-testid={`message-${message.id}`}
@@ -353,9 +400,9 @@ export function MessageItem({
             {resolvedUser?.displayName || fallbackDisplayName}
           </div>
         )}
-        
+
         {renderReplyBadge()}
-        
+
         <div
           className={cn(
             'p-3 rounded-md',
@@ -366,13 +413,19 @@ export function MessageItem({
         >
           {renderMessageContent()}
         </div>
-        
+
         {renderReactions()}
-        
-        <div className="flex items-center mt-1 text-xs text-muted-foreground">
+
+        <div className="flex items-center mt-1 text-xs text-muted-foreground gap-2">
           <span>{formatMessageTime(message.timestamp)}</span>
           {isCurrentUser && message.status && (
-            <span className="ml-2">{getMessageStatusIcon(message.status)}</span>
+            <span>{getMessageStatusIcon(message.status)}</span>
+          )}
+          {isPinned && (
+            <Pin className="h-3 w-3 text-muted-foreground rotate-45" />
+          )}
+          {isStarred && (
+            <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
           )}
         </div>
 
@@ -404,7 +457,7 @@ export function MessageItem({
           </Button>
         </div>
       </div>
-      
+
       {renderActions()}
     </div>
   );

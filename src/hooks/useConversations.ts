@@ -424,17 +424,30 @@ export function useConversations() {
   // Pin / Unpin conversations with optimistic updates
   const pinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('pin-conv') : '';
-    // Optimistic
+    // Optimistic update - handle cases where preferences may not exist yet
     setConversations(prev => prev.map(c => {
-      if (c.id !== conversationId || !c.preferences) {
+      if (c.id !== conversationId) {
         return c;
       }
+      // Create preferences if they don't exist
+      const existingPrefs = c.preferences || {
+        id: '',
+        conversationId: c.id,
+        userId: currentUserProfile?.id || '',
+        isPinned: false,
+        pinnedOrder: null,
+        isStarred: false,
+        isArchived: false,
+        notificationsEnabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       return {
         ...c,
         preferences: {
-          ...c.preferences,
+          ...existingPrefs,
           isPinned: true,
-          pinnedOrder: c.preferences.pinnedOrder ?? 0,
+          pinnedOrder: existingPrefs.pinnedOrder ?? 0,
         },
       };
     }));
@@ -443,10 +456,15 @@ export function useConversations() {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.event('useConversations.pin', 'success', { traceId, conversationId });
       }
+      // Refresh to get the real preferences from server
+      await refreshConversations();
     } catch (error) {
       // Revert
       setConversations(prev => prev.map(c => {
-        if (c.id !== conversationId || !c.preferences) {
+        if (c.id !== conversationId) {
+          return c;
+        }
+        if (!c.preferences) {
           return c;
         }
         return {
@@ -462,13 +480,16 @@ export function useConversations() {
       }
       throw error;
     }
-  }, []);
+  }, [currentUserProfile?.id, refreshConversations]);
 
   const unpinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('unpin-conv') : '';
-    // Optimistic
+    // Optimistic update
     setConversations(prev => prev.map(c => {
-      if (c.id !== conversationId || !c.preferences) {
+      if (c.id !== conversationId) {
+        return c;
+      }
+      if (!c.preferences) {
         return c;
       }
       return {
@@ -485,10 +506,15 @@ export function useConversations() {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.event('useConversations.unpin', 'success', { traceId, conversationId });
       }
+      // Refresh to get the real preferences from server
+      await refreshConversations();
     } catch (error) {
       // Revert
       setConversations(prev => prev.map(c => {
-        if (c.id !== conversationId || !c.preferences) {
+        if (c.id !== conversationId) {
+          return c;
+        }
+        if (!c.preferences) {
           return c;
         }
         return {
@@ -504,7 +530,7 @@ export function useConversations() {
       }
       throw error;
     }
-  }, []);
+  }, [refreshConversations]);
   
   // Function to mark a conversation as read
   const markConversationAsRead = useCallback(async (conversationId: string) => {

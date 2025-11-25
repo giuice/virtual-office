@@ -12,6 +12,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { User } from '@/types/database';
+import { useMessageActions } from '@/hooks/useMessageActions';
 
 interface EnhancedMessageFeedProps {
   messages: Message[];
@@ -37,9 +38,16 @@ export function EnhancedMessageFeed({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { companyUsers, currentUserProfile } = useCompany();
-  
+
   // Use conversation presence for typing indicators
   const { typingUsers, presentUsers } = useConversationPresence(conversationId);
+
+  const {
+    pinMessage,
+    unpinMessage,
+    starMessage,
+    unstarMessage
+  } = useMessageActions({ conversationId: conversationId || '' });
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -94,6 +102,10 @@ export function EnhancedMessageFeed({
               sender={participantsById.get(message.senderId) ?? null}
               onReply={onReply}
               onReaction={onReaction}
+              onPin={pinMessage}
+              onUnpin={unpinMessage}
+              onStar={starMessage}
+              onUnstar={unstarMessage}
             />
           ))}
 

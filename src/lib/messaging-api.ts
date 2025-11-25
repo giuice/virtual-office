@@ -69,10 +69,34 @@ function normalizeConversation(raw: any): Conversation {
           ? new Date(raw.lastActivity)
           : new Date(),
     name: raw?.name ?? undefined,
-    isArchived: Boolean(raw?.isArchived),
+    isArchived: Boolean(raw?.isArchived ?? raw?.is_archived),
     unreadCount: raw?.unreadCount ?? raw?.unread_count ?? {},
     roomId: raw?.roomId ?? raw?.room_id ?? undefined,
     visibility: raw?.visibility,
+    preferences: raw?.preferences ? {
+      id: raw.preferences.id,
+      conversationId: raw.preferences.conversationId ?? raw.preferences.conversation_id,
+      userId: raw.preferences.userId ?? raw.preferences.user_id,
+      isPinned: Boolean(raw.preferences.isPinned ?? raw.preferences.is_pinned),
+      pinnedOrder: raw.preferences.pinnedOrder ?? raw.preferences.pinned_order ?? null,
+      isStarred: Boolean(raw.preferences.isStarred ?? raw.preferences.is_starred),
+      isArchived: Boolean(raw.preferences.isArchived ?? raw.preferences.is_archived),
+      notificationsEnabled: raw.preferences.notificationsEnabled ?? raw.preferences.notifications_enabled ?? true,
+      createdAt: raw.preferences.createdAt instanceof Date
+        ? raw.preferences.createdAt
+        : raw.preferences.createdAt
+          ? new Date(raw.preferences.createdAt)
+          : raw.preferences.created_at
+            ? new Date(raw.preferences.created_at)
+            : new Date(),
+      updatedAt: raw.preferences.updatedAt instanceof Date
+        ? raw.preferences.updatedAt
+        : raw.preferences.updatedAt
+          ? new Date(raw.preferences.updatedAt)
+          : raw.preferences.updated_at
+            ? new Date(raw.preferences.updated_at)
+            : new Date(),
+    } : undefined,
   } as Conversation;
 }
 

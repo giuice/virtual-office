@@ -19,10 +19,12 @@ Each epic includes:
 
 **Epic Sequencing Principles:**
 - Epic 1 establishes foundational infrastructure and initial functionality
+- Epic 2 provides authentication and company management
+- **Epic 3 delivers the "Unleashed" visual experience and floor plan** (merged from original Epic 3 + Epic 10)
+- Epic 4A/4B adds messaging features that inherit the visual foundation
 - Subsequent epics build progressively, each delivering significant end-to-end value
 - Stories within epics are vertically sliced and sequentially ordered
 - No forward dependencies - each story builds only on previous work
-- Epic 10 introduces the "Unleashed" UX/UI overhaul, transforming the visual experience
 
 ---
 
@@ -65,227 +67,314 @@ This epic enabled the fundamental access control model: companies can onboard te
 
 ---
 
-## Epic 3: Interactive Floor Plan & Space Management 🚧 IN PROGRESS
+## Epic 3: Visual Experience & Floor Plan (Unleashed) 🚧 IN PROGRESS
 
 **Expanded Goal:**
-Create an intuitive, interactive floor plan using Konva.js that allows users to visualize their virtual office, see real-time colleague presence, and navigate between spaces. Enable admins to design custom office layouts with draggable spaces, templates, and professional visual styling that makes the virtual office feel like a real workspace.
+Transform Virtual Office into a visually stunning, investor-ready spatial workspace using the "Reality Distortion" design system. This epic merges original floor plan functionality with the "Unleashed" UX patterns from Epic 10, delivering the Orbit Gallery layout, theme system, avatar constellations, and attention beacons as the foundation for all subsequent features.
 
 **Value Delivery:**
-The floor plan is the core differentiator from chat-only tools, providing spatial awareness and ambient presence. This epic delivers the foundation plus critical UX/design improvements to make the interface professional and delightful.
+Visual polish wins investor demos. This epic elevates the product from a utility to a premium experience, providing role-adaptive views (Orbit for general use, Analyst for ops, Cinema for lobbies) and personalization (Neon, Zen, Obsidian themes). The floor plan becomes the "wow factor" that differentiates Virtual Office from chat-only tools.
 
-**Current Status:** Basic functionality complete; **major UX/design improvements needed**
+**Design References:**
+- UX Specification: `docs/ux-design-specification.md`
+- Interactive Demo: `docs/ux-space-grid-v2.html`
+- Color Themes: `docs/ux-color-themes.html`
 
-### Stories (12-15 total)
+**Current Status:** Foundation complete; **Unleashed visual overhaul starting**
 
-**Story 3.1: Visual Design Overhaul**
-
-As a user,
-I want the floor plan spaces to have modern, professional visual design,
-So that the virtual office feels polished and intuitive to use.
-
-**Acceptance Criteria:**
-1. Spaces display with rounded corners, subtle shadows, and professional color palette
-2. Hover states clearly indicate interactive elements (cursor changes, highlight effect)
-3. Active/selected space has distinct visual treatment (border, glow)
-4. Space types (meeting room, focus area, lounge) have distinct visual styles (colors, icons)
-5. Click targets are large enough for easy selection (minimum 40x40px interactive areas)
-
-**Prerequisites:** None (visual refresh of existing components)
+### Stories (14 total - merged from Epic 3 + Epic 10)
 
 ---
 
-**Story 3.2: Space Occupancy Visualization**
+**Story 3.1: Reality Distortion Engine (Theme System)** ⭐ PRIORITY
 
 As a user,
-I want to see how many people are in each space at a glance,
-So that I can quickly identify active areas and decide where to join.
+I want to switch between different visual themes (Neon, Zen, Obsidian, Paper),
+So that I can align the workspace with my current mood or lighting conditions.
 
 **Acceptance Criteria:**
-1. Each space displays occupancy count (e.g., "3/10")
-2. Visual indicator shows occupancy level (color-coded: empty/low/medium/high/full)
-3. User avatars stack or cluster within space bounds (up to 5 visible, then "+N more")
-4. Tooltip on hover shows full participant list
-5. Occupancy updates in real-time as users enter/exit spaces
+1. Theme switcher UI (dropdown or palette selector) in header/settings
+2. CSS variable tokens for all themes (colors, gradients, shadows, glass effects)
+3. "Neon Cyberpunk" theme: High contrast, cyan/magenta accents, void black base (`#050505`)
+4. "Zen Garden" theme: Soft earth tones, paper textures, moss green (`#3D4C41`)
+5. "Obsidian Stealth" theme: Monochrome dark, true black (`#000000`), minimal
+6. "Paper White" theme: Pure white, ink black text, red signals
+7. Theme preference persists in `users.preferences.theme`
+8. Instant theme switching without page reload
 
-**Prerequisites:** Story 3.1 (visual foundation)
+**Technical Reference:** See `docs/ux-space-grid-v2.html` CSS variables
+
+**Prerequisites:** None (foundation story)
 
 ---
 
-**Story 3.3: Customizable Space Styling**
+**Story 3.2: Space Card V2 (Orbit Gallery Component)** ⭐ PRIORITY
 
-As an admin,
-I want to customize the appearance of spaces (colors, icons, borders),
-So that I can visually organize the office layout (e.g., marketing spaces blue, engineering spaces green).
+As a user,
+I want rich, interactive space cards that reveal details on hover,
+So that I can see what's happening inside a room without entering it.
 
 **Acceptance Criteria:**
-1. Space edit modal includes color picker for background/border
-2. Icon library available for space types (10+ professional icons)
-3. Border style options (solid, dashed, thick, thin)
-4. Changes preview in real-time before saving
-5. Custom styles persist in `spaces` table and render correctly on floor plan
+1. New `SpaceCard` component implementing Orbit Gallery design (refactor from `SpaceElement.tsx`)
+2. Gradient backgrounds based on space type/neighborhood
+3. Status ribbons (Agenda Phase, Meeting Type) visible on card face
+4. Card displays: space name, occupancy count, phase pill
+5. Hover interaction expands card to reveal:
+   - Full participant roster (avatars row)
+   - Current agenda phase/topic
+   - Latest activity log entry (monospace font)
+6. Smooth transition animations for hover state (200ms, ease-elastic)
+7. Theme-aware styling (inherits CSS variables from Story 3.1)
+
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.space-card` implementation
 
 **Prerequisites:** Story 3.1
 
 ---
 
-**Story 3.4: Improved Space Selection UX**
+**Story 3.3: Avatar Constellation V2** ⭐ PRIORITY
 
 As a user,
-I want clear visual feedback when selecting and interacting with spaces,
-So that I always know what space I'm focused on and what actions are available.
+I want to see my colleagues' photos with clear status indicators,
+So that I can instantly recognize who is speaking or listening.
 
 **Acceptance Criteria:**
-1. Selected space highlights with clear border and optional glow effect
-2. Context menu appears on right-click with actions (Join, Edit, Delete, View Details)
-3. Double-click on space triggers default action (Join for members, Edit for admins)
-4. Keyboard navigation supported (Tab to cycle spaces, Enter to activate)
-5. Visual feedback for disabled actions (grayed out "Join" if space is full)
+1. `AvatarConstellation` component (extend `UserAvatarPresence.tsx`)
+2. Photo-first design (36px circular avatars with 2px border)
+3. Animated status rings:
+   - Box-shadow glow for "Speaking" (accent color)
+   - Solid border for "Presenting"
+   - Dimmed opacity for "Observer/Muted"
+4. Smart stacking: negative margin overlap (-10px), max 4 visible
+5. Overflow badge: "+N" for 5+ participants
+6. Hover on avatar: translateY(-3px) scale(1.1) with z-index bump
+7. Tooltips show name, role, and status
 
-**Prerequisites:** Story 3.1
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.avatars-row` implementation
+
+**Prerequisites:** Story 3.2
 
 ---
 
-**Story 3.5: Space Grouping and Zones**
+**Story 3.4: Attention Beacon System**
+
+As a leader,
+I want to see visual pulses on spaces that need attention,
+So that I can quickly identify blockers or active discussions.
+
+**Acceptance Criteria:**
+1. `AttentionBeacon` component (animated pulse ring/halo)
+2. Beacon indicator: 10px circle with box-shadow glow
+3. Pulse animation: 2s infinite for normal, 1s for critical
+4. Logic to trigger beacons based on:
+   - "Blocker" logged in meeting
+   - Occupancy > 80%
+   - "Help Requested" signal
+5. Visual severity levels:
+   - Normal: theme accent color
+   - Critical: red (#ff4d4d) with fast pulse
+6. Beacons visible in all layout modes
+
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.beacon-indicator` CSS
+
+**Prerequisites:** Story 3.2
+
+---
+
+**Story 3.5: Orbit Gallery Layout (Default View)** ⭐ PRIORITY
+
+As a user,
+I want the default floor plan to use the Orbit Gallery layout,
+So that I have a balanced view of space and detail.
+
+**Acceptance Criteria:**
+1. Implement Orbit Gallery grid system: `grid-template-columns: repeat(auto-fill, minmax(300px, 1fr))`
+2. Integrate `SpaceCard` V2 into the grid
+3. "Now Board" header region showing active beacons and summary metrics
+4. Responsive behavior:
+   - Desktop (≥1440px): 3-4 columns
+   - Tablet (1024-1439px): 2 columns
+   - Mobile (<1024px): 1 column
+5. Glass-morphism controls bar: blur backdrop, subtle border
+6. Replace Konva.js canvas view with this DOM-based grid (better accessibility)
+
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.layout-orbit` implementation
+
+**Prerequisites:** Story 3.2, 3.3, 3.4
+
+---
+
+**Story 3.6: Analyst Matrix Layout (Dense View)**
+
+As an operations manager,
+I want a dense, data-rich view of all spaces,
+So that I can monitor 20+ rooms simultaneously without scrolling.
+
+**Acceptance Criteria:**
+1. "Analyst Matrix" layout option in view switcher
+2. Compact grid: `minmax(220px, 1fr)` with 1rem gap
+3. Hide avatar constellation, show sparkline instead
+4. Sparkline bar showing occupancy/activity percentage
+5. Reduced card padding (1rem vs 1.5rem)
+6. Text-heavy: Room Name, Phase, Occupancy numbers prominent
+7. Maximum density: 30+ spaces visible on 1080p screen
+
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.layout-analyst` implementation
+
+**Prerequisites:** Story 3.5
+
+---
+
+**Story 3.7: Cinema Mode Layout (Immersive View)**
+
+As a user in a lobby or public screen,
+I want a large-scale, immersive view of key spaces,
+So that the office activity looks beautiful on a big screen.
+
+**Acceptance Criteria:**
+1. "Cinema Mode" layout option in view switcher
+2. Large cards: `minmax(400px, 1fr)`
+3. Full-screen cards for active spaces only
+4. Auto-rotate/carousel feature (cycle through active rooms every 15s)
+5. High-fidelity visuals: larger avatars, full background gradients
+6. Hide UI chrome (headers, sidebars) option
+
+**Technical Reference:** See `docs/ux-space-grid-v2.html` `.layout-cinema` implementation
+
+**Prerequisites:** Story 3.5
+
+---
+
+**Story 3.8: Perspective Switcher UI**
+
+As a user,
+I want to easily toggle between Orbit, Analyst, and Cinema views,
+So that I can choose the best layout for my current task.
+
+**Acceptance Criteria:**
+1. `PerspectiveSwitcher` component in controls bar
+2. Three buttons: Orbit (default), Analyst, Cinema
+3. Active button styling: background fill, text color, box-shadow
+4. Instant layout switch via CSS class toggle on body
+5. Keyboard shortcut hints (optional): O, A, C
+6. Preference persists in localStorage or user profile
+
+**Prerequisites:** Story 3.5, 3.6, 3.7
+
+---
+
+**Story 3.9: Space Grouping and Neighborhoods**
 
 As an admin,
-I want to organize spaces into zones or floors (e.g., "1st Floor", "Marketing Wing"),
+I want to organize spaces into neighborhoods (e.g., "Engineering", "Marketing"),
 So that large office layouts are easier to navigate and understand.
 
 **Acceptance Criteria:**
-1. Zone creation UI in admin settings (name, color, description)
-2. Spaces can be assigned to zones via drag-and-drop or selection
-3. Floor plan displays zone boundaries with subtle background colors or labels
-4. Filter/toggle to show/hide specific zones
-5. Zone data stored in `spaces.metadata` or new `zones` table
+1. Zone/neighborhood creation UI in admin settings
+2. Spaces can be assigned to neighborhoods
+3. Grid displays neighborhood groupings via visual bands/sections
+4. Neighborhood colors derived from theme CSS variables
+5. Filter chips in Now Board to show/hide neighborhoods
+6. Zone data stored in `spaces.metadata` or `neighborhoods` table
 
-**Prerequisites:** Story 3.3
+**Prerequisites:** Story 3.5
 
 ---
 
-**Story 3.6: Enhanced Zoom and Pan Controls**
+**Story 3.10: Now Board Header**
+
+As a leader,
+I want a summary bar showing the office pulse at a glance,
+So that I can instantly see active beacons, key metrics, and filters.
+
+**Acceptance Criteria:**
+1. `NowBoard` component at top of floor plan
+2. Shows: total spaces, active users, beacons count
+3. Filter chips for neighborhoods
+4. Search input for finding spaces
+5. Live beacon alerts with severity icons
+6. `aria-live` region for screen reader announcements
+
+**Prerequisites:** Story 3.4, 3.5
+
+---
+
+**Story 3.11: Space Detail Hover Panel**
 
 As a user,
-I want intuitive zoom and pan controls with visual indicators,
-So that I can easily navigate large floor plans without getting lost.
+I want detailed information about a space when I hover,
+So that I can quickly see who's in a space and what's happening before I join.
 
 **Acceptance Criteria:**
-1. Mouse wheel zoom centers on cursor position
-2. Zoom controls (+ / - buttons) visible in corner with current zoom level (e.g., "100%")
-3. "Fit to screen" button resets view to show entire floor plan
-4. Pan with mouse drag (cursor changes to grab hand)
-5. Mini-map in corner shows current viewport within full floor plan (for large offices)
+1. Hover on SpaceCard shows expanded details
+2. Shows: full participant roster, agenda phase, activity log, transcript snippet
+3. Primary action button (Join/Knock/Leave) prominent
+4. Panel animation: smooth expand/collapse (200ms)
+5. Click-stop protocol honored (data-avatar-interactive)
+6. Mobile: tap to expand (bottom sheet pattern)
 
-**Prerequisites:** Story 3.4
+**Prerequisites:** Story 3.2
 
 ---
 
-**Story 3.7: Space Templates Gallery**
-
-As an admin,
-I want a visual gallery of pre-designed space templates,
-So that I can quickly create professional-looking spaces without starting from scratch.
-
-**Acceptance Criteria:**
-1. Template gallery modal shows 8+ templates with previews (Meeting Room, Focus Area, Lounge, etc.)
-2. Each template includes icon, default colors, capacity, and description
-3. One-click to add template to floor plan at cursor position
-4. Templates are configurable (admins can create custom templates)
-5. Template data stored in `spaces` table with `is_template: true` flag
-
-**Prerequisites:** Story 3.3
-
----
-
-**Story 3.8: Space Capacity and "Room Full" Handling**
+**Story 3.12: Space Capacity and "Room Full" Handling**
 
 As a user,
 I want clear visual indication when a space is at capacity,
 So that I don't try to join full spaces and get blocked.
 
 **Acceptance Criteria:**
-1. Spaces display capacity badge (e.g., "10/10 - Full")
-2. Full spaces have visual treatment (grayed out, "Full" label, lock icon)
-3. "Join" button disabled for full spaces with tooltip explaining why
-4. Option to "Knock to Enter" even when full (admin can expand capacity temporarily)
-5. Capacity validation enforced in API (`POST /api/spaces/join`)
+1. Occupancy count visible on card (e.g., "6 Active")
+2. Full spaces have visual treatment (dimmed, "Full" badge)
+3. "Join" button disabled for full spaces with tooltip
+4. Beacon triggers automatically at 80% capacity
+5. Capacity validation enforced in API
 
-**Prerequisites:** Story 3.2
+**Prerequisites:** Story 3.2, 3.4
 
 ---
 
-**Story 3.9: Real-Time Presence Animation**
+**Story 3.13: Real-Time Presence Animation**
 
 As a user,
 I want smooth animations when colleagues enter or exit spaces,
-So that the floor plan feels alive and updates feel natural rather than jarring.
+So that the floor plan feels alive and updates feel natural.
 
 **Acceptance Criteria:**
-1. User avatars fade in when entering spaces (300ms transition)
-2. Avatars fade out when leaving spaces
-3. Movement between spaces shows smooth transition (avatar slides from old to new location)
-4. Presence status changes (online → away) animate smoothly (color transition)
-5. Performance: animations maintain 60 FPS even with 20+ users on floor plan
+1. Avatar fade-in when entering (300ms transition)
+2. Avatar fade-out when leaving
+3. Speaking status ring animates smoothly
+4. Beacon pulses sync with presence changes
+5. Performance: animations maintain 60 FPS with 20+ users
 
-**Prerequisites:** Story 3.2
+**Prerequisites:** Story 3.3
 
 ---
 
-**Story 3.10: Space Detail Panel Redesign**
-
-As a user,
-I want a modern, informative space detail panel,
-So that I can quickly see who's in a space and what's happening before I join.
-
-**Acceptance Criteria:**
-1. Panel slides in from right side when space is selected (not a modal)
-2. Shows space name, type icon, description, capacity, current occupants
-3. Participant list with avatars, names, and status indicators
-4. Recent messages preview from space conversation (last 3 messages)
-5. Primary action button (Join/Knock/Leave) prominent at bottom
-
-**Prerequisites:** Story 3.4
-
----
-
-**Story 3.11: Drag-and-Drop Space Positioning Polish**
-
-As an admin,
-I want smooth, snapping drag-and-drop for positioning spaces,
-So that I can create organized, grid-aligned floor plans easily.
-
-**Acceptance Criteria:**
-1. Spaces snap to grid when dragging (configurable grid size: 10px, 20px, 50px)
-2. Drag ghost/preview shows where space will land
-3. Collision detection prevents overlapping spaces (visual warning + prevent drop)
-4. Alignment guides appear when space aligns with other spaces (horizontal/vertical lines)
-5. Undo/redo support for space movements
-
-**Prerequisites:** Story 3.4
-
----
-
-**Story 3.12: Mobile-Responsive Floor Plan (Basic)**
+**Story 3.14: Mobile-Responsive Floor Plan**
 
 As a mobile user,
 I want to view and navigate the floor plan on my phone,
 So that I can see team presence even when away from my desktop.
 
 **Acceptance Criteria:**
-1. Floor plan renders on mobile devices (responsive canvas scaling)
-2. Touch gestures supported (pinch to zoom, two-finger pan)
-3. Space detail panel adapted for mobile (bottom sheet instead of side panel)
-4. Mobile view prioritizes viewing over editing (admin edit features hidden on mobile)
-5. Performance acceptable on mid-range phones (30 FPS minimum)
+1. Single-column card layout on mobile (<768px)
+2. Touch gestures: tap to expand card details
+3. Bottom sheet for space detail panel
+4. Simplified controls bar (stacked layout)
+5. Theme switching works on mobile
+6. Performance acceptable on mid-range phones (30 FPS)
 
-**Prerequisites:** Story 3.6, 3.10
+**Prerequisites:** Story 3.5, 3.11
 
 ---
 
 **Epic 3 Summary:**
-- **Total Stories:** 12
-- **Estimated Effort:** 24-36 hours
-- **Dependencies:** Konva.js library, existing floor plan component
-- **Key Risk:** Performance with 50+ spaces and real-time updates - need optimization testing
+- **Total Stories:** 14
+- **Estimated Effort:** 50-70 hours
+- **Priority Stories:** 3.1 (Theme), 3.2 (SpaceCard), 3.3 (Avatars), 3.5 (Orbit Layout)
+- **Design References:** `docs/ux-design-specification.md`, `docs/ux-space-grid-v2.html`
+- **Key Risk:** CSS complexity for themes, performance of animated DOM elements
 
 ---
 
@@ -1675,171 +1764,11 @@ So that we comply with GDPR and company policies.
 
 ---
 
-## Epic 10: Advanced UX & Theming (Unleashed) ⏳ PLANNED
+## Epic 10: MERGED INTO EPIC 3
 
-**Expanded Goal:**
-Implement the "Reality Distortion" design system and "Unleashed" UX patterns to transform Virtual Office into a visually stunning, highly adaptable workspace. This epic delivers the Orbit Gallery, Analyst Matrix, and Cinema Mode layouts, along with the Neon, Zen, and Obsidian themes, ensuring the interface is not just functional but emotionally resonant and role-adaptive.
-
-**Value Delivery:**
-This epic elevates the product from a utility to a premium experience. It provides specific views for specific roles (Analyst for ops, Orbit for leaders, Cinema for lobbies) and allows users to personalize their environment (Themes), increasing engagement and satisfaction.
-
-**Dependencies:** Epic 3 (Basic Floor Plan)
-
-### Stories (8 total)
-
-**Story 10.1: Reality Distortion Engine (Theme System)**
-
-As a user,
-I want to switch between different visual themes (Neon, Zen, Obsidian, Warm, Cosmic),
-So that I can align the workspace with my current mood or lighting conditions.
-
-**Acceptance Criteria:**
-1. Theme switcher UI (dropdown or palette selector) in settings/header
-2. Implementation of CSS variable tokens for all themes (colors, gradients, shadows)
-3. "Neon Cyberpunk" theme: High contrast, neon accents, dark base
-4. "Zen Garden" theme: Soft earth tones, paper textures, calming green
-5. "Obsidian Stealth" theme: Monochrome dark, minimal distractions
-6. Theme preference persists in user profile (`users.preferences.theme`)
-7. Instant theme switching without page reload
-
-**Prerequisites:** None
-
----
-
-**Story 10.2: Space Card V2 (Orbit Gallery Component)**
-
-As a user,
-I want rich, interactive space cards that reveal details on hover,
-So that I can see what's happening inside a room without entering it.
-
-**Acceptance Criteria:**
-1. New `SpaceCard` component implementing the Orbit Gallery design
-2. Gradient backgrounds based on space type/neighborhood
-3. Status ribbons (Agenda Phase, Meeting Type) visible on card face
-4. Hover interaction expands card to reveal:
-   - Full participant roster
-   - Current agenda phase/topic
-   - Latest activity log entry
-   - Live transcript snippet (if active)
-5. Smooth transition animations for hover state (200ms)
-
-**Prerequisites:** Story 10.1
-
----
-
-**Story 10.3: Avatar Constellation V2**
-
-As a user,
-I want to see my colleagues' photos with clear status indicators,
-So that I can instantly recognize who is speaking or listening.
-
-**Acceptance Criteria:**
-1. `AvatarConstellation` component replacing simple avatar stacks
-2. Photo-first design (large circular avatars)
-3. Animated status rings:
-   - Pulse/Glow for "Speaking"
-   - Solid color for "Presenting"
-   - Dimmed/Ghost for "Observer/Muted"
-4. Smart clustering for 8+ participants (primary ring + overflow badge)
-5. Tooltips show name, role, and status duration
-
-**Prerequisites:** Story 10.2
-
----
-
-**Story 10.4: Attention Beacon System**
-
-As a leader,
-I want to see visual pulses on spaces that need attention,
-So that I can quickly identify blockers or active discussions.
-
-**Acceptance Criteria:**
-1. `AttentionBeacon` component (animated pulse ring/halo)
-2. Logic to trigger beacons based on:
-   - "Blocker" logged in meeting
-   - Occupancy > 80%
-   - "Help Requested" signal
-3. Visual severity levels: Info (Blue), Warning (Yellow), Critical (Red)
-4. Beacons visible in both Orbit Gallery and Grid Overview
-5. Admin log of beacon activations
-
-**Prerequisites:** Story 10.2
-
----
-
-**Story 10.5: Orbit Gallery Layout (Default View)**
-
-As a user,
-I want the default floor plan to use the Orbit Gallery layout,
-So that I have a balanced view of space and detail.
-
-**Acceptance Criteria:**
-1. Implement Orbit Gallery grid system (responsive 12-column)
-2. Integrate `SpaceCard` V2 into the grid
-3. "Now Board" header showing active beacons and summary metrics
-4. Responsive behavior: 3 columns (desktop), 2 columns (tablet), 1 column (mobile)
-5. Replace existing Konva.js canvas view (or offer as alternative) with this DOM-based grid for better accessibility and text rendering
-
-**Prerequisites:** Story 10.2, 10.3
-
----
-
-**Story 10.6: Analyst Matrix Layout (Dense View)**
-
-As an operations manager,
-I want a dense, data-rich view of all spaces,
-So that I can monitor 20+ rooms simultaneously without scrolling.
-
-**Acceptance Criteria:**
-1. "Analyst Matrix" layout option in view switcher
-2. Compact row/tile design (minimized height)
-3. Sparklines or mini-bars for occupancy/activity history
-4. Text-heavy display: Room Name, Phase, Occupancy (Numbers), Last Log
-5. Maximum density: show 30+ spaces on a 1080p screen
-
-**Prerequisites:** Story 10.5
-
----
-
-**Story 10.7: Cinema Mode Layout (Immersive View)**
-
-As a user in a lobby or public screen,
-I want a large-scale, immersive view of key spaces,
-So that the office activity looks beautiful on a big screen.
-
-**Acceptance Criteria:**
-1. "Cinema Mode" layout option
-2. Full-screen cards for active spaces only
-3. Auto-rotate/carousel feature (cycle through active rooms every 15s)
-4. High-fidelity visuals: larger avatars, full background gradients, motion backgrounds
-5. Hide UI chrome (headers, sidebars) in this mode
-
-**Prerequisites:** Story 10.5
-
----
-
-**Story 10.8: Space Grid Overview (Masonry)**
-
-As a user in a large company,
-I want a view that handles 15+ spaces gracefully,
-So that the interface doesn't break as the company grows.
-
-**Acceptance Criteria:**
-1. Auto-switch to "Grid Overview" when space count > 15 (configurable)
-2. Masonry or dense-packing algorithm to fit cards efficiently
-3. "Neighborhood" grouping (visual bands/sections for Depts)
-4. Zoom controls to scale grid density
-5. Search/Filter bar remains pinned and accessible
-
-**Prerequisites:** Story 10.5
-
----
-
-**Epic 10 Summary:**
-- **Total Stories:** 8
-- **Estimated Effort:** 40-60 hours
-- **Dependencies:** Epic 3 (for basic space data structure)
-- **Key Risks:** CSS complexity for themes, performance of many animated DOM elements
+> **Note:** Epic 10 (Advanced UX & Theming - Unleashed) has been merged into Epic 3 (Visual Experience & Floor Plan) as of 2025-11-25. All "Reality Distortion" theme system, Orbit Gallery, Avatar Constellation, and layout stories are now part of Epic 3.
+>
+> This merger prioritizes visual polish for investor demos while eliminating duplicate work between the two epics.
 
 ---
 

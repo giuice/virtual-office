@@ -24,12 +24,12 @@ export interface IMessageRepository {
   getUnreadMessages(conversationId: string, userId: string, since?: Date): Promise<Message[]>;
 
   // Message pin methods (user-specific, per-conversation)
-  pinMessage(messageId: string, userId: string): Promise<MessagePin>;
+  pinMessage(messageId: string, conversationId: string, userId: string): Promise<MessagePin>;
   unpinMessage(messageId: string, userId: string): Promise<boolean>;
   getPinnedMessages(conversationId: string, userId: string): Promise<Message[]>;
 
   // Message star methods (user-specific, cross-conversation bookmarks)
-  starMessage(messageId: string, userId: string): Promise<MessageStar>;
+  starMessage(messageId: string, conversationId: string, userId: string): Promise<MessageStar>;
   unstarMessage(messageId: string, userId: string): Promise<boolean>;
   getStarredMessages(userId: string, conversationId?: string): Promise<Message[]>;
 }
