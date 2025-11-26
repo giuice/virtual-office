@@ -68,6 +68,7 @@ development_status:
   3-12-space-capacity-and-room-full-handling: backlog
   3-13-real-time-presence-animation: backlog
   3-14-mobile-responsive-floor-plan: backlog
+  3-15-dashboard-landing-page-polish: done  # ✅ COMPLETE - 2025-11-26 (Fixed broken links, Coming Soon teasers, Investor Resources, double header fix)
   epic-3-retrospective: optional
   
   # Epic 4A: Messaging Timeline & Composer (DEFERRED - after Epic 3 visual foundation)

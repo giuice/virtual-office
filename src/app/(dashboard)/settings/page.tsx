@@ -2,26 +2,16 @@
 'use client';
 
 import { DashboardShell } from '@/components/shell/dashboard-shell';
-import { DashboardHeader } from '@/components/shell/dashboard-header';
-import { UserProfile } from '@/components/dashboard/user-profile';
 import { EnhancedUserProfile } from '@/components/profile/EnhancedUserProfile';
 
-export default function SettingsPage() {  // Toggle this to use either the original or enhanced profile component
-  const useEnhancedProfile = true;
-  
+export default function SettingsPage() {
   return (
-    <DashboardShell>
-      <DashboardHeader
-        heading="Settings"
-        description="Manage your personal settings and preferences"
-      />
-      
+    <DashboardShell
+      heading="Settings"
+      description="Manage your personal settings and preferences"
+    >
       <div className="grid gap-8">
-        {useEnhancedProfile ? (
-          <EnhancedUserProfile />
-        ) : (
-          <UserProfile />
-        )}
+        <EnhancedUserProfile />
       </div>
     </DashboardShell>
   );

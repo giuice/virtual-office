@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/shell/dashboard-shell';
-import { DashboardHeader } from '@/components/shell/dashboard-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompanySettings } from '@/components/dashboard/company-settings';
 import { CompanyMembers } from '@/components/dashboard/company-members';
@@ -48,11 +47,10 @@ export default function CompanyPage() {
   // If still loading, show loading state
   if (isLoading) {
     return (
-      <DashboardShell>
-        <DashboardHeader
-          heading="Company Management"
-          description="Loading company information..."
-        />
+      <DashboardShell
+        heading="Company Management"
+        description="Loading company information..."
+      >
         <div className="grid gap-8">
           <Card>
             <CardHeader>
@@ -74,11 +72,10 @@ export default function CompanyPage() {
   // If no company, show placeholder (should redirect, but just in case)
   if (!hasCompany) {
     return (
-      <DashboardShell>
-        <DashboardHeader
-          heading="Company Management"
-          description="You need to create or join a company first"
-        />
+      <DashboardShell
+        heading="Company Management"
+        description="You need to create or join a company first"
+      >
         <div className="grid gap-8">
           <Card>
             <CardHeader>
@@ -99,12 +96,10 @@ export default function CompanyPage() {
   }
 
   return (
-    <DashboardShell>
-      <DashboardHeader
-        heading="Company Management"
-        description={`Manage ${company?.name || 'your company'} settings, members and permissions`}
-      />
-      
+    <DashboardShell
+      heading="Company Management"
+      description={`Manage ${company?.name || 'your company'} settings, members and permissions`}
+    >
       <div className="grid gap-8">
         <Tabs 
           defaultValue="members" 
