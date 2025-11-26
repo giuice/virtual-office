@@ -3,15 +3,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Space, User, RoomTemplate } from '@/types/database';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Users, Monitor, Video, MessageSquare, Plus, Settings, Copy, Filter, Loader2 } from 'lucide-react';
+import { Users, Video, MessageSquare, Plus, Settings, Copy, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button'
 import { RoomDialog } from './room-dialog/index'
 import { RoomManagement } from './room-management'
 import { RoomTemplateSelector } from './room-template-selector';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,10 +26,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import { ModernFloorPlan, NeighborhoodFilters, type FloorPlanPerspective } from './modern';
+import { ModernFloorPlan, NowBoard, type FloorPlanPerspective } from './modern';
 import { NeighborhoodManager } from './neighborhoods';
 import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
+import { useBeaconAggregator } from '@/hooks/useBeaconAggregator';
 import { Grid2X2, LayoutGrid, Monitor as MonitorIcon, FolderOpen } from 'lucide-react';
 
 
@@ -66,6 +65,9 @@ export function FloorPlan() {
   // Neighborhood data and filters (Story 3.9)
   const { data: neighborhoods = [] } = useNeighborhoods();
   const neighborhoodFilters = useNeighborhoodFilters(neighborhoods);
+
+  // Beacon aggregation (Story 3.10)
+  const beaconAggregation = useBeaconAggregator(spaces, usersInSpaces);
 
   const { isAuthReady } = useAuth();
 
@@ -263,6 +265,20 @@ export function FloorPlan() {
     }
   }, [lastSpaceId, spaces]);
 
+  // Story 3.10: Scroll to space when beacon is clicked
+  const scrollToSpace = useCallback((spaceId: string) => {
+    const element = document.querySelector(`[data-space-id="${spaceId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedSpaceId(spaceId);
+      // Find the space and select it
+      const space = spaces.find(s => s.id === spaceId);
+      if (space) {
+        setSelectedSpace(space);
+      }
+    }
+  }, [spaces]);
+
   return (
     <div className="space-y-4 w-full">
       {/* Add debug button and panel */}
@@ -285,44 +301,21 @@ export function FloorPlan() {
         />
       )}
 
-      {/* Status Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Online Users</span>
-              </div>
-              <span className="text-2xl font-bold">{users?.length || 0}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Video className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">Active Meetings</span>
-              </div>
-              <span className="text-2xl font-bold">{Array.from(usersInSpaces.values()).filter(spaceUsers => spaceUsers.length > 0).length}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium">Messages</span>
-              </div>
-              <span className="text-2xl font-bold">--</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* NowBoard - Office Pulse Summary (Story 3.10) */}
+      <NowBoard
+        spaces={spaces}
+        users={users}
+        usersInSpaces={usersInSpaces}
+        neighborhoods={neighborhoods}
+        activeFilters={neighborhoodFilters.activeFilters}
+        onFilterToggle={neighborhoodFilters.toggleFilter}
+        onShowAll={neighborhoodFilters.showAll}
+        isShowingAll={neighborhoodFilters.isShowingAll}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        beacons={beaconAggregation.activeBeacons}
+        onBeaconClick={scrollToSpace}
+      />
 
       {/* Room Management Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -347,49 +340,29 @@ export function FloorPlan() {
             Use Template
           </Button>
 
-          <div className="flex items-center gap-2">
-            <Select
-              value={filterType}
-              onValueChange={setFilterType}
-            >
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="workspace">Workspace</SelectItem>
-                <SelectItem value="conference">Conference Room</SelectItem>
-                <SelectItem value="social">Social Space</SelectItem>
-                <SelectItem value="breakout">Breakout Room</SelectItem>
-                <SelectItem value="private_office">Private Office</SelectItem>
-                <SelectItem value="open_space">Open Space</SelectItem>
-                <SelectItem value="lounge">Lounge</SelectItem>
-                <SelectItem value="lab">Lab</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Input
-              placeholder="Search rooms..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-[200px] h-9"
-            />
-          </div>
+          {/* Filter by Type */}
+          <Select
+            value={filterType}
+            onValueChange={setFilterType}
+          >
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="workspace">Workspace</SelectItem>
+              <SelectItem value="conference">Conference Room</SelectItem>
+              <SelectItem value="social">Social Space</SelectItem>
+              <SelectItem value="breakout">Breakout Room</SelectItem>
+              <SelectItem value="private_office">Private Office</SelectItem>
+              <SelectItem value="open_space">Open Space</SelectItem>
+              <SelectItem value="lounge">Lounge</SelectItem>
+              <SelectItem value="lab">Lab</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Neighborhood Filters (Story 3.9) */}
-          {neighborhoods.length > 0 && (
-            <NeighborhoodFilters
-              neighborhoods={neighborhoods}
-              activeFilters={neighborhoodFilters.activeFilters}
-              onToggle={neighborhoodFilters.toggleFilter}
-              onShowAll={neighborhoodFilters.showAll}
-              isShowingAll={neighborhoodFilters.isShowingAll}
-              className="mr-2"
-            />
-          )}
-
           {/* Perspective Switcher */}
           <div className="flex items-center gap-1 border rounded-lg p-1" style={{ backgroundColor: 'var(--vo-glass-bg)', borderColor: 'var(--vo-glass-border)' }}>
             <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>

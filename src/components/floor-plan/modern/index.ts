@@ -16,3 +16,9 @@ export { default as SpaceContextMenu } from './SpaceContextMenu';
 // Neighborhood components (Story 3.9)
 export { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 export { NeighborhoodFilters } from './NeighborhoodFilters';
+
+// NowBoard components (Story 3.10)
+export { NowBoard } from './NowBoard';
+export { NowBoardMetrics } from './NowBoardMetrics';
+export { BeaconQueue } from './BeaconQueue';
+export { SpaceSearch } from './SpaceSearch';

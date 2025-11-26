@@ -394,6 +394,62 @@ html[data-theme="paper"] .vo-ambient-mesh {
 }
 
 /* ============================================
+   NOW BOARD SYSTEM (Story 3.10)
+   ============================================ */
+
+/* NowBoard structural tokens */
+:root {
+  --vo-now-board-height: 80px;
+  --vo-now-board-height-tablet: 60px;
+  --vo-now-board-height-mobile: 48px;
+  --vo-now-board-padding: 12px 24px;
+  --vo-now-board-gap: 24px;
+  --vo-now-board-backdrop-blur: 12px;
+  --vo-now-board-metric-icon-size: 20px;
+  --vo-now-board-metric-font-size: 14px;
+  --vo-now-board-beacon-item-height: 32px;
+  --vo-now-board-beacon-max-height: 120px;
+}
+
+/* NowBoard responsive styling */
+@media (max-width: 1439px) {
+  :root {
+    --vo-now-board-height: var(--vo-now-board-height-tablet);
+    --vo-now-board-padding: 10px 16px;
+    --vo-now-board-gap: 16px;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --vo-now-board-height: var(--vo-now-board-height-mobile);
+    --vo-now-board-padding: 8px 12px;
+    --vo-now-board-gap: 12px;
+  }
+}
+
+/* NowBoard base class for glass-morphism */
+.now-board {
+  min-height: var(--vo-now-board-height);
+}
+
+/* NowBoard responsive: tablet collapsible */
+@media (max-width: 1439px) and (min-width: 1024px) {
+  .now-board .beacon-queue-expanded {
+    max-height: var(--vo-now-board-beacon-max-height);
+    overflow-y: auto;
+  }
+}
+
+/* NowBoard responsive: mobile compact */
+@media (max-width: 1023px) {
+  .now-board {
+    flex-direction: column;
+    gap: var(--vo-now-board-gap);
+  }
+}
+
+/* ============================================
    NEIGHBORHOOD SYSTEM (Story 3.9)
    ============================================ */
 
