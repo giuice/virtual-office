@@ -1,5 +1,40 @@
 # Changelog
 
+## 2025-11-26: Story 3.9 - Space Grouping and Neighborhoods
+Implemented neighborhood system for organizing spaces into logical groups (e.g., Engineering, Marketing).
+
+### Added
+- **Database**: `neighborhoods` table with RLS policies for company-scoped access
+- **API Routes**: Full CRUD endpoints at `/api/neighborhoods` and `/api/neighborhoods/[id]`
+- **Repository**: `INeighborhoodRepository` interface and Supabase implementation
+- **Hooks**: 
+  - `useNeighborhoods` query hook with company filtering
+  - `useNeighborhoodMutations` for create/update/delete operations
+  - `useGroupedSpaces` for organizing spaces by neighborhood
+  - `useNeighborhoodFilters` for filter chip state management with localStorage persistence
+- **Components**:
+  - `NeighborhoodManager` - Admin CRUD interface
+  - `NeighborhoodForm` - Create/edit form with color picker
+  - `NeighborhoodSelector` - Dropdown for space assignment
+  - `NeighborhoodDeleteDialog` - Safe delete confirmation
+  - `NeighborhoodSection` / `UngroupedSection` - Visual grouping headers
+  - `NeighborhoodFilters` - Filter chips for Now Board
+  - `SpaceContextMenu` - Role-based space action menu (Enter, Chat, Edit)
+- **Styling**: 8 neighborhood colors with theme variants (neon, zen, obsidian, paper)
+- **Tests**: 26 unit/integration tests for neighborhoods feature
+
+### Changed
+- Extended `Space` type with optional `neighborhoodId` field
+- Updated `RoomDialog` to include neighborhood selector in General tab
+- Updated `ModernSpaceCard` with context menu and admin props
+- Added role-based visibility for admin-only buttons (Create Room, Neighborhoods)
+
+### Technical Details
+- RLS policies use `users.supabase_uid::text = auth.uid()::text` for proper auth
+- CSS variables `--vo-neighborhood-1` through `--vo-neighborhood-8` for theming
+- Filter state persisted to localStorage for cross-session consistency
+- Controlled state pattern for dropdown menus to fix event propagation issues
+
 ## 2025-04-04: Real-time Space Updates and Avatar Implementation
 - Implemented `useSpaceRealtime` hook for automatic React Query cache invalidation
 - Integrated Supabase Realtime with React Query for spaces

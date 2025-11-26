@@ -11,6 +11,8 @@ export interface RoomDialogProps {
   onUpdate?: (updatedRoom: Space) => void; // Already optional
   isCreating?: boolean;
   companyId: string; // Added for React Query mutations
+  /** Whether current user is an admin - controls edit/save visibility */
+  isAdmin?: boolean;
 }
 
 export interface RoomTabsProps {
@@ -52,6 +54,10 @@ export interface RoomInfoTabProps {
   features: string[] | undefined;
   description: string | undefined;
   getRoomTypeLabel: (type: SpaceType) => string;
+  /** Current neighborhood ID for the room (Story 3.9) */
+  neighborhoodId?: string;
+  /** Handler for neighborhood change (Story 3.9) */
+  onNeighborhoodChange?: (neighborhoodId: string | null) => void;
 }
 
 export const availableFeatures = [

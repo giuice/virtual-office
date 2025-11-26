@@ -2,15 +2,19 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { SpaceType } from '@/types/database';
 import { RoomInfoTabProps } from '../types';
+import { NeighborhoodSelector } from '../../neighborhoods/NeighborhoodSelector';
 
 export function InfoTab({ 
   type, 
   capacity, 
   features, 
   description, 
-  getRoomTypeLabel 
+  getRoomTypeLabel,
+  neighborhoodId,
+  onNeighborhoodChange
 }: RoomInfoTabProps) {
   return (
     <div className="space-y-4">
@@ -43,6 +47,21 @@ export function InfoTab({
         <div>
           <h3 className="text-sm font-medium">Description</h3>
           <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      )}
+
+      {/* Neighborhood Assignment (Story 3.9) */}
+      {onNeighborhoodChange && (
+        <div className="space-y-2">
+          <Label htmlFor="neighborhood-edit">Neighborhood</Label>
+          <NeighborhoodSelector
+            value={neighborhoodId}
+            onChange={onNeighborhoodChange}
+            placeholder="Assign to a neighborhood"
+          />
+          <p className="text-xs text-muted-foreground">
+            Group this room with others for easier navigation
+          </p>
         </div>
       )}
     </div>

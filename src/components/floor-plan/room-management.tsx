@@ -32,7 +32,8 @@ export interface RoomManagementProps {
   onDuplicateRoom: (room: Space) => void; // Expect global Space
   onOpenChat?: (room: Space) => void; // Expect global Space
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => void;
+  isAdmin?: boolean;
 }
 
 export function RoomManagement({
@@ -43,7 +44,8 @@ export function RoomManagement({
   onDuplicateRoom,
   onOpenChat,
   open,
-  onOpenChange
+  onOpenChange,
+  isAdmin = false,
 }: RoomManagementProps) {
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -160,7 +162,7 @@ export function RoomManagement({
               </Select>
             </div>
             
-            {selectedRooms.length > 0 && (
+            {selectedRooms.length > 0 && isAdmin && (
               <Button 
                 variant="destructive" 
                 size="sm"
@@ -184,12 +186,15 @@ export function RoomManagement({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedRooms.includes(space.id)}
-                        onChange={() => handleRoomSelectionToggle(space.id)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary"
-                      />
+                      {isAdmin && (
+                        <input
+                          type="checkbox"
+                          checked={selectedRooms.includes(space.id)}
+                          onChange={() => handleRoomSelectionToggle(space.id)}
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                          aria-label={`Select ${space.name} for bulk actions`}
+                        />
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium">{space.name}</h3>
@@ -213,36 +218,46 @@ export function RoomManagement({
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => onEditRoom(space)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => onDuplicateRoom(space)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => onEditRoom(space)}
+                          aria-label={`Edit ${space.name}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => onDuplicateRoom(space)}
+                          aria-label={`Duplicate ${space.name}`}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      )}
                       {onOpenChat && (
                         <Button 
                           variant="ghost" 
                           size="icon"
                           onClick={() => onOpenChat(space)}
+                          aria-label={`Open chat for ${space.name}`}
                         >
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => onDeleteRoom(space.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => onDeleteRoom(space.id)}
+                          aria-label={`Delete ${space.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -260,10 +275,12 @@ export function RoomManagement({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={onCreateRoom}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Room
-          </Button>
+          {isAdmin && (
+            <Button onClick={onCreateRoom}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Room
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

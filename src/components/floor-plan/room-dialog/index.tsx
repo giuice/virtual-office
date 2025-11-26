@@ -28,7 +28,8 @@ export function RoomDialog({
   // onCreate, // Removed onCreate prop
   // onUpdate, // Removed onUpdate prop - handled by mutation hook now
   isCreating = false,
-  companyId // Added companyId prop
+  companyId, // Added companyId prop
+  isAdmin = false // Added isAdmin prop
 }: RoomDialogProps & { companyId: string }) { // Remove onUpdate from props if no longer needed externally
   const { user } = useAuth(); 
   // Room state - Use global Space type
@@ -145,7 +146,8 @@ export function RoomDialog({
         description: roomData.description,
         accessControl: roomData.accessControl || { isPublic: true },
         isTemplate: roomData.isTemplate || false,
-        templateName: roomData.templateName
+        templateName: roomData.templateName,
+        neighborhoodId: roomData.neighborhoodId // Story 3.9 neighborhood assignment
       };
       createSpace.mutate(createPayload, {
         onSuccess: () => {
@@ -174,6 +176,7 @@ export function RoomDialog({
         accessControl: roomData.accessControl,
         isTemplate: roomData.isTemplate,
         templateName: roomData.templateName,
+        neighborhoodId: roomData.neighborhoodId, // Story 3.9 neighborhood assignment
       };
       updateSpace.mutate({ id: roomData.id, updates: updatePayload }, {
         onSuccess: () => {
@@ -215,6 +218,7 @@ export function RoomDialog({
           ) : (
             <ViewRoomTabs
               roomData={roomData}
+              setRoomData={setRoomData}
               initialRoomData={room || undefined} // Handle null case by converting to undefined
               isMicActive={isMicActive}
               setIsMicActive={setIsMicActive}
@@ -226,6 +230,7 @@ export function RoomDialog({
               handleJoinRoom={handleJoinRoom}
               onSave={handleSaveRoom}
               isSaving={updateSpace.isPending}
+              isAdmin={isAdmin}
             />
           )}
         </DialogContent>

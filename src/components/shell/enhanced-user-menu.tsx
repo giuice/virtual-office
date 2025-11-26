@@ -93,14 +93,18 @@ export function EnhancedUserMenu() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+        <div 
+          role="button"
+          tabIndex={0}
+          className="relative h-10 w-10 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <UploadableAvatar
             user={combinedUser}
             size="sm"
             className="cursor-pointer"
             showUploadButton={false}
           />
-        </Button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-64" align="end">
         <div className="grid gap-4">

@@ -14,6 +14,7 @@ import { getRoomTypeLabel } from './utils';
 
 interface ViewRoomTabsProps {
   roomData: Partial<Space>;
+  setRoomData: React.Dispatch<React.SetStateAction<Partial<Space>>>; // Added for neighborhood editing
   initialRoomData?: Partial<Space>; // Add initial room data for comparison
   isMicActive: boolean;
   setIsMicActive: React.Dispatch<React.SetStateAction<boolean>>;
@@ -25,10 +26,13 @@ interface ViewRoomTabsProps {
   handleJoinRoom: () => void;
   onSave: () => void;
   isSaving: boolean;
+  /** Whether current user is an admin */
+  isAdmin?: boolean;
 }
 
 export function ViewRoomTabs({
   roomData,
+  setRoomData,
   initialRoomData,
   isMicActive,
   setIsMicActive,
@@ -39,7 +43,8 @@ export function ViewRoomTabs({
   handleMessageUser,
   handleJoinRoom,
   onSave,
-  isSaving
+  isSaving,
+  isAdmin = false
 }: ViewRoomTabsProps) {
   // Compare current room data with initial data to detect changes
   const hasChanges = (() => {
@@ -48,7 +53,7 @@ export function ViewRoomTabs({
     // Fields to compare
     const fieldsToCompare: (keyof Space)[] = [
       'name', 'type', 'capacity', 'features', 'description',
-      'accessControl', 'position'
+      'accessControl', 'position', 'neighborhoodId' // Added neighborhoodId for Story 3.9
     ];
     
     // Check each field for changes
@@ -95,6 +100,7 @@ export function ViewRoomTabs({
             setIsScreenSharing={setIsScreenSharing}
             isRoomLocked={isRoomLocked}
             setIsRoomLocked={setIsRoomLocked}
+            isAdmin={isAdmin}
           />
         </TabsContent>
 
@@ -109,7 +115,10 @@ export function ViewRoomTabs({
             features={roomData.features}
             description={roomData.description}
             getRoomTypeLabel={getRoomTypeLabel}
-            // TODO: Pass setRoomData or individual setters if info is editable here
+            neighborhoodId={roomData.neighborhoodId}
+            onNeighborhoodChange={isAdmin ? (neighborhoodId) => 
+              setRoomData(prev => ({ ...prev, neighborhoodId: neighborhoodId || undefined }))
+            : undefined}
           />
         </TabsContent>
       </Tabs>
@@ -122,12 +131,14 @@ export function ViewRoomTabs({
           <Button variant="outline" onClick={handleJoinRoom}> {/* Keep Join Room */}
             Join Room
           </Button>
-          <Button
-            onClick={onSave}
-            disabled={isSaving || !hasChanges} // Disable if saving or no changes
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'} {/* Show loading text */}
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={onSave}
+              disabled={isSaving || !hasChanges} // Disable if saving or no changes
+            >
+              {isSaving ? 'Saving...' : 'Save Changes'} {/* Show loading text */}
+            </Button>
+          )}
         </div>
       </DialogFooter>
     </div>

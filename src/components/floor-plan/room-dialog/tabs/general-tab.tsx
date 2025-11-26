@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Space, SpaceStatus, SpaceType } from '@/types/database';
+import { NeighborhoodSelector } from '../../neighborhoods/NeighborhoodSelector';
 
 interface GeneralTabProps {
   roomData: Partial<Space>;
@@ -74,6 +75,19 @@ export function GeneralTab({ roomData, setRoomData, errors }: GeneralTabProps) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Neighborhood Assignment (Story 3.9) */}
+      <div className="space-y-2">
+        <Label htmlFor="neighborhood">Neighborhood</Label>
+        <NeighborhoodSelector
+          value={roomData.neighborhoodId}
+          onChange={(neighborhoodId) => setRoomData({...roomData, neighborhoodId: neighborhoodId || undefined})}
+          placeholder="Assign to a neighborhood (optional)"
+        />
+        <p className="text-xs text-muted-foreground">
+          Group this room with others for easier navigation
+        </p>
       </div>
       
       <div className="space-y-2">

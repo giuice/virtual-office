@@ -120,6 +120,9 @@ export interface Space {
   updatedAt?: string | Date;
   isTemplate?: boolean; // If this space is a template itself
   templateName?: string; // Name of the template used, if any
+  // Neighborhood assignment (Story 3.9)
+  neighborhoodId?: string; // Link to Neighborhood.id
+  neighborhood?: Neighborhood; // Joined data for queries
   // This property won't be stored directly in the spaces table
   // but will be populated when fetching a space with its reservations
   reservations?: Reservation[];
@@ -205,4 +208,28 @@ export interface RoomTemplate {
   defaultHeight: number;
   createdBy?: string; // User ID
   isPublic: boolean;
+}
+
+// Neighborhood Collection (Story 3.9)
+// Neighborhoods group spaces into logical sections (e.g., "Engineering", "Marketing")
+export interface Neighborhood {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  color: string; // CSS variable name like '--vo-neighborhood-1'
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateNeighborhoodData {
+  name: string;
+  description?: string;
+  color?: string;
+}
+
+export interface UpdateNeighborhoodData {
+  name?: string;
+  description?: string;
+  color?: string;
 }

@@ -5,6 +5,7 @@ import { UserPresenceData } from '@/types/database';
 import AvatarGroup from './AvatarGroup';
 import { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';
 import AttentionBeacon from './AttentionBeacon';
+import SpaceContextMenu from './SpaceContextMenu';
 import { useAttentionBeacon, SpaceBeaconData } from '@/hooks/useAttentionBeacon';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
@@ -31,8 +32,12 @@ interface ModernSpaceCardProps {
   onOpenChat?: (space: Space) => void;
   onUserClick?: (userId: string) => void;
   onSpaceDoubleClick?: (space: Space) => void;
+  /** Handler for editing the space (admin only) */
+  onEditSpace?: (space: Space) => void;
   isHighlighted?: boolean;
   isUserInSpace?: boolean;
+  /** Whether the current user is an admin */
+  isAdmin?: boolean;
   className?: string;
   compact?: boolean;
   /** Perspective variant: orbit (default), analyst (dense with sparkline), cinema (large) */
@@ -48,8 +53,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   onOpenChat, 
   onUserClick,
   onSpaceDoubleClick,
+  onEditSpace,
   isHighlighted = false,
   isUserInSpace = false,
+  isAdmin = false,
   className = '',
   compact = false,
   variant = 'orbit',
@@ -168,10 +175,32 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           className="absolute top-2 right-2 z-20"
         />
         
-        {/* Space badges at top right - offset to accommodate beacon */}
+        {/* Context Menu - positioned top right, offset from beacon */}
+        <div 
+          className={cn(
+            "absolute flex items-center gap-1 z-30",
+            beaconState.active ? "top-2 right-8" : "top-2 right-2"
+          )}
+          data-avatar-interactive="true"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <SpaceContextMenu
+            space={space}
+            isAdmin={isAdmin}
+            isUserInSpace={isUserInSpace}
+            onEnter={() => onEnterSpace(space.id)}
+            onOpenChat={onOpenChat ? () => onOpenChat(space) : undefined}
+            onEdit={onEditSpace ? () => onEditSpace(space) : undefined}
+            size="sm"
+            variant="ghost"
+          />
+        </div>
+
+        {/* Space badges below menu */}
         <div className={cn(
           "absolute flex flex-col gap-1 items-end",
-          beaconState.active ? "top-2 right-5" : "top-2 right-2"
+          "top-10 right-2"
         )}>
           {/* Only show status badge if not compact/analyst mode */}
           {!isCompact && (

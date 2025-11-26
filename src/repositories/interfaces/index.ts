@@ -9,3 +9,4 @@ export * from './IConversationRepository';
 export * from './IInvitationRepository';
 export * from './IAnnouncementRepository';
 export * from './IMeetingNoteRepository';
+export * from './INeighborhoodRepository';

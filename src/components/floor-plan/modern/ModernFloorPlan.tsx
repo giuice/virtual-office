@@ -1,10 +1,12 @@
 // src/components/floor-plan/modern/ModernFloorPlan.tsx
 import React, { useState, useEffect } from 'react';
-import { Space } from '@/types/database';
+import { Space, Neighborhood } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import ModernSpaceCard from './ModernSpaceCard';
+import { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 import { floorPlanTokens } from './designTokens';
+import { useGroupedSpaces } from '@/hooks/useGroupedSpaces';
 import { cn } from '@/lib/utils';
 
 // Perspective types matching UX spec
@@ -15,6 +17,8 @@ interface ModernFloorPlanProps {
   onSpaceSelect?: (space: Space) => void;
   onSpaceDoubleClick?: (space: Space) => void;
   onUserClick?: (userId: string) => void;
+  /** Handler for editing a space (admin only) */
+  onEditSpace?: (space: Space) => void;
   highlightedSpaceId?: string | null;
   isEditable?: boolean;
   onOpenChat?: (space: Space) => void;
@@ -25,6 +29,12 @@ interface ModernFloorPlanProps {
   compactCards?: boolean;
   /** Current perspective mode: orbit (default), analyst (dense), cinema (large) */
   perspective?: FloorPlanPerspective;
+  /** Neighborhoods for grouping spaces (Story 3.9) */
+  neighborhoods?: Neighborhood[];
+  /** Whether to enable neighborhood grouping (Story 3.9) */
+  enableNeighborhoodGrouping?: boolean;
+  /** Whether the current user is an admin */
+  isAdmin?: boolean;
 }
 
 // Grid classes for each perspective (from UX spec)
@@ -39,13 +49,17 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   onSpaceSelect,
   onSpaceDoubleClick,
   onUserClick,
+  onEditSpace,
   highlightedSpaceId = null,
   isEditable = false,
   onOpenChat,
   layout = 'default',
   className = '',
   compactCards = false,
-  perspective = 'orbit'
+  perspective = 'orbit',
+  neighborhoods = [],
+  enableNeighborhoodGrouping = true,
+  isAdmin = false
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
@@ -172,15 +186,13 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         </div>
       )}
 
-      {/* Grid container for spaces */}
-      <div className={gridLayoutClass}>
-        {spaces.map((space, index) => {
-          // Get users in this space from presence system
+      {/* Render helper for space cards */}
+      {(() => {
+        const renderSpaceCard = (space: Space, index: number) => {
           const spaceUsers = usersInSpaces.get(space.id) || [];
-          
           const isHighlighted = highlightedSpaceId === space.id;
           const userInSpace = isUserInSpace(space);
-          
+
           return (
             <ModernSpaceCard
               key={space.id || index}
@@ -190,21 +202,92 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               onOpenChat={onOpenChat}
               onUserClick={onUserClick}
               onSpaceDoubleClick={onSpaceDoubleClick}
+              onEditSpace={onEditSpace}
               isHighlighted={isHighlighted}
               isUserInSpace={userInSpace}
+              isAdmin={isAdmin}
               compact={compactCards || perspective === 'analyst'}
               variant={perspective}
             />
           );
-        })}
+        };
+
+        // Group spaces by neighborhood if enabled and neighborhoods exist
+        const shouldGroup = enableNeighborhoodGrouping && neighborhoods.length > 0;
         
-        {/* Empty state */}
-        {spaces.length === 0 && (
-          <div className="col-span-full p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
-            <p className="text-muted-foreground">No spaces available</p>
+        if (shouldGroup) {
+          // Use grouping logic
+          const grouped = new Map<string, Space[]>();
+          const ungrouped: Space[] = [];
+
+          // Initialize the map with empty arrays for each neighborhood
+          neighborhoods.forEach(neighborhood => {
+            grouped.set(neighborhood.id, []);
+          });
+
+          // Group spaces
+          spaces.forEach(space => {
+            if (space.neighborhoodId && grouped.has(space.neighborhoodId)) {
+              grouped.get(space.neighborhoodId)!.push(space);
+            } else {
+              ungrouped.push(space);
+            }
+          });
+
+          return (
+            <div className="space-y-6">
+              {/* Render grouped sections */}
+              {neighborhoods.map(neighborhood => {
+                const sectionSpaces = grouped.get(neighborhood.id) || [];
+                if (sectionSpaces.length === 0) return null;
+
+                return (
+                  <NeighborhoodSection
+                    key={neighborhood.id}
+                    neighborhood={neighborhood}
+                    spaces={sectionSpaces}
+                    variant={perspective}
+                  >
+                    <div className={gridLayoutClass}>
+                      {sectionSpaces.map((space, index) => renderSpaceCard(space, index))}
+                    </div>
+                  </NeighborhoodSection>
+                );
+              })}
+
+              {/* Render ungrouped section */}
+              {ungrouped.length > 0 && (
+                <UngroupedSection spaces={ungrouped} variant={perspective}>
+                  <div className={gridLayoutClass}>
+                    {ungrouped.map((space, index) => renderSpaceCard(space, index))}
+                  </div>
+                </UngroupedSection>
+              )}
+
+              {/* Empty state */}
+              {spaces.length === 0 && (
+                <div className="p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
+                  <p className="text-muted-foreground">No spaces available</p>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Flat rendering (no grouping)
+        return (
+          <div className={gridLayoutClass}>
+            {spaces.map((space, index) => renderSpaceCard(space, index))}
+            
+            {/* Empty state */}
+            {spaces.length === 0 && (
+              <div className="col-span-full p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
+                <p className="text-muted-foreground">No spaces available</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
       
       {/* Loading indicator */}
       {isLoading && (

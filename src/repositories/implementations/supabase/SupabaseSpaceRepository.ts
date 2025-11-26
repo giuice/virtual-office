@@ -18,6 +18,7 @@ type SpaceRow = {
   created_by: string | null;
   is_template: boolean | null;
   template_name: string | null;
+  neighborhood_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -40,6 +41,7 @@ function mapToCamelCase(data: SpaceRow): Space {
     createdBy: data.created_by,
     isTemplate: data.is_template,
     templateName: data.template_name,
+    neighborhoodId: data.neighborhood_id ?? undefined,
     createdAt: data.created_at,
     updatedAt: data.updated_at
   } as Space;
@@ -115,7 +117,8 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
         access_control: spaceData.accessControl,
         created_by: spaceData.createdBy,
         is_template: spaceData.isTemplate,
-        template_name: spaceData.templateName
+        template_name: spaceData.templateName,
+        neighborhood_id: spaceData.neighborhoodId ?? null
         // NOTE: removed reservations as it's handled by space_reservations table
         // created_at and updated_at handled by Supabase default value/triggers
     };
@@ -136,7 +139,7 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
 
   async update(id: string, updates: Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Space | null> {
     // Map Space type (camelCase) to DB schema (snake_case)
-    const { companyId, accessControl, createdBy, isTemplate, templateName, ...restUpdates } = updates;
+    const { companyId, accessControl, createdBy, isTemplate, templateName, neighborhoodId, ...restUpdates } = updates;
     const dbUpdates: Partial<{
       company_id: string;
       name: string;
@@ -150,12 +153,14 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
       created_by: string | null;
       is_template: boolean | null;
       template_name: string | null;
+      neighborhood_id: string | null;
     }> = { ...restUpdates };
     if (companyId !== undefined) dbUpdates.company_id = companyId;
     if (accessControl !== undefined) dbUpdates.access_control = accessControl;
     if (createdBy !== undefined) dbUpdates.created_by = createdBy;
     if (isTemplate !== undefined) dbUpdates.is_template = isTemplate;
     if (templateName !== undefined) dbUpdates.template_name = templateName;
+    if (neighborhoodId !== undefined) dbUpdates.neighborhood_id = neighborhoodId ?? null;
 
     const { data, error } = await this.supabase
       .from(this.TABLE_NAME)

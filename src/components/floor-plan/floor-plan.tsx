@@ -28,8 +28,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import { ModernFloorPlan, type FloorPlanPerspective } from './modern';
-import { Grid2X2, LayoutGrid, Monitor as MonitorIcon } from 'lucide-react';
+import { ModernFloorPlan, NeighborhoodFilters, type FloorPlanPerspective } from './modern';
+import { NeighborhoodManager } from './neighborhoods';
+import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
+import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
+import { Grid2X2, LayoutGrid, Monitor as MonitorIcon, FolderOpen } from 'lucide-react';
 
 
 
@@ -58,8 +61,16 @@ export function FloorPlan() {
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   const [useModernUI, setUseModernUI] = useState(false);
   const [perspective, setPerspective] = useState<FloorPlanPerspective>('orbit');
+  const [isNeighborhoodManagerOpen, setIsNeighborhoodManagerOpen] = useState(false);
+
+  // Neighborhood data and filters (Story 3.9)
+  const { data: neighborhoods = [] } = useNeighborhoods();
+  const neighborhoodFilters = useNeighborhoodFilters(neighborhoods);
 
   const { isAuthReady } = useAuth();
+
+  // Check if current user is admin (for showing/hiding admin controls)
+  const isAdmin = currentUserProfile?.role === 'admin';
 
   if (!isAuthReady || isCompanyLoading) {
     return (
@@ -72,13 +83,16 @@ export function FloorPlan() {
     );
   }
 
-  // Filter spaces from context based on type and search query
+  // Filter spaces from context based on type, search query, and neighborhood filters
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
     const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
+
+  // Apply neighborhood filters (Story 3.9)
+  const neighborhoodFilteredSpaces = neighborhoodFilters.filterSpaces(filteredSpaces);
 
   // Log spaces for debugging
   useEffect(() => {
@@ -104,6 +118,12 @@ export function FloorPlan() {
     setHighlightedSpaceId(space.id);
     handleEnterSpace(space);
     // Other handlers...
+  };
+
+  // Handler for editing a space (opens RoomDialog in edit mode)
+  const handleEditSpace = (space: Space) => {
+    setSelectedSpace(space);
+    setIsEditingRoom(true);
   };
 
   // TODO: Refactor room management functions (create, update, delete, duplicate)
@@ -358,6 +378,18 @@ export function FloorPlan() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Neighborhood Filters (Story 3.9) */}
+          {neighborhoods.length > 0 && (
+            <NeighborhoodFilters
+              neighborhoods={neighborhoods}
+              activeFilters={neighborhoodFilters.activeFilters}
+              onToggle={neighborhoodFilters.toggleFilter}
+              onShowAll={neighborhoodFilters.showAll}
+              isShowingAll={neighborhoodFilters.isShowingAll}
+              className="mr-2"
+            />
+          )}
+
           {/* Perspective Switcher */}
           <div className="flex items-center gap-1 border rounded-lg p-1" style={{ backgroundColor: 'var(--vo-glass-bg)', borderColor: 'var(--vo-glass-border)' }}>
             <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>
@@ -390,15 +422,31 @@ export function FloorPlan() {
             </Button>
           </div>
 
-          <Button
-            variant="default"
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => setIsRoomDialogOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Create Room
-          </Button>
+          {/* Admin-only: Create Room */}
+          {isAdmin && (
+            <Button
+              variant="default"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => setIsRoomDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Create Room
+            </Button>
+          )}
+
+          {/* Admin-only: Manage Neighborhoods Button (Story 3.9) */}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => setIsNeighborhoodManagerOpen(true)}
+            >
+              <FolderOpen className="h-4 w-4" />
+              Neighborhoods
+            </Button>
+          )}
 
           {selectedSpace && (
           <Button
@@ -423,12 +471,16 @@ export function FloorPlan() {
             ) : (
               
                 <ModernFloorPlan
-                  spaces={filteredSpaces || []}
+                  spaces={neighborhoodFilteredSpaces || []}
+                  neighborhoods={neighborhoods}
+                  enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
                   onSpaceSelect={handleSpaceSelect}
                   onOpenChat={handleOpenChat}
                   onSpaceDoubleClick={(space) => void handleOpenChat(space)}
+                  onEditSpace={isAdmin ? handleEditSpace : undefined}
                   highlightedSpaceId={highlightedSpaceId}
                   perspective={perspective}
+                  isAdmin={isAdmin}
                 />
               
             )}
@@ -448,6 +500,7 @@ export function FloorPlan() {
         }}
         isCreating={!isEditingRoom}
         companyId={currentUserProfile?.companyId || ''} // Add required companyId prop
+        isAdmin={isAdmin} // Pass admin status for edit controls
       />
 
       {/* Room Management Dialog - Pass global Space[] */}
@@ -471,6 +524,7 @@ export function FloorPlan() {
         }}
         open={isRoomManagementOpen}
         onOpenChange={setIsRoomManagementOpen}
+        isAdmin={isAdmin}
       />
 
       {/* Template Selection Dialog */}
@@ -495,6 +549,13 @@ export function FloorPlan() {
             }}
             userTemplates={userTemplates}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Neighborhood Manager Dialog (Story 3.9) */}
+      <Dialog open={isNeighborhoodManagerOpen} onOpenChange={setIsNeighborhoodManagerOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <NeighborhoodManager />
         </DialogContent>
       </Dialog>
 
