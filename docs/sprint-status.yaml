@@ -63,7 +63,7 @@ development_status:
   3-7-cinema-mode-layout-immersive-view: done  # ✅ COMPLETE - Merged into 3.2 (cinema variant with large cards)
   3-8-perspective-switcher-ui: done  # ✅ COMPLETE - Merged into 3.2 (View buttons in floor plan controls)
   3-9-space-grouping-and-neighborhoods: done  # ✅ COMPLETE - 2025-11-26 (Neighborhoods CRUD, filter chips, color system, admin protection, 26 tests)
-  3-10-now-board-header: backlog
+  3-10-now-board-header: ready-for-dev  # Story context created 2025-11-26 - NowBoard summary bar with metrics, beacons, filters, search
   3-11-space-detail-hover-panel: backlog
   3-12-space-capacity-and-room-full-handling: backlog
   3-13-real-time-presence-animation: backlog

@@ -27,7 +27,7 @@ TODO_TITLE: Avatar Constellation V2
 TODO_STATUS: backlog
 IN_PROGRESS_STORY:
 IN_PROGRESS_TITLE:
-STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3, 3.1, 3.2, 3.5, 3.6, 3.7, 3.8]
+STORIES_DONE: [2.9, 4A.1, 4A.2, 4A.3, 3.1, 3.2, 3.5, 3.6, 3.7, 3.8, 3.9]
 
 ## Next Action
 
