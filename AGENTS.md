@@ -27,6 +27,41 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - In API routes call `createSupabaseServerClient()` and pass that instance to repositories.
 - Reason: `auth.uid()` requires server context; otherwise RLS fails.
 
+## Database Schema (Supabase Postgres) — CRITICAL: Always verify table/column names before writing SQL
+
+> **📁 Authoritative Source: `migrations/database-structure.md`**
+> 
+> Before writing ANY SQL, migrations, or database queries:
+> 1. **ALWAYS** check `migrations/database-structure.md` for exact table/column names
+> 2. This file contains the complete schema exported from Supabase with all columns, types, constraints, and foreign keys
+> 3. If the file is outdated, use `mcp_supabase_list_tables` to refresh it
+> 4. **NEVER guess table or column names** — verify first!
+
+
+### Enums (PostgreSQL types)
+- `user_status`: online, away, busy, offline
+- `user_role`: admin, member
+- `space_type`: workspace, conference, social, breakout, private_office, open_space, lounge, lab
+- `space_status`: active, available, maintenance, locked, reserved, in_use
+- `conversation_type`: direct, group, room
+- `message_type`: text, image, file, system, announcement
+- `message_status`: sending, sent, delivered, read, failed
+
+### Key Relationships
+- `users.company_id` → `companies.id`
+- `users.current_space_id` → `spaces.id`
+- `spaces.company_id` → `companies.id`
+- `spaces.neighborhood_id` → `neighborhoods.id`
+- `conversations.room_id` → `spaces.id` (links chat to space)
+- `messages.conversation_id` → `conversations.id`
+- `messages.sender_id` → `users.id`
+
+### Common Mistakes to Avoid
+- ❌ `profiles` table — Does NOT exist! Use `users`
+- ❌ `messages.room_id` — Does NOT exist! Messages link via `conversations.room_id`
+- ❌ `users.id = auth.uid()` — Wrong! Use `users.supabase_uid = auth.uid()::text`
+
+
 ## Type Registry & Change Control
 - Canonical types live in `src/types/`. Examples: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`.
 - **Do not create new types** if a semantic equivalent exists. Extend existing ones.

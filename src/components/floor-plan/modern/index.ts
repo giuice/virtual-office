@@ -22,3 +22,19 @@ export { NowBoard } from './NowBoard';
 export { NowBoardMetrics } from './NowBoardMetrics';
 export { BeaconQueue } from './BeaconQueue';
 export { SpaceSearch } from './SpaceSearch';
+
+// SpaceDetailPanel components (Story 3.11)
+export { SpaceDetailPanel } from './SpaceDetailPanel';
+export type { SpaceDetailPanelProps } from './SpaceDetailPanel';
+export { ParticipantRoster } from './ParticipantRoster';
+export type { ParticipantRosterProps } from './ParticipantRoster';
+export { AgendaPhaseDisplay } from './AgendaPhaseDisplay';
+export type { AgendaPhaseDisplayProps } from './AgendaPhaseDisplay';
+export { ActivityLogPreview } from './ActivityLogPreview';
+export type { ActivityLogPreviewProps, ActivityLogEntry } from './ActivityLogPreview';
+export { TranscriptSnippet } from './TranscriptSnippet';
+export type { TranscriptSnippetProps } from './TranscriptSnippet';
+export { SpaceActionButtons } from './SpaceActionButtons';
+export type { SpaceActionButtonsProps } from './SpaceActionButtons';
+export { SpaceDetailBottomSheet } from './SpaceDetailBottomSheet';
+export type { SpaceDetailBottomSheetProps } from './SpaceDetailBottomSheet';

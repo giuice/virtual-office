@@ -1,9 +1,9 @@
-// src/middleware.ts
+// src/proxy.ts
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 // import { Database } from '@/lib/supabase/database.types'; // Uncomment if using types
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -38,8 +38,10 @@ export async function middleware(request: NextRequest) {
   // Fetch user instead of session to ensure authentication against the server
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  // Log user status in middleware
-  console.log(`[Middleware] Path: ${request.nextUrl.pathname}, User: ${user?.id || 'None'}, Error: ${userError?.message || 'None'}`);
+  // Log user status in proxy
+  console.log(
+    `[Proxy] Path: ${request.nextUrl.pathname}, User: ${user?.id || 'None'}, Error: ${userError?.message || 'None'}`
+  );
 
   // Optional: Redirect logic based on auth state and path
   const { pathname } = request.nextUrl;
@@ -49,8 +51,10 @@ export async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users trying to access protected routes
   if (!user && protectedRoutes.some(route => pathname.startsWith(route))) {
-     console.log(`[Middleware] Redirecting unauthenticated user from protected route: ${pathname} to /login`);
-     return NextResponse.redirect(new URL('/login', request.url));
+    console.log(
+      `[Proxy] Redirecting unauthenticated user from protected route: ${pathname} to /login`
+    );
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // --- Remove the redirect for authenticated users on /login ---
