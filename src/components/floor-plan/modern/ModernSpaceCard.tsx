@@ -55,6 +55,8 @@ interface ModernSpaceCardProps {
   presentingUserId?: string;
   /** Story 3.11: Muted user IDs for dimmed display */
   mutedUserIds?: string[];
+  /** Story 3.11: Handler for leaving the space */
+  onLeaveSpace?: (spaceId: string) => void;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({ 
@@ -76,6 +78,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   speakingUserIds = [],
   presentingUserId,
   mutedUserIds = [],
+  onLeaveSpace,
 }) => {
   const [hovered, setHovered] = useState(false);
   // Story 3.11: Detail panel state
@@ -188,11 +191,12 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   }, [space, onEnterSpace, onOpenChat]);
 
   const handleLeave = useCallback(() => {
-    // Leave action - would need a proper handler passed down
-    console.log('Leave space:', space.id);
+    if (onLeaveSpace) {
+      onLeaveSpace(space.id);
+    }
     setShowPanel(false);
     setBottomSheetOpen(false);
-  }, [space.id]);
+  }, [space.id, onLeaveSpace]);
 
   // Story 3.11 AC10: Show panel on keyboard focus
   const handleFocus = useCallback(() => {

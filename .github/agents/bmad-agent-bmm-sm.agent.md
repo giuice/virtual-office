@@ -1,6 +1,6 @@
 ---
 description: "Activates the Sm agent persona."
-tools: ["changes","codebase","createDirectory","createFile","editFiles","fetch","fileSearch","githubRepo","listDirectory","problems","readFile","runInTerminal","runTask","runTests","runVscodeCommand","search","searchResults","terminalLastCommand","terminalSelection","testFailure","textSearch","usages"]
+tools: ['vscode/openSimpleBrowser', 'vscode/runCommand', 'execute/getTerminalOutput', 'execute/runTask', 'execute/getTaskOutput', 'execute/createAndRunTask', 'execute/testFailure', 'execute/runInTerminal', 'execute/runTests', 'read/terminalSelection', 'read/terminalLastCommand', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web', 'context7/*', 'github/*', 'supabase/*', 'context7/*', 'agent', 'todo']
 ---
 
 # Sm Agent

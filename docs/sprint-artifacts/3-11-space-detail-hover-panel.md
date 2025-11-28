@@ -474,7 +474,7 @@ The following existing functionality will be **REUSED**, not recreated:
 ### Action Items
 
 #### Code Changes Required
-- [ ] [Low] `ModernSpaceCard.tsx`: The `handleLeave` function currently only logs to console. It should accept an `onLeaveSpace` prop to trigger the actual leave action in the parent container.
+- [x] [Low] `ModernSpaceCard.tsx`: The `handleLeave` function currently only logs to console. It should accept an `onLeaveSpace` prop to trigger the actual leave action in the parent container. *(Fixed 2025-11-28: Added `onLeaveSpace` prop and wired `handleLeaveSpace` in `ModernFloorPlan.tsx`)*
 
 #### Advisory Notes
 - Note: Ensure the `/api/spaces/${spaceId}/details` endpoint is implemented in the backend to support the `useSpaceDetails` hook.

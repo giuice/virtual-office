@@ -161,6 +161,26 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     }
   };
 
+  // Story 3.11: Handler for leaving a space
+  const handleLeaveSpace = async () => {
+    try {
+      if (!currentUserProfile?.id) {
+        throw new Error('Cannot update location: user ID missing');
+      }
+      
+      setError(null);
+      await updateLocation(null);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Leave space failed:', error.message);
+        setError(error.message);
+      } else {
+        console.error('Leave space failed: Unknown error');
+        setError('An unknown error occurred');
+      }
+    }
+  };
+
   // Get grid layout based on perspective (new) or legacy layout prop
   const gridLayoutClass = perspectiveGridClasses[perspective] || floorPlanTokens.floorPlanLayout.grid[layout];
 
@@ -199,6 +219,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               space={space}
               usersInSpace={spaceUsers}
               onEnterSpace={handleEnterSpace}
+              onLeaveSpace={handleLeaveSpace}
               onOpenChat={onOpenChat}
               onUserClick={onUserClick}
               onSpaceDoubleClick={onSpaceDoubleClick}
