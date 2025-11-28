@@ -10,10 +10,12 @@ import { AgendaPhaseDisplay } from './AgendaPhaseDisplay';
 import { ActivityLogPreview, type ActivityLogEntry } from './ActivityLogPreview';
 import { TranscriptSnippet } from './TranscriptSnippet';
 import { SpaceActionButtons } from './SpaceActionButtons';
+import { CapacityIndicator } from './StatusIndicators';
 
 /**
  * Story 3.11 - AC1: Hover Reveals Expanded Details
  * Story 3.11 - AC9: Theme-Aware Styling with glass-morphism
+ * Story 3.12 - AC6: Capacity Display in SpaceDetailPanel
  */
 export interface SpaceDetailPanelProps {
   space: Space;
@@ -32,6 +34,8 @@ export interface SpaceDetailPanelProps {
   };
   isUserInSpace: boolean;
   isPrivate?: boolean;
+  /** Story 3.12 - AC3: Whether space is at full capacity */
+  isFull?: boolean;
   onJoin: () => void;
   onLeave: () => void;
   onKnock?: () => void;
@@ -70,6 +74,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   transcript,
   isUserInSpace,
   isPrivate = false,
+  isFull = false,
   onJoin,
   onLeave,
   onKnock,
@@ -146,6 +151,22 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
             )}
           </div>
 
+          {/* Story 3.12 - AC6: Capacity Display */}
+          {space.capacity > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <CapacityIndicator 
+                current={usersInSpace.length} 
+                capacity={space.capacity} 
+                size="md"
+              />
+              {isFull && (
+                <span className="text-xs text-destructive font-medium">
+                  At capacity
+                </span>
+              )}
+            </div>
+          )}
+
           {/* AC2: Full Participant Roster */}
           <ParticipantRoster
             users={usersInSpace}
@@ -188,6 +209,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
           <SpaceActionButtons
             isUserInSpace={isUserInSpace}
             isPrivate={isPrivate}
+            isFull={isFull}
             onJoin={onJoin}
             onLeave={onLeave}
             onKnock={onKnock}

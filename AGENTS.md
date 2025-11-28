@@ -8,6 +8,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Do not assume code behavior. Ask for or provide tests.
 - Prefer edits to existing code over new files.
 - Run the Anti-Duplication Protocol before proposing changes.
+- **CRITICAL** On any **Plan** or **Story** conception you must verify if feature already exists or partialy exists, this is the most important rule on this app DO NOT DUPLICATE FEATURES or FUNCTIONALITIES.
 - Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
 
 ## Architecture Snapshot (single source)
@@ -127,9 +128,8 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Portal menus (Radix/shadcn): On `DropdownMenuContent`, stop propagation on `onPointerDown`, `onClick`, and `onKeyDown`; on `DropdownMenuItem`, cancel `onSelect` and stop propagation in `onClick`. Also mark the content with `data-avatar-interactive`.
 - Avatars/menus: Wrappers like `UserAvatarPresence` and `UserInteractionMenu` must stop propagation on pointer/click to prevent space navigation when interacting with messaging actions.
 
-## UI Libraries — Migration Note
+## UI Libraries
 - Current: shadcn/ui + Radix.
-- Later: Plan to update/replace shadcn components with DaisyUI equivalents; keep interaction contracts and data attributes stable to simplify the swap.
 
 ## Workflows (concise)
 - Auth & Onboarding: Register → Email/Google → Profile → Company. `src/app/(auth)/`

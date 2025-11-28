@@ -51,6 +51,18 @@ export function useLastSpace(currentUser: User | null, spaces: Space[]) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
         // console.error(`[useLastSpace] Failed to update location to space ${spaceId}. Status: ${response.status}`, errorData);
         
+        // Story 3.12 - AC5: Handle 409 Space Full error
+        if (response.status === 409 && errorData.code === 'SPACE_FULL') {
+          setLastSpaceId(null);
+          setRejoinAttempts(0);
+          toast({
+            title: "Cannot join - space is full",
+            description: `${spaceName || 'The space'} is currently at capacity. Try again later.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
         // Implement exponential backoff for retries
         const newAttempts = rejoinAttempts + 1;
         setRejoinAttempts(newAttempts);

@@ -111,8 +111,9 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
   
       // Space validation checks
+      // Story 3.12 - AC3: Client-side check for full capacity
       if (selectedSpace.capacity && (usersInSpaces.get(spaceId)?.length || 0) >= selectedSpace.capacity) {
-        setError('This space is at full capacity');
+        setError('Cannot join - space is full');
         return;
       }
   

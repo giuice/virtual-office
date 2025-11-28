@@ -40,6 +40,39 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Story 3.12 - AC5: Capacity Validation Enforced in API
+    // Check if space is at capacity before allowing join
+    if (spaceId) {
+      // Get space capacity
+      const { data: space, error: spaceError } = await supabase
+        .from('spaces')
+        .select('capacity')
+        .eq('id', spaceId)
+        .single();
+
+      if (spaceError) {
+        console.error('Error fetching space for capacity check:', spaceError);
+        // Continue with update if space not found (fallback behavior)
+      } else if (space?.capacity && space.capacity > 0) {
+        // Count current users in space (excluding the requesting user who might be moving within)
+        const { count, error: countError } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('current_space_id', spaceId)
+          .neq('id', userId); // Exclude current user in case of re-join
+
+        if (countError) {
+          console.error('Error counting users in space:', countError);
+        } else if (count !== null && count >= space.capacity) {
+          // Space is at capacity - return 409 Conflict
+          return NextResponse.json(
+            { error: 'Space is full', code: 'SPACE_FULL' },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const updatedUser = await userRepository.updateLocation(userId, spaceId);
 
     if (!updatedUser) {

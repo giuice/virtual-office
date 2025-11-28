@@ -709,6 +709,45 @@ html[data-theme="paper"] {
   }
 }
 
+/* ============================================
+   FULL BADGE SYSTEM (Story 3.12)
+   ============================================ */
+
+/* Full Badge - Base tokens */
+:root {
+  --vo-full-badge-bg: #ef4444;
+  --vo-full-badge-text: #ffffff;
+  --vo-full-badge-shadow: none;
+}
+
+/* Theme: Neon Cyberpunk */
+html[data-theme="neon"] {
+  --vo-full-badge-bg: rgba(255, 77, 77, 0.9);
+  --vo-full-badge-text: #ffffff;
+  --vo-full-badge-shadow: 0 0 8px rgba(255, 77, 77, 0.5);
+}
+
+/* Theme: Zen Garden */
+html[data-theme="zen"] {
+  --vo-full-badge-bg: #C45B4D;
+  --vo-full-badge-text: #ffffff;
+  --vo-full-badge-shadow: none;
+}
+
+/* Theme: Obsidian Stealth */
+html[data-theme="obsidian"] {
+  --vo-full-badge-bg: #333333;
+  --vo-full-badge-text: #ffffff;
+  --vo-full-badge-shadow: none;
+}
+
+/* Theme: Paper White */
+html[data-theme="paper"] {
+  --vo-full-badge-bg: #FF3B30;
+  --vo-full-badge-text: #ffffff;
+  --vo-full-badge-shadow: none;
+}
+
 /* Avatar speaking pulse animation */
 @keyframes vo-avatar-speaking-pulse {
   0% {

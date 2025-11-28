@@ -8,14 +8,18 @@ import { LogIn, LogOut, DoorOpen } from 'lucide-react';
 
 /**
  * Story 3.11 - AC6: Primary Action Button
+ * Story 3.12 - AC3: Join Button Disabled for Full Spaces
  * - "Join" button prominent at bottom of hover panel
  * - "Leave" shown if user is already in the space
  * - "Knock" option if space is private/locked
  * - Button styled per theme with hover states
+ * - Join disabled when space is full (AC3)
  */
 export interface SpaceActionButtonsProps {
   isUserInSpace: boolean;
   isPrivate?: boolean;
+  /** Story 3.12 - AC3: Whether the space is at full capacity */
+  isFull?: boolean;
   onJoin: () => void;
   onLeave: () => void;
   onKnock?: () => void;
@@ -25,6 +29,7 @@ export interface SpaceActionButtonsProps {
 export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   isUserInSpace,
   isPrivate = false,
+  isFull = false,
   onJoin,
   onLeave,
   onKnock,
@@ -105,14 +110,20 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onJoin();
+            if (!isFull) {
+              onJoin();
+            }
           }}
-          className={cn(primaryButton, 'flex-1')}
+          className={cn(primaryButton, 'flex-1', isFull && 'opacity-50 cursor-not-allowed')}
           data-space-action="true"
-          aria-label="Join this space"
+          // Story 3.12 - AC3: Disable when space is full
+          disabled={isFull}
+          aria-disabled={isFull}
+          title={isFull ? 'Space is full - cannot join' : 'Join this space'}
+          aria-label={isFull ? 'Space is full - cannot join' : 'Join this space'}
         >
           <LogIn className="w-4 h-4" />
-          Join
+          {isFull ? 'Full' : 'Join'}
         </button>
       )}
     </div>

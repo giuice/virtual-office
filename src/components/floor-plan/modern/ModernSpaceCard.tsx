@@ -4,6 +4,7 @@ import { Space, SpaceType } from '@/types/database';
 import { UserPresenceData } from '@/types/database';
 import AvatarGroup from './AvatarGroup';
 import { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';
+import { FullBadge } from './FullBadge';
 import AttentionBeacon from './AttentionBeacon';
 import SpaceContextMenu from './SpaceContextMenu';
 import { SpaceDetailPanel } from './SpaceDetailPanel';
@@ -116,6 +117,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   const isAnalyst = variant === 'analyst';
   const isCinema = variant === 'cinema';
   const isCompact = compact || isAnalyst;
+  
+  // Story 3.12 - AC2: Calculate if space is at capacity
+  const isFull = space.capacity > 0 && usersInSpace.length >= space.capacity;
   
   // Story 3.11: Handle hover with delay to prevent flicker
   // The hover area now includes both card and panel
@@ -259,6 +263,8 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           // Min height varies by variant
           isAnalyst ? "min-h-[100px]" : isCinema ? "min-h-[200px]" : "min-h-[160px]",
           "cursor-pointer",
+          // Story 3.12 - AC2: Dimmed styling when space is full
+          isFull && "opacity-70 saturate-[0.7]",
           className
         )}
         // Story 3.2: Apply space type gradient and theme styling via inline styles
@@ -286,7 +292,12 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         onDoubleClick={() => onSpaceDoubleClick?.(space)}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        aria-label={`Enter space ${space.name}`}
+        // Story 3.12 - AC8: Enhanced aria-label with capacity info
+        aria-label={
+          space.capacity > 0
+            ? `Space ${space.name}, ${usersInSpace.length} of ${space.capacity} participants${isFull ? ', full' : ''}`
+            : `Space ${space.name}, ${usersInSpace.length} active`
+        }
         role="button"
         aria-current={isHighlighted ? 'true' : undefined}
         tabIndex={0}
@@ -337,6 +348,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           "absolute flex flex-col gap-1 items-end",
           "top-10 right-2"
         )}>
+          {/* Story 3.12 - AC2: Show Full badge when space is at capacity */}
+          {isFull && (
+            <FullBadge />
+          )}
+          
           {/* Only show status badge if not compact/analyst mode */}
           {!isCompact && (
             <SpaceStatusBadge status={space.status} showIcon size="sm" />
@@ -432,6 +448,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
             transcript={transcript ?? undefined}
             isUserInSpace={isUserInSpace}
             isPrivate={!space.accessControl?.isPublic}
+            isFull={isFull}
             onJoin={handleJoin}
             onLeave={handleLeave}
             onUserClick={onUserClick}
@@ -456,6 +473,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           transcript={transcript ?? undefined}
           isUserInSpace={isUserInSpace}
           isPrivate={!space.accessControl?.isPublic}
+          isFull={isFull}
           onJoin={handleJoin}
           onLeave={handleLeave}
           onUserClick={onUserClick}

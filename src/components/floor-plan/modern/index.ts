@@ -38,3 +38,7 @@ export { SpaceActionButtons } from './SpaceActionButtons';
 export type { SpaceActionButtonsProps } from './SpaceActionButtons';
 export { SpaceDetailBottomSheet } from './SpaceDetailBottomSheet';
 export type { SpaceDetailBottomSheetProps } from './SpaceDetailBottomSheet';
+
+// FullBadge component (Story 3.12)
+export { FullBadge } from './FullBadge';
+export type { FullBadgeProps } from './FullBadge';
