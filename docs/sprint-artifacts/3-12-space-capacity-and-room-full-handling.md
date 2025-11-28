@@ -1,6 +1,6 @@
 # Story 3.12: Space Capacity and "Room Full" Handling
 
-Status: drafted
+Status: ready-for-dev
 
 ## Story
 
@@ -399,7 +399,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- [3-12-space-capacity-and-room-full-handling.context.xml](3-12-space-capacity-and-room-full-handling.context.xml)
 
 ### Agent Model Used
 
@@ -414,3 +414,4 @@ export async function POST(request: Request, { params }: { params: { id: string 
 ## Change Log
 
 - 2025-11-28: Story drafted via Scrum Master agent for Epic 3 visual overhaul (Story 3.12).
+- 2025-11-28: Story context XML generated via `*create-story-context` workflow. Status: ready-for-dev.

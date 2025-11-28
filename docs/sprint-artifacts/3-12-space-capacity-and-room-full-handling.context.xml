@@ -1,0 +1,650 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 3.12 - Space Capacity and "Room Full" Handling
+  Generated: 2025-11-28
+  Epic: 3 - UX Design Implementation
+  Status: ready-for-dev
+  
+  This file provides complete technical context for an AI dev agent to implement
+  Story 3.12. It includes code artifacts, interfaces, constraints, and test specs.
+-->
+<storyContext version="1.0">
+  <metadata>
+    <storyId>3-12</storyId>
+    <storyFile>docs/sprint-artifacts/3-12-space-capacity-and-room-full-handling.md</storyFile>
+    <epic>Epic 3 - UX Design Implementation</epic>
+    <generatedAt>2025-11-28T12:00:00Z</generatedAt>
+    <generatedBy>SM Agent (Bob)</generatedBy>
+    <contextVersion>1.0.0</contextVersion>
+  </metadata>
+
+  <story>
+    <title>Space Capacity and "Room Full" Handling</title>
+    <description>
+      As a user, I want clear visual indication when a space is at capacity,
+      so that I don't try to join full spaces and get blocked.
+    </description>
+    <acceptanceCriteriaCount>8</acceptanceCriteriaCount>
+    <taskCount>12</taskCount>
+    <estimatedComplexity>medium</estimatedComplexity>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Occupancy Count Visible on Card">
+      <description>
+        ModernSpaceCard displays occupancy count (e.g., "6 Active").
+        Count updates in real-time as users join/leave.
+        Format: "{current}/{capacity}" or "{current} Active" if no capacity limit.
+      </description>
+      <testable>true</testable>
+      <tasks>Task 1, Task 2, Task 4</tasks>
+    </criterion>
+    <criterion id="AC2" title="Full Spaces Have Visual Treatment">
+      <description>
+        Full spaces (occupancy ≥ capacity) have dimmed appearance.
+        "Full" badge displayed prominently on card.
+        Badge styled per theme (e.g., red in Neon, muted in Zen).
+      </description>
+      <testable>true</testable>
+      <tasks>Task 3, Task 4</tasks>
+    </criterion>
+    <criterion id="AC3" title="Join Button Disabled for Full Spaces">
+      <description>
+        "Join" button disabled when space is at capacity.
+        Disabled button shows tooltip explaining "Space is full".
+        Visual state change (grayed out, cursor not-allowed).
+      </description>
+      <testable>true</testable>
+      <tasks>Task 5, Task 9</tasks>
+    </criterion>
+    <criterion id="AC4" title="Attention Beacon Triggers at 80% Capacity">
+      <description>
+        Beacon fires automatically when occupancy reaches 80% of capacity.
+        Beacon type: "warning" (not critical) per UX spec.
+        Beacon message: "Space nearing capacity".
+        Integrates with existing AttentionBeacon system (Story 3.4).
+      </description>
+      <testable>true</testable>
+      <tasks>Task 7</tasks>
+    </criterion>
+    <criterion id="AC5" title="Capacity Validation Enforced in API">
+      <description>
+        POST /api/spaces/[id]/join validates capacity before allowing join.
+        Returns 409 Conflict if space is full with error message.
+        Race condition handling: Check capacity atomically with join.
+      </description>
+      <testable>true</testable>
+      <tasks>Task 1, Task 8</tasks>
+    </criterion>
+    <criterion id="AC6" title="Capacity Display in SpaceDetailPanel">
+      <description>
+        SpaceDetailPanel shows capacity info: "6 of 10 participants".
+        Progress bar or indicator showing how full the space is.
+        Clear messaging when space is full.
+      </description>
+      <testable>true</testable>
+      <tasks>Task 6</tasks>
+    </criterion>
+    <criterion id="AC7" title="Theme-Aware Capacity Styling">
+      <description>
+        "Full" badge and disabled states use theme tokens.
+        Works correctly in all 4 themes (Neon, Zen, Obsidian, Paper).
+        Consistent with existing warning/error color patterns.
+      </description>
+      <testable>true</testable>
+      <tasks>Task 2, Task 3, Task 12</tasks>
+    </criterion>
+    <criterion id="AC8" title="Accessibility for Capacity States">
+      <description>
+        Screen reader announces capacity status: "Space Engineering Hub, 6 of 10 participants, nearing capacity".
+        "Full" badge has appropriate aria-label.
+        Disabled join button announces why it's disabled.
+      </description>
+      <testable>true</testable>
+      <tasks>Task 10</tasks>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <code>
+      <file path="src/components/floor-plan/modern/ModernSpaceCard.tsx" action="MODIFY">
+        <purpose>Main space card component - add capacity indicator, full badge, dimmed styling</purpose>
+        <keyInterfaces>
+          <interface name="ModernSpaceCardProps">
+            <property name="space" type="Space" required="true" />
+            <property name="variant" type="SpaceCardVariant" required="false" />
+            <property name="usersInSpace" type="UserPresenceData[]" required="false" />
+            <property name="isSelected" type="boolean" required="false" />
+            <property name="onClick" type="() => void" required="false" />
+            <property name="className" type="string" required="false" />
+          </interface>
+        </keyInterfaces>
+        <importantPatterns>
+          <pattern name="gradient-utility">Uses getSpaceGradient() from designTokens.ts</pattern>
+          <pattern name="beacon-integration">Uses useAttentionBeacon hook for warning states</pattern>
+          <pattern name="hover-panel">Integrates SpaceDetailPanel for expanded view</pattern>
+          <pattern name="click-stop">Uses data-avatar-interactive for nested interactions</pattern>
+        </importantPatterns>
+        <codeSnippet context="current-structure" lines="150-180">
+<![CDATA[
+// ModernSpaceCard integrates with SpaceDetailPanel via SpaceCardContainer
+// Relevant props: space, usersInSpace, isSelected
+// Space object has: space.capacity (number)
+// usersInSpace.length gives current occupancy
+
+// Calculate capacity percentage for styling:
+const capacityPercentage = space.capacity 
+  ? (usersInSpace.length / space.capacity) * 100 
+  : 0;
+const isFull = space.capacity && usersInSpace.length >= space.capacity;
+const isNearingFull = capacityPercentage >= 80 && capacityPercentage < 100;
+
+// Current beacon usage in component:
+const beaconState = useAttentionBeacon(
+  space.id,
+  usersInSpace,
+  space.capacity || 0,
+  spaceBeaconData
+);
+]]>
+        </codeSnippet>
+        <changeRequired>
+          - Add CapacityIndicator component import
+          - Add FullBadge component import
+          - Calculate isFull and capacityPercentage
+          - Apply dimmed styling when isFull: opacity-70, grayscale(30%)
+          - Render FullBadge when isFull === true
+          - Render CapacityIndicator with current/capacity counts
+        </changeRequired>
+      </file>
+
+      <file path="src/components/floor-plan/modern/SpaceActionButtons.tsx" action="MODIFY">
+        <purpose>Action buttons for spaces - add disabled state for Join when full</purpose>
+        <keyInterfaces>
+          <interface name="SpaceActionButtonsProps">
+            <property name="spaceId" type="string" required="true" />
+            <property name="isUserInSpace" type="boolean" required="true" />
+            <property name="isPrivate" type="boolean" required="false" />
+            <property name="onJoin" type="() => void" required="false" />
+            <property name="onLeave" type="() => void" required="false" />
+            <property name="onKnock" type="() => void" required="false" />
+            <property name="className" type="string" required="false" />
+          </interface>
+        </keyInterfaces>
+        <codeSnippet context="button-structure" lines="50-80">
+<![CDATA[
+// Current Join button implementation:
+<Button
+  variant="default"
+  size="sm"
+  className="..."
+  onClick={(e) => {
+    e.stopPropagation();
+    onJoin?.();
+  }}
+  data-space-action="true"
+>
+  <LogIn className="h-4 w-4 mr-1" />
+  Join
+</Button>
+
+// Add isFull prop to component:
+interface SpaceActionButtonsProps {
+  // ... existing props
+  isFull?: boolean; // NEW: Disable join when true
+}
+
+// Modify Join button:
+<Button
+  variant="default"
+  size="sm"
+  className={cn("...", isFull && "opacity-50 cursor-not-allowed")}
+  onClick={(e) => {
+    e.stopPropagation();
+    if (!isFull) onJoin?.();
+  }}
+  disabled={isFull}
+  title={isFull ? "Space is full - cannot join" : undefined}
+  aria-disabled={isFull}
+  data-space-action="true"
+>
+  <LogIn className="h-4 w-4 mr-1" />
+  Join
+</Button>
+]]>
+        </codeSnippet>
+        <changeRequired>
+          - Add isFull prop to SpaceActionButtonsProps interface
+          - Apply disabled styling to Join button when isFull
+          - Add title attribute for tooltip
+          - Add aria-disabled for accessibility
+          - Prevent onClick when disabled
+        </changeRequired>
+      </file>
+
+      <file path="src/components/floor-plan/modern/SpaceDetailPanel.tsx" action="MODIFY">
+        <purpose>Detail panel - add capacity section with progress bar</purpose>
+        <keyInterfaces>
+          <interface name="SpaceDetailPanelProps">
+            <property name="space" type="Space" required="true" />
+            <property name="usersInSpace" type="UserPresenceData[]" required="false" />
+            <property name="isUserInSpace" type="boolean" required="false" />
+            <property name="onJoin" type="() => void" required="false" />
+            <property name="onLeave" type="() => void" required="false" />
+            <property name="onKnock" type="() => void" required="false" />
+            <property name="onClose" type="() => void" required="false" />
+            <property name="className" type="string" required="false" />
+          </interface>
+        </keyInterfaces>
+        <importantPatterns>
+          <pattern name="glass-morphism">backdrop-blur: 16px, rgba() backgrounds</pattern>
+          <pattern name="click-stop">Stops propagation on content interactions</pattern>
+          <pattern name="theme-tokens">Uses CSS variables from tokens.css</pattern>
+        </importantPatterns>
+        <changeRequired>
+          - Add CapacityIndicator with showBar={true} 
+          - Calculate isFull and pass to SpaceActionButtons
+          - Add capacity section below participant roster
+          - Show "Space is full" message when at capacity
+        </changeRequired>
+      </file>
+
+      <file path="src/components/floor-plan/modern/StatusIndicators.tsx" action="REFERENCE">
+        <purpose>Existing capacity indicator component - may extend or reuse</purpose>
+        <keyInterfaces>
+          <interface name="CapacityIndicatorProps">
+            <property name="current" type="number" required="true" />
+            <property name="capacity" type="number" required="true" />
+            <property name="className" type="string" required="false" />
+            <property name="size" type="'sm' | 'md' | 'lg'" required="false" />
+          </interface>
+        </keyInterfaces>
+        <codeSnippet context="existing-implementation">
+<![CDATA[
+// CapacityIndicator already exists with color-coded display
+// Shows current/capacity with tooltip for utilization %
+// Colors: low (green), medium (amber), high (red)
+// Consider extending with:
+// - showBar prop for progress bar
+// - theme-aware token colors
+// - aria-live for real-time updates
+]]>
+        </codeSnippet>
+        <changeRequired>
+          - Extend existing CapacityIndicator with showBar prop
+          - Add progress bar element
+          - Update to use CSS variable tokens
+          - Add aria-live="polite" for accessibility
+        </changeRequired>
+      </file>
+
+      <file path="src/hooks/useAttentionBeacon.ts" action="MODIFY">
+        <purpose>Hook for beacon trigger logic - extend with capacity threshold</purpose>
+        <keyInterfaces>
+          <interface name="BeaconState">
+            <property name="active" type="boolean" />
+            <property name="severity" type="'normal' | 'critical'" />
+            <property name="reason" type="string" />
+            <property name="lastChange" type="Date | null" />
+          </interface>
+        </keyInterfaces>
+        <codeSnippet context="current-trigger-logic" lines="90-115">
+<![CDATA[
+// Current occupancy trigger (>80%):
+if (capacity > 0) {
+  const occupancyRatio = usersInSpace.length / capacity;
+  if (occupancyRatio > opts.occupancyThreshold) {
+    active = true;
+    severity = 'normal';
+    reason = 'High occupancy';
+    return { active, severity, reason };
+  }
+}
+
+// Story 3.12 Enhancement:
+// - Change reason to "Space nearing capacity" for clarity
+// - Add 100% capacity trigger with different reason
+// - Keep severity as 'normal' for 80-99%
+// - Consider 'info' severity for 100% (full) state
+]]>
+        </codeSnippet>
+        <changeRequired>
+          - Update reason message to "Space nearing capacity"
+          - Add check for 100% capacity with reason "Space is full"
+          - Ensure beacon fires at exactly 80% threshold
+        </changeRequired>
+      </file>
+
+      <file path="src/components/floor-plan/modern/designTokens.ts" action="REFERENCE">
+        <purpose>Design tokens for floor plan components</purpose>
+        <codeSnippet context="capacity-tokens">
+<![CDATA[
+// Existing capacity tokens:
+capacityIndicator: {
+  container: "flex items-center gap-1 text-xs text-muted-foreground",
+  icon: {
+    base: "h-3.5 w-3.5",
+    low: "text-emerald-500",  // <33% full
+    medium: "text-amber-500", // 33-66% full
+    high: "text-rose-500"     // >66% full
+  }
+}
+
+// Add new tokens for:
+// - fullBadge styling
+// - capacity progress bar
+// - dimmed card state
+]]>
+        </codeSnippet>
+      </file>
+
+      <file path="src/styles/themes/tokens.css" action="MODIFY">
+        <purpose>CSS custom properties for theme tokens</purpose>
+        <changeRequired>
+          - Add --vo-capacity-bar-height: 4px
+          - Add --vo-capacity-bar-radius: 2px
+          - Add --vo-capacity-bar-bg: rgba(128, 128, 128, 0.2)
+          - Add --vo-capacity-normal: var(--vo-text-muted)
+          - Add --vo-capacity-warning: var(--vo-signal-warning)
+          - Add --vo-capacity-full: var(--vo-signal-critical)
+          - Add --vo-full-badge-bg for each theme
+          - Add --vo-full-badge-text for each theme
+          - Add theme-specific overrides for [data-theme="neon|zen|obsidian|paper"]
+        </changeRequired>
+      </file>
+
+      <file path="src/app/api/spaces/route.ts" action="REFERENCE">
+        <purpose>Spaces API - reference for API patterns</purpose>
+        <keyInterfaces>
+          <interface name="APIPattern">
+            <description>
+              Uses createSupabaseServerClient() for server-side Supabase client.
+              Repository pattern: SupabaseSpaceRepository.
+              Error handling: NextResponse.json with status codes.
+            </description>
+          </interface>
+        </keyInterfaces>
+      </file>
+
+      <file path="src/app/api/spaces/[id]/join/route.ts" action="CREATE">
+        <purpose>New API route for joining a space with capacity validation</purpose>
+        <codeSnippet context="implementation-template">
+<![CDATA[
+// POST /api/spaces/[id]/join
+import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+
+export async function POST(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: spaceId } = await params;
+  const supabase = await createSupabaseServerClient();
+  
+  // 1. Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  // 2. Get space with capacity
+  const { data: space, error: spaceError } = await supabase
+    .from('spaces')
+    .select('id, capacity')
+    .eq('id', spaceId)
+    .single();
+  
+  if (spaceError || !space) {
+    return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+  }
+  
+  // 3. Get current occupancy
+  const { count: currentOccupancy } = await supabase
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('current_space_id', spaceId);
+  
+  // 4. Check capacity
+  if (space.capacity && currentOccupancy >= space.capacity) {
+    return NextResponse.json(
+      { error: 'Space is full', code: 'SPACE_FULL' },
+      { status: 409 }
+    );
+  }
+  
+  // 5. Update user's current_space_id
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ current_space_id: spaceId })
+    .eq('supabase_uid', user.id);
+  
+  if (updateError) {
+    return NextResponse.json(
+      { error: 'Failed to join space' },
+      { status: 500 }
+    );
+  }
+  
+  return NextResponse.json({ success: true, spaceId });
+}
+]]>
+        </codeSnippet>
+      </file>
+
+      <file path="src/types/database.ts" action="REFERENCE">
+        <purpose>Type definitions - Space interface already has capacity</purpose>
+        <keyInterfaces>
+          <interface name="Space">
+            <property name="id" type="string" />
+            <property name="companyId" type="string" />
+            <property name="name" type="string" />
+            <property name="type" type="SpaceType" />
+            <property name="status" type="SpaceStatus" />
+            <property name="capacity" type="number" description="Already exists in interface" />
+            <property name="features" type="string[]" />
+            <property name="position" type="Position" />
+            <property name="description" type="string | undefined" />
+            <property name="accessControl" type="AccessControl" />
+          </interface>
+        </keyInterfaces>
+        <note>Space.capacity already defined as number - no changes needed</note>
+      </file>
+
+      <file path="src/repositories/interfaces/ISpaceRepository.ts" action="REFERENCE">
+        <purpose>Repository interface - may need capacity-specific methods</purpose>
+        <keyInterfaces>
+          <interface name="ISpaceRepository">
+            <method name="findById" params="id: string" returns="Promise&lt;Space | null&gt;" />
+            <method name="findByCompany" params="companyId: string, options?: PaginationOptions" returns="Promise&lt;Space[]&gt;" />
+            <method name="create" params="spaceData: Omit&lt;Space, 'id' | 'createdAt' | 'updatedAt'&gt;" returns="Promise&lt;Space&gt;" />
+            <method name="update" params="id: string, updates: Partial&lt;...&gt;" returns="Promise&lt;Space | null&gt;" />
+            <method name="deleteById" params="id: string" returns="Promise&lt;boolean&gt;" />
+          </interface>
+        </keyInterfaces>
+        <note>Consider adding: checkCapacity(spaceId: string): Promise&lt;{current: number, capacity: number | null}&gt;</note>
+      </file>
+    </code>
+
+    <newFiles>
+      <file path="src/components/floor-plan/modern/FullBadge.tsx" action="CREATE">
+        <purpose>Badge component displaying "Full" status on space cards</purpose>
+        <template>
+<![CDATA[
+// src/components/floor-plan/modern/FullBadge.tsx
+import React from 'react';
+import { cn } from '@/lib/utils';
+
+interface FullBadgeProps {
+  className?: string;
+}
+
+export const FullBadge: React.FC<FullBadgeProps> = ({ className }) => {
+  return (
+    <span
+      className={cn(
+        // Base styles
+        'inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded',
+        // Theme-aware colors via CSS variables
+        'bg-[var(--vo-full-badge-bg)] text-[var(--vo-full-badge-text)]',
+        // Animation
+        'animate-in fade-in duration-200',
+        className
+      )}
+      aria-label="Space is full"
+      role="status"
+    >
+      Full
+    </span>
+  );
+};
+
+export default FullBadge;
+]]>
+        </template>
+      </file>
+
+      <file path="__tests__/space-capacity-handling.test.tsx" action="CREATE">
+        <purpose>Test suite for capacity handling features</purpose>
+        <testCases>
+          <testCase id="TC1" ac="AC1">CapacityIndicator renders correct format</testCase>
+          <testCase id="TC2" ac="AC2">FullBadge renders with correct theme styling</testCase>
+          <testCase id="TC3" ac="AC2">ModernSpaceCard shows dimmed state when full</testCase>
+          <testCase id="TC4" ac="AC3">SpaceActionButtons disable join when full</testCase>
+          <testCase id="TC5" ac="AC4">Attention beacon triggers at 80% capacity</testCase>
+          <testCase id="TC6" ac="AC5">API returns 409 for full space join attempt</testCase>
+          <testCase id="TC7" ac="AC6">SpaceDetailPanel shows capacity progress bar</testCase>
+          <testCase id="TC8" ac="AC7">All 4 themes render capacity styling correctly</testCase>
+          <testCase id="TC9" ac="AC8">Screen reader announcements for capacity</testCase>
+        </testCases>
+      </file>
+    </newFiles>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Repository Pattern: Use ISpaceRepository for data access</rule>
+      <rule>Server Client: Use createSupabaseServerClient() in API routes</rule>
+      <rule>Type Safety: Strict TypeScript with explicit types</rule>
+      <rule>Anti-Duplication: Extend existing components, don't recreate</rule>
+    </constraint>
+    <constraint type="ui">
+      <rule>Click-Stop Protocol: Use data-avatar-interactive and stopPropagation()</rule>
+      <rule>Glass-Morphism: backdrop-blur: 16px for panels</rule>
+      <rule>Theme Tokens: Use CSS variables from tokens.css</rule>
+      <rule>Animations: 200ms transitions with ease-out timing</rule>
+    </constraint>
+    <constraint type="accessibility">
+      <rule>WCAG AA: Ensure color contrast meets standards</rule>
+      <rule>ARIA: Use aria-label, aria-live, aria-disabled appropriately</rule>
+      <rule>Screen Reader: Announce capacity status changes</rule>
+    </constraint>
+    <constraint type="database">
+      <rule>spaces.capacity column exists (integer, default 0)</rule>
+      <rule>RLS: Policies already cover space access</rule>
+      <rule>Realtime: Capacity updates via Supabase Realtime</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <apiEndpoint path="/api/spaces/[id]/join" method="POST">
+      <request>
+        <description>Join a space (no body required, uses auth user)</description>
+      </request>
+      <response status="200">
+        <body>{ "success": true, "spaceId": "uuid" }</body>
+      </response>
+      <response status="409">
+        <body>{ "error": "Space is full", "code": "SPACE_FULL" }</body>
+      </response>
+      <response status="404">
+        <body>{ "error": "Space not found" }</body>
+      </response>
+      <response status="401">
+        <body>{ "error": "Unauthorized" }</body>
+      </response>
+    </apiEndpoint>
+
+    <realtimeChannel name="spaces">
+      <event name="UPDATE">
+        <description>Triggered when space data changes (including user joins/leaves)</description>
+        <payload>{ space: Space, usersInSpace: UserPresenceData[] }</payload>
+      </event>
+    </realtimeChannel>
+  </interfaces>
+
+  <tests>
+    <testingApproach>
+      <framework>Vitest + Testing Library</framework>
+      <coverage>Unit tests for components, integration tests for API</coverage>
+      <e2e>Playwright for full capacity flow (optional)</e2e>
+    </testingApproach>
+
+    <unitTests>
+      <test id="UT1" file="__tests__/space-capacity-handling.test.tsx">
+        <description>CapacityIndicator displays "{current}/{capacity}" format</description>
+        <ac>AC1</ac>
+      </test>
+      <test id="UT2" file="__tests__/space-capacity-handling.test.tsx">
+        <description>CapacityIndicator displays "{current} Active" when no capacity</description>
+        <ac>AC1</ac>
+      </test>
+      <test id="UT3" file="__tests__/space-capacity-handling.test.tsx">
+        <description>FullBadge renders with aria-label</description>
+        <ac>AC2, AC8</ac>
+      </test>
+      <test id="UT4" file="__tests__/space-capacity-handling.test.tsx">
+        <description>ModernSpaceCard has opacity-70 when isFull</description>
+        <ac>AC2</ac>
+      </test>
+      <test id="UT5" file="__tests__/space-capacity-handling.test.tsx">
+        <description>SpaceActionButtons Join button disabled when isFull=true</description>
+        <ac>AC3</ac>
+      </test>
+      <test id="UT6" file="__tests__/use-attention-beacon.test.ts">
+        <description>Beacon activates at 80% occupancy with "Space nearing capacity" reason</description>
+        <ac>AC4</ac>
+      </test>
+      <test id="UT7" file="__tests__/space-capacity-handling.test.tsx">
+        <description>SpaceDetailPanel shows progress bar when showBar=true</description>
+        <ac>AC6</ac>
+      </test>
+    </unitTests>
+
+    <integrationTests>
+      <test id="IT1" file="__tests__/api/spaces-join.test.ts">
+        <description>POST /api/spaces/[id]/join returns 409 when capacity reached</description>
+        <ac>AC5</ac>
+      </test>
+      <test id="IT2" file="__tests__/api/spaces-join.test.ts">
+        <description>POST /api/spaces/[id]/join succeeds when capacity available</description>
+        <ac>AC5</ac>
+      </test>
+    </integrationTests>
+  </tests>
+
+  <dependencies>
+    <runtime>
+      <package name="next" version="15.3.0" />
+      <package name="react" version="19.1.0" />
+      <package name="@supabase/supabase-js" />
+      <package name="@supabase/ssr" version="0.6.1" />
+      <package name="lucide-react" />
+      <package name="tailwindcss" version="4.1.3" />
+    </runtime>
+    <devDependencies>
+      <package name="vitest" version="3" />
+      <package name="@testing-library/react" />
+      <package name="playwright" />
+    </devDependencies>
+  </dependencies>
+
+  <references>
+    <document path="docs/epics.md" section="story-3.12-space-capacity-and-room-full-handling" />
+    <document path="docs/ux-design-specification.md" section="7.1-consistency-rules" />
+    <document path="docs/ux-design-specification.md" section="3.1-color-system" />
+    <document path="docs/sprint-artifacts/3-11-space-detail-hover-panel.md" />
+    <document path="docs/sprint-artifacts/3-4-attention-beacon-system.md" />
+    <document path="docs/architecture.md" />
+    <document path="AGENTS.md" section="ui-interaction-click-stop-standard" />
+  </references>
+</storyContext>
