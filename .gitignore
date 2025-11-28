@@ -67,4 +67,4 @@ bmad/
 # Claude-specific files
 .claude/
 bmad-bak/
-.bmad/
+#.bmad/

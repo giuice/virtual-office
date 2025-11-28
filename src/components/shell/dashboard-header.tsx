@@ -58,7 +58,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
 
   return (
     <div className="border-b bg-background">
-      <div className="flex h-16 items-center px-4 container">
+      <div className="flex h-16 items-center px-4 max-w-[1600px] mx-auto">
         <div className="mr-8 flex items-center gap-2">
           <div className="hidden md:flex">
             {isDashboardPage ? (
@@ -71,21 +71,21 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
             )}
           </div>
         </div>
-        
+
         <div className="flex-1 md:max-w-md lg:max-w-lg">
           <GlobalSearch />
         </div>
-        
+
         <div className="ml-auto flex items-center gap-4">
           {/* Theme Toggle */}
           <ThemeToggle />
-          
+
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
           </Button>
-          
+
           {/* User Menu */}
           {USE_ENHANCED_USER_MENU ? (
             <EnhancedUserMenu />
@@ -94,7 +94,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
               <PopoverTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar>
-                    <AvatarImage 
+                    <AvatarImage
                       src={getAvatarUrl({
                         // Highest priority: user-set avatar from our DB profile
                         avatarUrl: currentUserProfile?.avatarUrl,
@@ -103,7 +103,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                         // Fallback context for generated avatar
                         name: getUserDisplayName(),
                       })}
-                      alt="User avatar" 
+                      alt="User avatar"
                     />
                     <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
                   </Avatar>
@@ -113,13 +113,13 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                 <div className="grid gap-4">
                   <div className="flex items-center gap-4">
                     <Avatar>
-                      <AvatarImage 
+                      <AvatarImage
                         src={getAvatarUrl({
                           avatarUrl: currentUserProfile?.avatarUrl,
                           photoURL: (user as any)?.user_metadata?.avatar_url || (user as any)?.photoURL,
                           name: getUserDisplayName(),
                         })}
-                        alt="User avatar" 
+                        alt="User avatar"
                       />
                       <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
                     </Avatar>
@@ -135,9 +135,9 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
                       <span>Settings</span>
                     </Link>
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" 
+                  <Button
+                    variant="ghost"
+                    className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
                     onClick={handleSignOut}
                     disabled={isSigningOut}
                   >
@@ -150,9 +150,9 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
           )}
         </div>
       </div>
-      
+
       {(heading || description) && (
-        <div className="container py-4">
+        <div className="max-w-[1600px] mx-auto px-4 py-4">
           {heading && <h1 className="text-2xl font-bold">{heading}</h1>}
           {description && <p className="text-muted-foreground">{description}</p>}
         </div>

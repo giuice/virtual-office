@@ -1,0 +1,4 @@
+# Whitelist .bmad folder for editor indexing / ripgrep
+# This allows the editor to see the files even if they are ignored by git
+!.bmad/
+!.bmad/*
