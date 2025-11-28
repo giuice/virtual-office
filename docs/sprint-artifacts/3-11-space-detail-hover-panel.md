@@ -1,6 +1,6 @@
 # Story 3.11: Space Detail Hover Panel
 
-Status: review
+Status: done
 
 ## Story
 
