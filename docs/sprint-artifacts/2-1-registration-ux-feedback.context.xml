@@ -1,0 +1,126 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>1</storyId>
+    <title>Story 2.1: Registration UX Feedback</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29T00:44:33Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/2-1-registration-ux-feedback.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>As a new user registering on the platform</asA>
+    <iWant>I want clear feedback after signup about what to do next</iWant>
+    <soThat>So that I understand the email confirmation process and can successfully access the platform.</soThat>
+    <tasks>Task 1: Create Email Confirmation Success Component (AC1, AC5, AC6)
+- [ ] 1.1 Create src/components/auth/EmailConfirmationMessage.tsx with success state, email display, instructions, accessibility attributes; props { email: string; onResend: () =&gt; Promise&lt;void&gt; }
+- [ ] 1.2 Add Lucide icons: CheckCircle, Mail, RefreshCw
+- [ ] 1.3 Style with theme tokens (glass-morphism optional)
+
+Task 2: Implement Resend Confirmation API (AC2)
+- [ ] 2.1 Add resendConfirmationEmail to src/lib/auth/supabase-auth.ts using supabase.auth.resend({ type: "signup", email })
+- [ ] 2.2 Export from auth utilities
+- [ ] 2.3 Handle rate limit error (60s cooldown)
+
+Task 3: Update Signup Page with Success State (AC1, AC2)
+- [ ] 3.1 Modify src/app/(auth)/signup/page.tsx to add signupSuccess state and render EmailConfirmationMessage on success
+- [ ] 3.2 Remove immediate redirect to /create-company after signup
+- [ ] 3.3 Add "Ja confirmou? Fazer login" link in success state
+
+Task 4: Update Login Page with Unconfirmed Email Detection (AC3)
+- [ ] 4.1 Modify src/app/(auth)/login/page.tsx to detect Supabase error for unconfirmed email and store attempted email
+- [ ] 4.2 Add resend button component below error message
+- [ ] 4.3 Clear error when user modifies email field
+
+Task 5: Create Onboarding Page (AC4)
+- [ ] 5.1 Create src/app/onboarding/page.tsx to redirect based on company_id presence
+- [ ] 5.2 Options UI: Create Company and Join via Invite Code
+- [ ] 5.3 Handle auth callback redirect from email confirmation
+
+Task 6: Update Auth Callback Handler (AC4)
+- [ ] 6.1 Verify src/app/auth/callback/route.ts exists and handles email confirmation
+- [ ] 6.2 Ensure redirect goes to /onboarding not /dashboard
+- [ ] 6.3 Handle error states (invalid token, expired link)
+
+Task 7: Unit Tests
+- [ ] 7.1 Test EmailConfirmationMessage renders correctly (AC1, AC2, AC5, AC6)
+- [ ] 7.2 Test resend button loading states and cooldown (AC2)
+- [ ] 7.3 Test login page unconfirmed email detection and resend flow (AC3)
+- [ ] 7.4 Test onboarding page routing logic for company/no-company (AC4)
+- [ ] 7.5 Test accessibility: aria-live/role and focus after state changes (AC5)
+- [ ] 7.6 Test i18n/PT-BR: no hardcoded EN strings in added components (AC6)</tasks>
+  </story>
+
+  <acceptanceCriteria>AC1 - Email Confirmation Success Message
+- After successful signup, show a clear success message with the user's email
+- Display step-by-step instructions: check email, click link, proceed to onboarding
+- Include visual indicators (checkmark icon, email icon)
+- Message should be prominent and not easily dismissed
+- Source: docs/epics.md#story-2.1-registration-ux-feedback
+
+AC2 - Resend Confirmation Email Button
+- Add "Resend confirmation email" button below the success message
+- Button calls supabase.auth.resend({ type: "signup", email })
+- Show loading state while sending
+- Show success toast: "Email reenviado com sucesso!"
+- Implement rate limiting feedback (Supabase has built-in 60s cooldown)
+- Source: docs/epics.md#story-2.1-registration-ux-feedback
+
+AC3 - Login Page Unconfirmed Email Detection
+- On login attempt with unconfirmed email, detect the error
+- Show specific message: "Email nao confirmado"
+- Display resend button with the attempted email pre-filled
+- Clear error state when user starts typing again
+- Source: docs/epics.md#story-2.1-registration-ux-feedback
+
+AC4 - Post-Confirmation Onboarding Redirect
+- After email confirmation, user lands on /onboarding page
+- If user has no company_id -> show Create Company and Join via Invite Code buttons
+- If user has company_id -> redirect to /dashboard
+- Handle edge case: user confirmed but page not refreshed
+- Source: docs/epics.md#story-2.1-registration-ux-feedback
+
+AC5 - Accessibility (PRD NFR)
+- All auth success/error messages use role="alert" or aria-live="polite"
+- Resend button and links have clear labels for screen readers
+- Focus management after state changes
+- Source: docs/prd.md#non-functional-requirements
+
+AC6 - Portugues and Prep for i18n
+- All strings in PT-BR per config
+- Structure ready for future i18n extraction (no hardcoded EN strings)
+- Source: .bmad/bmm/config.yaml</acceptanceCriteria>
+
+  <artifacts>
+    <docs>docs/epics.md | Story 2.1: Registration UX Feedback | Acceptance Criteria | Signup success message, resend button, login detects unconfirmed email, redirect to /onboarding with create/join options.
+docs/sprint-artifacts/tech-spec-epic-2.md | Epic Technical Specification: Epic 2 – Authentication & Company Management | Overview | Hotfix scope covers feedback pos-signup, resend confirmation, onboarding redirect, Supabase Auth/RLS alignment.
+docs/prd.md | Non-Functional Requirements | NFR004 Accessibility | UI must comply with WCAG 2.1 Level AA with keyboard navigation and screen reader support.
+docs/architecture.md | Authentication Architecture | RLS Enforcement | All database access uses server-side Supabase client to preserve auth.uid() and middleware for route protection.
+docs/sprint-artifacts/hotfix-epic2-invitation-flow.md | Hotfix Epic 2: Invitation & Registration Flow | Story 2.X Registration UX Feedback | Problem statement: no feedback after signup; expected message with email, steps, resend button, onboarding redirect.</docs>
+    <code>src/app/(auth)/signup/page.tsx#L20-L140 | page component | On successful signUp shows toast then router.push('/create-company'); lacks success state with email confirmation and resend flow.
+src/app/(auth)/login/page.tsx#L20-L170 | page component | Uses mapSupabaseAuthError and CompanyContext redirects; no explicit handling for Supabase email_not_confirmed or resend control.
+src/contexts/AuthContext.tsx#L94-L148 | AuthContext | signUp uses supabaseClient.auth.signUp and syncUserProfile; no resend helper or success-state handoff, assumes immediate navigation.
+src/lib/auth/error-messages.ts#L1-L55 | mapSupabaseAuthError | Error mapping returns English strings; email not confirmed branch is generic and not PT-BR.
+src/lib/supabase/server-client.ts#L1-L45 | createSupabaseServerClient | Server-side Supabase client required in API routes to preserve auth.uid() for RLS.</code>
+    <dependencies>next ^16.0.1; react ^19.2.0; typescript ^5
+@supabase/supabase-js ^2.79.0; @supabase/ssr ^0.8.0
+lucide-react ^0.555.0; @shadcn/ui ^0.0.4 + radix components
+@tanstack/react-query ^5.90.6; tailwindcss ^4.1.16
+@testing-library/react ^16.3.0; @playwright/test ^1.56.1; vitest ^4.0.7</dependencies>
+  </artifacts>
+
+  <constraints>Use createSupabaseServerClient in API routes to satisfy RLS; never use browser Supabase client in APIs.
+All user-facing auth strings should be PT-BR and ready for future i18n (avoid hardcoded EN).
+Respect NFR004 accessibility: role="alert"/aria-live on success and error states; manage focus on state changes.
+Supabase resend API enforces ~60s cooldown; surface UX feedback and avoid repeated calls during cooldown.
+Follow repository/context patterns already in src/contexts and src/lib/auth; keep within users table (no profiles table).</constraints>
+  <interfaces>AuthContext.signUp(email: string, password: string, displayName?: string): Promise&lt;void&gt; (src/contexts/AuthContext.tsx#L94-L148)
+supabaseClient.auth.resend({ type: 'signup', email: string }): Promise&lt;{ data: unknown; error: unknown }&gt; (Supabase JS, used for confirmation resend)
+mapSupabaseAuthError(error: unknown): string (src/lib/auth/error-messages.ts#L1-L55) — needs PT-BR mapping for email_not_confirmed.</interfaces>
+  <tests>
+    <standards>Use Vitest + @testing-library/react (happy-dom) for components; Playwright for end-to-end auth flows; assert accessibility roles/aria per NFR.</standards>
+    <locations>__tests__/; vitest.config.mts; playwright.config.ts; auth components under src/app/(auth) for RTL coverage.</locations>
+    <ideas>AC1: signup success renders email and steps with aria-live alert. AC2: resend button calls supabase.auth.resend with provided email, shows loading, blocks during 60s cooldown and shows success toast. AC3: login surfaces PT-BR "Email nao confirmado" message when Supabase returns email_not_confirmed and clears on input change; resend uses attempted email. AC4: onboarding redirect sends users with company_id to /dashboard and shows create-company/join options when null.</ideas>
+  </tests>
+</story-context>

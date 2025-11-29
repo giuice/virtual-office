@@ -1,6 +1,6 @@
 # Story 2.1: Registration UX Feedback
 
-Status: ready-for-dev
+Status: drafted
 
 ## Story
 

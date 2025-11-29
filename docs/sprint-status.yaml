@@ -37,7 +37,7 @@
 # 🎯 After hotfix: Resume Epic 3 remaining stories
 # Epic 4A deferred until visual foundation complete.
 
-generated: 2025-11-28T00:00:00.000000+00:00
+generated: 2025-11-29T00:00:00.000000+00:00
 project: virtual-office
 project_key: virtual-office
 tracking_system: file-system
@@ -55,9 +55,9 @@ development_status:
   # Invitation flow is non-functional. Business Model: Freemium (10 users free)
   # See: docs/sprint-artifacts/hotfix-epic2-invitation-flow.md
   epic-2: contexted  # Has tech context from existing code analysis
-  2-1-registration-ux-feedback: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Email confirmation UX
-  2-2-invitation-accept-flow: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Fix /join page, remove fake UUID
-  2-3-invitation-link-copy-limit: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Copy link, 10-user freemium limit
+  2-1-registration-ux-feedback: drafted  # ✅ DRAFTED 2025-11-28 - Email confirmation UX
+  2-2-invitation-accept-flow: ready-for-dev  # ✅ READY 2025-11-29 - Context created, ready for dev
+  2-3-invitation-link-copy-limit: ready-for-dev  # ✅ READY 2025-11-29 - Context created, ready for dev
   epic-2-retrospective: optional
   
   # 🎯 PRIORITY EPIC - Epic 3: Visual Experience & Floor Plan (Unleashed)

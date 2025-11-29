@@ -1,7 +1,6 @@
 # Story 2.3: Invitation Link Copy & User Limit
 
 Status: ready-for-dev
-
 ## Story
 
 As a company admin inviting a new member,
@@ -239,7 +238,7 @@ const messages = {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+docs/sprint-artifacts/2-3.context.xml
 
 ### Agent Model Used
 

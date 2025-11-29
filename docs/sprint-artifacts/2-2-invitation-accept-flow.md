@@ -189,7 +189,7 @@ const messages = {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+docs/sprint-artifacts/2-2.context.xml
 
 ### Agent Model Used
 
