@@ -28,33 +28,42 @@
 # - Stories can be worked in parallel if team capacity allows
 # - SM drafts next story after previous one is 'done'
 #
-# SPRINT PRIORITY (2025-11-25):
+# SPRINT PRIORITY (2025-11-28):
 # =============================
-# 🎯 Epic 3 (Visual Experience & Floor Plan - Unleashed) is the current PRIORITY
-# UX-first strategy for investor demos. Visual polish wins investor demos.
-# Priority sequence: 3.1 → 3.2 → 3.3 → 3.5
+# 🚨 HOTFIX: Epic 2 Invitation & Registration Flow is CRITICAL BLOCKER
+# Without working invites/registration, no new users can access the system.
+# Priority: Hotfix 2.X → 2.Y → 2.Z (9-13 hours total)
+#
+# 🎯 After hotfix: Resume Epic 3 remaining stories
 # Epic 4A deferred until visual foundation complete.
 
-generated: 2025-11-25T00:00:00.000000+00:00
+generated: 2025-11-28T00:00:00.000000+00:00
 project: virtual-office
 project_key: virtual-office
 tracking_system: file-system
 story_location: "{project-root}/docs/stories"
 
 # ============================================
-# CURRENT SPRINT: Epic 3 - Visual Experience
+# Epic Status Overview
 # ============================================
 
 development_status:
   epic-1: backlog
   epic-1-retrospective: optional
-  epic-2: backlog
+  
+  # 🚨 Epic 2: Authentication - HOTFIX REQUIRED
+  # Invitation flow is non-functional. Business Model: Freemium (10 users free)
+  # See: docs/sprint-artifacts/hotfix-epic2-invitation-flow.md
+  epic-2: contexted  # Has tech context from existing code analysis
+  2-1-registration-ux-feedback: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Email confirmation UX
+  2-2-invitation-accept-flow: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Fix /join page, remove fake UUID
+  2-3-invitation-link-copy-limit: ready-for-dev  # ✅ DRAFTED 2025-11-28 - Copy link, 10-user freemium limit
   epic-2-retrospective: optional
   
   # 🎯 PRIORITY EPIC - Epic 3: Visual Experience & Floor Plan (Unleashed)
   # MERGED from Epic 3 + Epic 10 - "Reality Distortion" design system
   epic-3: contexted
-  story-platform-admin: backlog # 🚨 CRITICAL HOTFIX - 2025-11-27 (Platform Admin & Tenant Creation)
+  story-platform-admin: drafted # 🚨 CRITICAL HOTFIX - 2025-11-27 (Platform Admin & Tenant Creation)
   3-1-reality-distortion-engine-theme-system: done  # ✅ COMPLETE - 2025-11-25 (4 themes, CSS tokens, ThemeSwitcher, Supabase sync)
   3-2-space-card-v2-orbit-gallery-component: done  # ✅ COMPLETE - 2025-11-25 (Gradients, glass morphism, Orbit/Analyst/Cinema perspectives)
   3-3-avatar-constellation-v2: done  # ✅ COMPLETE - 2025-11-25 (Status rings, stacking -10px, max 4, overflow badge, hover animations, 32 tests)

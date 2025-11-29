@@ -47,7 +47,7 @@ This epic delivered the technical foundation enabling all subsequent features: t
 
 ---
 
-## Epic 2: Authentication & Company Management ✅ COMPLETE
+## Epic 2: Authentication & Company Management 🚨 HOTFIX REQUIRED
 
 **Expanded Goal:**
 Implement secure, company-based multi-tenancy with Supabase Auth, enabling organizations to create isolated workspaces and manage team members through invitation workflows with role-based access control.
@@ -55,15 +55,103 @@ Implement secure, company-based multi-tenancy with Supabase Auth, enabling organ
 **Value Delivery:**
 This epic enabled the fundamental access control model: companies can onboard teams securely, admins can manage members, and all data is isolated per company through RLS policies.
 
-**Key Achievements:**
-- Supabase Auth with email/password authentication
-- SSR-compatible auth flows using @supabase/ssr
-- Company creation and settings management
-- User invitation system with secure token-based acceptance
-- Role-based access control (Admin/Member)
-- Auth middleware protecting API routes
+**Current Status:** ⚠️ PARTIALLY COMPLETE - Invitation flow broken, requires hotfix
 
-**Stories: ~6-8** (Completed retrospectively, documented for reference)
+**Key Achievements:**
+- Supabase Auth with email/password authentication ✅
+- SSR-compatible auth flows using @supabase/ssr ✅
+- Company creation and settings management ✅
+- Role-based access control (Admin/Member) ✅
+- Auth middleware protecting API routes ✅
+
+**Known Issues (Hotfix Required):**
+- User invitation system uses fake UUID instead of Supabase Auth ❌
+- No email confirmation feedback after signup ❌
+- No way to copy/share invitation links ❌
+
+**Business Model:** Freemium - 10 users free per company
+
+### Hotfix Stories (3 total)
+
+---
+
+**Story 2.1: Registration UX Feedback** ⭐ PRIORITY
+
+As a new user registering on the platform,
+I want clear feedback after signup about what to do next,
+So that I understand the email confirmation process and can successfully access the platform.
+
+**Acceptance Criteria:**
+1. After successful signup, show clear message with email confirmation instructions
+2. Display user's email address in the confirmation message
+3. "Resend confirmation email" button that calls Supabase resend API
+4. On login page, detect unconfirmed email and show resend option
+5. After email confirmation, redirect to `/onboarding` page
+6. Onboarding shows "Create Company" or "Join via Invite Code" options
+
+**Technical Reference:** 
+- `src/app/(auth)/signup/page.tsx` - Add success state
+- `src/app/(auth)/login/page.tsx` - Detect unconfirmed email
+- Supabase API: `supabase.auth.resend({ type: 'signup', email })`
+
+**Prerequisites:** None (independent fix)
+**Estimate:** 2-3 hours
+
+---
+
+**Story 2.2: Invitation Accept Flow** ⭐ PRIORITY
+
+As a user who received an invitation link,
+I want to click the link and be guided through registration/login,
+So that I can join the company that invited me.
+
+**Acceptance Criteria:**
+1. Remove `generateTestUuid()` function and all fake UUID logic from `/join` page
+2. `/join?token=xxx` validates token before showing auth UI
+3. Show Supabase Auth UI (Google + Email/Password) if not logged in
+4. After auth success, auto-call `/api/invitations/accept` with token
+5. Update user's `company_id` and invitation status to `accepted`
+6. Redirect to `/dashboard` with success toast
+7. Show clear error for invalid/expired tokens
+8. Show warning if user already belongs to a company
+
+**Technical Reference:**
+- `src/app/join/page.tsx` - Complete rewrite required
+- `src/app/api/invitations/accept/route.ts` - Ensure uses server client
+- Database trigger `handle_new_user()` creates user with `company_id = NULL`
+
+**Prerequisites:** Story 2.1 (registration UX)
+**Estimate:** 4-6 hours
+
+---
+
+**Story 2.3: Invitation Link Copy & User Limit** ⭐ PRIORITY
+
+As a company admin inviting a new member,
+I want to see and copy the invitation link,
+So that I can manually share it while email sending is not implemented.
+
+**Acceptance Criteria:**
+1. After creating invitation, show success state with copyable link
+2. Copy button copies full URL with visual feedback ("Link copiado!")
+3. Show pending invitations list with email, status, created date
+4. "Copy link" action for pending invitations
+5. "Revoke" action for pending invitations
+6. Enforce 10-user limit (Freemium model)
+7. Count includes current users + pending invitations
+8. Clear messaging when limit reached with upgrade prompt
+
+**Technical Reference:**
+- `src/components/dashboard/invite-user-dialog.tsx` - Add success state
+- `src/app/api/invitations/create/route.ts` - Return full URL
+- `src/app/api/invitations/list/route.ts` - NEW: List invitations
+
+**Prerequisites:** Story 2.2 (invitation accept flow)
+**Estimate:** 3-4 hours
+
+---
+
+**Stories: 3 hotfix + ~6-8 completed retrospectively**
 
 ---
 

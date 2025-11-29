@@ -1,0 +1,256 @@
+# Story 2.3: Invitation Link Copy & User Limit
+
+Status: ready-for-dev
+
+## Story
+
+As a company admin inviting a new member,
+I want to see and copy the invitation link,
+So that I can manually share it while email sending is not implemented.
+
+## Acceptance Criteria
+
+1. **AC1 – Show Invitation Link After Creation**
+   - After successful invitation creation, show success state in dialog
+   - Display full invitation URL prominently
+   - Show email address the invitation was sent to
+   - Show expiration date (7 days)
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+2. **AC2 – Copy Button with Feedback**
+   - "Copiar link" button copies full URL to clipboard
+   - Use `navigator.clipboard.writeText()`
+   - Visual feedback: button text changes to "✓ Link copiado!"
+   - Feedback resets after 2 seconds
+   - Fallback for browsers without clipboard API
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+3. **AC3 – Pending Invitations List**
+   - Show list of all pending invitations for company
+   - Display: email, status, created date, expires date
+   - "Copy link" action for pending invitations
+   - "Revoke" action for pending invitations (sets status to 'expired')
+   - List updates after create/revoke actions
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+4. **AC4 – 10-User Freemium Limit**
+   - Before creating invitation, check user count
+   - Count current `users` where `company_id = current_company`
+   - Count pending `invitations` for same company
+   - If total >= 10, block invitation creation
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+5. **AC5 – Limit Reached UI**
+   - When limit reached, show warning message:
+     - "Limite atingido (10 usuários)"
+     - "O plano gratuito permite até 10 usuários."
+     - "Para convidar mais pessoas, entre em contato para upgrade."
+   - Disable "Send Invite" button
+   - Show "Entrar em contato" link
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+6. **AC6 – API Returns Full URL**
+   - `/api/invitations/create` returns `inviteUrl` field
+   - URL format: `{NEXT_PUBLIC_APP_URL}/join?token={token}`
+   - Handle missing env var gracefully
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+7. **AC7 – List Invitations API**
+   - Create `/api/invitations/list` endpoint
+   - Returns all invitations for current company
+   - Supports filtering by status
+   - Sorted by created_at descending
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+8. **AC8 – Revoke Invitation API**
+   - Create `/api/invitations/revoke` endpoint
+   - Sets invitation status to 'expired'
+   - Only company admins can revoke
+   - Returns success/error response
+   - [Source: docs/epics.md#story-2.3-invitation-link-copy-limit]
+
+## Tasks / Subtasks
+
+### Task 1: Update Create API to Return URL (AC6)
+- [ ] 1.1 **MODIFY** `src/app/api/invitations/create/route.ts`:
+  ```typescript
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const inviteUrl = `${baseUrl}/join?token=${createdInvitation.token}`;
+  
+  return NextResponse.json({
+    success: true,
+    invitation: {
+      id: createdInvitation.id,
+      email: createdInvitation.email,
+      token: createdInvitation.token,
+      expiresAt: createdInvitation.expiresAt,
+      inviteUrl  // Add this field
+    }
+  });
+  ```
+- [ ] 1.2 Add `NEXT_PUBLIC_APP_URL` to `.env.example`
+
+### Task 2: Create List Invitations API (AC7)
+- [ ] 2.1 Create `src/app/api/invitations/list/route.ts`:
+  ```typescript
+  export async function GET(req: NextRequest) {
+    const companyId = req.nextUrl.searchParams.get('companyId');
+    const status = req.nextUrl.searchParams.get('status'); // optional filter
+    
+    // Validate companyId, verify user is admin
+    // Query invitations ordered by created_at DESC
+    // Return list with inviteUrl computed for each
+  }
+  ```
+- [ ] 2.2 Use `createSupabaseServerClient()` for auth context
+- [ ] 2.3 Add admin check before returning data
+
+### Task 3: Create Revoke Invitation API (AC8)
+- [ ] 3.1 Create `src/app/api/invitations/revoke/route.ts`:
+  ```typescript
+  export async function POST(req: NextRequest) {
+    const { invitationId } = await req.json();
+    
+    // Validate invitationId
+    // Verify user is admin of the invitation's company
+    // Update status to 'expired'
+    // Return success
+  }
+  ```
+- [ ] 3.2 Add proper error handling
+
+### Task 4: Add User Limit Check to Create API (AC4)
+- [ ] 4.1 **MODIFY** `src/app/api/invitations/create/route.ts`:
+  ```typescript
+  // Before creating invitation:
+  const { count: userCount } = await supabase
+    .from('users')
+    .select('*', { count: 'exact', head: true })
+    .eq('company_id', companyId);
+    
+  const { count: pendingCount } = await supabase
+    .from('invitations')
+    .select('*', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('status', 'pending');
+    
+  if ((userCount || 0) + (pendingCount || 0) >= 10) {
+    return NextResponse.json(
+      { error: 'USER_LIMIT_REACHED', message: 'Free plan limited to 10 users' },
+      { status: 403 }
+    );
+  }
+  ```
+- [ ] 4.2 Return `remaining` count to help UI display capacity
+- [ ] 4.3 Add tests for limit reached path
+
+## API Payload Examples
+
+**Create Invitation Response:**
+```json
+{
+  "success": true,
+  "invitation": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "token": "abc123...",
+    "expiresAt": 1733356800,
+    "inviteUrl": "https://app.virtualoffice.com/join?token=abc123..."
+  }
+}
+```
+
+**List Invitations:**
+```json
+{
+  "invitations": [
+    {
+      "id": "uuid",
+      "email": "user@example.com",
+      "status": "pending",
+      "createdAt": "2025-11-28T10:00:00Z",
+      "expiresAt": 1733961600,
+      "inviteUrl": "https://..."
+    }
+  ],
+  "total": 3,
+  "limit": 10,
+  "remaining": 7
+}
+```
+
+### Portuguese Strings
+
+```typescript
+const messages = {
+  successTitle: "Convite criado para {email}",
+  linkLabel: "Link do convite (válido por 7 dias):",
+  copyButton: "Copiar",
+  copySuccess: "✓ Link copiado!",
+  hint: "💡 Envie este link para o convidado por email ou mensagem.",
+  createAnother: "Criar outro convite",
+  close: "Fechar",
+  limitReached: {
+    title: "Limite atingido (10 usuários)",
+    description: "O plano gratuito permite até 10 usuários.",
+    action: "Para convidar mais pessoas, entre em contato para upgrade.",
+    contactButton: "Entrar em contato"
+  },
+  revoke: "Revogar",
+  revokeConfirm: "Tem certeza que deseja revogar este convite?",
+  revokeSuccess: "Convite revogado com sucesso",
+  noPending: "Nenhum convite pendente"
+};
+```
+
+### Project Structure Notes
+
+- API routes in `src/app/api/invitations/`
+- Dashboard components in `src/components/dashboard/`
+- Hooks in `src/hooks/` (queries pattern)
+- Use TanStack Query for data fetching
+
+### File Changes Summary
+
+| File | Action | Changes |
+|------|--------|---------|
+| `src/app/api/invitations/create/route.ts` | MODIFY | Add inviteUrl, add limit check |
+| `src/app/api/invitations/list/route.ts` | NEW | List invitations endpoint |
+| `src/app/api/invitations/revoke/route.ts` | NEW | Revoke invitation endpoint |
+| `src/app/api/companies/[id]/user-count/route.ts` | NEW | User count endpoint |
+| `src/components/dashboard/invite-user-dialog.tsx` | MODIFY | Success state, copy link |
+| `src/components/dashboard/pending-invitations-list.tsx` | NEW | Invitations table |
+| `src/hooks/useCompanyUserCount.ts` | NEW | User count hook |
+| `.env.example` | MODIFY | Add NEXT_PUBLIC_APP_URL |
+
+### References
+
+- [docs/epics.md#story-2.3-invitation-link-copy-limit](docs/epics.md#story-2.3-invitation-link-copy-limit)
+- [docs/sprint-artifacts/tech-spec-epic-2.md](docs/sprint-artifacts/tech-spec-epic-2.md)
+- [docs/prd.md](docs/prd.md)
+- [docs/architecture.md#repository-pattern](docs/architecture.md#repository-pattern)
+- [AGENTS.md#supabase--rls](AGENTS.md#supabase--rls)
+
+### Dependencies
+
+- **Story 2.2** (Invitation Accept Flow): `/join` page must work for copied links to be useful
+
+## Dev Agent Record
+
+### Context Reference
+
+<!-- Path(s) to story context XML will be added here by context workflow -->
+
+### Agent Model Used
+
+Claude Opus 4.5 (Preview)
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+## Change Log
+
+- 2025-11-28: Story drafted via SM agent for Epic 2 hotfix (Story 2.3).
