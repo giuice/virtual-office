@@ -56,7 +56,7 @@ development_status:
   # See: docs/sprint-artifacts/hotfix-epic2-invitation-flow.md
   epic-2: contexted  # Has tech context from existing code analysis
   2-1-registration-ux-feedback: done  # ✅ COMPLETE 2025-12-01 - Email confirmation, error mapping, resend inline, server-client fix
-  2-2-invitation-accept-flow: ready-for-dev  # ✅ READY 2025-11-29 - Context created, ready for dev
+  2-2-invitation-accept-flow: in-progress  # 🔍 REVIEW 2025-12-01 - Token validation, auth flow, auto-accept, 38 tests
   2-3-invitation-link-copy-limit: ready-for-dev  # ✅ READY 2025-11-29 - Context created, ready for dev
   epic-2-retrospective: optional
   

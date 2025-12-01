@@ -29,7 +29,20 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ user }, { status: 200 });
+    // If user has company, fetch company name for AC6 display
+    let companyName: string | null = null;
+    if (user.companyId) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', user.companyId)
+        .single();
+      companyName = company?.name || null;
+    }
+
+    return NextResponse.json({ 
+      user: { ...user, companyName } 
+    }, { status: 200 });
   } catch (error) {
     console.error('Error in get-by-id:', error);
     return NextResponse.json(
