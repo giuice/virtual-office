@@ -1,7 +1,7 @@
 // src/app/(auth)/signup/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Loader2 } from 'lucide-react';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { EmailConfirmationMessage } from '@/components/auth/EmailConfirmationMessage';
 
 type FormStatus = 'idle' | 'password' | 'google';
 
@@ -34,16 +36,31 @@ export default function SignupPage() {
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = useState<{ success: boolean; email: string } | null>(null);
 
   const router = useRouter();
   const { signUp, signInWithGoogle, loading: authLoading, isAuthReady, actionLoading } = useAuth();
   const { showSuccess, showError } = useNotification();
+  const errorRef = useRef<HTMLDivElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
 
   const isBusy = isLoading || actionLoading;
   const isDisabled = isBusy || !isAuthReady;
 
+  useEffect(() => {
+    if (formError) {
+      errorRef.current?.focus();
+    }
+  }, [formError]);
+
+  useEffect(() => {
+    if (signupSuccess?.success) {
+      successRef.current?.focus();
+    }
+  }, [signupSuccess]);
+
   if (!isAuthReady || authLoading) {
-    return <AuthLoadingScreen message="Preparing sign up experience..." />;
+    return <AuthLoadingScreen message="Preparando experiência de cadastro..." />;
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,20 +68,20 @@ export default function SignupPage() {
     setFormError(null);
 
     if (password !== confirmPassword) {
-      const mismatchMessage = 'Passwords do not match. Please confirm your password.';
+      const mismatchMessage = 'As senhas não conferem. Confirme sua senha.';
       setFormError(mismatchMessage);
       showError({ description: mismatchMessage });
       return;
     }
 
-    setStatusMessage('Creating your account...');
+    setStatusMessage('Criando sua conta...');
     setIsLoading(true);
     setFormStatus('password');
 
     try {
       await signUp(email, password, displayName);
-      showSuccess({ description: 'Account created successfully!' });
-      router.push('/create-company');
+      setSignupSuccess({ success: true, email });
+      showSuccess({ description: 'Conta criada com sucesso!' });
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
       showError({ description: friendlyMessage });
@@ -78,14 +95,14 @@ export default function SignupPage() {
 
   const handleGoogleSignIn = async () => {
     setFormError(null);
-    setStatusMessage('Signing up with Google...');
+    setStatusMessage('Entrando com Google...');
     setIsLoading(true);
     setFormStatus('google');
 
     try {
       await signInWithGoogle();
-      showSuccess({ description: 'Successfully signed up with Google!' });
-      router.push('/create-company');
+      showSuccess({ description: 'Conta criada com Google com sucesso!' });
+      router.push('/onboarding');
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
       showError({ description: friendlyMessage });
@@ -100,12 +117,30 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Sign up to join your virtual office</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {signupSuccess ? (
+          <CardContent className="pt-6" tabIndex={-1} ref={successRef}>
+            <EmailConfirmationMessage
+              email={signupSuccess.email}
+              onResend={async () => {
+                const supabase = createSupabaseBrowserClient();
+                const { error } = await supabase.auth.resend({ type: 'signup', email: signupSuccess.email });
+                if (error) throw error;
+              }}
+            />
+            <div className="mt-4 text-center">
+              <Link href="/login" className="text-sm text-primary hover:underline">
+                Já confirmou? Fazer login
+              </Link>
+            </div>
+          </CardContent>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle>Criar conta</CardTitle>
+              <CardDescription>Cadastre-se para acessar seu escritório virtual</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
                 Email
@@ -115,49 +150,49 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="Digite seu email"
                 required
                 disabled={isDisabled}
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="displayName" className="text-sm font-medium">
-                Display Name
+                Nome
               </label>
               <Input
                 id="displayName"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter your name"
+                placeholder="Digite seu nome"
                 required
                 disabled={isDisabled}
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
-                Password
+                Senha
               </label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
+                placeholder="Crie uma senha"
                 required
                 disabled={isDisabled}
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
-                Confirm Password
+                Confirmar senha
               </label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
+                placeholder="Confirme sua senha"
                 required
                 disabled={isDisabled}
               />
@@ -166,6 +201,8 @@ export default function SignupPage() {
             {formError && (
               <div
                 role="alert"
+                tabIndex={-1}
+                ref={errorRef}
                 className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
               >
                 {formError}
@@ -176,10 +213,10 @@ export default function SignupPage() {
               {isBusy && formStatus === 'password' ? (
                 <span className="inline-flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {statusMessage ?? 'Creating account...'}
+                  {statusMessage ?? 'Criando conta...'}
                 </span>
               ) : (
-                'Create Account'
+                'Criar conta'
               )}
             </Button>
 
@@ -188,7 +225,7 @@ export default function SignupPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">Ou continuar com</span>
               </div>
             </div>
 
@@ -202,7 +239,7 @@ export default function SignupPage() {
               {isBusy && formStatus === 'google' ? (
                 <span className="inline-flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {statusMessage ?? 'Signing up with Google...'}
+                  {statusMessage ?? 'Entrando com Google...'}
                 </span>
               ) : (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -224,7 +261,7 @@ export default function SignupPage() {
                       fill="#EA4335"
                     />
                   </svg>
-                  Sign up with Google
+                  Entrar com Google
                 </span>
               )}
             </Button>
@@ -234,15 +271,16 @@ export default function SignupPage() {
             </p>
 
             <p className="text-sm text-center text-muted-foreground">
-              Already have an account?{' '}
+              Já tem uma conta?{' '}
               <Link href="/login" className="text-primary hover:underline">
-                Sign in
+                Entrar
               </Link>
             </p>
           </form>
         </CardContent>
+          </>
+        )}
       </Card>
     </div>
   );
 }
-

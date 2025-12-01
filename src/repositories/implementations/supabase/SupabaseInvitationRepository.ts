@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase/client';
 import { IInvitationRepository } from '@/repositories/interfaces/IInvitationRepository';
 import { Invitation, UserRole } from '@/types/database'; // Import UserRole if needed
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase
 // Handles timestamp conversions
@@ -40,9 +41,14 @@ function mapToCamelCase(data: InvitationRow | null): Invitation | null {
 
 export class SupabaseInvitationRepository implements IInvitationRepository {
   private TABLE_NAME = 'invitations'; // Ensure this matches your Supabase table name
+  private client: SupabaseClient;
+
+  constructor(client: SupabaseClient = supabase) {
+    this.client = client;
+  }
 
   async findByToken(token: string): Promise<Invitation | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .select('*')
       .eq('token', token) // Assuming 'token' is the primary key or unique
@@ -70,7 +76,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
         // created_at handled by Supabase default value
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -87,7 +93,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
   }
 
   async updateStatus(token: string, status: Invitation['status']): Promise<Invitation | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .update({ status: status })
       .eq('token', token)
@@ -101,6 +107,21 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     }
     // Map DB response back to Invitation type
   return data ? mapToCamelCase(data) : null;
+  }
+
+  async findByCompanyId(companyId: string): Promise<Invitation[]> {
+    const { data, error } = await this.client
+      .from(this.TABLE_NAME)
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching invitations by company:', error);
+      throw error;
+    }
+
+    return (data || []).map((row) => mapToCamelCase(row)).filter(Boolean) as Invitation[];
   }
 
   // Optional: Implement deleteByToken if needed

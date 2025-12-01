@@ -1,7 +1,7 @@
 // src/app/(auth)/login/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Loader2 } from 'lucide-react';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 type FormStatus = 'idle' | 'credential' | 'google';
 
@@ -33,6 +34,8 @@ export default function LoginPage() {
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
   const {
@@ -43,11 +46,17 @@ export default function LoginPage() {
     isAuthReady,
     actionLoading,
   } = useAuth();
-  const { company, isLoading: companyLoading, currentUserProfile } = useCompany();
+  const { isLoading: companyLoading } = useCompany();
   const { showSuccess, showError } = useNotification();
 
   const isBusy = isLoading || actionLoading;
   const isDisabled = isBusy || !isAuthReady;
+
+  useEffect(() => {
+    if (formError) {
+      errorRef.current?.focus();
+    }
+  }, [formError]);
 
   useEffect(() => {
     if (!isAuthReady) {
@@ -57,34 +66,36 @@ export default function LoginPage() {
     if (!user || companyLoading) return;
 
     const redirectTimer = setTimeout(() => {
-      if (!company || !currentUserProfile?.companyId) {
-        router.push('/create-company');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push('/onboarding');
     }, 400);
 
     return () => clearTimeout(redirectTimer);
-  }, [company, companyLoading, currentUserProfile, isAuthReady, router, user]);
+  }, [companyLoading, isAuthReady, router, user]);
 
   if (!isAuthReady || authLoading) {
-    return <AuthLoadingScreen message="Restoring session..." />;
+    return <AuthLoadingScreen message="Restaurando sessão..." />;
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError(null);
-    setStatusMessage('Signing in...');
+    setStatusMessage('Entrando...');
     setIsLoading(true);
     setFormStatus('credential');
 
     try {
       await signIn(email, password);
-      showSuccess({ description: 'Successfully logged in!' });
+      showSuccess({ description: 'Login realizado com sucesso!' });
     } catch (error) {
-      const friendlyMessage = mapSupabaseAuthError(error);
-      showError({ description: friendlyMessage });
-      setFormError(friendlyMessage);
+      const err = error as any;
+      if (err?.code === 'email_not_confirmed') {
+        setUnconfirmedEmail(email);
+        setFormError('Email não confirmado');
+      } else {
+        const friendlyMessage = mapSupabaseAuthError(error);
+        showError({ description: friendlyMessage });
+        setFormError(friendlyMessage);
+      }
       setStatusMessage(null);
     } finally {
       setFormStatus('idle');
@@ -94,13 +105,13 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setFormError(null);
-    setStatusMessage('Signing in with Google...');
+    setStatusMessage('Entrando com Google...');
     setIsLoading(true);
     setFormStatus('google');
 
     try {
       await signInWithGoogle();
-      showSuccess({ description: 'Successfully logged in with Google!' });
+      showSuccess({ description: 'Login com Google realizado!' });
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
       showError({ description: friendlyMessage });
@@ -116,8 +127,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
-          <CardDescription>Sign in to access your virtual office</CardDescription>
+          <CardTitle>Bem-vindo de volta</CardTitle>
+          <CardDescription>Entre para acessar seu escritório virtual</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -129,22 +140,28 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (unconfirmedEmail) {
+                    setUnconfirmedEmail(null);
+                    setFormError(null);
+                  }
+                }}
+                placeholder="Digite seu email"
                 required
                 disabled={isDisabled}
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
-                Password
+                Senha
               </label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder="Digite sua senha"
                 required
                 disabled={isDisabled}
               />
@@ -153,9 +170,33 @@ export default function LoginPage() {
             {formError && (
               <div
                 role="alert"
+                tabIndex={-1}
+                ref={errorRef}
                 className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
               >
                 {formError}
+              </div>
+            )}
+
+            {unconfirmedEmail && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Verifique sua caixa de entrada ou clique abaixo para reenviar.</p>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const supabase = createSupabaseBrowserClient();
+                      const { error } = await supabase.auth.resend({ type: 'signup', email: unconfirmedEmail });
+                      if (error) throw error;
+                      showSuccess({ description: 'Email reenviado com sucesso!' });
+                    } catch (error) {
+                      showError({ description: 'Erro ao reenviar email.' });
+                    }
+                  }}
+                  className="w-full"
+                >
+                  Reenviar confirmação
+                </Button>
               </div>
             )}
 
@@ -163,10 +204,10 @@ export default function LoginPage() {
               {isBusy && formStatus === 'credential' ? (
                 <span className="inline-flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {statusMessage ?? 'Signing in...'}
+                  {statusMessage ?? 'Entrando...'}
                 </span>
               ) : (
-                'Sign In'
+                'Entrar'
               )}
             </Button>
 
@@ -175,7 +216,7 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">Ou continuar com</span>
               </div>
             </div>
 
@@ -189,7 +230,7 @@ export default function LoginPage() {
               {isBusy && formStatus === 'google' ? (
                 <span className="inline-flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {statusMessage ?? 'Signing in with Google...'}
+                  {statusMessage ?? 'Entrando com Google...'}
                 </span>
               ) : (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -211,7 +252,7 @@ export default function LoginPage() {
                       fill="#EA4335"
                     />
                   </svg>
-                  Sign in with Google
+                  Entrar com Google
                 </span>
               )}
             </Button>
@@ -221,9 +262,9 @@ export default function LoginPage() {
             </p>
 
             <p className="text-sm text-center text-muted-foreground">
-              Don't have an account?{' '}
+              Não tem conta?{' '}
               <Link href="/signup" className="text-primary hover:underline">
-                Sign up
+                Criar conta
               </Link>
             </p>
           </form>
@@ -232,4 +273,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

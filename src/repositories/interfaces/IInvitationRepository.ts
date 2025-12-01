@@ -25,6 +25,12 @@ export interface IInvitationRepository {
   updateStatus(token: string, status: Invitation['status']): Promise<Invitation | null>;
 
   /**
+   * Lists invitations for a company.
+   * @param companyId Company identifier
+   */
+  findByCompanyId(companyId: string): Promise<Invitation[]>;
+
+  /**
    * Deletes an invitation by its unique token.
    * (Optional, implement if needed for cleanup or revocation)
    * @param token The unique token of the invitation to delete.
