@@ -13,6 +13,8 @@ import { InviteUserDialog } from './invite-user-dialog';
 import { getUserInitials } from '@/lib/avatar-utils';
 import { UserRole, User } from '@/types/database';
 import { useNotification } from '@/hooks/useNotification';
+import { Mail, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 // Role Management Dialog Component
 function RoleManagementDialog({ user, onRoleChange }: { 
@@ -225,68 +227,91 @@ export function CompanyMembers() {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Team Members</CardTitle>
-          <CardDescription>
-            {companyUsers.length} member{companyUsers.length !== 1 ? 's' : ''} in {company?.name}
-          </CardDescription>
-        </div>
-        {isAdmin && <InviteUserDialog />}
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {companyUsers.map((user) => (
-            <div key={user.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <EnhancedAvatarV2
-                  user={user}
-                  size="md"
-                  showStatus={true}
-                  status={user.status}
-                  onError={(error) => {
-                    console.warn(`Avatar load failed for user ${user.displayName}:`, error.additionalInfo.message);
-                  }}
-                />
-                <div>
-                  <div className="font-medium">{user.displayName}</div>
-                  <div className="text-sm text-muted-foreground">{user.email}</div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Team Members</CardTitle>
+            <CardDescription>
+              {companyUsers.length} member{companyUsers.length !== 1 ? 's' : ''} in {company?.name}
+            </CardDescription>
+          </div>
+          {isAdmin && <InviteUserDialog />}
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {companyUsers.map((user) => (
+              <div key={user.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <EnhancedAvatarV2
+                    user={user}
+                    size="md"
+                    showStatus={true}
+                    status={user.status}
+                    onError={(error) => {
+                      console.warn(`Avatar load failed for user ${user.displayName}:`, error.additionalInfo.message);
+                    }}
+                  />
+                  <div>
+                    <div className="font-medium">{user.displayName}</div>
+                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getRoleBadge(user.role)}
+                  {user.id === currentUserProfile?.id && (
+                    <Badge variant="secondary">You</Badge>
+                  )}
+                  
+                  {/* Admin actions dropdown */}
+                  {isAdmin && user.id !== currentUserProfile?.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="19" cy="12" r="1" />
+                            <circle cx="5" cy="12" r="1" />
+                          </svg>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <RoleManagementDialog user={user} onRoleChange={handleRoleChange} />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <RemoveUserDialog user={user} onRemoveUser={handleRemoveUser} />
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {getRoleBadge(user.role)}
-                {user.id === currentUserProfile?.id && (
-                  <Badge variant="secondary">You</Badge>
-                )}
-                
-                {/* Admin actions dropdown */}
-                {isAdmin && user.id !== currentUserProfile?.id && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                          <circle cx="12" cy="12" r="1" />
-                          <circle cx="19" cy="12" r="1" />
-                          <circle cx="5" cy="12" r="1" />
-                        </svg>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <RoleManagementDialog user={user} onRoleChange={handleRoleChange} />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <RemoveUserDialog user={user} onRemoveUser={handleRemoveUser} />
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Link to manage invitations - only visible to admins */}
+      {isAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Gerenciar Convites
+              </CardTitle>
+              <CardDescription>Crie, copie e revogue convites para sua equipe</CardDescription>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            <Button asChild variant="outline">
+              <Link href="/admin/invitations" className="flex items-center gap-2">
+                Abrir Gerenciador
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+        </Card>
+      )}
+    </div>
   );
 }

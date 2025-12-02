@@ -249,28 +249,21 @@ vi.mock('@/lib/supabase/server-client', () => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      delete: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
     }),
+    storage: {
+      from: vi.fn().mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+        upload: vi.fn().mockResolvedValue({ error: null }),
+        getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/test.jpg' } }),
+      }),
+    },
   }),
 }));
 
-// Mock createRouteHandlerClient for Supabase
-vi.mock('@supabase/auth-helpers-nextjs', () => {
-  return {
-    createRouteHandlerClient: vi.fn().mockReturnValue({
-      storage: {
-        from: vi.fn().mockReturnValue({
-          upload: vi.fn().mockResolvedValue({ error: null }),
-          getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/test.jpg' } }),
-        }),
-      },
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: { participants: ['user-db-456'] } }),
-      }),
-    }),
-  };
-});
+// '@supabase/auth-helpers-nextjs' used to be mocked here. We've migrated to '@supabase/ssr' and wrapped client helpers.
+// The server and browser clients are already mocked above, including storage.
 
 // Mock session validation
 vi.mock('@/lib/auth/session', () => {

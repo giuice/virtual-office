@@ -252,12 +252,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
   // Update company details
   const updateCompanyDetails = async (data: Partial<Company>): Promise<void> => {
-    if (!company || !user?.id) { // Check user.id
+    if (!company || !currentUserProfile?.id) {
       throw new Error('Company and authenticated user required');
     }
 
-    // Check if user is admin (assuming company.adminIds stores Supabase UIDs)
-    if (!company.adminIds.includes(user.id)) {
+    // Check if user is admin (company.adminIds stores database user IDs, not Supabase Auth UIDs)
+    if (!company.adminIds.includes(currentUserProfile.id)) {
       throw new Error('Only admins can update company details');
     }
 
@@ -323,13 +323,13 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   // Update user role
   const updateUserRole = async (userDbIdToUpdate: string, newRole: UserRole): Promise<void> => {
     // userDbIdToUpdate is the DB ID of the user whose role is being changed
-    // user.id is the Supabase Auth UID of the *current* admin performing the action
-    if (!user?.id || !company || !currentUserProfile) {
+    // currentUserProfile.id is the DB ID of the *current* admin performing the action
+    if (!user?.id || !company || !currentUserProfile?.id) {
       throw new Error('Admin user must be authenticated with a company profile');
     }
 
-    // Check if the *current* user is admin (assuming company.adminIds stores Supabase UIDs)
-    if (!company.adminIds.includes(user.id)) {
+    // Check if the *current* user is admin (company.adminIds stores database user IDs)
+    if (!company.adminIds.includes(currentUserProfile.id)) {
       throw new Error('Only admins can update user roles');
     }
 
@@ -345,22 +345,22 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       // Use API client to update user role, passing the DB User ID
       await apiUpdateUserRole(userDbIdToUpdate, newRole); // api.ts expects DB ID
 
-      // Find the target user in local state to get their Supabase UID for adminIds update
+      // Find the target user in local state to get their DB ID for adminIds update
       const targetUser = companyUsers.find(u => u.id === userDbIdToUpdate);
-      if (!targetUser?.supabase_uid) {
-        console.warn(`[CompanyContext] Could not find Supabase UID for user ${userDbIdToUpdate} in local state to update adminIds.`);
+      if (!targetUser) {
+        console.warn(`[CompanyContext] Could not find user ${userDbIdToUpdate} in local state to update adminIds.`);
         // Consider reloading users or handling this case more robustly
       } else {
-        const targetUserSupabaseUid = targetUser.supabase_uid;
+        const targetUserDbId = targetUser.id;
         let updatedAdminIds = [...company.adminIds];
-        const isAdmin = company.adminIds.includes(targetUserSupabaseUid);
+        const isAdmin = company.adminIds.includes(targetUserDbId);
 
         let needsCompanyUpdate = false;
         if (newRole === 'admin' && !isAdmin) {
-            updatedAdminIds.push(targetUserSupabaseUid);
+            updatedAdminIds.push(targetUserDbId);
             needsCompanyUpdate = true;
         } else if (newRole !== 'admin' && isAdmin) {
-            updatedAdminIds = updatedAdminIds.filter(id => id !== targetUserSupabaseUid);
+            updatedAdminIds = updatedAdminIds.filter(id => id !== targetUserDbId);
             needsCompanyUpdate = true;
         }
 
@@ -368,7 +368,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             await updateCompany(company.id, { adminIds: updatedAdminIds });
             // Update local company state optimistically
             setCompany(prev => prev ? { ...prev, adminIds: updatedAdminIds } : null);
-            console.log(`[CompanyContext] Company adminIds updated for user ${targetUserSupabaseUid}.`);
+            console.log(`[CompanyContext] Company adminIds updated for user ${targetUserDbId}.`);
         }
       }
 
@@ -392,21 +392,21 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   // Remove user from company
   const removeUserFromCompany = async (userDbIdToRemove: string): Promise<void> => {
     // userDbIdToRemove is the DB ID of the user being removed
-    // user.id is the Supabase Auth UID of the *current* admin performing the action
-    if (!user?.id || !company || !currentUserProfile) {
+    // currentUserProfile.id is the DB ID of the *current* admin performing the action
+    if (!user?.id || !company || !currentUserProfile?.id) {
       throw new Error('Admin user must be authenticated with a company profile');
     }
 
-    // Check if the *current* user is admin (assuming company.adminIds stores Supabase UIDs)
-    if (!company.adminIds.includes(user.id)) {
+    // Check if the *current* user is admin (company.adminIds stores database user IDs)
+    if (!company.adminIds.includes(currentUserProfile.id)) {
       throw new Error('Only admins can remove users');
     }
 
     // Find the user being removed to check if they are the current user
     const userToRemoveProfile = companyUsers.find(u => u.id === userDbIdToRemove);
 
-    // Prevent removing yourself (check against Supabase Auth UID)
-    if (userToRemoveProfile?.supabase_uid === user.id) {
+    // Prevent removing yourself (check against DB ID)
+    if (userDbIdToRemove === currentUserProfile.id) {
       throw new Error('You cannot remove yourself from the company using this function.');
     }
 
@@ -417,14 +417,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       // Use API client to remove user from company, passing the DB User ID
       await apiRemoveUserFromCompany(userDbIdToRemove, company.id); // api.ts expects DB ID
 
-      // If removed user was an admin, update company adminIds (using their Supabase UID)
-      const removedUserSupabaseUid = userToRemoveProfile?.supabase_uid;
-      if (removedUserSupabaseUid && company.adminIds.includes(removedUserSupabaseUid)) {
-        const updatedAdminIds = company.adminIds.filter(id => id !== removedUserSupabaseUid);
+      // If removed user was an admin, update company adminIds (using their DB ID)
+      const removedUserDbId = userToRemoveProfile?.id;
+      if (removedUserDbId && company.adminIds.includes(removedUserDbId)) {
+        const updatedAdminIds = company.adminIds.filter(id => id !== removedUserDbId);
         await updateCompany(company.id, { adminIds: updatedAdminIds });
         // Update local company state optimistically
         setCompany(prev => prev ? { ...prev, adminIds: updatedAdminIds } : null);
-        console.log(`[CompanyContext] Company adminIds updated after removing admin ${removedUserSupabaseUid}.`);
+        console.log(`[CompanyContext] Company adminIds updated after removing admin ${removedUserDbId}.`);
       }
 
       // Remove user from local state using DB User ID

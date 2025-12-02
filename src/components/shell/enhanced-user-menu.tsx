@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
@@ -15,10 +16,15 @@ import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
 export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
   const { currentUserProfile } = useCompany();
+  const { users } = usePresence();
   const router = useRouter();
   const { showSuccess, showError } = useNotification();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Get presence-aware status for the current user
+  const presenceAwareUser = users?.find(u => u.id === currentUserProfile?.id);
+  const currentStatus = presenceAwareUser?.status || currentUserProfile?.status || 'offline';
 
   const handleSignOut = async () => {
     try {
@@ -85,8 +91,10 @@ export function EnhancedUserMenu() {
     );
   }
   // Combine Supabase user data with our database user profile
+  // Use presence-aware status for real-time accuracy
   const combinedUser = {
     ...currentUserProfile,
+    status: currentStatus,
     photoURL: user?.user_metadata?.avatar_url || currentUserProfile.avatarUrl || user?.user_metadata.photoURL,
   };
 
@@ -123,12 +131,12 @@ export function EnhancedUserMenu() {
               <div className="flex items-center mt-1">
                 <span className={`
                   h-2 w-2 rounded-full mr-1
-                  ${currentUserProfile.status === 'online' ? 'bg-emerald-500' : 
-                    currentUserProfile.status === 'away' ? 'bg-amber-500' : 
-                    currentUserProfile.status === 'busy' ? 'bg-rose-500' : 
+                  ${currentStatus === 'online' ? 'bg-emerald-500' : 
+                    currentStatus === 'away' ? 'bg-amber-500' : 
+                    currentStatus === 'busy' ? 'bg-rose-500' : 
                     'bg-gray-400'}
                 `} />
-                <span className="text-xs capitalize">{currentUserProfile.status}</span>
+                <span className="text-xs capitalize">{currentStatus}</span>
               </div>
             </div>
           </div>

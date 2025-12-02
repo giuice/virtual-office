@@ -1,7 +1,6 @@
 // src/app/api/messages/attachment/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { validateUserSession } from '@/lib/auth/session';
 
 /**
@@ -26,8 +25,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Attachment ID is required' }, { status: 400 });
     }
     
-    // Create Supabase client with context
-    const supabase = createRouteHandlerClient({ cookies });
+    // Create Supabase client with server-side context
+    const supabase = await createSupabaseServerClient();
     
     // Get the attachment to find its path in storage
     const { data: attachment, error: fetchError } = await supabase

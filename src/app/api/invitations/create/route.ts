@@ -75,6 +75,35 @@ export async function POST(request: Request) {
       );
     }
 
+    // AC4: Check 10-user freemium limit before creating invitation
+    const { count: userCount } = await supabaseClient
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId);
+
+    const { count: pendingCount } = await supabaseClient
+      .from('invitations')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('status', 'pending');
+
+    const totalCount = (userCount || 0) + (pendingCount || 0);
+    const limit = 10;
+
+    if (totalCount >= limit) {
+      console.log(`[API /invitations/create] User limit reached for company ${companyId}: ${totalCount}/${limit}`);
+      return NextResponse.json(
+        {
+          error: 'USER_LIMIT_REACHED',
+          message: 'Limite atingido (10 usuários). O plano gratuito permite até 10 usuários.',
+          limit,
+          current: totalCount,
+          remaining: 0,
+        },
+        { status: 403 }
+      );
+    }
+
     // Generate a secure random token for our records
     const token = crypto.randomBytes(32).toString('hex');
     
@@ -136,6 +165,10 @@ export async function POST(request: Request) {
       console.warn('[API /invitations/create] Warning: Email sent but failed to create invitation record');
     }
 
+    // Build the full invite URL for the admin to share
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+    const inviteUrl = `${baseUrl}/join?token=${token}`;
+
     // Return success response (token included for admin to share the link)
     return NextResponse.json({
       success: true,
@@ -146,7 +179,11 @@ export async function POST(request: Request) {
         email: email,
         token: token, // Admin needs this to share the invitation link
         expiresAt: new Date(expiresAtMs).toISOString(),
-      }
+        inviteUrl: inviteUrl, // AC6: Full URL for copying
+      },
+      // AC4: Return remaining capacity to help UI display
+      limit,
+      remaining: Math.max(0, limit - totalCount - 1), // -1 because we just created one
     }, { status: 201 });
     
   } catch (error) {

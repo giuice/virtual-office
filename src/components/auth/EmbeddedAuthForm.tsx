@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/hooks/useNotification';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, KeyRound } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 interface EmbeddedAuthFormProps {
   /**
@@ -25,8 +26,8 @@ interface EmbeddedAuthFormProps {
   disabled?: boolean;
 }
 
-type FormStatus = 'idle' | 'credential' | 'google';
-type AuthMode = 'login' | 'signup';
+type FormStatus = 'idle' | 'credential' | 'google' | 'resending';
+type AuthMode = 'login' | 'signup' | 'set-password';
 
 export function EmbeddedAuthForm({
   onSuccess,
@@ -40,7 +41,9 @@ export function EmbeddedAuthForm({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
   const [formError, setFormError] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode>('signup');
+  const [emailSent, setEmailSent] = useState(false);
+  // If user was invited via email, show set-password flow (they need to define password via reset)
+  const [authMode, setAuthMode] = useState<AuthMode>(inviteEmail ? 'set-password' : 'signup');
 
   const errorRef = useRef<HTMLDivElement>(null);
   
@@ -49,6 +52,35 @@ export function EmbeddedAuthForm({
 
   const isBusy = actionLoading || formStatus !== 'idle';
   const isDisabled = disabled || isBusy || !isAuthReady;
+
+  // Resend invite/magic link for invited users
+  const handleResendInviteEmail = async () => {
+    if (!inviteEmail) return;
+    
+    setFormStatus('resending');
+    setFormError(null);
+    
+    try {
+      const supabase = createSupabaseBrowserClient();
+      
+      // Use password reset to send a new magic link
+      // This works because the user was created via invite
+      const { error } = await supabase.auth.resetPasswordForEmail(inviteEmail, {
+        redirectTo: `${window.location.origin}${window.location.pathname}${window.location.search}`,
+      });
+      
+      if (error) throw error;
+      
+      setEmailSent(true);
+      showSuccess({ description: 'Email reenviado! Verifique sua caixa de entrada.' });
+    } catch (error) {
+      const friendlyMessage = mapSupabaseAuthError(error);
+      setFormError(friendlyMessage);
+      showError({ description: friendlyMessage });
+    } finally {
+      setFormStatus('idle');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -173,7 +205,79 @@ export function EmbeddedAuthForm({
 
   return (
     <div className="space-y-4">
-      <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as AuthMode)}>
+      {/* Special flow for invited users - they need to click email link or use Google */}
+      {inviteEmail && authMode === 'set-password' && (
+        <div className="space-y-4">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+            <p className="font-medium flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Você foi convidado!
+            </p>
+            <p className="mt-2">
+              Um email de convite foi enviado para <strong>{inviteEmail}</strong>.
+            </p>
+            <p className="mt-1 text-xs">
+              Clique no link do email para acessar automaticamente, ou use uma das opções abaixo.
+            </p>
+          </div>
+
+          {emailSent ? (
+            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              <p>✓ Email reenviado! Verifique sua caixa de entrada (e spam).</p>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleResendInviteEmail}
+              disabled={isDisabled}
+            >
+              {formStatus === 'resending' ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Reenviando...
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Reenviar email de acesso
+                </span>
+              )}
+            </Button>
+          )}
+
+          {formError && (
+            <div
+              role="alert"
+              tabIndex={-1}
+              ref={errorRef}
+              aria-live="assertive"
+              className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {formError}
+            </div>
+          )}
+
+          {Divider}
+          {GoogleButton}
+          
+          <div className="text-center">
+            <Button
+              type="button"
+              variant="link"
+              className="text-xs text-muted-foreground"
+              onClick={() => setAuthMode('login')}
+            >
+              Já tenho senha? Fazer login
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Standard auth flow (no invite or user chose login/signup) */}
+      {(!inviteEmail || authMode !== 'set-password') && (
+        <Tabs value={authMode === 'set-password' ? 'login' : authMode} onValueChange={(v) => setAuthMode(v as AuthMode)}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signup" disabled={isDisabled}>
             Criar conta
@@ -339,6 +443,7 @@ export function EmbeddedAuthForm({
           </form>
         </TabsContent>
       </Tabs>
+      )}
     </div>
   );
 }

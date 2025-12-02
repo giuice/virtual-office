@@ -117,6 +117,23 @@ function JoinPageContent() {
             setPageState('error');
           } else {
             console.log('Session set successfully from hash:', data.user?.email);
+            
+            // Check if this is an invite flow - user needs to set password
+            // The 'type' will be 'invite' or 'recovery' for password-less users
+            if (type === 'invite' || type === 'recovery') {
+              console.log('Invite/recovery flow detected, redirecting to set-password...');
+              // Preserve the token in the URL for after password setup
+              const currentToken = new URLSearchParams(window.location.search).get('token');
+              const returnUrl = currentToken ? `/join?token=${currentToken}` : '/onboarding';
+              
+              // Store return URL for after password setup
+              sessionStorage.setItem('passwordSetReturnUrl', returnUrl);
+              
+              // Clear the hash and redirect to set-password
+              window.location.href = '/set-password';
+              return;
+            }
+            
             // Clear the hash from URL to prevent reprocessing
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
@@ -129,7 +146,7 @@ function JoinPageContent() {
     };
 
     processHashFragment();
-  }, []);
+  }, [router]);
 
   /**
    * Validate token via API (AC2)
@@ -491,6 +508,11 @@ function JoinPageContent() {
               ? `Você foi convidado para ${validationData.companyName}`
               : 'Você foi convidado para entrar em uma empresa'}
           </CardDescription>
+          {validationData?.email && (
+            <p className="text-xs text-muted-foreground mt-2">
+              💡 Se você recebeu um email de convite, clique no link do email para acesso automático.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <EmbeddedAuthForm

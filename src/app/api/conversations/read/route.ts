@@ -1,7 +1,6 @@
 // src/app/api/conversations/read/route.ts
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+// cookies import removed: server-side client handles cookies internally
 import { validateUserSession } from '@/lib/auth/session';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
@@ -27,7 +26,8 @@ export async function PATCH(request: Request) {
   const { conversationRepository } = await getSupabaseRepositories(serverSupabase);
     
     // Check if the conversation exists and if the user is a participant
-    const supabase = createRouteHandlerClient({ cookies });
+    // Reuse the server Supabase client created earlier to access DB/storage
+    const supabase = serverSupabase;
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('participants')
