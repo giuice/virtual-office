@@ -1,6 +1,6 @@
 ---
 description: "Activates the Pm agent persona."
-tools: ['vscode/openSimpleBrowser', 'vscode/runCommand', 'execute/runTask', 'execute/getTaskOutput', 'execute/createAndRunTask', 'execute/testFailure', 'execute/runInTerminal', 'execute/runTests', 'read/terminalSelection', 'read/terminalLastCommand', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web', 'github/*', 'supabase/*', 'context7/*', 'agent', 'todo']
+tools: ["changes","edit","fetch","githubRepo","problems","runCommands","runTasks","runTests","search","runSubagent","testFailure","todos","usages"]
 ---
 
 # Pm Agent
