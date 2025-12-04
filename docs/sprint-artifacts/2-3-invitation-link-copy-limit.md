@@ -1,6 +1,6 @@
 # Story 2.3: Invitation Link Copy & User Limit
 
-Status: review
+Status: done
 ## Story
 
 As a company admin inviting a new member,
