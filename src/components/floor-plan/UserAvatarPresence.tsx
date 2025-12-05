@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserPresenceData } from '@/types/database';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
-import { 
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -27,6 +27,7 @@ export interface UserAvatarPresenceProps {
   size?: 'sm' | 'md' | 'lg';
   /** Show status text in tooltip */
   showStatusInTooltip?: boolean;
+
 }
 
 // Size mapping to EnhancedAvatarV2 sizes
@@ -36,8 +37,8 @@ const sizeMap = {
   lg: 'lg' as const,
 };
 
-const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({ 
-  user, 
+const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
+  user,
   onClick,
   isSpeaking = false,
   isPresenting = false,
@@ -76,10 +77,9 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
             className={cn(
               // Base styles - vo-avatar-item for constellation integration
               'vo-avatar-item relative inline-block',
-              // Hover interaction: translateY(-3px) scale(1.1) with z-index bump (AC6)
-              'transition-all duration-200 ease-out',
+              // Hover interaction: translateY(-3px) scale(1.1) with z-index bump
               'hover:translate-y-[-3px] hover:scale-110 hover:z-50',
-              // Status states (AC3)
+              // Status states (AC3) - smooth transitions via CSS
               isSpeaking && 'vo-avatar-speaking',
               isPresenting && 'vo-avatar-presenting',
               isMuted && 'vo-avatar-muted',

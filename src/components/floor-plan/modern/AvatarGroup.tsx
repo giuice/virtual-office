@@ -1,9 +1,10 @@
 // src/components/floor-plan/modern/AvatarGroup.tsx
 // Story 3.3: Avatar Constellation V2 - Smart stacking with negative margin overlap
-import React from 'react';
+// Story 3.13: Real-time presence animations with enter/exit tracking
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { UserPresenceData } from '@/types/database';
 import ModernUserAvatar from './ModernUserAvatar';
-import { 
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -48,6 +49,39 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   presentingUserId,
   mutedUserIds = [],
 }) => {
+  // Story 3.13 AC1: Track entering users for enter animation (only truly new users)
+  const [enteringUserIds, setEnteringUserIds] = useState<Set<string>>(new Set());
+  const prevUserIdsRef = useRef<Set<string>>(new Set(users.map(u => u.id)));
+  const isInitialRender = useRef(true);
+
+  // Story 3.13: Detect user additions and trigger enter animation
+  useEffect(() => {
+    const currentIds = new Set(users.map(u => u.id));
+    const prevIds = prevUserIdsRef.current;
+
+    // Skip animation on initial render
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      prevUserIdsRef.current = currentIds;
+      return;
+    }
+
+    // Find users that were added (present in current, not in prev)
+    const addedIds = Array.from(currentIds).filter(id => !prevIds.has(id));
+
+    // Handle entering users (animate in)
+    if (addedIds.length > 0) {
+      setEnteringUserIds(new Set(addedIds));
+      // Clear entering state after animation completes (300ms per AC1)
+      setTimeout(() => {
+        setEnteringUserIds(new Set());
+      }, 300);
+    }
+
+    // Always update ref for next comparison
+    prevUserIdsRef.current = currentIds;
+  }, [users]);
+
   // If no users are present
   if (users.length === 0 && showEmpty) {
     return (
@@ -64,28 +98,32 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
 
   // Calculate how many users to show and how many are remaining
   const visibleUsers = users.slice(0, max);
-  const remainingCount = users.length - max;
+  const remainingCount = Math.max(0, users.length - max);
 
   // Story 3.3: Check status for each user
   const isSpeaking = (userId: string) => speakingUserIds.includes(userId);
   const isPresenting = (userId: string) => presentingUserId === userId;
   const isMuted = (userId: string) => mutedUserIds.includes(userId);
+  // Story 3.13 AC1: Check if user is entering (new to the space)
+  const isEntering = (userId: string) => enteringUserIds.has(userId);
 
   return (
     <div className={cn("flex items-center", className)}>
       {/* Story 3.3: Avatar constellation with smart stacking */}
       <div className="vo-avatar-constellation flex items-center pl-[10px]">
         {visibleUsers.map((user, index) => (
-          <div 
-            key={user.id} 
+          <div
+            key={user.id}
             className={cn(
               'vo-avatar-item relative',
+              // Story 3.13 AC1: Enter animation only for truly new users
+              isEntering(user.id) && 'vo-avatar-enter',
               // Story 3.3: Status state classes
               isSpeaking(user.id) && 'vo-avatar-speaking',
               isPresenting(user.id) && 'vo-avatar-presenting',
               isMuted(user.id) && 'vo-avatar-muted'
             )}
-            style={{ 
+            style={{
               // Story 3.3: Negative margin overlap (-10px) per UX spec (AC4)
               marginLeft: index > 0 ? '-10px' : '0',
               // Story 3.3: Z-index layering - rightmost avatar on top
@@ -107,7 +145,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div 
+                <div
                   className="vo-avatar-overflow"
                   style={{ zIndex: visibleUsers.length + 1 }}
                   role="button"

@@ -41,7 +41,7 @@ generated: 2025-11-29T00:00:00.000000+00:00
 project: virtual-office
 project_key: virtual-office
 tracking_system: file-system
-story_location: "{project-root}/docs/stories"
+story_location: "{project-root}/docs/sprint-artifacts"
 
 # ============================================
 # Epic Status Overview
@@ -76,7 +76,7 @@ development_status:
   3-10-now-board-header: done  # ✅ COMPLETE - 2025-11-26 (NowBoard, metrics, beacon queue, search, glass-morphism, 63 tests)
   3-11-space-detail-hover-panel: done  # ✅ COMPLETE - 2025-11-27 (Hover panel, participant roster, activity log, transcript, bottom sheet, 43 tests)
   3-12-space-capacity-and-room-full-handling: done  # ✅ COMPLETE - 2025-11-28 (FullBadge, disabled join, API 409 validation, 16 tests, 401 total)
-  3-13-real-time-presence-animation: backlog
+  3-13-real-time-presence-animation: review  # ✅ COMPLETE - 2025-12-04 (Presence animations, exit tracking, 18 tests)
   3-14-mobile-responsive-floor-plan: backlog
   3-15-dashboard-landing-page-polish: done  # ✅ COMPLETE - 2025-11-26 (Fixed broken links, Coming Soon teasers, Investor Resources, double header fix)
   epic-3-retrospective: optional

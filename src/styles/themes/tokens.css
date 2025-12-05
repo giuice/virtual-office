@@ -391,6 +391,10 @@ html[data-theme="paper"] .vo-ambient-mesh {
   --vo-avatar-muted-opacity: 0.5;
   --vo-avatar-hover-lift: -3px;
   --vo-avatar-hover-scale: 1.1;
+  /* Story 3.13: Avatar presence animation tokens (AC1, AC2, AC3) */
+  --vo-avatar-enter-duration: 300ms;
+  --vo-avatar-leave-duration: 200ms;
+  --vo-avatar-status-transition: 300ms ease;
 }
 
 /* ============================================
@@ -829,3 +833,73 @@ html[data-theme="paper"] {
   transform: translateY(var(--vo-avatar-hover-lift)) scale(var(--vo-avatar-hover-scale));
   z-index: 50;
 }
+
+/* ============================================
+   AVATAR PRESENCE ANIMATIONS (Story 3.13)
+   ============================================ */
+
+/* AC1: Avatar enter animation - fade in with scale */
+@keyframes vo-avatar-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* AC2: Avatar leave animation - fade out with scale */
+@keyframes vo-avatar-leave {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* Avatar enter state class */
+.vo-avatar-enter {
+  animation: vo-avatar-enter var(--vo-avatar-enter-duration) ease-out forwards;
+}
+
+/* Avatar leave state class */
+.vo-avatar-leave {
+  animation: vo-avatar-leave var(--vo-avatar-leave-duration) ease-in forwards;
+}
+
+/* AC3: Smooth status transitions for speaking ring, presenting border, muted opacity */
+.vo-avatar-item {
+  transition: 
+    box-shadow var(--vo-avatar-status-transition),
+    border-color var(--vo-avatar-status-transition),
+    opacity var(--vo-avatar-status-transition),
+    transform 0.2s ease;
+}
+
+/* AC6: Reduced motion accessibility - disable scale/translate, use opacity only */
+@media (prefers-reduced-motion: reduce) {
+  .vo-avatar-item {
+    animation: none !important;
+    transition: opacity 0.3s ease !important;
+  }
+  
+  .vo-avatar-enter {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  
+  .vo-avatar-leave {
+    animation: none !important;
+  }
+  
+  .vo-avatar-item:hover {
+    transform: none !important;
+  }
+}
+
