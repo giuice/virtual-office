@@ -392,8 +392,8 @@ html[data-theme="paper"] .vo-ambient-mesh {
   --vo-avatar-hover-lift: -3px;
   --vo-avatar-hover-scale: 1.1;
   /* Story 3.13: Avatar presence animation tokens (AC1, AC2, AC3) */
-  --vo-avatar-enter-duration: 300ms;
-  --vo-avatar-leave-duration: 200ms;
+  --vo-avatar-enter-duration: 800ms;
+  --vo-avatar-leave-duration: 600ms;
   --vo-avatar-status-transition: 300ms ease;
 }
 

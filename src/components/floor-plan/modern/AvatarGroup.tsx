@@ -51,39 +51,64 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
 }) => {
   // Story 3.13 AC1: Track entering users for enter animation (only truly new users)
   const [enteringUserIds, setEnteringUserIds] = useState<Set<string>>(new Set());
-  const prevUserIdsRef = useRef<Set<string>>(new Set(users.map(u => u.id)));
+  // Story 3.13 AC2: Track exiting users for leave animation
+  const [exitingUsers, setExitingUsers] = useState<UserPresenceData[]>([]);
+
+  const prevUsersRef = useRef<UserPresenceData[]>(users);
   const isInitialRender = useRef(true);
 
-  // Story 3.13: Detect user additions and trigger enter animation
+  // Story 3.13: Detect user additions/removals and trigger animations
   useEffect(() => {
-    const currentIds = new Set(users.map(u => u.id));
-    const prevIds = prevUserIdsRef.current;
+    const currentUsers = users;
+    const prevUsers = prevUsersRef.current;
+    const currentIds = new Set(currentUsers.map(u => u.id));
+    const prevIds = new Set(prevUsers.map(u => u.id));
 
     // Skip animation on initial render
     if (isInitialRender.current) {
       isInitialRender.current = false;
-      prevUserIdsRef.current = currentIds;
+      prevUsersRef.current = currentUsers;
       return;
     }
 
-    // Find users that were added (present in current, not in prev)
+    // Find users that were added
     const addedIds = Array.from(currentIds).filter(id => !prevIds.has(id));
 
     // Handle entering users (animate in)
     if (addedIds.length > 0) {
-      setEnteringUserIds(new Set(addedIds));
+      setEnteringUserIds(prev => {
+        const next = new Set(prev);
+        addedIds.forEach(id => next.add(id));
+        return next;
+      });
       // Clear entering state after animation completes (300ms per AC1)
       setTimeout(() => {
-        setEnteringUserIds(new Set());
+        setEnteringUserIds(prev => {
+          const next = new Set(prev);
+          addedIds.forEach(id => next.delete(id));
+          return next;
+        });
       }, 300);
     }
 
+    // Find users that were removed
+    const removedUsers = prevUsers.filter(u => !currentIds.has(u.id));
+
+    // Handle exiting users (animate out)
+    if (removedUsers.length > 0) {
+      setExitingUsers(prev => [...prev, ...removedUsers]);
+      // Remove from exiting state after animation completes (200ms per AC2)
+      setTimeout(() => {
+        setExitingUsers(prev => prev.filter(u => !removedUsers.find(r => r.id === u.id)));
+      }, 200);
+    }
+
     // Always update ref for next comparison
-    prevUserIdsRef.current = currentIds;
+    prevUsersRef.current = currentUsers;
   }, [users]);
 
-  // If no users are present
-  if (users.length === 0 && showEmpty) {
+  // If no users are present (and no exiting users)
+  if (users.length === 0 && exitingUsers.length === 0 && showEmpty) {
     return (
       <div className={cn("flex items-center", className)}>
         <span className="text-xs text-muted-foreground">{emptyText}</span>
@@ -92,20 +117,26 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   }
 
   // Display empty div if no users and showEmpty is false
-  if (users.length === 0 && !showEmpty) {
+  if (users.length === 0 && exitingUsers.length === 0 && !showEmpty) {
     return <div className={className} />;
   }
 
+  // Combine current and exiting users for rendering
+  // Note: Exiting users are appended to ensure they don't shift current users
+  const allUsers = [...users, ...exitingUsers];
+
   // Calculate how many users to show and how many are remaining
-  const visibleUsers = users.slice(0, max);
-  const remainingCount = Math.max(0, users.length - max);
+  const visibleUsers = allUsers.slice(0, max);
+  const remainingCount = Math.max(0, allUsers.length - max);
 
   // Story 3.3: Check status for each user
   const isSpeaking = (userId: string) => speakingUserIds.includes(userId);
   const isPresenting = (userId: string) => presentingUserId === userId;
   const isMuted = (userId: string) => mutedUserIds.includes(userId);
-  // Story 3.13 AC1: Check if user is entering (new to the space)
+  // Story 3.13 AC1: Check if user is entering
   const isEntering = (userId: string) => enteringUserIds.has(userId);
+  // Story 3.13 AC2: Check if user is exiting
+  const isExiting = (userId: string) => exitingUsers.some(u => u.id === userId);
 
   return (
     <div className={cn("flex items-center", className)}>
@@ -116,8 +147,10 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
             key={user.id}
             className={cn(
               'vo-avatar-item relative',
-              // Story 3.13 AC1: Enter animation only for truly new users
+              // Story 3.13 AC1: Enter animation
               isEntering(user.id) && 'vo-avatar-enter',
+              // Story 3.13 AC2: Leave animation
+              isExiting(user.id) && 'vo-avatar-leave',
               // Story 3.3: Status state classes
               isSpeaking(user.id) && 'vo-avatar-speaking',
               isPresenting(user.id) && 'vo-avatar-presenting',

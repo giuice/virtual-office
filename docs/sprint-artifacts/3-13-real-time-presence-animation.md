@@ -1,6 +1,6 @@
 # Story 3.13: Real-Time Presence Animation
 
-Status: Ready for Review
+Status: Done
 
 ## Story
 
@@ -180,4 +180,9 @@ Implement `@media (prefers-reduced-motion: reduce)` for all new animations.
 - src/components/floor-plan/UserAvatarPresence.tsx (modified: +8 lines - isExiting prop, animation classes)
 - src/components/floor-plan/modern/AvatarGroup.tsx (modified: +48 lines - exit tracking with useState/useEffect)
 - __tests__/presence-animation.test.tsx (new: 278 lines - 18 unit tests)
+
+### Code Review Fixes (2025-12-04)
+- 🐛 Fixed Critical Issue: Implemented missing exit animation logic in `AvatarGroup.tsx` (AC2).
+- 🐛 Fixed Critical Issue: Updated tests to verify exit animation behavior instead of immediate removal.
+- ✅ Story verified as complete.
 

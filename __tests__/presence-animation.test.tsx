@@ -1,9 +1,9 @@
 /**
  * Story 3.13: Real-Time Presence Animation - Unit Tests
- * Tests for enter animations and status transitions (simplified approach)
+ * Tests for enter and exit animations and status transitions.
  * 
- * Note: Exit animations were removed due to complexity causing bugs.
- * Enter animations only apply to truly NEW users added to a space.
+ * Enter animations apply to new users.
+ * Exit animations apply to removed users (delayed removal).
  */
 import React from 'react';
 import { render, screen, act } from '@testing-library/react';
@@ -181,7 +181,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 			expect(newUserContainer?.className).not.toContain('vo-avatar-enter');
 		});
 
-		it('removed users disappear immediately (no exit animation)', () => {
+		it('applies exit animation when user is removed', () => {
 			const initialUsers = createMockUsers(2);
 			const { rerender } = render(<AvatarGroup users={initialUsers} />);
 
@@ -189,7 +189,31 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 			const remainingUsers = [initialUsers[1]];
 			rerender(<AvatarGroup users={remainingUsers} />);
 
-			// Removed user should be gone immediately
+			// Removed user should still be present but with exit animation class
+			const removedUserContainer = screen.getByTestId('modern-user-avatar-user-1').parentElement;
+			expect(removedUserContainer?.className).toContain('vo-avatar-leave');
+		});
+
+		it('removes user from DOM after 200ms', () => {
+			const initialUsers = createMockUsers(2);
+			const { rerender } = render(<AvatarGroup users={initialUsers} />);
+
+			// Remove one user
+			const remainingUsers = [initialUsers[1]];
+			rerender(<AvatarGroup users={remainingUsers} />);
+
+			// User should still be there
+			expect(screen.getByTestId('modern-user-avatar-user-1')).toBeDefined();
+
+			// Fast-forward 200ms
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+
+			// Re-render to reflect state update
+			rerender(<AvatarGroup users={remainingUsers} />);
+
+			// Removed user should be gone
 			expect(screen.queryByTestId('modern-user-avatar-user-1')).toBeNull();
 		});
 
