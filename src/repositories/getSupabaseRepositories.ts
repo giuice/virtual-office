@@ -3,6 +3,7 @@ import type { IMessageRepository } from '@/repositories/interfaces/IMessageRepos
 import type { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
 import type { ICompanyRepository, ISpaceRepository, IUserRepository } from './interfaces';
 import type { INeighborhoodRepository } from './interfaces/INeighborhoodRepository';
+import type { IPlatformAdminRepository } from './interfaces/IPlatformAdminRepository';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Factory to create and return repository instances (only those needed by API routes)
@@ -13,6 +14,7 @@ export async function getSupabaseRepositories(supabase: SupabaseClient): Promise
   spaceRepository: ISpaceRepository;
   companyRepository: ICompanyRepository;
   neighborhoodRepository: INeighborhoodRepository;
+  platformAdminRepository: IPlatformAdminRepository;
 }> {
   // Lazy-load ONLY the implementations needed to avoid test-time side effects
   const [
@@ -21,7 +23,8 @@ export async function getSupabaseRepositories(supabase: SupabaseClient): Promise
     { SupabaseUserRepository },
     { SupabaseSpaceRepository },
     { SupabaseCompanyRepository },
-    { SupabaseNeighborhoodRepository }
+    { SupabaseNeighborhoodRepository },
+    { SupabasePlatformAdminRepository }
   ] = await Promise.all([
     import('./implementations/supabase/SupabaseMessageRepository'),
     import('./implementations/supabase/SupabaseConversationRepository'),
@@ -29,6 +32,7 @@ export async function getSupabaseRepositories(supabase: SupabaseClient): Promise
     import('./implementations/supabase/SupabaseSpaceRepository'),
     import('./implementations/supabase/SupabaseCompanyRepository'),
     import('./implementations/supabase/SupabaseNeighborhoodRepository'),
+    import('./implementations/supabase/SupabasePlatformAdminRepository'),
   ]);
 
   const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
@@ -37,6 +41,7 @@ export async function getSupabaseRepositories(supabase: SupabaseClient): Promise
   const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
   const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
   const neighborhoodRepository: INeighborhoodRepository = new SupabaseNeighborhoodRepository(supabase);
+  const platformAdminRepository: IPlatformAdminRepository = new SupabasePlatformAdminRepository(supabase);
 
   return {
     messageRepository,
@@ -45,5 +50,7 @@ export async function getSupabaseRepositories(supabase: SupabaseClient): Promise
     spaceRepository,
     companyRepository,
     neighborhoodRepository,
+    platformAdminRepository,
   };
 }
+

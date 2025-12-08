@@ -525,6 +525,34 @@ export class WebRTCManager {
 
 ---
 
+### Epic 8A: Audio MVP Architecture (P2P Mesh)
+
+To meet the urgent requirement for "Sococo-style" audio without infrastructure costs, we implement a **P2P Mesh** topology.
+
+**1. Topology Strategy:**
+- **Mesh:** Every client connects directly to every other client.
+- **Constraints:** Bandwidth usage scales quadratically ($N*(N-1)$). Steps to mitigate:
+  - **Soft Limit:** UI warning at >8 users.
+  - **Hard Limit:** Disable audio or switch to listener-only at >12 users (future).
+
+**2. Signaling Protocol (Supabase Realtime):**
+We reuse the existing `rooms` channel for WebRTC signaling messages.
+- **Topic:** `room:audio:${spaceId}`
+- **Events:**
+  - `handshake`: Joined user announces "I am here" -> triggers Offers.
+  - `signal`: Payload `{ type: 'offer' | 'answer' | 'ice-candidate', target: userId, data: ... }`
+
+**3. Voice Activity Detection (VAD):**
+Instead of sending "is_speaking" events over the network (latency), we use **Client-Side Detection**.
+- **Mechanism:** `AudioContext` with `AnalyserNode` attached to incoming `MediaStream`.
+- **Logic:** Calculate RMS volume every 100ms. If > Threshold, set `isSpeaking` state locally.
+- **Result:** Visualizer drives the Avatar pulse animation (Story 3.3) with zero latency.
+
+**4. State Synchronization:**
+- **Mute Status:** Synced via Supabase Presence `metadata: { is_muted: boolean }`.
+
+---
+
 ### Epic 9: Admin Dashboard & Analytics (8-12 stories)
 
 **Architecture Needs:**

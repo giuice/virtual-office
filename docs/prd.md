@@ -79,8 +79,11 @@ Virtual Office fills the gap between generic chat tools (Slack/Teams - no spatia
 **Presence & Space Access Control**
 - **FR017:** System shall enforce space-level access control with explicit membership tracking via `space_members` table
 - **FR018:** System shall support "Knock to Enter" workflow for restricted spaces
-- **FR019:** System shall provide cross-space calling capabilities
-- **FR020:** System shall automatically update user status based on activity patterns
+- FR019: System shall provide cross-space calling capabilities
+- **FR019a [NEW]:** System shall support "Sococo-style" P2P audio: users entering a space automatically connect to audio (mesh topology)
+- **FR019b [NEW]:** System shall default microphone to MUTED upon entry
+- **FR019c [NEW]:** System shall visually indicate who is speaking (avatar pulse/glow) via client-side VAD
+- FR020: System shall automatically update user status based on activity patterns
 
 **Meeting Notes & Action Items**
 - **FR021:** System shall allow meeting note creation, editing, and archival in `meeting_notes` table
@@ -258,10 +261,15 @@ Virtual Office fills the gap between generic chat tools (Slack/Teams - no spatia
 **Stories:** ~12-18 stories
 **Status:** Planned - Dependencies: Epic 5 complete, AI service selection
 
-### Epic 8: Enhanced Communication Tools ⏳ PLANNED
+### Epic 8A: Audio MVP (Sococo-Style) 🚧 URGENT
+**Goal:** Enable "always-available" audio in spaces with P2P Mesh architecture.
+**Stories:** ~4-6 stories
+**Status:** In Progress - Priority I
+
+### Epic 8B: Enhanced Communication Tools (Video/Screen) ⏳ PLANNED
 **Goal:** Add WebRTC video conferencing, screen sharing, and virtual whiteboard
-**Stories:** ~10-15 stories
-**Status:** Planned - Dependencies: Epic 4 complete
+**Stories:** ~10 stories
+**Status:** Planned - Dependencies: Epic 8A complete
 
 ### Epic 9: Administrative Dashboard & Analytics ⏳ PLANNED
 **Goal:** Build comprehensive admin analytics for presence tracking, space utilization, and compliance reporting
@@ -305,7 +313,7 @@ Virtual Office fills the gap between generic chat tools (Slack/Teams - no spatia
 **Explicitly Not Supported:**
 - Legacy browser support (IE11, pre-2020 browsers)
 - On-premise deployment options - Cloud-only (Supabase hosted)
-- Real-time video/audio for MVP - Deferred to Epic 8
+- Real-time Video for MVP - Deferred to Epic 8B (Phase 4)
 - Offline-first mobile apps - Requires internet connection
 - End-to-end encryption for messages - Standard Supabase encryption only
 - Multi-language UI localization - English only initially

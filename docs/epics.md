@@ -466,7 +466,86 @@ So that I can see team presence even when away from my desktop.
 
 ---
 
-## Epic 4A: Real-Time Messaging - Timeline & Composer 🚧 IN PROGRESS
+## Epic 8A: Audio MVP (Sococo-Style) 🚧 URGENT
+
+**Goal:** implement "simples assim" audio conversation. When a user enters a space, they can hear others. Mic defaults to muted. speaking indicator shows who is talking.
+
+**Architecture:** P2P Mesh (Limit ~8 users/room). Signaling via Supabase Realtime.
+
+**Stories (4 total)**
+
+---
+
+**Story 8A.1: WebRTC Manager & Signaling** ⭐ PRIORITY
+
+As a developer,
+I want to establish P2P connections between users in the same space,
+So that audio streams can be exchanged directly.
+
+**Acceptance Criteria:**
+1.  `WebRTCManager` class handles `RTCPeerConnection` creation/teardown
+2.  Signaling via `supabase.channel` (events: `signal`, `handshake`)
+3.  On user join: send `handshake` -> receive `offers` -> send `answers`
+4.  Handle ICE candidates exchange
+5.  Clean up connections on user leave
+6.  Limit: Show warning toast if >8 users in room ("Audio quality may degrade")
+
+**Prerequisites:** Epic 1 (Realtime foundation)
+
+---
+
+**Story 8A.2: Audio Stream Handling & Permissions**
+
+As a user,
+I want to grant microphone access once,
+So that I can be heard when I unmnute.
+
+**Acceptance Criteria:**
+1.  Request `navigator.mediaDevices.getUserMedia({ audio: true })` on first join
+2.  Handle permission denied with helpful UI instruction
+3.  Manage local `MediaStream` (keep active across room changes if desired, or re-request)
+4.  Play remote audio streams via hidden `<audio>` elements
+5.  Audio routing logic: Ensure audio output device selection works (browser default)
+
+**Prerequisites:** Story 8A.1
+
+---
+
+**Story 8A.3: Speaking Indicator (Visualizer)**
+
+As a user,
+I want to see who is talking,
+So that I can follow the conversation naturally.
+
+**Acceptance Criteria:**
+1.  Use `AudioContext` + `AnalyserNode` on remote streams
+2.  Detect volume amplitude > threshold (e.g., -50dB)
+3.  Update local React state `isSpeaking` for that user
+4.  Trigger `AvatarConstellation` pulse animation (reusing Story 3.3 visual)
+5.  Zero network traffic for this (purely client-side analysis)
+
+**Prerequisites:** Story 8A.2, Story 3.3
+
+---
+
+**Story 8A.4: Mic Controls & Default State**
+
+As a user,
+I want to control my microphone status,
+So that I don't broadcast background noise accidentally.
+
+**Acceptance Criteria:**
+1.  Default state on room entry: **MUTED**
+2.  Mic toggle button in "Now Board" or Space Controls
+3.  Sync mute state to other users via Supabase Presence (`is_muted` metadata)
+4.  Show "Muted" icon on avatar when `is_muted: true`
+5.  Hotkeys: `M` to toggle mute, Spacebar (PTT - nice to have)
+
+**Prerequisites:** Story 8A.2
+
+---
+
+## Epic 8B: Enhanced Communication Tools (Video/Screen) ⏳ PLANNED
 
 **Expanded Goal:**
 Deliver user-facing messaging features to achieve feature parity with Slack/Teams: threaded conversations, reactions, message pins/stars, read receipts, infinite scroll, file attachments, voice notes, and conversation search. This epic focuses on the Timeline and Composer user experience.

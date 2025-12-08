@@ -4,7 +4,7 @@
 export type UserRole = 'admin' | 'member';
 
 // User status types
-export type UserStatus = 'online' | 'away' | 'busy' | 'offline' ;
+export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
 
 // UI-specific user status (different from database status)
 export type UIUserStatus = 'active' | 'away' | 'presenting' | 'viewing';
@@ -233,3 +233,12 @@ export interface UpdateNeighborhoodData {
   description?: string;
   color?: string;
 }
+
+// Platform Admin Collection (Story: story-platform-admin)
+// Platform admins are Virtual Office staff who can create companies and manage tenants
+export interface PlatformAdmin {
+  id: string;
+  userId: string; // References auth.users(id)
+  createdAt: string; // ISO timestamp
+}
+
