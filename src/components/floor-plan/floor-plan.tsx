@@ -31,7 +31,9 @@ import { NeighborhoodManager } from './neighborhoods';
 import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
 import { useBeaconAggregator } from '@/hooks/useBeaconAggregator';
-import { Grid2X2, LayoutGrid, Monitor as MonitorIcon, FolderOpen } from 'lucide-react';
+import { Grid2X2, LayoutGrid, Monitor as MonitorIcon, FolderOpen, Mic } from 'lucide-react';
+import { SpaceAudioControls } from './SpaceAudioControls';
+import { AudioProvider } from '@/contexts/AudioContext';
 
 
 
@@ -422,43 +424,50 @@ export function FloorPlan() {
           )}
 
           {selectedSpace && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => void handleOpenChat(selectedSpace)}
-          >
-            <MessageSquare className="h-4 w-4" />
-            Chat in Room
-          </Button>
+            <>
+              {/* Story 8A: Audio Controls - wrapped with AudioProvider for spaceId */}
+              <AudioProvider spaceId={selectedSpace.id}>
+                <SpaceAudioControls />
+              </AudioProvider>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => void handleOpenChat(selectedSpace)}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Chat in Room
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      
-        {/* Main Floor Plan Card */}
-        <Card className="w-full">
-          <div className="p-4 min-h-[600px]"> {/* Added min-height */}
-            {isCompanyLoading ? (
-              <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-            ) : (
-              
-                <ModernFloorPlan
-                  spaces={neighborhoodFilteredSpaces || []}
-                  neighborhoods={neighborhoods}
-                  enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
-                  onSpaceSelect={handleSpaceSelect}
-                  onOpenChat={handleOpenChat}
-                  onSpaceDoubleClick={(space) => void handleOpenChat(space)}
-                  onEditSpace={isAdmin ? handleEditSpace : undefined}
-                  highlightedSpaceId={highlightedSpaceId}
-                  perspective={perspective}
-                  isAdmin={isAdmin}
-                />
-              
-            )}
-          </div>
-        </Card>
+
+      {/* Main Floor Plan Card */}
+      <Card className="w-full">
+        <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+          {isCompanyLoading ? (
+            <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
+          ) : (
+
+            <ModernFloorPlan
+              spaces={neighborhoodFilteredSpaces || []}
+              neighborhoods={neighborhoods}
+              enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
+              onSpaceSelect={handleSpaceSelect}
+              onOpenChat={handleOpenChat}
+              onSpaceDoubleClick={(space) => void handleOpenChat(space)}
+              onEditSpace={isAdmin ? handleEditSpace : undefined}
+              highlightedSpaceId={highlightedSpaceId}
+              perspective={perspective}
+              isAdmin={isAdmin}
+            />
+
+          )}
+        </div>
+      </Card>
 
       {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
       <RoomDialog

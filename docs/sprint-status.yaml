@@ -81,6 +81,11 @@ development_status:
   3-15-dashboard-landing-page-polish: done  # ✅ COMPLETE - 2025-11-26 (Fixed broken links, Coming Soon teasers, Investor Resources, double header fix)
   epic-3-retrospective: optional
   
+  # 🚨 Epic 8A: Audio MVP (Sococo-Style) - URGENT INVESTOR REQUEST
+  # P2P audio chat for spaces using WebRTC + Supabase Realtime signaling
+  epic-8a: contexted
+  8a-audio-mvp: review  # 🎤 IN REVIEW - 2025-12-08 (WebRTC P2P mesh, VAD, Safari compat, mic controls)
+  
   # Epic 4A: Messaging Timeline & Composer (DEFERRED - after Epic 3 visual foundation)
   epic-4a: contexted
   4a-1-render-reply-indicators-and-thread-ui: done

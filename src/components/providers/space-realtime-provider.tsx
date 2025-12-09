@@ -9,11 +9,12 @@ import { useCompany } from '@/contexts/CompanyContext';
  */
 export function SpaceRealtimeProvider({ children }: { children: React.ReactNode }) {
   const { company } = useCompany();
-  
+
   // Set up the real-time subscription using the hook
   // This will automatically invalidate React Query caches when spaces change
   useSpaceRealtime(company?.id);
-  
+
   // Just render children - this component doesn't add any UI
   return <>{children}</>;
 }
+
