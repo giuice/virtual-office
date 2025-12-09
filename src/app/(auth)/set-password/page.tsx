@@ -1,23 +1,27 @@
 // src/app/(auth)/set-password/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/hooks/useNotification';
-import { Loader2, KeyRound, CheckCircle } from 'lucide-react';
+import { Loader2, KeyRound, CheckCircle, Building2 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import type { PendingInvitationResponse } from '@/app/api/invitations/pending/route';
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [pendingInvite, setPendingInvite] = useState<PendingInvitationResponse['invitation'] | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const router = useRouter();
   const { user, loading: authLoading, isAuthReady } = useAuth();
@@ -77,6 +81,53 @@ export default function SetPasswordPage() {
     }
   }, [isCheckingSession, isAuthReady, user, router, showError]);
 
+  /**
+   * Check for pending invitation after session is established
+   * This runs after password is set to auto-accept any pending invites
+   */
+  const checkAndAcceptPendingInvite = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('[set-password] Checking for pending invitation...');
+      
+      const response = await fetch('/api/invitations/pending');
+      const data: PendingInvitationResponse = await response.json();
+      
+      if (!data.hasPending || !data.invitation) {
+        console.log('[set-password] No pending invitation found');
+        return false;
+      }
+
+      console.log('[set-password] Found pending invitation for company:', data.invitation.companyName);
+      setPendingInvite(data.invitation);
+      setIsAcceptingInvite(true);
+
+      // Auto-accept the invitation
+      const acceptResponse = await fetch('/api/invitations/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: data.invitation.token }),
+      });
+
+      const acceptData = await acceptResponse.json();
+
+      if (!acceptResponse.ok) {
+        console.error('[set-password] Failed to accept invitation:', acceptData.error);
+        // Don't throw - let the user proceed to onboarding
+        setIsAcceptingInvite(false);
+        return false;
+      }
+
+      console.log('[set-password] Invitation accepted successfully!');
+      setSuccessMessage(`Você entrou na empresa ${data.invitation.companyName}!`);
+      return true;
+
+    } catch (error) {
+      console.error('[set-password] Error checking/accepting invite:', error);
+      setIsAcceptingInvite(false);
+      return false;
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError(null);
@@ -105,24 +156,43 @@ export default function SetPasswordPage() {
         console.error('Error updating password:', error);
         setFormError(error.message);
         showError({ description: 'Erro ao definir senha.' });
+        setIsLoading(false);
+        return;
+      }
+
+      // Password set successfully - now check for pending invite
+      setIsSuccess(true);
+      showSuccess({ description: 'Senha definida com sucesso!' });
+      
+      // Check and auto-accept pending invitation
+      const inviteAccepted = await checkAndAcceptPendingInvite();
+      
+      // Determine redirect destination
+      let redirectUrl = '/onboarding';
+      
+      if (inviteAccepted) {
+        // Invite was accepted - go straight to dashboard
+        redirectUrl = '/dashboard';
+        showSuccess({ description: `Bem-vindo! Você entrou na empresa.` });
       } else {
-        setIsSuccess(true);
-        showSuccess({ description: 'Senha definida com sucesso!' });
-        
-        // Check if there's a return URL from invite flow
+        // Check if there's a manual return URL from the join flow
         const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
         sessionStorage.removeItem('passwordSetReturnUrl');
-        
-        // Redirect after a short delay
-        setTimeout(() => {
-          router.push(returnUrl || '/onboarding');
-        }, 1500);
+        if (returnUrl) {
+          redirectUrl = returnUrl;
+        }
       }
+      
+      // Redirect after a short delay
+      // Use window.location.href for hard navigation to ensure fresh context
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 1500);
+
     } catch (error) {
       console.error('Exception updating password:', error);
       setFormError('Ocorreu um erro inesperado. Tente novamente.');
       showError({ description: 'Erro inesperado.' });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -137,7 +207,7 @@ export default function SetPasswordPage() {
     );
   }
 
-  // Show success state
+  // Show success state with invite info
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -146,7 +216,19 @@ export default function SetPasswordPage() {
             <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
             <CardTitle>Senha definida!</CardTitle>
             <CardDescription>
-              Sua senha foi configurada com sucesso. Redirecionando...
+              {isAcceptingInvite ? (
+                <span className="flex items-center justify-center gap-2 mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Entrando na empresa...
+                </span>
+              ) : successMessage ? (
+                <span className="flex items-center justify-center gap-2 mt-2">
+                  <Building2 className="h-4 w-4 text-green-500" />
+                  {successMessage}
+                </span>
+              ) : (
+                'Sua senha foi configurada com sucesso. Redirecionando...'
+              )}
             </CardDescription>
           </CardHeader>
         </Card>
