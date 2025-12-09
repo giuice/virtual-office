@@ -84,7 +84,7 @@ development_status:
   # 🚨 Epic 8A: Audio MVP (Sococo-Style) - URGENT INVESTOR REQUEST
   # P2P audio chat for spaces using WebRTC + Supabase Realtime signaling
   epic-8a: contexted
-  8a-audio-mvp: review  # 🎤 IN REVIEW - 2025-12-08 (WebRTC P2P mesh, VAD, Safari compat, mic controls)
+  8a-audio-mvp: done  # ✅ COMPLETE - 2025-12-09 (WebRTC P2P mesh, VAD, Safari compat, mic controls, speaking animation)
   
   # Epic 4A: Messaging Timeline & Composer (DEFERRED - after Epic 3 visual foundation)
   epic-4a: contexted

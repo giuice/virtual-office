@@ -29,7 +29,11 @@ interface AudioContextValue {
 	isInitializing: boolean;
 	micPermission: MicPermissionState;
 	speakingUsers: Map<string, boolean>;
+	mutedUserIds: Set<string>;
 	error: string | null;
+
+	// Helpers
+	isUserMuted: (userId: string) => boolean;
 
 	// Actions
 	initializeAudio: () => Promise<boolean>;
@@ -54,12 +58,14 @@ export function useAudio(): AudioContextValue {
 
 interface AudioProviderProps {
 	spaceId: string | undefined;
+	userId?: string; // Internal user.id (from profile), not supabase_uid
 	children: ReactNode;
 }
 
-export function AudioProvider({ spaceId, children }: AudioProviderProps) {
+export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) {
 	const { user } = useAuth();
-	const currentUserId = user?.id;
+	// Use internal userId if provided, otherwise fall back to supabase uid
+	const currentUserId = userId || user?.id;
 
 	// State
 	const [webrtcManager, setWebrtcManager] = useState<WebRTCManager | null>(null);
@@ -75,11 +81,12 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 	const managerRef = useRef<WebRTCManager | null>(null);
 
 	// Setup signaling when manager is ready
-	useAudioSignaling({
+	const { mutedUserIds } = useAudioSignaling({
 		spaceId,
 		currentUserId,
 		webrtcManager,
-		enabled: isAudioEnabled && !!webrtcManager,
+		enabled: !!webrtcManager, // Enable signaling immediately for listen-only mode
+		isMuted,
 	});
 
 	// Create manager when entering space
@@ -102,6 +109,22 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 					next.delete(peerId);
 					return next;
 				});
+				setSpeakingUsers((prev) => {
+					const next = new Map(prev);
+					next.delete(peerId);
+					return next;
+				});
+			},
+			onPeerSpeaking: (peerId, isSpeaking) => {
+				setSpeakingUsers((prev) => {
+					const next = new Map(prev);
+					if (isSpeaking) {
+						next.set(peerId, true);
+					} else {
+						next.delete(peerId);
+					}
+					return next;
+				});
 			},
 			onRoomLimitWarning: (count) => {
 				toast.warning(`Sala com ${count} usuários. Performance pode ser afetada acima de ${ROOM_LIMITS.SOFT_WARNING} pessoas.`);
@@ -119,8 +142,15 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 		setWebrtcManager(manager);
 		managerRef.current = manager;
 
+		// Browser audio policy: resume any blocked audio on ANY user interaction
+		const handleGlobalClick = () => {
+			manager.resumeRemoteAudio();
+		};
+		window.addEventListener('click', handleGlobalClick, { once: false });
+
 		return () => {
 			console.log('[AudioProvider] Cleaning up manager');
+			window.removeEventListener('click', handleGlobalClick);
 			manager.cleanup();
 			setWebrtcManager(null);
 			managerRef.current = null;
@@ -155,9 +185,13 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 			// Request microphone access
 			await webrtcManager.initializeLocalStream();
 
+			// Also resume any blocked remote audio (since we now have a user gesture)
+			webrtcManager.resumeRemoteAudio();
+
 			setMicPermission('granted');
 			setIsAudioEnabled(true);
-			setIsMutedState(true); // Start muted
+			setIsMutedState(false); // Start unmuted (One-click enable)
+			webrtcManager.setMuted(false); // CRITICAL: Actually unmute the tracks!
 
 			return true;
 		} catch (err) {
@@ -227,6 +261,12 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 		}
 	}, []);
 
+	// Helper to check if a user is muted
+	const isUserMuted = useCallback((userId: string) => {
+		if (userId === currentUserId) return isMuted;
+		return mutedUserIds.has(userId);
+	}, [currentUserId, isMuted, mutedUserIds]);
+
 	const value: AudioContextValue = {
 		webrtcManager,
 		isMuted,
@@ -241,6 +281,8 @@ export function AudioProvider({ spaceId, children }: AudioProviderProps) {
 		setSpeaking,
 		cleanup,
 		peerCount,
+		mutedUserIds,
+		isUserMuted,
 	};
 
 	return (

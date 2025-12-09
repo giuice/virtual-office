@@ -12,6 +12,7 @@
  */
 
 import { getIceServers, ROOM_LIMITS } from './ice-config';
+import { VoiceActivityDetector } from '@/lib/audio/VoiceActivityDetector';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type SignalingEvent =
@@ -41,14 +42,19 @@ export class WebRTCManager {
 	private localStream: MediaStream | null = null;
 	private peerConnections: Map<string, PeerConnection> = new Map();
 	private audioElements: Map<string, HTMLAudioElement> = new Map();
+	private vadMap: Map<string, VoiceActivityDetector> = new Map();
 	private signalingChannel: RealtimeChannel | null = null;
 	private events: Partial<WebRTCManagerEvents> = {};
 	private isMuted: boolean = true; // Default: muted on entry
+	private pendingAudioRetryInterval: ReturnType<typeof setInterval> | null = null;
 
 	constructor(spaceId: string, currentUserId: string, events?: Partial<WebRTCManagerEvents>) {
 		this.spaceId = spaceId;
 		this.currentUserId = currentUserId;
 		this.events = events || {};
+
+		// Start retry interval for blocked audio
+		this.startAudioRetryInterval();
 	}
 
 	/**
@@ -67,12 +73,52 @@ export class WebRTCManager {
 			// Start muted by default
 			this.setMuted(true);
 
+			// If we already have peers, we need to add this stream to them and renegotiate
+			if (this.peerConnections.size > 0) {
+				await this.addLocalStreamToPeers();
+			}
+
 			return this.localStream;
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error('Failed to get user media');
 			this.events.onError?.(err);
 			throw err;
 		}
+	}
+
+	/**
+	 * Add local stream tracks to existing peer connections and renegotiate
+	 */
+	private async addLocalStreamToPeers(): Promise<void> {
+		if (!this.localStream) return;
+
+		const promises = Array.from(this.peerConnections.entries()).map(async ([peerId, { pc }]) => {
+			try {
+				// Add tracks to the connection
+				this.localStream!.getTracks().forEach(track => {
+					pc.addTrack(track, this.localStream!);
+				});
+
+				// Create new offer (renegotiation)
+				const offer = await pc.createOffer();
+				await pc.setLocalDescription(offer);
+
+				// Send offer to peer
+				await this.signalingChannel?.send({
+					type: 'broadcast',
+					event: 'offer',
+					payload: {
+						targetUserId: peerId,
+						senderId: this.currentUserId,
+						sdp: offer,
+					},
+				});
+			} catch (err) {
+				console.error(`[WebRTC] Failed to renegotiate with peer ${peerId}:`, err);
+			}
+		});
+
+		await Promise.all(promises);
 	}
 
 	/**
@@ -126,13 +172,24 @@ export class WebRTCManager {
 
 	/**
 	 * Handle incoming offer - create and send answer
+	 * Supports both initial connection and renegotiation
 	 */
 	async handleOffer(senderId: string, targetUserId: string, sdp: RTCSessionDescriptionInit): Promise<void> {
 		// Only process offers targeted at us
 		if (targetUserId !== this.currentUserId) return;
 		if (senderId === this.currentUserId) return;
 
-		const pc = await this.createPeerConnection(senderId);
+		// Check for existing connection (renegotiation case)
+		let pc: RTCPeerConnection;
+		const existing = this.peerConnections.get(senderId);
+		if (existing) {
+			// Reuse existing connection for renegotiation
+			pc = existing.pc;
+		} else {
+			// Create new connection
+			pc = await this.createPeerConnection(senderId);
+		}
+
 		await pc.setRemoteDescription(new RTCSessionDescription(sdp));
 
 		const answer = await pc.createAnswer();
@@ -254,19 +311,22 @@ export class WebRTCManager {
 
 		audioEl.srcObject = stream;
 
-		// Safari autoplay handling
-		audioEl.play().catch((error) => {
-			console.warn('Autoplay blocked, user gesture required:', error);
-			// Event will be emitted to show "Click to enable audio" button
-			this.events.onError?.(new Error('AUTOPLAY_BLOCKED'));
+		// Safari autoplay handling - silent retry, don't show error
+		audioEl.play().catch(() => {
+			// Audio blocked, will be retried by interval
+			console.log('[WebRTC] Audio blocked for peer, will retry:', peerId);
 		});
 
 		// Store stream reference
 		const peerConn = this.peerConnections.get(peerId);
-		if (peerConn) {
-			peerConn.stream = stream;
-			peerConn.audioElement = audioEl;
-		}
+
+		// Setup VAD for remote stream
+		const vad = new VoiceActivityDetector(stream, {
+			onSpeakingChange: (isSpeaking) => {
+				this.events.onPeerSpeaking?.(peerId, isSpeaking);
+			}
+		});
+		this.vadMap.set(peerId, vad);
 	}
 
 	/**
@@ -333,6 +393,35 @@ export class WebRTCManager {
 			audioEl.remove();
 			this.audioElements.delete(peerId);
 		}
+
+		const vad = this.vadMap.get(peerId);
+		if (vad) {
+			vad.stop();
+			this.vadMap.delete(peerId);
+		}
+	}
+
+	/**
+	 * Start interval to retry playing blocked audio
+	 */
+	private startAudioRetryInterval(): void {
+		this.pendingAudioRetryInterval = setInterval(() => {
+			this.audioElements.forEach((el) => {
+				if (el.paused && el.srcObject) {
+					el.play().catch(() => { /* still blocked, will retry */ });
+				}
+			});
+		}, 500);
+	}
+
+	/**
+	 * Retry playing all remote audio elements
+	 * Call this from a user gesture event handler (e.g. onClick)
+	 */
+	resumeRemoteAudio(): void {
+		this.audioElements.forEach((el) => {
+			el.play().catch(err => console.warn('Still failed to play remote audio:', err));
+		});
 	}
 
 	/**
@@ -361,7 +450,17 @@ export class WebRTCManager {
 			this.audioElements.delete(peerId);
 		});
 
-		// 4. Clear signaling channel reference
+		// 4. Stop all VADs
+		this.vadMap.forEach((vad) => vad.stop());
+		this.vadMap.clear();
+
+		// 5. Stop retry interval
+		if (this.pendingAudioRetryInterval) {
+			clearInterval(this.pendingAudioRetryInterval);
+			this.pendingAudioRetryInterval = null;
+		}
+
+		// 6. Clear signaling channel reference
 		this.signalingChannel = null;
 	}
 }

@@ -87,6 +87,10 @@ export function FloorPlan() {
     );
   }
 
+  // Derive current space ID from presence for global audio context
+  const currentUserPresence = users?.find(u => u.id === currentUserProfile?.id);
+  const currentSpaceId = currentUserPresence?.currentSpaceId || undefined;
+
   // Filter spaces from context based on type, search query, and neighborhood filters
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
@@ -282,266 +286,266 @@ export function FloorPlan() {
   }, [spaces]);
 
   return (
-    <div className="space-y-4 w-full">
-      {/* Add debug button and panel */}
-      <div className="flex justify-end mb-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowDebugPanel(!showDebugPanel)}
-          className="text-xs"
-        >
-          {showDebugPanel ? 'Hide' : 'Show'} Debug Panel
-        </Button>
-      </div>
-
-      {showDebugPanel && (
-        <SpaceDebugPanel
-          spaces={spaces}
-          onHighlightSpace={(space) => setHighlightedSpaceId(space.id)}
-          onHidePanel={() => setShowDebugPanel(false)}
-        />
-      )}
-
-      {/* NowBoard - Office Pulse Summary (Story 3.10) */}
-      <NowBoard
-        spaces={spaces}
-        users={users}
-        usersInSpaces={usersInSpaces}
-        neighborhoods={neighborhoods}
-        activeFilters={neighborhoodFilters.activeFilters}
-        onFilterToggle={neighborhoodFilters.toggleFilter}
-        onShowAll={neighborhoodFilters.showAll}
-        isShowingAll={neighborhoodFilters.isShowingAll}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        beacons={beaconAggregation.activeBeacons}
-        onBeaconClick={scrollToSpace}
-      />
-
-      {/* Room Management Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
+    <AudioProvider spaceId={currentSpaceId || selectedSpace?.id} userId={currentUserProfile?.id}>
+      <div className="space-y-4 w-full">
+        {/* Add debug button and panel */}
+        <div className="flex justify-end mb-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex items-center gap-2"
-            onClick={() => setIsRoomManagementOpen(true)}
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            className="text-xs"
           >
-            <Settings className="h-4 w-4" />
-            Manage Rooms
+            {showDebugPanel ? 'Hide' : 'Show'} Debug Panel
           </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => setIsTemplateDialogOpen(true)}
-          >
-            <Copy className="h-4 w-4" />
-            Use Template
-          </Button>
-
-          {/* Filter by Type */}
-          <Select
-            value={filterType}
-            onValueChange={setFilterType}
-          >
-            <SelectTrigger className="w-[180px] h-9">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="workspace">Workspace</SelectItem>
-              <SelectItem value="conference">Conference Room</SelectItem>
-              <SelectItem value="social">Social Space</SelectItem>
-              <SelectItem value="breakout">Breakout Room</SelectItem>
-              <SelectItem value="private_office">Private Office</SelectItem>
-              <SelectItem value="open_space">Open Space</SelectItem>
-              <SelectItem value="lounge">Lounge</SelectItem>
-              <SelectItem value="lab">Lab</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Perspective Switcher */}
-          <div className="flex items-center gap-1 border rounded-lg p-1" style={{ backgroundColor: 'var(--vo-glass-bg)', borderColor: 'var(--vo-glass-border)' }}>
-            <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>
-            <Button
-              variant={perspective === 'orbit' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setPerspective('orbit')}
-              className="h-7 px-2"
-              title="Orbit View - Standard layout"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={perspective === 'analyst' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setPerspective('analyst')}
-              className="h-7 px-2"
-              title="Analyst View - Dense layout with sparklines"
-            >
-              <Grid2X2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={perspective === 'cinema' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setPerspective('cinema')}
-              className="h-7 px-2"
-              title="Cinema View - Large cards"
-            >
-              <MonitorIcon className="h-4 w-4" />
-            </Button>
-          </div>
+        {showDebugPanel && (
+          <SpaceDebugPanel
+            spaces={spaces}
+            onHighlightSpace={(space) => setHighlightedSpaceId(space.id)}
+            onHidePanel={() => setShowDebugPanel(false)}
+          />
+        )}
 
-          {/* Admin-only: Create Room */}
-          {isAdmin && (
-            <Button
-              variant="default"
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => setIsRoomDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Create Room
-            </Button>
-          )}
+        {/* NowBoard - Office Pulse Summary (Story 3.10) */}
+        <NowBoard
+          spaces={spaces}
+          users={users}
+          usersInSpaces={usersInSpaces}
+          neighborhoods={neighborhoods}
+          activeFilters={neighborhoodFilters.activeFilters}
+          onFilterToggle={neighborhoodFilters.toggleFilter}
+          onShowAll={neighborhoodFilters.showAll}
+          isShowingAll={neighborhoodFilters.isShowingAll}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          beacons={beaconAggregation.activeBeacons}
+          onBeaconClick={scrollToSpace}
+        />
 
-          {/* Admin-only: Manage Neighborhoods Button (Story 3.9) */}
-          {isAdmin && (
+        {/* Room Management Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               className="flex items-center gap-2"
-              onClick={() => setIsNeighborhoodManagerOpen(true)}
+              onClick={() => setIsRoomManagementOpen(true)}
             >
-              <FolderOpen className="h-4 w-4" />
-              Neighborhoods
+              <Settings className="h-4 w-4" />
+              Manage Rooms
             </Button>
-          )}
 
-          {selectedSpace && (
-            <>
-              {/* Story 8A: Audio Controls - wrapped with AudioProvider for spaceId */}
-              <AudioProvider spaceId={selectedSpace.id}>
-                <SpaceAudioControls />
-              </AudioProvider>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => setIsTemplateDialogOpen(true)}
+            >
+              <Copy className="h-4 w-4" />
+              Use Template
+            </Button>
 
+            {/* Filter by Type */}
+            <Select
+              value={filterType}
+              onValueChange={setFilterType}
+            >
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="workspace">Workspace</SelectItem>
+                <SelectItem value="conference">Conference Room</SelectItem>
+                <SelectItem value="social">Social Space</SelectItem>
+                <SelectItem value="breakout">Breakout Room</SelectItem>
+                <SelectItem value="private_office">Private Office</SelectItem>
+                <SelectItem value="open_space">Open Space</SelectItem>
+                <SelectItem value="lounge">Lounge</SelectItem>
+                <SelectItem value="lab">Lab</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Perspective Switcher */}
+            <div className="flex items-center gap-1 border rounded-lg p-1" style={{ backgroundColor: 'var(--vo-glass-bg)', borderColor: 'var(--vo-glass-border)' }}>
+              <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>
+              <Button
+                variant={perspective === 'orbit' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPerspective('orbit')}
+                className="h-7 px-2"
+                title="Orbit View - Standard layout"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={perspective === 'analyst' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPerspective('analyst')}
+                className="h-7 px-2"
+                title="Analyst View - Dense layout with sparklines"
+              >
+                <Grid2X2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={perspective === 'cinema' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setPerspective('cinema')}
+                className="h-7 px-2"
+                title="Cinema View - Large cards"
+              >
+                <MonitorIcon className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Admin-only: Create Room */}
+            {isAdmin && (
+              <Button
+                variant="default"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => setIsRoomDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Create Room
+              </Button>
+            )}
+
+            {/* Admin-only: Manage Neighborhoods Button (Story 3.9) */}
+            {isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
-                onClick={() => void handleOpenChat(selectedSpace)}
+                onClick={() => setIsNeighborhoodManagerOpen(true)}
               >
-                <MessageSquare className="h-4 w-4" />
-                Chat in Room
+                <FolderOpen className="h-4 w-4" />
+                Neighborhoods
               </Button>
-            </>
-          )}
+            )}
+
+            {selectedSpace && (
+              <>
+                {/* Story 8A: Audio Controls - now uses global AudioProvider */}
+                <SpaceAudioControls />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => void handleOpenChat(selectedSpace)}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Chat in Room
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
 
-      {/* Main Floor Plan Card */}
-      <Card className="w-full">
-        <div className="p-4 min-h-[600px]"> {/* Added min-height */}
-          {isCompanyLoading ? (
-            <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-          ) : (
+        {/* Main Floor Plan Card */}
+        <Card className="w-full">
+          <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+            {isCompanyLoading ? (
+              <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
+            ) : (
 
-            <ModernFloorPlan
-              spaces={neighborhoodFilteredSpaces || []}
-              neighborhoods={neighborhoods}
-              enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
-              onSpaceSelect={handleSpaceSelect}
-              onOpenChat={handleOpenChat}
-              onSpaceDoubleClick={(space) => void handleOpenChat(space)}
-              onEditSpace={isAdmin ? handleEditSpace : undefined}
-              highlightedSpaceId={highlightedSpaceId}
-              perspective={perspective}
-              isAdmin={isAdmin}
+              <ModernFloorPlan
+                spaces={neighborhoodFilteredSpaces || []}
+                neighborhoods={neighborhoods}
+                enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
+                onSpaceSelect={handleSpaceSelect}
+                onOpenChat={handleOpenChat}
+                onSpaceDoubleClick={(space) => void handleOpenChat(space)}
+                onEditSpace={isAdmin ? handleEditSpace : undefined}
+                highlightedSpaceId={highlightedSpaceId}
+                perspective={perspective}
+                isAdmin={isAdmin}
+              />
+
+            )}
+          </div>
+        </Card>
+
+        {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
+        <RoomDialog
+          room={isEditingRoom ? selectedSpace : null} // Pass global Space or null
+          open={isRoomDialogOpen || isEditingRoom}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsRoomDialogOpen(false);
+              setIsEditingRoom(false);
+              setSelectedSpace(null);
+            }
+          }}
+          isCreating={!isEditingRoom}
+          companyId={currentUserProfile?.companyId || ''} // Add required companyId prop
+          isAdmin={isAdmin} // Pass admin status for edit controls
+        />
+
+        {/* Room Management Dialog - Pass global Space[] */}
+        <RoomManagement
+          spaces={spaces} // Pass global Space[]
+          onCreateRoom={() => {
+            setIsRoomDialogOpen(true); // Open the standard create/edit dialog
+            setIsEditingRoom(false); // Ensure it's in create mode
+            setIsRoomManagementOpen(false);
+          }}
+          onEditRoom={(room: Space) => { // Expect global Space
+            setSelectedSpace(room);
+            setIsEditingRoom(true); // Open the standard create/edit dialog in edit mode
+            setIsRoomManagementOpen(false);
+          }}
+          onDeleteRoom={handleDeleteRoom} // Pass updated handler
+          onDuplicateRoom={handleDuplicateRoom} // Pass updated handler
+          onOpenChat={(room: Space) => { // Expect global Space
+            void handleOpenChat(room);
+            setIsRoomManagementOpen(false);
+          }}
+          open={isRoomManagementOpen}
+          onOpenChange={setIsRoomManagementOpen}
+          isAdmin={isAdmin}
+        />
+
+        {/* Template Selection Dialog */}
+        <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <RoomTemplates
+              onSelectTemplate={(template) => {
+                // Pass template to create room with template position
+                setTemplatePosition(prevPos => ({
+                  x: prevPos?.x || 100,
+                  y: prevPos?.y || 100,
+                  width: template.defaultWidth,
+                  height: template.defaultHeight
+                }));
+                setIsTemplateDialogOpen(false);
+              }}
+              onSaveTemplate={(template) => {
+                setUserTemplates(prev => [...prev, template]);
+              }}
+              onDeleteTemplate={(templateId) => {
+                setUserTemplates(prev => prev.filter(t => t.id !== templateId));
+              }}
+              userTemplates={userTemplates}
             />
+          </DialogContent>
+        </Dialog>
 
-          )}
-        </div>
-      </Card>
+        {/* Neighborhood Manager Dialog (Story 3.9) */}
+        <Dialog open={isNeighborhoodManagerOpen} onOpenChange={setIsNeighborhoodManagerOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <NeighborhoodManager />
+          </DialogContent>
+        </Dialog>
 
-      {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
-      <RoomDialog
-        room={isEditingRoom ? selectedSpace : null} // Pass global Space or null
-        open={isRoomDialogOpen || isEditingRoom}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsRoomDialogOpen(false);
-            setIsEditingRoom(false);
-            setSelectedSpace(null);
-          }
-        }}
-        isCreating={!isEditingRoom}
-        companyId={currentUserProfile?.companyId || ''} // Add required companyId prop
-        isAdmin={isAdmin} // Pass admin status for edit controls
-      />
-
-      {/* Room Management Dialog - Pass global Space[] */}
-      <RoomManagement
-        spaces={spaces} // Pass global Space[]
-        onCreateRoom={() => {
-          setIsRoomDialogOpen(true); // Open the standard create/edit dialog
-          setIsEditingRoom(false); // Ensure it's in create mode
-          setIsRoomManagementOpen(false);
-        }}
-        onEditRoom={(room: Space) => { // Expect global Space
-          setSelectedSpace(room);
-          setIsEditingRoom(true); // Open the standard create/edit dialog in edit mode
-          setIsRoomManagementOpen(false);
-        }}
-        onDeleteRoom={handleDeleteRoom} // Pass updated handler
-        onDuplicateRoom={handleDuplicateRoom} // Pass updated handler
-        onOpenChat={(room: Space) => { // Expect global Space
-          void handleOpenChat(room);
-          setIsRoomManagementOpen(false);
-        }}
-        open={isRoomManagementOpen}
-        onOpenChange={setIsRoomManagementOpen}
-        isAdmin={isAdmin}
-      />
-
-      {/* Template Selection Dialog */}
-      <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <RoomTemplates
-            onSelectTemplate={(template) => {
-              // Pass template to create room with template position
-              setTemplatePosition(prevPos => ({
-                x: prevPos?.x || 100,
-                y: prevPos?.y || 100,
-                width: template.defaultWidth,
-                height: template.defaultHeight
-              }));
-              setIsTemplateDialogOpen(false);
-            }}
-            onSaveTemplate={(template) => {
-              setUserTemplates(prev => [...prev, template]);
-            }}
-            onDeleteTemplate={(templateId) => {
-              setUserTemplates(prev => prev.filter(t => t.id !== templateId));
-            }}
-            userTemplates={userTemplates}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Neighborhood Manager Dialog (Story 3.9) */}
-      <Dialog open={isNeighborhoodManagerOpen} onOpenChange={setIsNeighborhoodManagerOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <NeighborhoodManager />
-        </DialogContent>
-      </Dialog>
-
-      {/* Room Chat Integration */}
-    </div>
+        {/* Room Chat Integration */}
+      </div>
+    </AudioProvider>
   )
 }

@@ -60,11 +60,11 @@ interface ModernSpaceCardProps {
   onLeaveSpace?: (spaceId: string) => void;
 }
 
-const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({ 
-  space, 
-  usersInSpace, 
-  onEnterSpace, 
-  onOpenChat, 
+const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
+  space,
+  usersInSpace,
+  onEnterSpace,
+  onOpenChat,
   onUserClick,
   onSpaceDoubleClick,
   onEditSpace,
@@ -89,7 +89,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  
+
   // Story 3.11: Detect mobile viewport
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -98,13 +98,13 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   // Story 3.11: Lazy fetch space details when panel should show
   const shouldFetchDetails = showPanel || bottomSheetOpen;
   const { agenda, activityLog, transcript, isLoading: detailsLoading } = useSpaceDetails(
     shouldFetchDetails ? space.id : null
   );
-  
+
   // Story 3.4: Attention Beacon integration
   const beaconState = useAttentionBeacon(
     space.id,
@@ -112,15 +112,15 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     space.capacity,
     spaceBeaconData
   );
-  
+
   // Determine if we're in analyst mode (dense view)
   const isAnalyst = variant === 'analyst';
   const isCinema = variant === 'cinema';
   const isCompact = compact || isAnalyst;
-  
+
   // Story 3.12 - AC2: Calculate if space is at capacity
   const isFull = space.capacity > 0 && usersInSpace.length >= space.capacity;
-  
+
   // Story 3.11: Handle hover with delay to prevent flicker
   // The hover area now includes both card and panel
   const handleMouseEnter = useCallback(() => {
@@ -161,7 +161,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       }
     };
   }, []);
-  
+
   const handleClick = (e?: React.MouseEvent<HTMLDivElement>) => {
     if (e) {
       const target = e.target as HTMLElement;
@@ -171,19 +171,19 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         return;
       }
     }
-    
+
     // Story 3.11 AC8: Mobile tap opens bottom sheet instead of navigating
     if (isMobile && showDetailPanel && !isAnalyst) {
       setBottomSheetOpen(true);
       return;
     }
-    
+
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);
     }
   };
-  
+
   // Story 3.11: Handlers for detail panel actions
   const handleJoin = useCallback(() => {
     onEnterSpace(space.id);
@@ -225,14 +225,14 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   };
 
   // Occupancy percentage for sparkline
-  const occupancyPercent = space.capacity > 0 
-    ? Math.min((usersInSpace.length / space.capacity) * 100, 100) 
+  const occupancyPercent = space.capacity > 0
+    ? Math.min((usersInSpace.length / space.capacity) * 100, 100)
     : 0;
 
   return (
     // Story 3.11: Wrapper div handles hover for both card and panel
     // This ensures mouse can move from card to panel without closing it
-    <div 
+    <div
       ref={wrapperRef}
       className="relative"
       onMouseEnter={handleMouseEnter}
@@ -311,128 +311,130 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           }
         }}
       >
-      {/* Header section */}
-      <div className={floorPlanTokens.spaceCard.content.header}>
-        {/* Story 3.4: Attention Beacon - positioned absolute top-right */}
-        <AttentionBeacon
-          active={beaconState.active}
-          severity={beaconState.severity}
-          reason={beaconState.reason}
-          className="absolute top-2 right-2 z-20"
-        />
-        
-        {/* Context Menu - positioned top right, offset from beacon */}
-        <div 
-          className={cn(
-            "absolute flex items-center gap-1 z-30",
-            beaconState.active ? "top-2 right-8" : "top-2 right-2"
-          )}
-          data-avatar-interactive="true"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <SpaceContextMenu
-            space={space}
-            isAdmin={isAdmin}
-            isUserInSpace={isUserInSpace}
-            onEnter={() => onEnterSpace(space.id)}
-            onOpenChat={onOpenChat ? () => onOpenChat(space) : undefined}
-            onEdit={onEditSpace ? () => onEditSpace(space) : undefined}
-            size="sm"
-            variant="ghost"
+        {/* Header section */}
+        <div className={floorPlanTokens.spaceCard.content.header}>
+          {/* Story 3.4: Attention Beacon - positioned absolute top-right */}
+          <AttentionBeacon
+            active={beaconState.active}
+            severity={beaconState.severity}
+            reason={beaconState.reason}
+            className="absolute top-2 right-2 z-20"
           />
-        </div>
 
-        {/* Space badges below menu */}
-        <div className={cn(
-          "absolute flex flex-col gap-1 items-end",
-          "top-10 right-2"
-        )}>
-          {/* Story 3.12 - AC2: Show Full badge when space is at capacity */}
-          {isFull && (
-            <FullBadge />
-          )}
-          
-          {/* Only show status badge if not compact/analyst mode */}
-          {!isCompact && (
-            <SpaceStatusBadge status={space.status} showIcon size="sm" />
-          )}
-          
-          {/* Always show capacity indicator */}
-          <CapacityIndicator 
-            current={usersInSpace.length} 
-            capacity={space.capacity} 
-            size="sm"
-          />
-        </div>
-
-        {/* Space name and type */}
-        <h3 className={cn(
-          "font-medium text-foreground pr-16 truncate",
-          isAnalyst ? "text-sm" : isCinema ? "text-lg" : "text-base"
-        )}>
-          {space.name}
-        </h3>
-        
-        {/* Space meta - show in analyst mode as compact text */}
-        {isAnalyst && (
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {usersInSpace.length} Active
-          </div>
-        )}
-        
-        {/* Only show type indicator if not compact/analyst mode */}
-        {!isCompact && (
-          <div className="mt-1">
-            <SpaceTypeIndicator type={space.type} showLabel size="sm" />
-          </div>
-        )}
-      </div>
-      
-      {/* Description (if not compact mode and has description) */}
-      {!isCompact && space.description && (
-        <div className={floorPlanTokens.spaceCard.content.body}>
-          <p className={cn(
-            "text-muted-foreground line-clamp-2",
-            isCinema ? "text-sm" : "text-xs"
-          )}>
-            {space.description}
-          </p>
-        </div>
-      )}
-      
-      {/* User avatars - hidden in analyst mode per UX spec */}
-      {/* Story 3.3: Max 4 visible avatars in default Orbit view per spec */}
-      {!isAnalyst && (
-        <div className={floorPlanTokens.spaceCard.content.footer}>
-          <AvatarGroup
-            users={usersInSpace}
-            max={isCinema ? 6 : 4}
-            size={isCinema ? 'md' : 'sm'}
-            onUserClick={onUserClick}
-            emptyText="Empty"
-            className="mt-2"
-          />
-        </div>
-      )}
-      
-      {/* Sparkline - only in analyst mode per UX spec */}
-      {isAnalyst && (
-        <div className="h-1 w-full bg-[var(--vo-border-subtle)] rounded-sm overflow-hidden mt-auto">
+          {/* Context Menu - positioned top right, offset from beacon */}
           <div
-            className="h-full transition-all duration-500"
-            style={{
-              width: `${occupancyPercent}%`,
-              backgroundColor: 'var(--vo-accent)',
-            }}
-          />
+            className={cn(
+              "absolute flex items-center gap-1 z-30",
+              beaconState.active ? "top-2 right-8" : "top-2 right-2"
+            )}
+            data-avatar-interactive="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SpaceContextMenu
+              space={space}
+              isAdmin={isAdmin}
+              isUserInSpace={isUserInSpace}
+              onEnter={() => onEnterSpace(space.id)}
+              onOpenChat={onOpenChat ? () => onOpenChat(space) : undefined}
+              onEdit={onEditSpace ? () => onEditSpace(space) : undefined}
+              size="sm"
+              variant="ghost"
+            />
+          </div>
+
+          {/* Space badges below menu */}
+          <div className={cn(
+            "absolute flex flex-col gap-1 items-end",
+            "top-10 right-2"
+          )}>
+            {/* Story 3.12 - AC2: Show Full badge when space is at capacity */}
+            {isFull && (
+              <FullBadge />
+            )}
+
+            {/* Only show status badge if not compact/analyst mode */}
+            {!isCompact && (
+              <SpaceStatusBadge status={space.status} showIcon size="sm" />
+            )}
+
+            {/* Always show capacity indicator */}
+            <CapacityIndicator
+              current={usersInSpace.length}
+              capacity={space.capacity}
+              size="sm"
+            />
+          </div>
+
+          {/* Space name and type */}
+          <h3 className={cn(
+            "font-medium text-foreground pr-16 truncate",
+            isAnalyst ? "text-sm" : isCinema ? "text-lg" : "text-base"
+          )}>
+            {space.name}
+          </h3>
+
+          {/* Space meta - show in analyst mode as compact text */}
+          {isAnalyst && (
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {usersInSpace.length} Active
+            </div>
+          )}
+
+          {/* Only show type indicator if not compact/analyst mode */}
+          {!isCompact && (
+            <div className="mt-1">
+              <SpaceTypeIndicator type={space.type} showLabel size="sm" />
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Description (if not compact mode and has description) */}
+        {!isCompact && space.description && (
+          <div className={floorPlanTokens.spaceCard.content.body}>
+            <p className={cn(
+              "text-muted-foreground line-clamp-2",
+              isCinema ? "text-sm" : "text-xs"
+            )}>
+              {space.description}
+            </p>
+          </div>
+        )}
+
+        {/* User avatars - hidden in analyst mode per UX spec */}
+        {/* Story 3.3: Max 4 visible avatars in default Orbit view per spec */}
+        {!isAnalyst && (
+          <div className={floorPlanTokens.spaceCard.content.footer}>
+            <AvatarGroup
+              users={usersInSpace}
+              max={isCinema ? 6 : 4}
+              size={isCinema ? 'md' : 'sm'}
+              onUserClick={onUserClick}
+              emptyText="Empty"
+              className="mt-2"
+              speakingUserIds={speakingUserIds}
+              mutedUserIds={mutedUserIds}
+            />
+          </div>
+        )}
+
+        {/* Sparkline - only in analyst mode per UX spec */}
+        {isAnalyst && (
+          <div className="h-1 w-full bg-[var(--vo-border-subtle)] rounded-sm overflow-hidden mt-auto">
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${occupancyPercent}%`,
+                backgroundColor: 'var(--vo-accent)',
+              }}
+            />
+          </div>
+        )}
       </div>
-      
+
       {/* Story 3.11: Desktop Hover Panel (AC1) - Outside card but inside wrapper */}
       {showPanel && !isMobile && showDetailPanel && (
-        <div 
+        <div
           className={cn(
             "absolute left-0 right-0 top-full mt-2 z-50",
             "min-w-[280px] max-w-[400px]"
@@ -460,7 +462,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           />
         </div>
       )}
-      
+
       {/* Story 3.11: Mobile Bottom Sheet (AC8) */}
       {isMobile && showDetailPanel && (
         <SpaceDetailBottomSheet

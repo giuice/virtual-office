@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Space, Neighborhood } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
+import { useAudio } from '@/contexts/AudioContext';
 import ModernSpaceCard from './ModernSpaceCard';
 import { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 import { floorPlanTokens } from './designTokens';
@@ -63,6 +64,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 }) => {
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
+  const { speakingUsers, mutedUserIds } = useAudio();
   const [joiningSpaces, setJoiningSpaces] = useState<Set<string>>(new Set());
   const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +76,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       console.log('--- Modern Floor Plan Debug Info ---');
       console.log('Total spaces:', spaces.length);
       console.log('Total users:', users?.length ?? 0);
-      
+
       // Log presence data by space
       usersInSpaces.forEach((usersInSpace, spaceId) => {
         const spaceName = spaceId ? (spaces.find(s => s.id === spaceId)?.name || 'Unknown') : 'Unknown';
@@ -82,20 +84,20 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           usersInSpace.map(u => u.displayName).join(', '));
       });
     }
-  // avoid over-logging: no need to re-log when user list changes but spaces unchanged
+    // avoid over-logging: no need to re-log when user list changes but spaces unchanged
   }, [spaces.length, usersInSpaces]);
-  
+
   // Check if current user is in space
   const isUserInSpace = (space: Space) => {
     if (!currentUserProfile?.id) return false;
-    
+
     // Primary method: Check if user's current_space_id matches this space
     const currentUser = users?.find(u => u.id === currentUserProfile.id);
-    
+
     if (currentUser?.currentSpaceId === space.id) {
       return true;
     }
-    
+
     return false;
   };
 
@@ -104,24 +106,24 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       if (!currentUserProfile?.id) {
         throw new Error('Cannot update location: user ID missing');
       }
-  
+
       const selectedSpace = spaces.find(s => s.id === spaceId);
       if (!selectedSpace) {
         throw new Error('Space not found');
       }
-  
+
       // Space validation checks
       // Story 3.12 - AC3: Client-side check for full capacity
       if (selectedSpace.capacity && (usersInSpaces.get(spaceId)?.length || 0) >= selectedSpace.capacity) {
         setError('Cannot join - space is full');
         return;
       }
-  
+
       if (selectedSpace.status !== 'available' && selectedSpace.status !== 'active') {
         setError(`This space is currently ${selectedSpace.status}`);
         return;
       }
-  
+
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
       if (currentUser && currentUser.currentSpaceId === spaceId) {
         if (process.env.NODE_ENV === 'development') {
@@ -129,10 +131,10 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         }
         return;
       }
-  
+
       setLastRequestedSpaceId(spaceId);  // Set loading state
       setError(null);
-      
+
       try {
         await updateLocation(spaceId);
         setLastRequestedSpaceId(null);  // Reset after success
@@ -146,7 +148,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           throw new Error('Unknown error during location update');
         }
       }
-  
+
       if (selectedSpace) {
         onSpaceSelect?.(selectedSpace);
         onOpenChat?.(selectedSpace);
@@ -168,7 +170,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       if (!currentUserProfile?.id) {
         throw new Error('Cannot update location: user ID missing');
       }
-      
+
       setError(null);
       await updateLocation(null);
     } catch (error) {
@@ -185,6 +187,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   // Get grid layout based on perspective (new) or legacy layout prop
   const gridLayoutClass = perspectiveGridClasses[perspective] || floorPlanTokens.floorPlanLayout.grid[layout];
 
+  // Derive speaking users list
+  const currentSpeakingIds = Array.from(speakingUsers.entries())
+    .filter(([_, isSpeaking]) => isSpeaking)
+    .map(([id]) => id);
+
   return (
     <div className={cn(
       floorPlanTokens.floorPlanLayout.container.base,
@@ -196,8 +203,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
           <div className="bg-destructive text-destructive-foreground px-4 py-2 rounded-md text-sm shadow-md">
             {error}
-            <button 
-              className="ml-2 font-bold" 
+            <button
+              className="ml-2 font-bold"
               onClick={() => setError(null)}
               aria-label="Dismiss error"
             >
@@ -230,13 +237,15 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               isAdmin={isAdmin}
               compact={compactCards || perspective === 'analyst'}
               variant={perspective}
+              speakingUserIds={currentSpeakingIds}
+              mutedUserIds={Array.from(mutedUserIds)}
             />
           );
         };
 
         // Group spaces by neighborhood if enabled and neighborhoods exist
         const shouldGroup = enableNeighborhoodGrouping && neighborhoods.length > 0;
-        
+
         if (shouldGroup) {
           // Use grouping logic
           const grouped = new Map<string, Space[]>();
@@ -300,7 +309,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         return (
           <div className={gridLayoutClass}>
             {spaces.map((space, index) => renderSpaceCard(space, index))}
-            
+
             {/* Empty state */}
             {spaces.length === 0 && (
               <div className="col-span-full p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
@@ -310,7 +319,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           </div>
         );
       })()}
-      
+
       {/* Loading indicator */}
       {isLoading && (
         <div className="absolute inset-0 bg-background/50 flex items-center justify-center">

@@ -3,7 +3,7 @@
 **Epic:** [Epic 8A: Audio MVP](../epics.md#epic-8a-audio-mvp-sococo-style--urgent)  
 **Type:** Feature  
 **Priority:** Critical (Investor Request)  
-**Status:** Ready for Review  
+**Status:** Done  
 **Architecture Ref:** [architecture.md#epic-8a](../architecture.md) (lines 528-554)
 
 ---
@@ -362,3 +362,32 @@ sequenceDiagram
 | Date | Change |
 |------|--------|
 | 2025-12-08 | Initial implementation of all 8 tasks by Dev Agent |
+| 2025-12-09 | Bug fixes and debugging session (see below) |
+
+---
+
+## Bug Fixes (2025-12-09)
+
+### Issues Resolved
+
+| Issue | Root Cause | Fix |
+|-------|-----------|-----|
+| **Audio doesn't work after mic enable** | `handleOffer` recreated peer connections instead of reusing existing ones during renegotiation | Modified `handleOffer` to reuse existing `RTCPeerConnection` objects |
+| **Double-click to activate mic** | `initializeLocalStream` set muted=true, but AudioContext only updated React state | Added `webrtcManager.setMuted(false)` after initialization |
+| **AUTOPLAY_BLOCKED errors** | Browser policy blocks audio without user gesture | Added 500ms retry interval + global click handler to resume audio |
+| **Speaking animation not showing** | ID mismatch: WebRTC used `supabase_uid`, presence used internal `user.id` | Changed AudioProvider to accept `userId` prop from profile |
+| **speakingUserIds not reaching AvatarGroup** | AvatarGroup in ModernSpaceCard missing `speakingUserIds` prop | Added `speakingUserIds` and `mutedUserIds` props to AvatarGroup |
+| **Animation not visible** | CSS targeted outer div but avatar is nested inside | Changed CSS to target `.vo-avatar-speaking span.rounded-full` |
+| **Animation triggering on silence** | VAD threshold (-50dB) too sensitive for ambient noise | Increased threshold to -40dB |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|  
+| `WebRTCManager.ts` | Renegotiation fix, `addLocalStreamToPeers()`, `resumeRemoteAudio()`, audio retry interval |
+| `AudioContext.tsx` | `userId` prop, global click handler, `setMuted(false)` after init |
+| `VoiceActivityDetector.ts` | Threshold -50 → -40dB, proper RMS calculation |
+| `ModernFloorPlan.tsx` | Removed userInSpace filter for speakingUserIds |
+| `ModernSpaceCard.tsx` | Added speakingUserIds/mutedUserIds to AvatarGroup |
+| `floor-plan.tsx` | Added userId prop to AudioProvider from currentUserProfile |
+| `tokens.css` | Green pulsing animation targeting inner span |
