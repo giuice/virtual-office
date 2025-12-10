@@ -158,11 +158,16 @@ export async function POST(request: Request) {
       expiresAt: expiresAtMs // Unix timestamp in ms
     };
 
-    const createdInvitation = await invitationRepository.create(invitation);
-    
-    if (!createdInvitation) {
-      // Invitation email was sent but DB record failed - log warning but don't fail
-      console.warn('[API /invitations/create] Warning: Email sent but failed to create invitation record');
+    let createdInvitation;
+    try {
+      createdInvitation = await invitationRepository.create(invitation);
+      console.log('[API /invitations/create] Invitation record created:', createdInvitation?.id);
+    } catch (dbError) {
+      console.error('[API /invitations/create] CRITICAL: Email sent but DB insert failed:', dbError);
+      return NextResponse.json({
+        success: false,
+        error: 'Convite enviado por email, mas falha ao salvar no banco. Contate o administrador.',
+      }, { status: 500 });
     }
 
     // Build the full invite URL for the admin to share

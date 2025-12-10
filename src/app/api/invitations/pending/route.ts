@@ -26,6 +26,12 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
 		// Get authenticated user
 		const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
+		console.log('[API /invitations/pending] Auth check:', { 
+			hasUser: !!authUser, 
+			email: authUser?.email,
+			authError: authError?.message 
+		});
+
 		if (authError || !authUser?.email) {
 			return NextResponse.json({
 				hasPending: false,
@@ -34,6 +40,9 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
 		}
 
 		const userEmail = authUser.email.toLowerCase();
+		const nowIso = new Date().toISOString();
+
+		console.log('[API /invitations/pending] Searching for:', { userEmail, nowIso });
 
 		// Find pending invitation for this email
 		const { data: invitation, error: invitationError } = await supabase
@@ -50,10 +59,16 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
       `)
 			.ilike('email', userEmail)
 			.eq('status', 'pending')
-			.gt('expires_at', new Date().toISOString())
+			.gt('expires_at', nowIso)
 			.order('created_at', { ascending: false })
 			.limit(1)
 			.maybeSingle();
+
+		console.log('[API /invitations/pending] Query result:', { 
+			found: !!invitation, 
+			token: invitation?.token?.substring(0, 8) + '...', 
+			error: invitationError?.message 
+		});
 
 		if (invitationError) {
 			console.error('Error fetching pending invitation:', invitationError);

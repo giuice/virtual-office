@@ -9,6 +9,13 @@ export async function POST(req: NextRequest) {
   // Get authenticated user from session (AC4 - use real supabaseUid from session)
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
   
+  console.log('[API /invitations/accept] Auth check:', {
+    hasUser: !!authUser,
+    email: authUser?.email,
+    supabaseUid: authUser?.id,
+    authError: authError?.message
+  });
+  
   if (authError || !authUser) {
     return NextResponse.json({ 
       success: false,
@@ -24,6 +31,8 @@ export async function POST(req: NextRequest) {
   try {
     const { token } = await req.json();
 
+    console.log('[API /invitations/accept] Processing token:', token?.substring(0, 8) + '...');
+
     // Validate input
     if (!token) {
       return NextResponse.json({ error: 'Token de convite é obrigatório' }, { status: 400 });
@@ -31,6 +40,13 @@ export async function POST(req: NextRequest) {
 
     // 1. Get and validate invitation using repository
     const invitation = await invitationRepository.findByToken(token);
+    console.log('[API /invitations/accept] Invitation found:', {
+      found: !!invitation,
+      status: invitation?.status,
+      email: invitation?.email,
+      companyId: invitation?.companyId
+    });
+    
     if (!invitation) {
       return NextResponse.json({ error: 'Convite não encontrado ou inválido' }, { status: 404 });
     }
@@ -57,6 +73,13 @@ export async function POST(req: NextRequest) {
     let userProfile = await userRepository.findBySupabaseUid(supabaseUid);
     const userIdToUpdate: string | undefined = userProfile?.id;
 
+    console.log('[API /invitations/accept] User profile lookup:', {
+      found: !!userProfile,
+      userId: userProfile?.id,
+      currentCompanyId: userProfile?.companyId,
+      supabaseUid
+    });
+
     if (userProfile) {
       // 3a. User exists - check if they already belong to a company (AC6)
       if (userProfile.companyId && userProfile.companyId !== invitation.companyId) {
@@ -73,10 +96,14 @@ export async function POST(req: NextRequest) {
         }, { status: 409 });
       } else if (!userProfile.companyId) {
         // User exists but has no company - update their profile using repository
-        console.log(`Updating existing user ${userIdToUpdate} (supabaseUid: ${supabaseUid}) with company ${invitation.companyId} and role ${invitation.role}`);
+        console.log(`[API /invitations/accept] Updating user ${userIdToUpdate} with company ${invitation.companyId} and role ${invitation.role}`);
         const updatedUser = await userRepository.update(userIdToUpdate!, {
           companyId: invitation.companyId,
           role: invitation.role
+        });
+        console.log('[API /invitations/accept] User update result:', {
+          success: !!updatedUser,
+          newCompanyId: updatedUser?.companyId
         });
         if (!updatedUser) {
           throw new Error(`Falha ao associar usuário à empresa`);
