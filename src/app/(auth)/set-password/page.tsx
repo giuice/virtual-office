@@ -164,6 +164,9 @@ export default function SetPasswordPage() {
       setIsSuccess(true);
       showSuccess({ description: 'Senha definida com sucesso!' });
       
+      // Small delay to ensure session cookies are propagated to server
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Check and auto-accept pending invitation
       const inviteAccepted = await checkAndAcceptPendingInvite();
       
