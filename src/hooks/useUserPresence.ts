@@ -65,7 +65,7 @@ export function useUserPresence(currentUserId?: string) {
         // Ensure avatar and other fields are properly formatted
         const processedUser: UserPresenceData = {
           id: user.id,
-          displayName: user.displayName || 'Unknown User',
+          displayName: user.displayName || user.email || 'Unknown User',
           avatarUrl: user.avatarUrl || '',
           status: user.status || 'offline',
           statusMessage: user.statusMessage || '',
@@ -347,7 +347,7 @@ export function useUserPresence(currentUserId?: string) {
 
     const mapDbRowToPresence = (row: any): UserPresenceData => ({
       id: row.id,
-      displayName: row.display_name ?? row.displayName ?? 'Unknown User',
+      displayName: row.display_name ?? row.displayName ?? row.email ?? 'Unknown User',
       avatarUrl: row.avatar_url ?? row.avatarUrl ?? '',
       status: row.status ?? 'offline',
       statusMessage: row.status_message ?? row.statusMessage ?? '',

@@ -15,6 +15,7 @@ import type { PendingInvitationResponse } from '@/app/api/invitations/pending/ro
 export default function SetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
@@ -26,6 +27,16 @@ export default function SetPasswordPage() {
   const router = useRouter();
   const { user, loading: authLoading, isAuthReady } = useAuth();
   const { showSuccess, showError } = useNotification();
+
+  // Pre-fill display name if available in user metadata
+  useEffect(() => {
+    if (user?.user_metadata) {
+      const existingName = user.user_metadata.full_name || user.user_metadata.displayName || user.user_metadata.name;
+      if (existingName) {
+        setDisplayName(existingName);
+      }
+    }
+  }, [user]);
 
   // Check if user has a valid session (came from invite/recovery link)
   useEffect(() => {
@@ -105,7 +116,10 @@ export default function SetPasswordPage() {
       const acceptResponse = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: data.invitation.token }),
+        body: JSON.stringify({ 
+          token: data.invitation.token,
+          displayName: displayName 
+        }),
       });
 
       const acceptData = await acceptResponse.json();
@@ -133,6 +147,12 @@ export default function SetPasswordPage() {
     setFormError(null);
 
     // Validations
+    // Only require display name if it's not already set
+    if (!displayName.trim()) {
+      setFormError('Por favor, informe seu nome.');
+      return;
+    }
+
     if (password.length < 6) {
       setFormError('A senha deve ter pelo menos 6 caracteres.');
       return;
@@ -150,6 +170,7 @@ export default function SetPasswordPage() {
       
       const { error } = await supabase.auth.updateUser({
         password: password,
+        data: { full_name: displayName }
       });
 
       if (error) {
@@ -257,6 +278,21 @@ export default function SetPasswordPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="displayName" className="text-sm font-medium">
+                Nome completo
+              </label>
+              <Input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Seu nome"
+                required={!user?.user_metadata?.full_name} // Only required if not already present
+                disabled={isLoading}
+              />
+            </div>
+
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
                 Nova senha

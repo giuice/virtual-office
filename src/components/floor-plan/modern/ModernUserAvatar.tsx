@@ -78,7 +78,7 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
           ...user,
           // Ensure critical fields are not lost
           id: user.id,
-          displayName: user.displayName || fullUserData?.displayName || 'Unknown User',
+          displayName: user.displayName || fullUserData?.displayName || fullUserData?.email || (user as any)?.email || 'Unknown User',
           avatarUrl: user.avatarUrl || fullUserData?.avatarUrl,
           status: user.status || fullUserData?.status || 'offline',
           // Ensure fields required by the User type are present, falling back as needed
@@ -105,7 +105,7 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
         <TooltipTrigger asChild>{avatarCore}</TooltipTrigger>
         <TooltipContent side={tooltipPlacement} className="p-2 max-w-[200px]">
           <div className="text-center">
-            <p className="font-medium">{user.displayName}</p>
+            <p className="font-medium">{user.displayName || fullUserData?.displayName || fullUserData?.email || (user as any)?.email || 'Unknown User'}</p>
             {user.status && (
               <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
             )}

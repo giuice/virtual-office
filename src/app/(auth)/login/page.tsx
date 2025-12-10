@@ -86,6 +86,7 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       showSuccess({ description: 'Login realizado com sucesso!' });
+      setStatusMessage('Redirecionando...');
     } catch (error) {
       const err = error as any;
       if (err?.code === 'email_not_confirmed') {
@@ -97,7 +98,6 @@ export default function LoginPage() {
         setFormError(friendlyMessage);
       }
       setStatusMessage(null);
-    } finally {
       setFormStatus('idle');
       setIsLoading(false);
     }
@@ -112,12 +112,12 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       showSuccess({ description: 'Login com Google realizado!' });
+      setStatusMessage('Redirecionando...');
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
       showError({ description: friendlyMessage });
       setFormError(friendlyMessage);
       setStatusMessage(null);
-    } finally {
       setFormStatus('idle');
       setIsLoading(false);
     }
@@ -153,9 +153,17 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Senha
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-sm font-medium">
+                  Senha
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Esqueceu a senha?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

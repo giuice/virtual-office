@@ -169,7 +169,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       const otherUser = companyUsers.find((u) => u.id === otherUserId);
 
       if (otherUser) {
-        displayName = otherUser.displayName;
+        displayName = otherUser.displayName || otherUser.email || 'Unknown User';
         avatarUser = otherUser;
       } else {
         displayName = 'Unknown User';

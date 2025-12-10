@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
 
   try {
-    const { token } = await req.json();
+    const { token, displayName } = await req.json();
 
     console.log('[API /invitations/accept] Processing token:', token?.substring(0, 8) + '...');
 
@@ -97,10 +97,17 @@ export async function POST(req: NextRequest) {
       } else if (!userProfile.companyId) {
         // User exists but has no company - update their profile using repository
         console.log(`[API /invitations/accept] Updating user ${userIdToUpdate} with company ${invitation.companyId} and role ${invitation.role}`);
-        const updatedUser = await userRepository.update(userIdToUpdate!, {
+        
+        const updateData: any = {
           companyId: invitation.companyId,
           role: invitation.role
-        });
+        };
+        
+        if (displayName) {
+          updateData.displayName = displayName;
+        }
+
+        const updatedUser = await userRepository.update(userIdToUpdate!, updateData);
         console.log('[API /invitations/accept] User update result:', {
           success: !!updatedUser,
           newCompanyId: updatedUser?.companyId
@@ -126,10 +133,16 @@ export async function POST(req: NextRequest) {
       
       if (userProfile) {
         // Trigger created the user, now update with company info
-        const updatedUser = await userRepository.update(userProfile.id, {
+        const updateData: any = {
           companyId: invitation.companyId,
           role: invitation.role
-        });
+        };
+        
+        if (displayName) {
+          updateData.displayName = displayName;
+        }
+
+        const updatedUser = await userRepository.update(userProfile.id, updateData);
         if (!updatedUser) {
           throw new Error(`Falha ao associar usuário à empresa`);
         }

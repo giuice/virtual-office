@@ -72,7 +72,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, onStartReply
               ? { id: message.senderId, displayName: `User ${message.senderId.substring(0, 4)}` }
               : null;
 
-          const senderName = senderUser?.displayName || fallbackAvatar?.displayName || 'Unknown User';
+          const senderName = senderUser?.displayName || senderUser?.email || fallbackAvatar?.displayName || 'Unknown User';
 
           // Find the original message if this is a reply
           const originalMessage = message.replyToId

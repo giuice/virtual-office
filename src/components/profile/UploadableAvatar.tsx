@@ -41,6 +41,7 @@ interface UploadableAvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   onAvatarChange?: (file: File) => Promise<void>;
+  onUploadSuccess?: (url: string) => void;
   uploading?: boolean;
   showUploadButton?: boolean;
 }
@@ -50,6 +51,7 @@ export function UploadableAvatar({
   size = 'md',
   className,
   onAvatarChange,
+  onUploadSuccess,
   uploading = false,
   showUploadButton = false,
 }: UploadableAvatarProps) {
@@ -99,6 +101,9 @@ export function UploadableAvatar({
     onSuccess: (response) => {
       // The component now handles file uploads internally
       // If onAvatarChange is provided, it's for external handling
+      if (onUploadSuccess && response?.avatarUrl) {
+        onUploadSuccess(response.avatarUrl);
+      }
     },
   });
   

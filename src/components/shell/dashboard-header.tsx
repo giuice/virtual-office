@@ -3,22 +3,19 @@
 
 import { useState } from 'react';
 import { Bell, LogOut, Settings, Home } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
+
 import { GlobalSearch } from '@/components/search/global-search';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { getAvatarUrl, getUserInitials } from '@/lib/avatar-utils';
+
 import Link from 'next/link';
 import { EnhancedUserMenu } from './enhanced-user-menu';
 import { useCompany } from '@/contexts/CompanyContext';
+import ThemeSwitcher from '../ui/ThemeSwitcher';
 
-// Feature flag for enhanced user menu
-const USE_ENHANCED_USER_MENU = true;
 
 interface DashboardHeaderProps {
   heading?: string;
@@ -78,7 +75,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
 
         <div className="ml-auto flex items-center gap-4">
           {/* Theme Toggle */}
-          <ThemeToggle />
+          <ThemeSwitcher align="end" side="bottom" />
 
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
@@ -87,67 +84,9 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
           </Button>
 
           {/* User Menu */}
-          {USE_ENHANCED_USER_MENU ? (
+          
             <EnhancedUserMenu />
-          ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar>
-                    <AvatarImage
-                      src={getAvatarUrl({
-                        // Highest priority: user-set avatar from our DB profile
-                        avatarUrl: currentUserProfile?.avatarUrl,
-                        // Next: social avatar from Supabase auth metadata (Google)
-                        photoURL: (user as any)?.user_metadata?.avatar_url || (user as any)?.photoURL,
-                        // Fallback context for generated avatar
-                        name: getUserDisplayName(),
-                      })}
-                      alt="User avatar"
-                    />
-                    <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56" align="end">
-                <div className="grid gap-4">
-                  <div className="flex items-center gap-4">
-                    <Avatar>
-                      <AvatarImage
-                        src={getAvatarUrl({
-                          avatarUrl: currentUserProfile?.avatarUrl,
-                          photoURL: (user as any)?.user_metadata?.avatar_url || (user as any)?.photoURL,
-                          name: getUserDisplayName(),
-                        })}
-                        alt="User avatar"
-                      />
-                      <AvatarFallback>{getUserInitials(getUserDisplayName())}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{getUserDisplayName()}</p>
-                      <p className="text-xs text-muted-foreground">{user?.email || 'No email'}</p>
-                    </div>
-                  </div>
-                  <Separator />
-                  <Button variant="ghost" className="flex items-center justify-start gap-2" asChild>
-                    <Link href="/settings">
-                      <Settings className="h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+        
         </div>
       </div>
 

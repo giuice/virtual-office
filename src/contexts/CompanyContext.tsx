@@ -32,6 +32,7 @@ interface CompanyContextType {
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
   removeUserFromCompany: (userId: string) => Promise<void>;
   loadCompanyData: (userId: string) => Promise<void>;
+  refreshCompanyData: () => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -130,6 +131,13 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       console.log("[CompanyContext] Data loading finished.");
     }
   }, [user]); // Depend on the Supabase auth user object
+
+  // Refresh company data for the current user
+  const refreshCompanyData = useCallback(async () => {
+    if (user?.id) {
+      await loadCompanyData(user.id);
+    }
+  }, [user, loadCompanyData]);
 
   // Effect to trigger loading when auth user changes
   useEffect(() => {
@@ -453,6 +461,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     updateUserRole,
     removeUserFromCompany,
     loadCompanyData,
+    refreshCompanyData,
   };
 
   return <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>;

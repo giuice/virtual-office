@@ -120,7 +120,7 @@ export function EnhancedUserMenu() {
             <UploadableAvatar
               user={combinedUser}
               onAvatarChange={handleAvatarUpload}
-              size="sm"
+              size="lg"
               uploading={isUploading}
             />
             <div className="grid gap-1">
@@ -142,6 +142,12 @@ export function EnhancedUserMenu() {
           </div>
           <Separator />
           <div className="grid gap-2">
+            <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
+              <Link href="/dashboard/profile">
+                <Settings className="h-4 w-4" />
+                <span>Meu Perfil</span>
+              </Link>
+            </Button>
             <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
               <Link href="/avatar-demo">
                 <Settings className="h-4 w-4" />
