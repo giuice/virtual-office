@@ -2,7 +2,7 @@
 
 **Data:** 2025-12-09  
 **Autor:** Amelia (Dev Agent)  
-**Status:** Pronto para Review  
+**Status:** done
 
 ---
 
