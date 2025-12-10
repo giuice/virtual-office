@@ -62,6 +62,32 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - ❌ `messages.room_id` — Does NOT exist! Messages link via `conversations.room_id`
 - ❌ `users.id = auth.uid()` — Wrong! Use `users.supabase_uid = auth.uid()::text`
 
+### ⛔ CRITICAL: User ID vs Supabase UID — READ THIS BEFORE ANY USER QUERY
+
+> **THIS IS THE #1 SOURCE OF BUGS IN THIS CODEBASE. STOP AND VERIFY.**
+>
+> The `users` table has TWO different ID fields:
+>
+> | Field | Type | Description | When to Use |
+> |-------|------|-------------|-------------|
+> | `users.id` | UUID | Internal app user ID | Foreign keys, relationships between app tables |
+> | `users.supabase_uid` | TEXT | Supabase Auth user ID | Matching with `auth.uid()`, session user identification |
+>
+> **NEVER confuse these:**
+> - ❌ `users.id = auth.uid()` — **ALWAYS WRONG**
+> - ❌ `users.id = session.user.id` — **ALWAYS WRONG**  
+> - ❌ Comparing `users.id` with any Supabase Auth value — **ALWAYS WRONG**
+>
+> **CORRECT patterns:**
+> - ✅ `users.supabase_uid = auth.uid()::text` — For RLS policies
+> - ✅ `userRepository.findBySupabaseUid(authUser.id)` — For API routes
+> - ✅ `WHERE supabase_uid = $supabaseAuthId` — For raw SQL
+>
+> **Before writing ANY query involving users:**
+> 1. ASK: "Am I comparing with a Supabase Auth ID?"
+> 2. If YES → Use `supabase_uid` column
+> 3. If comparing app tables (messages.sender_id, spaces.created_by) → Use `users.id`
+
 
 ## Type Registry & Change Control
 - Canonical types live in `src/types/`. Examples: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`.
