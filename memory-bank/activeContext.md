@@ -3,6 +3,12 @@
 ## Current Project State
 Epic 3 (Visual Experience & Floor Plan - Unleashed) is in active development. Story 3.11 Space Detail Hover Panel has been completed. The UX-first strategy prioritizes visual polish for investor demos.
 
+## Research Completed
+- **Supabase Auth Patterns**: Verified against official docs (2025-12-11)
+  - Spec saved: `memory-bank/specs/supabase-auth-patterns/README.md`
+  - Full guide: `docs/supabase-auth-research.md`
+  - Key findings: getSession() vs getUser() security, MFA challenge step, Next.js 15 async cookies
+
 ## Recent Actions
 - Completed Story 3.11: Space Detail Hover Panel
   - Created SpaceDetailPanel component with glass-morphism styling

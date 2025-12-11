@@ -1,5 +1,11 @@
 # Progress Tracking
 
+## Research & Specs
+- **Supabase Auth Patterns** (2025-12-11): ✅ Verified
+  - Spec: `memory-bank/specs/supabase-auth-patterns/README.md`
+  - Guide: `docs/supabase-auth-research.md`
+  - Key patterns: getSession vs getUser, MFA flow, Next.js 15 middleware
+
 ## Implementation Plans
 - IP1_PresenceBugsResolution: 100% (Completed)
 - IP4_ModernFloorPlanUI: 20% (In Progress)

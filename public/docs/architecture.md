@@ -39,7 +39,7 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 - Next.js 15.3.0 with App Router and React 19.1.0
 - TypeScript 5 (strict mode) throughout
 - Supabase PostgreSQL with Row-Level Security (RLS)
-- Supabase Auth with SSR (@supabase/ssr v0.6.1)
+- Supabase Auth with SSR (@supabase/ssr ^0.8.0)
 - Repository Pattern with interfaces and implementations
 - Multi-tenancy via company-based data isolation
 
@@ -136,9 +136,9 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 | **TypeScript** | 5 (strict) | Type safety | ✅ Prevents type errors across 85-120 stories |
 | **Supabase** | v2.49.4 | Database, Auth, Realtime, Storage | ✅ All-in-one reduces vendor complexity |
 | **TailwindCSS** | 4.1.3 | Styling | ✅ Latest version; CSS variables for theming |
-| **TanStack Query** | v5.72.2 | State management | ✅ Intelligent caching, background updates |
-| **Vitest** | 3.1.1 | Unit testing | ✅ Fast, modern test runner |
-| **Playwright** | 1.51.1 | E2E testing | ✅ Cross-browser automation |
+| **TanStack Query** | ^5.90.6 | State management | ✅ Intelligent caching, background updates |
+| **Vitest** | ^4.0.7 | Unit testing | ✅ Fast, modern test runner |
+| **Playwright** | ^1.56.1 | E2E testing | ✅ Cross-browser automation |
 
 **Rationale for Supabase:**
 - **Integrated ecosystem**: Auth + DB + Realtime + Storage = fewer vendors
@@ -163,18 +163,18 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 - `sonner` v2.0.3: Toast notifications
 
 **Data & State:**
-- `@tanstack/react-query` v5.72.2: Caching and background updates
+- `@tanstack/react-query` ^5.90.6: Caching and background updates
 - `date-fns` v4.1.0: Date formatting
 - `uuid` v13.0.0: ID generation
 - `lodash` v4.17.21: Utility functions
 
 **Backend & Storage:**
 - `@supabase/supabase-js` v2.49.4: Database client
-- `@supabase/ssr` v0.7.0: Server-side auth
+- `@supabase/ssr` ^0.8.0: Server-side auth
 - `aws-sdk` v2.1692.0: Avatar uploads to S3
 
 **Testing:**
-- `vitest` v3.1.1, `@playwright/test` v1.51.1
+- `vitest` ^4.0.7, `@playwright/test` ^1.56.1
 - `@testing-library/react` v16.3.0
 - `happy-dom` v20.0.0 (fast DOM for tests)
 

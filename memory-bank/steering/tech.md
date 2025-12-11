@@ -4,11 +4,11 @@
 - **Framework**: Next.js 15.3.0 with App Router and TypeScript 5
 - **Runtime**: React 19.1.0 with React DOM 19.1.0
 - **Database**: Supabase (PostgreSQL) with real-time subscriptions and Row Level Security (RLS)
-- **Authentication**: Supabase Auth with SSR support (@supabase/ssr v0.6.1)
+- **Authentication**: Supabase Auth with SSR support (@supabase/ssr ^0.8.0)
 - **Styling**: TailwindCSS 4.1.3 + Shadcn/UI components with CSS custom properties
-- **State Management**: TanStack Query v5.72.2 + React Context patterns
+- **State Management**: TanStack Query ^5.90.6 + React Context patterns
 - **Real-time**: Supabase Realtime for live updates and presence
-- **Testing**: Vitest 3.1.1 + Playwright 1.51.1 + Testing Library 16.3.0
+- **Testing**: Vitest ^4.0.7 + Playwright ^1.56.1 + Testing Library 16.3.0
 
 ## Key Libraries
 - **UI Components**: Radix UI primitives (v1.1.x-v2.1.x) via Shadcn/UI
