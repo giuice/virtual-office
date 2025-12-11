@@ -15,10 +15,10 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Runtime: React 19.1.0 / React DOM 19.1.0
 - Lang: TypeScript 5, strict mode
 - Data: Supabase Postgres + Realtime, RLS enabled
-- Auth: Supabase Auth with SSR (@supabase/ssr v0.6.1)
+- Auth: Supabase Auth with SSR (@supabase/ssr ^0.8.0)
 - UI: TailwindCSS 4.1.3, shadcn/ui, Radix
 - State: TanStack Query v5 + React Context
-- Tests: Vitest 3, Playwright, Testing Library
+- Tests: Vitest 4, Playwright, Testing Library
 
 ## Supabase & RLS (critical)
 - Never use the browser Supabase client in API routes.
