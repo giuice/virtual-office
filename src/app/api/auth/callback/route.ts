@@ -5,11 +5,21 @@ import { GoogleAvatarService } from '@/lib/services/google-avatar-service';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
 // import { Database } from '@/lib/supabase/database.types'; // Uncomment if using types
 
+function getSafeNextPath(nextParam: string | null): string | null {
+  if (!nextParam) return null;
+  // Prevent open redirect: only allow same-origin relative paths
+  if (!nextParam.startsWith('/')) return null;
+  // Prevent protocol-relative URLs
+  if (nextParam.startsWith('//')) return null;
+  return nextParam;
+}
+
 export const dynamic = 'force-dynamic'; // Keep dynamic export
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const next = getSafeNextPath(requestUrl.searchParams.get('next'));
 
   let errorMessage = 'Authentication failed. Please try again.'; // Default error message
 
@@ -51,26 +61,29 @@ export async function GET(request: NextRequest) {
           }
 
           try {
-            // Check if the user has a company by querying user profiles
-            const { data: userProfile, error: profileError } = await supabase
-              .from('user_profiles')
-              .select('company_id')
-              .eq('user_id', user.id)
-              .single();
+            // If caller provided a next path (e.g., invite flow), honor it.
+            if (next) {
+              const redirectUrl = new URL(next, requestUrl.origin).toString();
+              console.log(`[Callback] Redirecting to next: ${redirectUrl}`);
+              return NextResponse.redirect(redirectUrl);
+            }
 
-            if (profileError && profileError.code !== 'PGRST116') {
-              console.error(`[Callback] Error fetching user profile: ${profileError.message}`);
+            // Check if the user has a company by querying our canonical users table
+            // IMPORTANT: do NOT use `user_profiles` (does not exist in this codebase)
+            const { data: userRow, error: userRowError } = await supabase
+              .from('users')
+              .select('company_id')
+              .eq('supabase_uid', user.id)
+              .maybeSingle();
+
+            if (userRowError) {
+              console.error(`[Callback] Error fetching user row: ${userRowError.message}`);
             }
 
             // Redirect based on whether the user has a company
-            let redirectPath;
-            if (userProfile?.company_id) {
-              console.log(`[Callback] User has a company. Redirecting to office.`);
-              redirectPath = '/office';
-            } else {
-              console.log(`[Callback] User does not have a company. Redirecting to create-company.`);
-              redirectPath = '/create-company';
-            }
+            const hasCompany = !!userRow?.company_id;
+            const redirectPath = hasCompany ? '/dashboard' : '/onboarding';
+            console.log(`[Callback] User company status: ${hasCompany ? 'has company' : 'no company'} -> ${redirectPath}`);
 
             const redirectUrl = new URL(redirectPath, requestUrl.origin).toString();
             console.log(`[Callback] Redirecting to: ${redirectUrl}`);
