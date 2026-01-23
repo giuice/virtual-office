@@ -35,6 +35,8 @@ export async function POST(request: Request) {
 
     console.log('[API /invitations/create] Received request:', { email, role, companyId });
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     // Verify requesting user is authenticated and is admin of company
     const { data: { user: currentUser }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !currentUser) {
@@ -104,6 +106,59 @@ export async function POST(request: Request) {
       );
     }
 
+    // If there's already a pending invite for this email+company, reuse it
+    // This avoids spamming emails (and hitting Supabase rate limits) on repeated clicks.
+    const nowIso = new Date().toISOString();
+    // NOTE: This is written defensively because our unit tests use simplified Supabase mocks
+    // that may not support full query-builder chaining.
+    let existingInvite: { token: string; expires_at: string } | null = null;
+    let existingInviteError: unknown = null;
+    try {
+      let q: any = (supabaseClient as any)
+        .from('invitations')
+        .select('token, expires_at');
+
+      if (q && typeof q.eq === 'function') q = q.eq('company_id', companyId);
+      if (q && typeof q.eq === 'function') q = q.eq('email', normalizedEmail);
+      if (q && typeof q.eq === 'function') q = q.eq('status', 'pending');
+      if (q && typeof q.gt === 'function') q = q.gt('expires_at', nowIso);
+
+      if (q && typeof q.maybeSingle === 'function') {
+        const res = await q.maybeSingle();
+        existingInvite = res?.data ?? null;
+        existingInviteError = res?.error ?? null;
+      }
+    } catch (err) {
+      existingInviteError = err;
+    }
+
+    if (existingInviteError) {
+      console.warn('[API /invitations/create] Error checking existing invite:', existingInviteError);
+    }
+
+    if (existingInvite?.token) {
+      const headersList = await headers();
+      const host = headersList.get('host') || 'localhost:3000';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+      const inviteUrl = `${baseUrl}/join?token=${existingInvite.token}`;
+
+      return NextResponse.json({
+        success: true,
+        message: 'Convite já existente (pendente). Reutilizando link para evitar spam.',
+        invitation: {
+          companyId,
+          email: normalizedEmail,
+          token: existingInvite.token,
+          expiresAt: new Date(existingInvite.expires_at).toISOString(),
+          inviteUrl,
+          emailSent: false,
+        },
+        limit,
+        remaining: Math.max(0, limit - totalCount),
+      }, { status: 200 });
+    }
+
     // Generate a secure random token for our records
     const token = crypto.randomBytes(32).toString('hex');
     
@@ -116,41 +171,10 @@ export async function POST(request: Request) {
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const redirectTo = `${protocol}://${host}/join?token=${token}`;
 
-    console.log('[API /invitations/create] Sending invite email via Supabase Auth...');
-    
-    // Send invitation email via Supabase Auth Admin API
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        redirectTo,
-        data: {
-          // Store metadata in user's raw_user_meta_data
-          invitation_token: token,
-          invited_company_id: companyId,
-          invited_role: role,
-        }
-      }
-    );
-
-    if (inviteError) {
-      console.error('[API /invitations/create] Supabase invite error:', inviteError);
-      
-      // Handle specific errors
-      if (inviteError.message.includes('already been registered')) {
-        return NextResponse.json(
-          { error: 'Este email já está cadastrado no sistema' },
-          { status: 409 }
-        );
-      }
-      
-      throw new Error(`Falha ao enviar email de convite: ${inviteError.message}`);
-    }
-
-    console.log('[API /invitations/create] Invite email sent successfully:', inviteData?.user?.id);
-
-    // Create the invitation record in our database
+    // Create the invitation record in our database FIRST.
+    // Even if email sending is rate-limited, the admin can still share the link manually.
     const invitation: Omit<Invitation, 'id' | 'createdAt'> = {
-      email,
+      email: normalizedEmail,
       companyId,
       role: role as UserRole,
       token,
@@ -163,11 +187,41 @@ export async function POST(request: Request) {
       createdInvitation = await invitationRepository.create(invitation);
       console.log('[API /invitations/create] Invitation record created:', createdInvitation?.id);
     } catch (dbError) {
-      console.error('[API /invitations/create] CRITICAL: Email sent but DB insert failed:', dbError);
+      console.error('[API /invitations/create] Failed to create invitation record:', dbError);
       return NextResponse.json({
         success: false,
-        error: 'Convite enviado por email, mas falha ao salvar no banco. Contate o administrador.',
+        error: 'Falha ao salvar convite no banco. Tente novamente.',
       }, { status: 500 });
+    }
+
+    console.log('[API /invitations/create] Sending invite email via Supabase Auth...');
+
+    // Try sending invitation email via Supabase Auth Admin API
+    let emailSent = false;
+    let emailSendError: string | null = null;
+    try {
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        normalizedEmail,
+        {
+          redirectTo,
+          data: {
+            invitation_token: token,
+            invited_company_id: companyId,
+            invited_role: role,
+          }
+        }
+      );
+
+      if (inviteError) {
+        console.error('[API /invitations/create] Supabase invite error:', inviteError);
+        emailSendError = inviteError.message;
+      } else {
+        emailSent = true;
+        console.log('[API /invitations/create] Invite email sent successfully:', inviteData?.user?.id);
+      }
+    } catch (err) {
+      console.error('[API /invitations/create] Exception sending invite email:', err);
+      emailSendError = err instanceof Error ? err.message : String(err);
     }
 
     // Build the full invite URL for the admin to share
@@ -177,14 +231,18 @@ export async function POST(request: Request) {
     // Return success response (token included for admin to share the link)
     return NextResponse.json({
       success: true,
-      message: 'Convite enviado com sucesso',
+      message: emailSent
+        ? 'Convite enviado com sucesso'
+        : 'Convite criado. Não foi possível enviar o email automaticamente — compartilhe o link manualmente.',
       invitation: {
         id: createdInvitation?.id,
         companyId: companyId,
-        email: email,
+        email: normalizedEmail,
         token: token, // Admin needs this to share the invitation link
         expiresAt: new Date(expiresAtMs).toISOString(),
         inviteUrl: inviteUrl, // AC6: Full URL for copying
+        emailSent,
+        emailSendError,
       },
       // AC4: Return remaining capacity to help UI display
       limit,

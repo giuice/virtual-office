@@ -56,7 +56,7 @@ function JoinPageContent() {
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') || null;
   const router = useRouter();
-  
+
   const { user, session, isAuthReady, loading: authLoading } = useAuth();
   const { showSuccess, showError } = useNotification();
 
@@ -71,7 +71,7 @@ function JoinPageContent() {
   const [userCompanyName, setUserCompanyName] = useState<string>('');
   const [pendingEmail, setPendingEmail] = useState<string>('');
   const [hashProcessed, setHashProcessed] = useState(false);
-  
+
   // CRITICAL: Prevent duplicate flow execution
   const [flowExecuted, setFlowExecuted] = useState(false);
 
@@ -83,7 +83,43 @@ function JoinPageContent() {
     const processHashFragment = async () => {
       // Check if URL has hash fragment with access_token (from Supabase invite email)
       if (typeof window === 'undefined') return;
-      
+
+      const supabase = createSupabaseBrowserClient();
+
+      // Support PKCE/code flows as well as hash-token flows.
+      // Some providers/flows return `?code=...` and require an exchange.
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const typeFromQuery = url.searchParams.get('type');
+
+      if (code) {
+        console.log('Processing Supabase auth code from URL...');
+        setPageState('processing-hash');
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('Error exchanging code for session:', error);
+          setErrorMessage('Erro ao processar link de convite. Tente novamente.');
+          setPageState('error');
+          setHashProcessed(true);
+          return;
+        }
+
+        // Clean up URL so we don't re-process the code on refresh
+        url.searchParams.delete('code');
+        window.history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''));
+
+        // If this code corresponds to an invite/recovery flow, send user to set-password
+        if (typeFromQuery === 'invite' || typeFromQuery === 'recovery') {
+          console.log('Invite/recovery flow detected (query), redirecting to set-password...');
+          const currentToken = new URLSearchParams(window.location.search).get('token');
+          const returnUrl = currentToken ? `/join?token=${currentToken}` : '/onboarding';
+          sessionStorage.setItem('passwordSetReturnUrl', returnUrl);
+          window.location.href = '/set-password';
+          return;
+        }
+      }
+
       const hash = window.location.hash;
       if (!hash || !hash.includes('access_token')) {
         setHashProcessed(true);
@@ -94,8 +130,6 @@ function JoinPageContent() {
       setPageState('processing-hash');
 
       try {
-        const supabase = createSupabaseBrowserClient();
-        
         // Parse the hash fragment
         const hashParams = new URLSearchParams(hash.substring(1));
         const accessToken = hashParams.get('access_token');
@@ -117,7 +151,7 @@ function JoinPageContent() {
             setPageState('error');
           } else {
             console.log('Session set successfully from hash:', data.user?.email);
-            
+
             // Check if this is an invite flow - user needs to set password
             // The 'type' will be 'invite' or 'recovery' for password-less users
             if (type === 'invite' || type === 'recovery') {
@@ -125,15 +159,15 @@ function JoinPageContent() {
               // Preserve the token in the URL for after password setup
               const currentToken = new URLSearchParams(window.location.search).get('token');
               const returnUrl = currentToken ? `/join?token=${currentToken}` : '/onboarding';
-              
+
               // Store return URL for after password setup
               sessionStorage.setItem('passwordSetReturnUrl', returnUrl);
-              
+
               // Clear the hash and redirect to set-password
               window.location.href = '/set-password';
               return;
             }
-            
+
             // Clear the hash from URL to prevent reprocessing
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
@@ -240,7 +274,7 @@ function JoinPageContent() {
 
       setPageState('success');
       showSuccess({ description: messages.success });
-      
+
       // CRITICAL: Use hard navigation to force full app reload
       // This ensures CompanyContext fetches fresh data with the new company_id
       // router.push() would use cached context data and redirect to /create-company
@@ -263,17 +297,11 @@ function JoinPageContent() {
    * CRITICAL: Only execute ONCE to prevent duplicate accept calls
    */
   useEffect(() => {
-    // Prevent duplicate execution
-    if (flowExecuted) return;
-    
     // Wait for hash processing to complete first (handles magic link from email)
     if (!hashProcessed) return;
-    
+
     // Then wait for auth to be ready
     if (!isAuthReady || authLoading) return;
-
-    // Mark flow as executed IMMEDIATELY to prevent race conditions
-    setFlowExecuted(true);
 
     const initFlow = async () => {
       // Step 1: Validate token (AC2)
@@ -282,9 +310,14 @@ function JoinPageContent() {
 
       // Step 2: Check if user is authenticated
       // After hash processing, user/session should be available if they clicked email link
+      // OR if they just came from Google OAuth
       if (user && session) {
+        // User has session - prevent duplicate execution
+        if (flowExecuted) return;
+        setFlowExecuted(true);
+
         console.log('User authenticated, proceeding to accept:', user.email);
-        
+
         // Step 3: Check if user already has company (AC6)
         const hasCompany = await checkUserCompany(user.id);
         if (hasCompany) return;
@@ -294,14 +327,16 @@ function JoinPageContent() {
       } else {
         // No session - show auth UI (AC3)
         // This happens if user manually navigated to /join?token=xxx
+        // Don't mark flowExecuted yet - will re-check when session becomes available (e.g., after OAuth)
         console.log('No session, showing auth UI');
         setPageState('show-auth');
       }
     };
 
     initFlow();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowExecuted, hashProcessed, isAuthReady, authLoading, user, session]);
+
 
   /**
    * Handle successful authentication from EmbeddedAuthForm
@@ -333,10 +368,10 @@ function JoinPageContent() {
   // Loading state (AC8)
   // Also show loading while processing hash fragment from invite email
   if (!hashProcessed || !isAuthReady || authLoading || pageState === 'loading' || pageState === 'processing-hash') {
-    const loadingMessage = pageState === 'processing-hash' 
-      ? 'Processando link de convite...' 
+    const loadingMessage = pageState === 'processing-hash'
+      ? 'Processando link de convite...'
       : messages.validating;
-    
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -504,7 +539,7 @@ function JoinPageContent() {
         <CardHeader>
           <CardTitle>Entrar na empresa</CardTitle>
           <CardDescription>
-            {validationData?.companyName 
+            {validationData?.companyName
               ? `Você foi convidado para ${validationData.companyName}`
               : 'Você foi convidado para entrar em uma empresa'}
           </CardDescription>
@@ -518,6 +553,7 @@ function JoinPageContent() {
           <EmbeddedAuthForm
             onSuccess={handleAuthSuccess}
             inviteEmail={validationData?.email}
+            oauthNextPath={token ? `/join?token=${token}` : undefined}
             onEmailConfirmation={handleEmailConfirmation}
           />
         </CardContent>

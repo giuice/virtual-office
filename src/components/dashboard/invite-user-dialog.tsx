@@ -34,6 +34,8 @@ interface InvitationSuccess {
   inviteUrl: string;
   expiresAt: string;
   remaining: number;
+  emailSent?: boolean;
+  emailSendError?: string | null;
 }
 
 interface LimitReachedError {
@@ -163,6 +165,8 @@ export function InviteUserDialog() {
         inviteUrl: data.invitation.inviteUrl,
         expiresAt: data.invitation.expiresAt,
         remaining: data.remaining,
+        emailSent: data.invitation.emailSent,
+        emailSendError: data.invitation.emailSendError,
       });
 
       // AC3: Invalidate invitations query so pending list refreshes
@@ -251,6 +255,14 @@ export function InviteUserDialog() {
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
+              {successData.emailSent === false && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  <p className="font-medium">Email não enviado automaticamente</p>
+                  <p className="mt-1 text-xs">
+                    Compartilhe o link abaixo manualmente. {successData.emailSendError ? `Motivo: ${successData.emailSendError}` : ''}
+                  </p>
+                </div>
+              )}
               {/* Email info */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4" />

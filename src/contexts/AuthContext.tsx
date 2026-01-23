@@ -138,15 +138,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [initialized, sessionLoading, supabaseClient]);
 
-  const signInWithGoogle = useCallback(async (): Promise<void> => {
+  const signInWithGoogle = useCallback(async (nextPath?: string): Promise<void> => {
     setActionLoading(true);
     setActionError(null);
     setIsAuthReady(false);
     try {
+      const safeNextPath = nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : undefined;
+      const callbackUrl = safeNextPath
+        ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(safeNextPath)}`
+        : `${window.location.origin}/api/auth/callback`;
+
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: callbackUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

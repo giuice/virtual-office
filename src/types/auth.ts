@@ -15,7 +15,11 @@ export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  /**
+   * Starts Google OAuth sign-in.
+   * Optionally provide a post-callback in-app path (must start with '/').
+   */
+  signInWithGoogle: (nextPath?: string) => Promise<void>;
 
   // Action-specific loading/error states
   actionLoading: boolean;

@@ -77,6 +77,8 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
             className={cn(
               // Base styles - vo-avatar-item for constellation integration
               'vo-avatar-item relative inline-block',
+              // Smooth animation (Story 3.3 AC6)
+              'transition-all duration-200',
               // Hover interaction: translateY(-3px) scale(1.1) with z-index bump
               'hover:translate-y-[-3px] hover:scale-110 hover:z-50',
               // Status states (AC3) - smooth transitions via CSS
