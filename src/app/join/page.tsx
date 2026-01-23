@@ -83,6 +83,42 @@ function JoinPageContent() {
     const processHashFragment = async () => {
       // Check if URL has hash fragment with access_token (from Supabase invite email)
       if (typeof window === 'undefined') return;
+
+      const supabase = createSupabaseBrowserClient();
+
+      // Support PKCE/code flows as well as hash-token flows.
+      // Some providers/flows return `?code=...` and require an exchange.
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const typeFromQuery = url.searchParams.get('type');
+
+      if (code) {
+        console.log('Processing Supabase auth code from URL...');
+        setPageState('processing-hash');
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('Error exchanging code for session:', error);
+          setErrorMessage('Erro ao processar link de convite. Tente novamente.');
+          setPageState('error');
+          setHashProcessed(true);
+          return;
+        }
+
+        // Clean up URL so we don't re-process the code on refresh
+        url.searchParams.delete('code');
+        window.history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''));
+
+        // If this code corresponds to an invite/recovery flow, send user to set-password
+        if (typeFromQuery === 'invite' || typeFromQuery === 'recovery') {
+          console.log('Invite/recovery flow detected (query), redirecting to set-password...');
+          const currentToken = new URLSearchParams(window.location.search).get('token');
+          const returnUrl = currentToken ? `/join?token=${currentToken}` : '/onboarding';
+          sessionStorage.setItem('passwordSetReturnUrl', returnUrl);
+          window.location.href = '/set-password';
+          return;
+        }
+      }
       
       const hash = window.location.hash;
       if (!hash || !hash.includes('access_token')) {
@@ -94,8 +130,6 @@ function JoinPageContent() {
       setPageState('processing-hash');
 
       try {
-        const supabase = createSupabaseBrowserClient();
-        
         // Parse the hash fragment
         const hashParams = new URLSearchParams(hash.substring(1));
         const accessToken = hashParams.get('access_token');
@@ -518,6 +552,7 @@ function JoinPageContent() {
           <EmbeddedAuthForm
             onSuccess={handleAuthSuccess}
             inviteEmail={validationData?.email}
+            oauthNextPath={token ? `/join?token=${token}` : undefined}
             onEmailConfirmation={handleEmailConfirmation}
           />
         </CardContent>

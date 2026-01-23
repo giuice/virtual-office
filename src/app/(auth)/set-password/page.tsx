@@ -42,6 +42,26 @@ export default function SetPasswordPage() {
   useEffect(() => {
     const checkSession = async () => {
       const supabase = createSupabaseBrowserClient();
+
+      // Support PKCE/code flows (some links arrive as ?code=...)
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        if (code) {
+          console.log('[set-password] Found code in URL, exchanging for session...');
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('[set-password] Error exchanging code for session:', error);
+            showError({ description: 'Link expirado ou inválido. Solicite um novo convite.' });
+            router.push('/login');
+            return;
+          }
+          url.searchParams.delete('code');
+          window.history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''));
+        }
+      } catch (err) {
+        console.warn('[set-password] Failed to process code param:', err);
+      }
       
       // Process hash fragment if present (from invite/recovery email)
       const hash = window.location.hash;

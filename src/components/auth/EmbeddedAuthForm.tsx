@@ -24,6 +24,12 @@ interface EmbeddedAuthFormProps {
   onEmailConfirmation?: (email: string) => void;
   /** Disable the form (e.g., during accept flow) */
   disabled?: boolean;
+
+  /**
+   * Optional in-app path to return to after Google OAuth completes.
+   * Must start with '/'. Example: `/join?token=...`
+   */
+  oauthNextPath?: string;
 }
 
 type FormStatus = 'idle' | 'credential' | 'google' | 'resending';
@@ -34,6 +40,7 @@ export function EmbeddedAuthForm({
   inviteEmail,
   onEmailConfirmation,
   disabled = false,
+  oauthNextPath,
 }: EmbeddedAuthFormProps) {
   const [email, setEmail] = useState(inviteEmail || '');
   const [displayName, setDisplayName] = useState('');
@@ -140,7 +147,7 @@ export function EmbeddedAuthForm({
     setFormStatus('google');
 
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(oauthNextPath);
       // Google OAuth will redirect, so this may not execute
       showSuccess({ description: 'Redirecionando para Google...' });
     } catch (error) {
@@ -219,6 +226,14 @@ export function EmbeddedAuthForm({
             <p className="mt-1 text-xs">
               Clique no link do email para acessar automaticamente, ou use uma das opções abaixo.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="invite-email" className="text-sm font-medium">
+              Email
+            </label>
+            <Input id="invite-email" type="email" value={inviteEmail} disabled readOnly />
+            <p className="text-xs text-muted-foreground">Email do convite (não pode ser alterado)</p>
           </div>
 
           {emailSent ? (

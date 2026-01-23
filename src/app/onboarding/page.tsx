@@ -201,6 +201,10 @@ export default function OnboardingPage() {
               Criar nova empresa
             </Link>
           </Button>
+
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/join">Tenho um código de convite</Link>
+          </Button>
           
           <p className="text-xs text-center text-muted-foreground">
             Se você foi convidado para uma empresa, verifique seu email ({user.email}) 
