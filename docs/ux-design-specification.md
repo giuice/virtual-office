@@ -175,7 +175,7 @@ flowchart LR
   - `RealitySwitcher` and `PerspectiveSwitcher` controls for toggling themes and layouts.
 
 **Reuse & Build Notes**
-- `SpaceElement.tsx` already powers individual rooms; we will refactor it into the Orbit Gallery `SpaceCard` by swapping the color utility for token-driven gradients, adding agenda/phase ribbons, hover transcript panels, and attention beacon slots.
+- `SpaceCard` components use DOM-based CSS Grid layout for optimal 60 FPS performance; refactored from legacy canvas approach to token-driven gradients, agenda/phase ribbons, hover transcript panels, and attention beacon slots.
 - `UserAvatarPresence.tsx` and related avatar helpers form the base of `AvatarConstellation`; enhancements include animated status rings, speaker/observer variants, and clustering for 8+ participants.
 - `floor-plan.tsx` and `NowBoard` logic (currently implicit in dashboard headers) will surface as the dedicated `NowBoard` module with filters and attention summaries.
 - `message-dialog` and log utilities plug into `ActivityLogPanel` / `TranscriptPeek`; we’ll expose them as reusable panels that stream Supabase data.
@@ -183,7 +183,7 @@ flowchart LR
 - `space-debug-panel.tsx` already lists rooms; it becomes the scaffold for `SpaceGridOverview`, sharing data loaders while adopting the new Orbit layout styles.
 
 **Component Specs**
-- `SpaceCard` (extends `src/components/floor-plan/SpaceElement.tsx`)
+- `SpaceCard` (DOM-based component using CSS Grid)
   - Purpose: Showcase a single space with agenda phase, participants, and attention state in Orbit Gallery.
   - Anatomy: Title + org badge, status ribbon, phase tracker pill, avatar cluster, hover panel (roster, log, transcript), beacon slot.
   - States: Default, hover reveal, live beacon (animated border), focus (keyboard), loading (skeleton), empty (no participants).

@@ -56,7 +56,7 @@ export function UserInteractionMenu({
   const [isOpen, setIsOpen] = useState(false);
   const { user: currentUser } = useAuth();
   const { currentUserProfile } = useCompany();
-  const { getOrCreateUserConversation, setActiveConversation } = useMessaging();
+  const { getOrCreateUserConversation, setActiveConversation, openDrawer } = useMessaging();
   const { usersInSpaces } = usePresence();
 
 
@@ -82,7 +82,7 @@ export function UserInteractionMenu({
   // Status color mapping
   const statusColors = {
     online: 'bg-emerald-500',
-    away: 'bg-amber-500', 
+    away: 'bg-amber-500',
     busy: 'bg-rose-500',
     offline: 'bg-gray-400',
   };
@@ -93,13 +93,14 @@ export function UserInteractionMenu({
   const handleSendMessage = async () => {
     try {
       setIsOpen(false);
-      
+
       // Create or get existing direct conversation
       const conversation = await getOrCreateUserConversation(user.id);
-      
+
       if (conversation) {
         // Set as active conversation to open the messaging interface
         setActiveConversation(conversation);
+        openDrawer();
       }
     } catch (error) {
       console.error('Failed to start conversation:', error);
@@ -136,8 +137,8 @@ export function UserInteractionMenu({
     <DropdownMenu open={isOpen} onOpenChange={(open) => {
       setIsOpen(open);
     }}>
-      <DropdownMenuTrigger 
-        asChild 
+      <DropdownMenuTrigger
+        asChild
         className={className}
         data-avatar-interactive
         onClick={(e) => {
@@ -148,9 +149,9 @@ export function UserInteractionMenu({
       >
         {children}
       </DropdownMenuTrigger>
-      
-      <DropdownMenuContent 
-        className="w-64 p-2 z-[1000]" 
+
+      <DropdownMenuContent
+        className="w-64 p-2 z-[1000]"
         align="start"
         side="bottom"
         sideOffset={8}
@@ -177,14 +178,14 @@ export function UserInteractionMenu({
                 )}
               />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">
                 {user.displayName}
               </p>
               <div className="flex items-center gap-2 mt-1">
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className={cn(
                     "text-xs capitalize px-2 py-0",
                     user.status === 'online' && "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -195,7 +196,7 @@ export function UserInteractionMenu({
                 >
                   {user.status}
                 </Badge>
-                
+
                 {userLocation && (
                   <Badge variant="outline" className="text-xs">
                     <MapPin className="h-3 w-3 mr-1" />
@@ -210,7 +211,7 @@ export function UserInteractionMenu({
         <DropdownMenuSeparator />
 
         {/* Primary Actions */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => { e.stopPropagation(); handleSendMessage(); }}
           onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer focus:bg-primary/10"
@@ -225,7 +226,7 @@ export function UserInteractionMenu({
         {/* Call Actions */}
         {showCallActions && user.status !== 'offline' && (
           <>
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={(e) => { e.stopPropagation(); handleCall(); }}
               onSelect={(e) => { e.preventDefault(); }}
               className="cursor-pointer"
@@ -241,7 +242,7 @@ export function UserInteractionMenu({
             </DropdownMenuItem>
 
             {userLocation && showTeleportActions && (
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={(e) => { e.stopPropagation(); handleTeleportToUser(); }}
                 onSelect={(e) => { e.preventDefault(); }}
                 className="cursor-pointer"
@@ -259,7 +260,7 @@ export function UserInteractionMenu({
         <DropdownMenuSeparator />
 
         {/* Secondary Actions */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => { e.stopPropagation(); handleEmailUser(); }}
           onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer"
@@ -268,7 +269,7 @@ export function UserInteractionMenu({
           <span>Send Email</span>
         </DropdownMenuItem>
 
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => { e.stopPropagation(); handleViewProfile(); }}
           onSelect={(e) => { e.preventDefault(); }}
           className="cursor-pointer"
@@ -278,7 +279,7 @@ export function UserInteractionMenu({
         </DropdownMenuItem>
 
         {/* Future: Calendar integration */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           className="cursor-pointer opacity-50"
           disabled
         >

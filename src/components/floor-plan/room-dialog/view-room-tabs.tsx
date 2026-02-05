@@ -49,30 +49,30 @@ export function ViewRoomTabs({
   // Compare current room data with initial data to detect changes
   const hasChanges = (() => {
     if (!initialRoomData) return false;
-    
+
     // Fields to compare
     const fieldsToCompare: (keyof Space)[] = [
       'name', 'type', 'capacity', 'features', 'description',
       'accessControl', 'position', 'neighborhoodId' // Added neighborhoodId for Story 3.9
     ];
-    
+
     // Check each field for changes
     return fieldsToCompare.some(field => {
       const initial = initialRoomData[field];
       const current = roomData[field];
-      
+
       // Handle arrays (features, userIds)
       if (Array.isArray(initial) && Array.isArray(current)) {
         return initial.length !== current.length ||
           initial.some((item, index) => item !== current[index]);
       }
-      
+
       // Handle objects (position, accessControl)
       if (typeof initial === 'object' && initial !== null &&
-          typeof current === 'object' && current !== null) {
+        typeof current === 'object' && current !== null) {
         return JSON.stringify(initial) !== JSON.stringify(current);
       }
-      
+
       // Handle primitive values
       return initial !== current;
     });
@@ -116,9 +116,12 @@ export function ViewRoomTabs({
             description={roomData.description}
             getRoomTypeLabel={getRoomTypeLabel}
             neighborhoodId={roomData.neighborhoodId}
-            onNeighborhoodChange={isAdmin ? (neighborhoodId) => 
+            onNeighborhoodChange={isAdmin ? (neighborhoodId) =>
               setRoomData(prev => ({ ...prev, neighborhoodId: neighborhoodId || undefined }))
-            : undefined}
+              : undefined}
+            onCapacityChange={isAdmin ? (capacity) =>
+              setRoomData(prev => ({ ...prev, capacity }))
+              : undefined}
           />
         </TabsContent>
       </Tabs>

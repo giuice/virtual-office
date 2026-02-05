@@ -58,6 +58,8 @@ export interface RoomInfoTabProps {
   neighborhoodId?: string;
   /** Handler for neighborhood change (Story 3.9) */
   onNeighborhoodChange?: (neighborhoodId: string | null) => void;
+  /** Handler for capacity change (admin only) */
+  onCapacityChange?: (capacity: number) => void;
 }
 
 export const availableFeatures = [

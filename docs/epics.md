@@ -457,12 +457,76 @@ So that I can see team presence even when away from my desktop.
 
 ---
 
+**Story 3.15: Knock to Enter Workflow**
+
+As a user,
+I want to request access to restricted spaces by "knocking",
+So that I can join private meetings when appropriate.
+
+**Acceptance Criteria:**
+1. Restricted spaces show "Knock to Enter" button instead of "Join" in SpaceCard hover panel
+2. Clicking "Knock" sends notification to ALL users currently inside the space
+3. All space occupants receive toast notification + sound with requester name and approve/deny buttons
+4. ANY occupant can approve or deny the knock request
+5. On approval: Requester receives success notification and is auto-joined to space
+6. On denial: Requester receives "Access denied" notification
+7. Pending knocks show "Waiting for approval..." status on the button
+8. Knock expires after 5 minutes with timeout notification to requester
+
+**Prerequisites:** Story 3.11
+
+---
+
+**Story 3.16: Auto-Remove Offline Users from Space Display**
+
+As a user,
+I want offline users to automatically disappear from the space view,
+So that I only see who is actually present right now (Sococo-style behavior).
+
+**Acceptance Criteria:**
+1. When a user goes offline, their avatar is REMOVED from the space floor plan within 5 seconds
+2. Offline users remain visible in DM/messaging contexts (to send offline messages)
+3. Space occupant count updates immediately when user disconnects
+4. `space_presence` table is updated on disconnect (user removed from space)
+5. `space_presence_log` records the exit event with `exited_at` timestamp
+6. UI shows smooth fade-out animation when avatar is removed
+7. Reconnecting user (within grace period) returns to their last space automatically (see Story 3.17)
+
+**Prerequisites:** Story 3.3 (Avatar Constellation)
+
+---
+
+**Story 3.17: Default Space Assignment & Reconnection Grace Period**
+
+As an admin,
+I want to assign default spaces to users and departments,
+So that team members automatically appear in the right location.
+
+As a user,
+I want to return to my last space if my connection drops briefly,
+So that I don't lose my context after network glitches.
+
+**Acceptance Criteria:**
+1. Admin can set a "default space" for each user in user management panel
+2. Company can designate one space as the "company default" for first-time users
+3. First-time users with no assigned space are placed in the company default space
+4. Users can only be "inside" one space at a time (enforced at data layer)
+5. When connection drops, system waits 5 minutes before removing user from space
+6. If user reconnects within 5 minutes, they auto-rejoin their last space
+7. After 5-minute timeout, user is removed from space (Story 3.16 behavior)
+8. `users` table has `default_space_id` column
+9. `companies` table has `default_space_id` column (company-wide default)
+
+**Prerequisites:** Story 3.16, Epic 2 (company management)
+
+---
+
 **Epic 3 Summary:**
-- **Total Stories:** 14
-- **Estimated Effort:** 50-70 hours
-- **Priority Stories:** 3.1 (Theme), 3.2 (SpaceCard), 3.3 (Avatars), 3.5 (Orbit Layout)
+- **Total Stories:** 17
+- **Estimated Effort:** 60-80 hours
+- **Priority Stories:** 3.1 (Theme), 3.2 (SpaceCard), 3.3 (Avatars), 3.5 (Orbit Layout), 3.16 (Offline Removal), 3.17 (Default Space)
 - **Design References:** `docs/ux-design-specification.md`, `docs/ux-space-grid-v2.html`
-- **Key Risk:** CSS complexity for themes, performance of animated DOM elements
+- **Key Risk:** CSS complexity for themes, performance of animated DOM elements, reconnection edge cases
 
 ---
 
@@ -1526,6 +1590,8 @@ Add WebRTC-based video conferencing, screen sharing, and virtual whiteboard capa
 This epic completes the collaboration suite, making Virtual Office a one-stop platform for remote team communication without switching between multiple apps.
 
 **Dependencies:** Epic 4 complete (messaging foundation)
+
+**Deferred Requirement (FR020):** Auto "In Meeting" status will be implemented in this epic - triggers when user starts video call or screen sharing, restores previous status when call ends.
 
 ### Stories (10-15 total)
 

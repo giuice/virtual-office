@@ -99,7 +99,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [isMinimized]);
-  
+
   useEffect(() => {
     const handler = () => {
       setIsMessagingV2Enabled(messagingFeatureFlags.isV2Enabled());
@@ -117,7 +117,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if(currentUserProfile?.id){
+    if (currentUserProfile?.id) {
       debugLogger.messaging.event('MessagingContext', 'refreshConversations:on-mount', { userId: currentUserProfile.id });
       void refreshConversations();
     }
@@ -222,7 +222,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
 
-  
+
   // Robust: ensure opening a conversation for a received message with retries
   const ensureOpenForMessage = useCallback(async (message: { conversationId: string; senderId: string }) => {
     if (debugLogger.messaging.enabled()) {
@@ -245,6 +245,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
       conversationsManager.updateConversationWithMessage(message.conversationId, message as any, message.senderId);
       setActiveConversation(existing);
+      setIsDrawerOpen(true);
       return;
     }
 
@@ -259,6 +260,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
       conversationsManager.updateConversationWithMessage(message.conversationId, message as any, message.senderId);
       setActiveConversation(existing);
+      setIsDrawerOpen(true);
       return;
     }
 
@@ -272,8 +274,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
       conversationsManager.updateConversationWithMessage(dm.id, message as any, message.senderId);
       setActiveConversation(dm);
+      setIsDrawerOpen(true);
       return;
-    } catch {}
+    } catch { }
 
     // 5) Retry loop with backoff in case replication delay prevents immediate discovery
     const delays = [200, 500, 1000];
@@ -290,6 +293,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         }
         conversationsManager.updateConversationWithMessage(found.id, message as any, message.senderId);
         setActiveConversation(found);
+        setIsDrawerOpen(true);
         return;
       }
     }
@@ -361,7 +365,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       root.removeAttribute('data-messaging-realtime-ready');
     }
   }, [realtimeStatus]);
-  
+
   // Wrapper function for sendMessage that also clears the draft
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
@@ -369,7 +373,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     type?: MessageType;
   }) => {
     if (!activeConversation) return;
-    
+
     // Send the message
     return await messagesManager.sendMessage(content, options);
   }, [activeConversation, messagesManager.sendMessage]);
@@ -427,7 +431,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     connectionStatus: realtimeStatus,
     isMessagingV2Enabled,
   };
-  
+
   return (
     <MessagingContext.Provider value={value}>
       {children}

@@ -42,7 +42,7 @@ export function MessageFeed({
     getOrCreateRoomConversation,
     addReaction,
   } = useMessaging();
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -82,7 +82,7 @@ export function MessageFeed({
       return !messageMap.has(message.replyToId);
     });
   }, [messages, messageMap]);
-  
+
   // Initialize / switch conversation when roomId changes
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +103,7 @@ export function MessageFeed({
     init();
     return () => { cancelled = true; };
   }, [roomId, roomName, getOrCreateRoomConversation, setActiveConversation]);
-  
+
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -140,11 +140,11 @@ export function MessageFeed({
       return { ...prev, [parentId]: true };
     });
   }, [replyToMessage, messageMap]);
-  
+
   // Handle sending a message
   const handleSendMessage = async (content: string) => {
     if (!activeConversation) return;
-    
+
     try {
       await sendMessage(content, {
         replyToId: replyToMessage?.id,
@@ -154,12 +154,12 @@ export function MessageFeed({
       console.error('Error sending message:', error);
     }
   };
-  
+
   // Handle reply
   const handleReply = (message: Message) => {
     setReplyToMessage(message);
   };
-  
+
   // Handle reaction
   const handleReaction = (messageId: string, emoji: string) => {
     addReaction(messageId, emoji);
@@ -201,7 +201,7 @@ export function MessageFeed({
       </div>
     );
   }, [expandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap]);
-  
+
   // Render loading state
   if (isLoading || loadingMessages) {
     return (
@@ -224,7 +224,7 @@ export function MessageFeed({
       </Card>
     );
   }
-  
+
   // Render error state
   if (errorMessages) {
     return (
@@ -233,8 +233,8 @@ export function MessageFeed({
           <div className="text-center text-red-500">
             <AlertCircle className="h-8 w-8 mx-auto mb-2" />
             <p>Failed to load messages. Please try again.</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => window.location.reload()}
             >
@@ -245,7 +245,7 @@ export function MessageFeed({
       </Card>
     );
   }
-  
+
   // Render empty state
   if (!activeConversation) {
     return (
@@ -258,24 +258,21 @@ export function MessageFeed({
       </Card>
     );
   }
-  
+
   return (
-    <Card className={cn("w-full flex flex-col", className)} data-testid="messages-feed">
+    <Card className={cn("w-full h-full min-h-0 flex flex-col", className)} data-testid="messages-feed">
       {/* Legacy test hook for older specs */}
       <div data-testid="message-feed" className="sr-only" />
       <CardHeader className="pb-2">
         <CardTitle>{activeConversation.name || 'Conversation'}</CardTitle>
       </CardHeader>
 
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea
-          className="h-full"
-          style={{ maxHeight }}
-        >
+      <CardContent className="flex-1 p-0 overflow-hidden min-h-0">
+        <ScrollArea className="h-full">
           {hasMoreMessages && (
             <div className="text-center py-2">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={loadMoreMessages}
                 disabled={loadingMessages}
@@ -284,7 +281,7 @@ export function MessageFeed({
               </Button>
             </div>
           )}
-          
+
           <div className="py-4">
             {topLevelMessages.length === 0 ? (
               <div className="text-center text-muted-foreground p-4">
@@ -297,14 +294,14 @@ export function MessageFeed({
           </div>
         </ScrollArea>
       </CardContent>
-      
+
       <CardFooter className="p-4 pt-2">
         <MessageComposer
           onSendMessage={handleSendMessage}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
           initialValue={""}
-          onValueChange={() => {}}
+          onValueChange={() => { }}
         />
       </CardFooter>
     </Card>
