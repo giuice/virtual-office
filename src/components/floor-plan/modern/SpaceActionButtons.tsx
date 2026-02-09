@@ -5,36 +5,48 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { LogIn, LogOut, DoorOpen } from 'lucide-react';
+import type { KnockStatus } from '@/hooks/useKnock';
 
 /**
  * Story 3.11 - AC6: Primary Action Button
  * Story 3.12 - AC3: Join Button Disabled for Full Spaces
- * - "Join" button prominent at bottom of hover panel
+ * Story 3.16 - Knock to Enter:
+ * - "Knock" shown if space has occupants (etiquette: always knock before entering)
+ * - "Join" shown if space is empty
  * - "Leave" shown if user is already in the space
- * - "Knock" option if space is private/locked
  * - Button styled per theme with hover states
  * - Join disabled when space is full (AC3)
  */
 export interface SpaceActionButtonsProps {
   isUserInSpace: boolean;
+  /** @deprecated Use hasOccupants instead for knock logic */
   isPrivate?: boolean;
+  /** Story 3.16: Whether the space has users inside (show Knock if true) */
+  hasOccupants?: boolean;
   /** Story 3.12 - AC3: Whether the space is at full capacity */
   isFull?: boolean;
   onJoin: () => void;
   onLeave: () => void;
   onKnock?: () => void;
+  knockStatus?: KnockStatus;
+  knockCooldownRemaining?: number;
   className?: string;
 }
 
 export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   isUserInSpace,
-  isPrivate = false,
   isFull = false,
   onJoin,
   onLeave,
   onKnock,
+  knockStatus = 'idle',
+  knockCooldownRemaining = 0,
   className,
 }) => {
+  // Story 3.16 (updated): default action is Knock for any enterable space.
+  const shouldShowKnock = Boolean(onKnock);
+  const isKnocking = knockStatus === 'knocking';
+  const isCooldown = knockStatus === 'cooldown' && knockCooldownRemaining > 0;
   // Common button styles
   const buttonBase = cn(
     'flex items-center justify-center gap-2',
@@ -72,7 +84,7 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   );
 
   return (
-    <div 
+    <div
       className={cn('flex gap-2 pt-2 border-t border-[var(--vo-border-subtle)]', className)}
       // AC7: exempt buttons from click-stop (they ARE the action)
       data-space-action="true"
@@ -91,19 +103,24 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
           <LogOut className="w-4 h-4" />
           Leave
         </button>
-      ) : isPrivate && onKnock ? (
-        // Private space - show Knock button
+      ) : shouldShowKnock ? (
+        // Default enter flow: show Knock button
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onKnock();
+            if (!isKnocking && !isCooldown) {
+              onKnock!();
+            }
           }}
           className={cn(knockButton, 'flex-1')}
           data-space-action="true"
-          aria-label="Knock to request entry"
+          disabled={isKnocking || isCooldown}
+          aria-disabled={isKnocking || isCooldown}
+          title={isKnocking ? 'Waiting for response' : isCooldown ? `Try again in ${knockCooldownRemaining}s` : 'Knock to request entry'}
+          aria-label={isKnocking ? 'Knock pending' : isCooldown ? `Knock cooldown active, ${knockCooldownRemaining} seconds remaining` : 'Knock to request entry'}
         >
           <DoorOpen className="w-4 h-4" />
-          Knock
+          {isKnocking ? 'Knocking...' : isCooldown ? `Knock (${knockCooldownRemaining}s)` : 'Knock'}
         </button>
       ) : (
         // Public space - show Join button

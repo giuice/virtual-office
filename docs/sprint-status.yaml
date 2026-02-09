@@ -79,6 +79,9 @@ development_status:
   3-13-real-time-presence-animation: done  # ✅ COMPLETE - 2025-12-04 (Presence animations, exit tracking, 18 tests)
   3-14-mobile-responsive-floor-plan: backlog
   3-15-dashboard-landing-page-polish: done  # ✅ COMPLETE - 2025-11-26 (Fixed broken links, Coming Soon teasers, Investor Resources, double header fix)
+  3-16-knock-to-enter-workflow: in-progress # 2026-02-09 - Review fixes in progress (validated knock response route + timeout/cooldown UI)
+  3-17-auto-remove-offline-users: backlog
+  3-18-default-space-assignment: backlog
   epic-3-retrospective: optional
   
   # 🚨 Epic 8A: Audio MVP (Sococo-Style) - URGENT INVESTOR REQUEST

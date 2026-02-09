@@ -58,6 +58,12 @@ interface ModernSpaceCardProps {
   mutedUserIds?: string[];
   /** Story 3.11: Handler for leaving the space */
   onLeaveSpace?: (spaceId: string) => void;
+  /** Story 3.16: Handler for knocking on a private space */
+  onKnock?: (spaceId: string) => void;
+  /** Story 3.16: Current knock status for this space */
+  knockStatus?: 'idle' | 'knocking' | 'approved' | 'denied' | 'timeout' | 'cooldown';
+  /** Story 3.16: Cooldown remaining for this space */
+  knockCooldownRemaining?: number;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
@@ -80,6 +86,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   presentingUserId,
   mutedUserIds = [],
   onLeaveSpace,
+  // Story 3.16: Knock to Enter
+  onKnock,
+  knockStatus,
+  knockCooldownRemaining = 0,
 }) => {
   const [hovered, setHovered] = useState(false);
   // Story 3.11: Detail panel state
@@ -453,6 +463,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
             isFull={isFull}
             onJoin={handleJoin}
             onLeave={handleLeave}
+            onKnock={onKnock ? () => onKnock(space.id) : undefined}
+            knockStatus={knockStatus}
+            knockCooldownRemaining={knockCooldownRemaining}
             onUserClick={onUserClick}
             onClose={() => setShowPanel(false)}
             speakingUserIds={speakingUserIds}
@@ -478,6 +491,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           isFull={isFull}
           onJoin={handleJoin}
           onLeave={handleLeave}
+          onKnock={onKnock ? () => onKnock(space.id) : undefined}
+          knockStatus={knockStatus}
+          knockCooldownRemaining={knockCooldownRemaining}
           onUserClick={onUserClick}
           speakingUserIds={speakingUserIds}
           presentingUserId={presentingUserId}

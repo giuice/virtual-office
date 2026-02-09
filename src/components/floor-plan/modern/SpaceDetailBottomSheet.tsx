@@ -38,6 +38,8 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   isUserInSpace,
   isPrivate,
   isFull,
+  knockStatus,
+  knockCooldownRemaining,
   onJoin,
   onLeave,
   onKnock,
@@ -129,6 +131,8 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
             isUserInSpace={isUserInSpace}
             isPrivate={isPrivate}
             isFull={isFull}
+            knockStatus={knockStatus}
+            knockCooldownRemaining={knockCooldownRemaining}
             onJoin={handleJoin}
             onLeave={handleLeave}
             onKnock={handleKnock}

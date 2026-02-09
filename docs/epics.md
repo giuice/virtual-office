@@ -457,7 +457,7 @@ So that I can see team presence even when away from my desktop.
 
 ---
 
-**Story 3.15: Knock to Enter Workflow**
+**Story 3.16: Knock to Enter Workflow**
 
 As a user,
 I want to request access to restricted spaces by "knocking",
@@ -477,7 +477,7 @@ So that I can join private meetings when appropriate.
 
 ---
 
-**Story 3.16: Auto-Remove Offline Users from Space Display**
+**Story 3.17: Auto-Remove Offline Users from Space Display**
 
 As a user,
 I want offline users to automatically disappear from the space view,
@@ -490,13 +490,13 @@ So that I only see who is actually present right now (Sococo-style behavior).
 4. `space_presence` table is updated on disconnect (user removed from space)
 5. `space_presence_log` records the exit event with `exited_at` timestamp
 6. UI shows smooth fade-out animation when avatar is removed
-7. Reconnecting user (within grace period) returns to their last space automatically (see Story 3.17)
+7. Reconnecting user (within grace period) returns to their last space automatically (see Story 3.18)
 
 **Prerequisites:** Story 3.3 (Avatar Constellation)
 
 ---
 
-**Story 3.17: Default Space Assignment & Reconnection Grace Period**
+**Story 3.18: Default Space Assignment & Reconnection Grace Period**
 
 As an admin,
 I want to assign default spaces to users and departments,
@@ -513,18 +513,18 @@ So that I don't lose my context after network glitches.
 4. Users can only be "inside" one space at a time (enforced at data layer)
 5. When connection drops, system waits 5 minutes before removing user from space
 6. If user reconnects within 5 minutes, they auto-rejoin their last space
-7. After 5-minute timeout, user is removed from space (Story 3.16 behavior)
+7. After 5-minute timeout, user is removed from space (Story 3.17 behavior)
 8. `users` table has `default_space_id` column
 9. `companies` table has `default_space_id` column (company-wide default)
 
-**Prerequisites:** Story 3.16, Epic 2 (company management)
+**Prerequisites:** Story 3.17, Epic 2 (company management)
 
 ---
 
 **Epic 3 Summary:**
 - **Total Stories:** 17
 - **Estimated Effort:** 60-80 hours
-- **Priority Stories:** 3.1 (Theme), 3.2 (SpaceCard), 3.3 (Avatars), 3.5 (Orbit Layout), 3.16 (Offline Removal), 3.17 (Default Space)
+- **Priority Stories:** 3.1 (Theme), 3.2 (SpaceCard), 3.3 (Avatars), 3.5 (Orbit Layout), 3.17 (Offline Removal), 3.18 (Default Space)
 - **Design References:** `docs/ux-design-specification.md`, `docs/ux-space-grid-v2.html`
 - **Key Risk:** CSS complexity for themes, performance of animated DOM elements, reconnection edge cases
 
