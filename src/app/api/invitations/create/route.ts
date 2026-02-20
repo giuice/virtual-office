@@ -4,7 +4,23 @@ import { SupabaseInvitationRepository } from '@/repositories/implementations/sup
 import { Invitation, UserRole } from '@/types/database';
 import crypto from 'crypto';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { headers } from 'next/headers';
+
+function resolveAppBaseUrl(request: Request): string {
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredAppUrl) {
+    try {
+      return new URL(configuredAppUrl).origin;
+    } catch (error) {
+      console.warn('[API /invitations/create] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
+    }
+  }
+
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+}
 
 export async function POST(request: Request) {
   // Use service_role client for admin operations (sending invite emails)
@@ -25,7 +41,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     if (role !== 'admin' && role !== 'member') {
       return NextResponse.json(
         { error: 'Invalid role specified' },
@@ -36,6 +52,14 @@ export async function POST(request: Request) {
     console.log('[API /invitations/create] Received request:', { email, role, companyId });
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return NextResponse.json(
+        { error: 'Formato de email inválido' },
+        { status: 400 }
+      );
+    }
 
     // Verify requesting user is authenticated and is admin of company
     const { data: { user: currentUser }, error: authError } = await supabaseClient.auth.getUser();
@@ -63,18 +87,41 @@ export async function POST(request: Request) {
     // Check if current user is admin of this company
     const { data: currentUserRecord } = await supabaseClient
       .from('users')
-      .select('id, role')
+      .select('id, role, company_id')
       .eq('supabase_uid', currentUser.id)
       .single();
-    
-    const isAdmin = currentUserRecord?.role === 'admin' || 
-                    (company.admin_ids && company.admin_ids.includes(currentUserRecord?.id));
-    
+
+    const isCompanyAdminByRole =
+      currentUserRecord?.role === 'admin' &&
+      currentUserRecord?.company_id === companyId;
+
+    const isCompanyAdminByList =
+      Array.isArray(company.admin_ids) &&
+      currentUserRecord?.id !== undefined &&
+      company.admin_ids.includes(currentUserRecord.id);
+
+    const isAdmin = Boolean(isCompanyAdminByRole || isCompanyAdminByList);
+
     if (!isAdmin) {
       return NextResponse.json(
         { error: 'Apenas administradores podem enviar convites' },
         { status: 403 }
       );
+    }
+
+    const nowIso = new Date().toISOString();
+    const baseUrl = resolveAppBaseUrl(request);
+
+    // Keep invitation status consistent before limit checks and listing.
+    const { error: expireError } = await supabaseClient
+      .from('invitations')
+      .update({ status: 'expired' })
+      .eq('company_id', companyId)
+      .eq('status', 'pending')
+      .lte('expires_at', nowIso);
+
+    if (expireError) {
+      console.warn('[API /invitations/create] Failed to expire stale invitations:', expireError);
     }
 
     // AC4: Check 10-user freemium limit before creating invitation
@@ -87,7 +134,8 @@ export async function POST(request: Request) {
       .from('invitations')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .gt('expires_at', nowIso);
 
     const totalCount = (userCount || 0) + (pendingCount || 0);
     const limit = 10;
@@ -108,39 +156,22 @@ export async function POST(request: Request) {
 
     // If there's already a pending invite for this email+company, reuse it
     // This avoids spamming emails (and hitting Supabase rate limits) on repeated clicks.
-    const nowIso = new Date().toISOString();
-    // NOTE: This is written defensively because our unit tests use simplified Supabase mocks
-    // that may not support full query-builder chaining.
-    let existingInvite: { token: string; expires_at: string } | null = null;
-    let existingInviteError: unknown = null;
-    try {
-      let q: any = (supabaseClient as any)
-        .from('invitations')
-        .select('token, expires_at');
-
-      if (q && typeof q.eq === 'function') q = q.eq('company_id', companyId);
-      if (q && typeof q.eq === 'function') q = q.eq('email', normalizedEmail);
-      if (q && typeof q.eq === 'function') q = q.eq('status', 'pending');
-      if (q && typeof q.gt === 'function') q = q.gt('expires_at', nowIso);
-
-      if (q && typeof q.maybeSingle === 'function') {
-        const res = await q.maybeSingle();
-        existingInvite = res?.data ?? null;
-        existingInviteError = res?.error ?? null;
-      }
-    } catch (err) {
-      existingInviteError = err;
-    }
+    const { data: existingInvite, error: existingInviteError } = await supabaseClient
+      .from('invitations')
+      .select('token, expires_at')
+      .eq('company_id', companyId)
+      .eq('email', normalizedEmail)
+      .eq('status', 'pending')
+      .gt('expires_at', nowIso)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (existingInviteError) {
       console.warn('[API /invitations/create] Error checking existing invite:', existingInviteError);
     }
 
     if (existingInvite?.token) {
-      const headersList = await headers();
-      const host = headersList.get('host') || 'localhost:3000';
-      const protocol = host.includes('localhost') ? 'http' : 'https';
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
       const inviteUrl = `${baseUrl}/join?token=${existingInvite.token}`;
 
       return NextResponse.json({
@@ -166,19 +197,15 @@ export async function POST(request: Request) {
     const expiresAtMs = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
     // Build redirect URL for after email confirmation
-    const headersList = await headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const redirectTo = `${protocol}://${host}/join?token=${token}`;
+    const redirectTo = `${baseUrl}/join?token=${token}`;
 
     // Create the invitation record in our database FIRST.
     // Even if email sending is rate-limited, the admin can still share the link manually.
-    const invitation: Omit<Invitation, 'id' | 'createdAt'> = {
+    const invitation: Omit<Invitation, 'id' | 'createdAt' | 'status'> = {
       email: normalizedEmail,
       companyId,
       role: role as UserRole,
       token,
-      status: 'pending',
       expiresAt: expiresAtMs // Unix timestamp in ms
     };
 
@@ -187,6 +214,44 @@ export async function POST(request: Request) {
       createdInvitation = await invitationRepository.create(invitation);
       console.log('[API /invitations/create] Invitation record created:', createdInvitation?.id);
     } catch (dbError) {
+      const dbErrorCode =
+        typeof dbError === 'object' &&
+        dbError !== null &&
+        'code' in dbError
+          ? String((dbError as { code?: unknown }).code ?? '')
+          : '';
+
+      // If a concurrent request created the same pending invite, reuse it.
+      if (dbErrorCode === '23505') {
+        const { data: concurrentInvite, error: concurrentInviteError } = await supabaseClient
+          .from('invitations')
+          .select('token, expires_at')
+          .eq('company_id', companyId)
+          .eq('email', normalizedEmail)
+          .eq('status', 'pending')
+          .gt('expires_at', nowIso)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!concurrentInviteError && concurrentInvite?.token) {
+          return NextResponse.json({
+            success: true,
+            message: 'Convite já existente (pendente). Reutilizando link para evitar duplicidade.',
+            invitation: {
+              companyId,
+              email: normalizedEmail,
+              token: concurrentInvite.token,
+              expiresAt: new Date(concurrentInvite.expires_at).toISOString(),
+              inviteUrl: `${baseUrl}/join?token=${concurrentInvite.token}`,
+              emailSent: false,
+            },
+            limit,
+            remaining: Math.max(0, limit - totalCount - 1),
+          }, { status: 200 });
+        }
+      }
+
       console.error('[API /invitations/create] Failed to create invitation record:', dbError);
       return NextResponse.json({
         success: false,
@@ -225,7 +290,6 @@ export async function POST(request: Request) {
     }
 
     // Build the full invite URL for the admin to share
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const inviteUrl = `${baseUrl}/join?token=${token}`;
 
     // Return success response (token included for admin to share the link)

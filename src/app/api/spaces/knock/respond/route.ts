@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,40 +13,10 @@ const requestSchema = z.object({
   decision: z.enum(['APPROVE', 'DENY']),
 });
 
-async function waitForSubscription(channel: RealtimeChannel, timeoutMs = 6000): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('Realtime channel subscription timed out'));
-    }, timeoutMs);
-
-    channel.subscribe((status, err) => {
-      if (settled) return;
-      if (err) {
-        settled = true;
-        clearTimeout(timer);
-        reject(err);
-        return;
-      }
-
-      if (status === 'SUBSCRIBED') {
-        settled = true;
-        clearTimeout(timer);
-        resolve();
-        return;
-      }
-
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        settled = true;
-        clearTimeout(timer);
-        reject(new Error(`Realtime channel failed to subscribe: ${status}`));
-      }
-    });
-  });
-}
-
+/**
+ * Validates the knock response (auth, occupant check, company), updates the DB row,
+ * and logs the action. Real-time notification delivered via postgres_changes.
+ */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
@@ -100,6 +69,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Cross-company knock response is not allowed' }, { status: 403 });
     }
 
+    // Update the knock_requests row — triggers postgres_changes for knocker listening
+    const { error: updateError } = await supabase
+      .from('knock_requests')
+      .update({
+        responder_id: responder.id,
+        responder_name: responder.displayName ?? null,
+        decision,
+        status: decision === 'APPROVE' ? 'approved' : 'denied',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', requestId)
+      .eq('space_id', spaceId)
+      .eq('status', 'pending');
+
+    if (updateError) {
+      console.error('[knock/respond] Failed to update knock request:', updateError.message);
+      return NextResponse.json({ error: 'Failed to update knock request' }, { status: 500 });
+    }
+
     // Best-effort action logging as a room system message.
     const { data: conversation } = await supabase
       .from('conversations')
@@ -137,21 +125,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       spaceId,
       timestamp: Date.now(),
     };
-
-    const channel = supabase.channel(`knock:space:${spaceId}`);
-    try {
-      await waitForSubscription(channel);
-      const sendResult = await channel.send({
-        type: 'broadcast',
-        event: 'knock',
-        payload: responsePayload,
-      });
-      if (sendResult !== 'ok') {
-        throw new Error(`Realtime knock response broadcast failed: ${sendResult}`);
-      }
-    } finally {
-      supabase.removeChannel(channel);
-    }
 
     return NextResponse.json({ ok: true, response: responsePayload }, { status: 200 });
   } catch (error) {

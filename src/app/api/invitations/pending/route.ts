@@ -21,15 +21,20 @@ export interface PendingInvitationResponse {
  */
 export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitationResponse>> {
 	try {
+		// Regular client for auth check
 		const supabase = await createSupabaseServerClient();
+		// Service role client for invitation queries (bypasses RLS).
+		// The invited user has no company yet, so RLS policies on invitations
+		// (which require company admin) would block all reads/writes.
+		const supabaseAdmin = await createSupabaseServerClient('service_role');
 
 		// Get authenticated user
 		const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-		console.log('[API /invitations/pending] Auth check:', { 
-			hasUser: !!authUser, 
+		console.log('[API /invitations/pending] Auth check:', {
+			hasUser: !!authUser,
 			email: authUser?.email,
-			authError: authError?.message 
+			authError: authError?.message
 		});
 
 		if (authError || !authUser?.email) {
@@ -44,8 +49,20 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
 
 		console.log('[API /invitations/pending] Searching for:', { userEmail, nowIso });
 
-		// Find pending invitation for this email
-		const { data: invitation, error: invitationError } = await supabase
+		// Use admin client for invitation operations (RLS bypass)
+		const { error: expireError } = await supabaseAdmin
+			.from('invitations')
+			.update({ status: 'expired' })
+			.eq('email', userEmail)
+			.eq('status', 'pending')
+			.lte('expires_at', nowIso);
+
+		if (expireError) {
+			console.warn('[API /invitations/pending] Failed to expire stale invitations:', expireError);
+		}
+
+		// Find pending invitation for this email (use admin client - RLS bypass)
+		const { data: invitation, error: invitationError } = await supabaseAdmin
 			.from('invitations')
 			.select(`
         token,
@@ -57,7 +74,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
           name
         )
       `)
-			.ilike('email', userEmail)
+			.eq('email', userEmail)
 			.eq('status', 'pending')
 			.gt('expires_at', nowIso)
 			.order('created_at', { ascending: false })

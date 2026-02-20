@@ -138,8 +138,59 @@ sequenceDiagram
 - Updated interaction behavior per product decision: users can knock any space by default.
 - Occupant approve/deny now goes through server validation route and logs the action as a system message in the room conversation when available.
 
+### Handoff: Realtime Timeout Investigation (2026-02-09)
+
+Current blocker:
+- In two-browser manual tests, occupants frequently show `occupiedChannelStatus: TIMED_OUT`.
+- When this occurs, knock request events are not delivered to occupants, so no knock toast and no sound are triggered.
+
+Reproduction context:
+- Browser A (knocker) sends request to target space.
+- Browser B (occupant) is in the target space (`current_space_id` set).
+- Both clients repeatedly report `TIMED_OUT` on occupied knock channel.
+
+Observed console patterns:
+- Occupant side:
+  - `[KnockSignaling] Occupied channel (<spaceId>) status: TIMED_OUT`
+- Knocker side:
+  - `[KnockSignaling] Knocking channel (<spaceId>) status: SUBSCRIBED`
+  - `[KnockSignaling] Knocking channel (<spaceId>) status: CLOSED`
+- Presence logs in same sessions also showed:
+  - `[Presence] Subscription timed out. Supabase client may attempt reconnection.`
+
+Implemented trials (chronological):
+- Added server request endpoint `POST /api/spaces/knock/request` to broadcast knock requests server-side and return `recipientCount`.
+- Added `waitForSubscription()` before server broadcasts in:
+  - `src/app/api/spaces/knock/request/route.ts`
+  - `src/app/api/spaces/knock/respond/route.ts`
+- Added listener status telemetry to UI:
+  - `useKnockSignaling` now exposes `occupiedChannelStatus` and `knockingChannelStatus`.
+  - `ModernFloorPlan` surfaces occupied-channel failures.
+- Fixed event-loss risks:
+  - stabilized knock callbacks with refs in `useKnockSignaling` (avoids subscription churn on re-render),
+  - strict request correlation in response handler (`active request id` must exist and match),
+  - desktop card click now routes to knock flow when `onKnock` exists.
+- Added reconnect logic for knock channels:
+  - exponential retry on `TIMED_OUT`/`CHANNEL_ERROR`.
+- Added realtime auth refresh before knock channel subscribe:
+  - `supabase.auth.getSession()` then `supabase.realtime.setAuth(token)`.
+- Sound trial:
+  - WebAudio cue remains best-effort; attempted `AudioContext` resume path before oscillator playback.
+
+What is verified working:
+- Knock timeout/cooldown UX and disabled button states.
+- Response route validation and action logging.
+- Recipient count diagnostics in request response payload.
+- Type-check and targeted tests pass.
+
+What is still not working:
+- Pending manual two-user verification after architecture fix.
+
 ## Change Log
 - 2026-02-09: Applied adversarial review fixes for pending/cooldown state UX, timeout handling, server-validated response flow, response action logging, notification sound cue, and added `SpaceActionButtons` tests.
 - 2026-02-09: Fixed realtime knock delivery race by waiting for channel `SUBSCRIBED` before broadcast send in both client request and server response paths.
 - 2026-02-09: Moved knock request broadcast to server endpoint (`/api/spaces/knock/request`) with DB-based recipient count to diagnose occupant visibility vs realtime delivery.
 - 2026-02-09: Added explicit knock listener channel status telemetry (`occupiedChannelStatus`) to surface silent subscription failures in UI.
+- 2026-02-09: Added knock signaling callback stabilization, strict active-request response filtering, and desktop card click routing to knock flow.
+- 2026-02-09: Added knock channel retry/backoff + realtime auth refresh before subscribe; `TIMED_OUT` still reproduced in manual multi-user tests.
+- 2026-02-09: **Architecture fix** — Moved broadcast from ephemeral server-side SSR client to persistent browser client singleton (matching working `useAudioSignaling` pattern). Server endpoints (`/api/spaces/knock/request` and `/api/spaces/knock/respond`) now handle validation + logging only; client broadcasts after server returns validated payload. Added `{ config: { broadcast: { self: false } } }` to knock channels. Pre-warmed AudioContext on first user gesture for sound cue reliability. Removed dead `refreshRealtimeAuth` code.

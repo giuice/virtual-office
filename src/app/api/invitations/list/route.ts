@@ -2,7 +2,23 @@ import { NextResponse } from 'next/server';
 import { IInvitationRepository } from '@/repositories/interfaces';
 import { SupabaseInvitationRepository } from '@/repositories/implementations/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { headers } from 'next/headers';
+
+function resolveAppBaseUrl(request: Request): string {
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredAppUrl) {
+    try {
+      return new URL(configuredAppUrl).origin;
+    } catch (error) {
+      console.warn('[API /invitations/list] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
+    }
+  }
+
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+}
 
 export async function GET(request: Request) {
   const supabaseClient = await createSupabaseServerClient();
@@ -15,6 +31,11 @@ export async function GET(request: Request) {
 
     if (!companyId) {
       return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
+    }
+
+    const allowedStatuses = new Set(['pending', 'accepted', 'expired']);
+    if (status && !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: 'status must be pending, accepted, or expired' }, { status: 400 });
     }
 
     // Verify user is authenticated and is admin of the company
@@ -39,6 +60,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Apenas administradores podem listar convites' }, { status: 403 });
     }
 
+    const nowIso = new Date().toISOString();
+    const { error: expireError } = await supabaseClient
+      .from('invitations')
+      .update({ status: 'expired' })
+      .eq('company_id', companyId)
+      .eq('status', 'pending')
+      .lte('expires_at', nowIso);
+
+    if (expireError) {
+      console.warn('[API /invitations/list] Failed to expire stale invitations:', expireError);
+    }
+
     // Fetch invitations
     let invitations = await repo.findByCompanyId(companyId);
 
@@ -48,10 +81,7 @@ export async function GET(request: Request) {
     }
 
     // Build base URL for invitation links
-    const headersList = await headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+    const baseUrl = resolveAppBaseUrl(request);
 
     // Add inviteUrl to each invitation (AC7)
     const invitationsWithUrl = invitations.map(inv => ({
@@ -65,7 +95,14 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId);
 
-    const pendingCount = invitations.filter(inv => inv.status === 'pending').length;
+    const { count: pendingCountDb } = await supabaseClient
+      .from('invitations')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('status', 'pending')
+      .gt('expires_at', nowIso);
+
+    const pendingCount = pendingCountDb || 0;
     const total = (userCount || 0) + pendingCount;
     const limit = 10;
     const remaining = Math.max(0, limit - total);

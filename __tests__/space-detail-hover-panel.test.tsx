@@ -596,6 +596,26 @@ describe('ModernSpaceCard with Hover Panel', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
   });
 
+  it('routes desktop card click to knock flow when onKnock is provided', () => {
+    const mockOnKnock = vi.fn();
+
+    render(
+      <ModernSpaceCard
+        space={mockSpace}
+        usersInSpace={mockUsers}
+        onEnterSpace={mockOnEnterSpace}
+        onKnock={mockOnKnock}
+        isUserInSpace={false}
+      />
+    );
+
+    const card = screen.getByTestId('space-space-1');
+    fireEvent.click(card);
+
+    expect(mockOnKnock).toHaveBeenCalledWith('space-1');
+    expect(mockOnEnterSpace).not.toHaveBeenCalled();
+  });
+
   it('shows aria-expanded attribute when panel visible (AC10)', async () => {
     vi.useFakeTimers();
     

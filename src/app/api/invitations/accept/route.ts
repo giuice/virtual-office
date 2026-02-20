@@ -4,29 +4,36 @@ import { SupabaseInvitationRepository, SupabaseUserRepository } from '@/reposito
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(req: NextRequest) {
+  // Regular client for authentication check
   const supabase = await createSupabaseServerClient();
-  
+  // Service role client for invitation operations (bypasses RLS)
+  // Needed because the invited user may not yet belong to the company,
+  // so RLS policies on invitations would block reads/writes.
+  const supabaseAdmin = await createSupabaseServerClient('service_role');
+
   // Get authenticated user from session (AC4 - use real supabaseUid from session)
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-  
+
   console.log('[API /invitations/accept] Auth check:', {
     hasUser: !!authUser,
     email: authUser?.email,
     supabaseUid: authUser?.id,
     authError: authError?.message
   });
-  
+
   if (authError || !authUser) {
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: false,
-      error: 'Autenticação necessária. Faça login para aceitar o convite.' 
+      error: 'Autenticação necessária. Faça login para aceitar o convite.'
     }, { status: 401 });
   }
-  
+
   const supabaseUid = authUser.id;
-  
-  const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabase);
-  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+
+  // Use service_role client for invitation ops (RLS bypass)
+  const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
+  // Use service_role for user ops too (user may not have company_id yet, RLS might block)
+  const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
 
   try {
     const { token, displayName } = await req.json();
@@ -83,8 +90,8 @@ export async function POST(req: NextRequest) {
     if (userProfile) {
       // 3a. User exists - check if they already belong to a company (AC6)
       if (userProfile.companyId && userProfile.companyId !== invitation.companyId) {
-        // Get current company name for the error message
-        const { data: currentCompany } = await supabase
+        // Get current company name for the error message (use admin client - RLS on companies)
+        const { data: currentCompany } = await supabaseAdmin
           .from('companies')
           .select('name')
           .eq('id', userProfile.companyId)

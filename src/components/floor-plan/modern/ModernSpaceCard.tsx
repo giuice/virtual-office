@@ -188,6 +188,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       return;
     }
 
+    if (!isUserInSpace && onKnock) {
+      onKnock(space.id);
+      return;
+    }
+
     onEnterSpace(space.id);
     if (onOpenChat) {
       onOpenChat(space);

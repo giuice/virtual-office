@@ -31,6 +31,7 @@ let mockCompanyData: any = null;
 let mockUserData: any = null;
 let mockUserCount: number = 0;
 let mockPendingCount: number = 0;
+let mockExistingInvite: any = null;
 
 // Mock Supabase server client
 vi.mock('@/lib/supabase/server-client', () => ({
@@ -48,40 +49,91 @@ vi.mock('@/lib/supabase/server-client', () => ({
       auth: {
         getUser: () => mockAuthGetUser(),
       },
-      from: (table: string) => ({
-        select: (columns: string, options?: { count?: string; head?: boolean }) => {
-          if (options?.count === 'exact' && options?.head === true) {
-            // Count query
-            return {
-              eq: (col: string, val: string) => {
-                if (table === 'users') {
-                  return Promise.resolve({ count: mockUserCount, error: null });
-                }
-                if (table === 'invitations' && col === 'company_id') {
-                  return {
-                    eq: () => Promise.resolve({ count: mockPendingCount, error: null }),
-                  };
-                }
-                return Promise.resolve({ count: 0, error: null });
-              },
-            };
-          }
-          // Single select query
+      from: (table: string) => {
+        if (table === 'users') {
           return {
-            eq: (col: string, val: string) => ({
-              single: () => {
-                if (table === 'companies') {
-                  return Promise.resolve({ data: mockCompanyData, error: mockCompanyData ? null : { code: 'PGRST116' } });
-                }
-                if (table === 'users') {
-                  return Promise.resolve({ data: mockUserData, error: mockUserData ? null : { code: 'PGRST116' } });
-                }
-                return Promise.resolve({ data: null, error: null });
-              },
+            select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+              if (options?.count === 'exact' && options?.head === true) {
+                return {
+                  eq: () => Promise.resolve({ count: mockUserCount, error: null }),
+                };
+              }
+
+              return {
+                eq: () => ({
+                  single: () => Promise.resolve({
+                    data: mockUserData,
+                    error: mockUserData ? null : { code: 'PGRST116' },
+                  }),
+                }),
+              };
+            },
+          };
+        }
+
+        if (table === 'companies') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({
+                  data: mockCompanyData,
+                  error: mockCompanyData ? null : { code: 'PGRST116' },
+                }),
+              }),
             }),
           };
-        },
-      }),
+        }
+
+        if (table === 'invitations') {
+          return {
+            update: () => ({
+              eq: () => ({
+                eq: () => ({
+                  lte: () => Promise.resolve({ error: null }),
+                }),
+              }),
+            }),
+            select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+              if (options?.count === 'exact' && options?.head === true) {
+                return {
+                  eq: () => ({
+                    eq: () => ({
+                      gt: () => Promise.resolve({ count: mockPendingCount, error: null }),
+                    }),
+                  }),
+                };
+              }
+
+              return {
+                eq: () => ({
+                  eq: () => ({
+                    eq: () => ({
+                      gt: () => ({
+                        order: () => ({
+                          limit: () => ({
+                            maybeSingle: () => Promise.resolve({
+                              data: mockExistingInvite,
+                              error: null,
+                            }),
+                          }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              };
+            },
+          };
+        }
+
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: null, error: null }),
+            }),
+          }),
+        };
+      },
     });
   }),
 }));
@@ -108,6 +160,7 @@ describe('/api/invitations/create - User Limit (AC4)', () => {
     mockUserData = null;
     mockUserCount = 0;
     mockPendingCount = 0;
+    mockExistingInvite = null;
   });
 
   const createRequest = (body: object) => {
@@ -166,6 +219,28 @@ describe('/api/invitations/create - User Limit (AC4)', () => {
 
     expect(response.status).toBe(403);
     expect(data.error).toBe('USER_LIMIT_REACHED');
+  });
+
+  it('returns 403 when admin belongs to another company and is not in admin_ids', async () => {
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: { id: 'user-123' } },
+      error: null,
+    });
+
+    mockCompanyData = { id: 'company-1', admin_ids: ['another-admin-id'] };
+    mockUserData = { id: 'db-user-1', role: 'admin', company_id: 'company-2' };
+
+    const request = createRequest({
+      email: 'new@example.com',
+      role: 'member',
+      companyId: 'company-1',
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toContain('administradores');
   });
 
   it('allows invitation when total < 10', async () => {

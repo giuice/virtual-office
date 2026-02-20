@@ -24,7 +24,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ValidateInvita
       }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient('service_role');
 
     // Fetch invitation with company name in a single query
     const { data: invitation, error: invitationError } = await supabase

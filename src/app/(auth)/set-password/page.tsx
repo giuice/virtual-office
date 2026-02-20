@@ -118,6 +118,44 @@ export default function SetPasswordPage() {
    */
   const checkAndAcceptPendingInvite = useCallback(async (): Promise<boolean> => {
     try {
+      const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
+      let tokenFromReturnUrl: string | null = null;
+
+      if (returnUrl) {
+        try {
+          const parsedReturnUrl = new URL(returnUrl, window.location.origin);
+          tokenFromReturnUrl = parsedReturnUrl.searchParams.get('token');
+        } catch (error) {
+          console.warn('[set-password] Could not parse passwordSetReturnUrl:', error);
+        }
+      }
+
+      // Priority 1: accept the exact token from the invitation flow.
+      if (tokenFromReturnUrl) {
+        console.log('[set-password] Found invitation token in return URL, accepting exact invitation...');
+        setIsAcceptingInvite(true);
+
+        const directAcceptResponse = await fetch('/api/invitations/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: tokenFromReturnUrl,
+            displayName,
+          }),
+        });
+
+        const directAcceptData = await directAcceptResponse.json();
+        if (directAcceptResponse.ok) {
+          console.log('[set-password] Invitation accepted successfully from return URL token');
+          setSuccessMessage('Você entrou na empresa!');
+          return true;
+        }
+
+        console.warn('[set-password] Failed to accept invitation from return URL token, falling back to email lookup:', directAcceptData?.error);
+        setIsAcceptingInvite(false);
+      }
+
+      // Fallback: email-based pending lookup
       console.log('[set-password] Checking for pending invitation...');
       
       const response = await fetch('/api/invitations/pending');
@@ -160,7 +198,7 @@ export default function SetPasswordPage() {
       setIsAcceptingInvite(false);
       return false;
     }
-  }, []);
+  }, [displayName]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -213,6 +251,8 @@ export default function SetPasswordPage() {
       
       // Determine redirect destination
       let redirectUrl = '/onboarding';
+      const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
+      sessionStorage.removeItem('passwordSetReturnUrl');
       
       if (inviteAccepted) {
         // Invite was accepted - go straight to dashboard
@@ -220,8 +260,6 @@ export default function SetPasswordPage() {
         showSuccess({ description: `Bem-vindo! Você entrou na empresa.` });
       } else {
         // Check if there's a manual return URL from the join flow
-        const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
-        sessionStorage.removeItem('passwordSetReturnUrl');
         if (returnUrl) {
           redirectUrl = returnUrl;
         }

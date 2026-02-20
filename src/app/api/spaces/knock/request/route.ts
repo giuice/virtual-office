@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
 
@@ -13,40 +12,10 @@ const requestSchema = z.object({
   requesterAvatarUrl: z.union([z.string().url(), z.literal('')]).optional(),
 });
 
-async function waitForSubscription(channel: RealtimeChannel, timeoutMs = 6000): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('Realtime channel subscription timed out'));
-    }, timeoutMs);
-
-    channel.subscribe((status, err) => {
-      if (settled) return;
-      if (err) {
-        settled = true;
-        clearTimeout(timer);
-        reject(err);
-        return;
-      }
-
-      if (status === 'SUBSCRIBED') {
-        settled = true;
-        clearTimeout(timer);
-        resolve();
-        return;
-      }
-
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        settled = true;
-        clearTimeout(timer);
-        reject(new Error(`Realtime channel failed to subscribe: ${status}`));
-      }
-    });
-  });
-}
-
+/**
+ * Validates the knock request (auth, company, space), inserts into knock_requests table,
+ * and returns recipient count. Real-time notification delivered via postgres_changes.
+ */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
@@ -105,34 +74,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const recipientCount = count ?? 0;
 
-    const payload = {
-      type: 'KNOCK_REQUEST' as const,
-      requestId,
-      requesterId: requester.id,
-      requesterName,
-      requesterAvatarUrl,
-      spaceId,
-      timestamp: Date.now(),
-    };
+    // Clean up old expired/stale knock requests for this space (older than 2 minutes)
+    await supabase
+      .from('knock_requests')
+      .delete()
+      .eq('space_id', spaceId)
+      .lt('created_at', new Date(Date.now() - 2 * 60 * 1000).toISOString());
 
-    const channel = supabase.channel(`knock:space:${spaceId}`);
-    try {
-      await waitForSubscription(channel);
-      const sendResult = await channel.send({
-        type: 'broadcast',
-        event: 'knock',
-        payload,
+    // Insert the knock request — triggers postgres_changes for occupants listening
+    const { error: insertError } = await supabase
+      .from('knock_requests')
+      .insert({
+        id: requestId,
+        space_id: spaceId,
+        requester_id: requester.id,
+        requester_name: requesterName,
+        requester_avatar_url: requesterAvatarUrl ?? null,
+        status: 'pending',
       });
 
-      if (sendResult !== 'ok') {
-        throw new Error(`Realtime knock request broadcast failed: ${sendResult}`);
-      }
-    } finally {
-      supabase.removeChannel(channel);
+    if (insertError) {
+      console.error('[knock/request] Failed to insert knock request:', insertError.message);
+      return NextResponse.json({ error: 'Failed to create knock request' }, { status: 500 });
     }
 
     return NextResponse.json(
-      { ok: true, requestId, recipientCount },
+      {
+        ok: true,
+        requestId,
+        requesterId: requester.id,
+        requesterName,
+        requesterAvatarUrl,
+        recipientCount,
+      },
       { status: 200 }
     );
   } catch (error) {

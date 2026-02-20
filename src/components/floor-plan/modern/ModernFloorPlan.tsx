@@ -73,6 +73,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const [error, setError] = useState<string | null>(null);
   const activeKnockRequestIdRef = useRef<string | null>(null);
   const knockStatusToastRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextWarmedRef = useRef(false);
   const respondToKnockRef = useRef<((input: {
     spaceId: string;
     requestId: string;
@@ -88,13 +90,26 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const currentUser = users?.find(u => u.id === currentUserProfile?.id);
   const occupiedSpaceId = currentUser?.currentSpaceId ?? null;
 
-  const playKnockCue = useCallback(() => {
-    if (currentUserProfile?.preferences?.notifications === false) {
-      return;
-    }
-
+  // Pre-warm AudioContext on first user interaction to satisfy autoplay policy
+  const warmUpAudioContext = useCallback(() => {
+    if (audioContextWarmedRef.current) return;
     try {
-      const audioContext = new AudioContext();
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      void ctx.resume();
+      audioContextRef.current = ctx;
+      audioContextWarmedRef.current = true;
+    } catch {
+      // AudioContext unavailable
+    }
+  }, []);
+
+  const playKnockCue = useCallback(() => {
+    try {
+      const audioContext = audioContextRef.current;
+      if (!audioContext || audioContext.state === 'closed') return;
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -109,13 +124,10 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       gainNode.connect(audioContext.destination);
       oscillator.start();
       oscillator.stop(audioContext.currentTime + 0.24);
-      oscillator.onended = () => {
-        void audioContext.close();
-      };
     } catch {
       // Sound cue is best-effort and should never block knock interactions.
     }
-  }, [currentUserProfile?.preferences?.notifications]);
+  }, []);
 
   // Handle incoming knock requests (for occupants)
   const handleIncomingKnockRequest = useCallback((payload: KnockRequestPayload) => {
@@ -170,7 +182,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       return;
     }
 
-    if (activeKnockRequestIdRef.current && payload.requestId !== activeKnockRequestIdRef.current) {
+    const activeRequestId = activeKnockRequestIdRef.current;
+    if (!activeRequestId || payload.requestId !== activeRequestId) {
       return;
     }
 
@@ -190,7 +203,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         description: `You can knock again in 60 seconds.`,
       });
     }
-  }, [knock]);
+  }, [knock.handleApproval, knock.handleDenial, knock.reset, knock.targetSpaceId]);
 
   const knockSignaling = useKnockSignaling({
     occupiedSpaceId,
@@ -203,12 +216,17 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 
   useEffect(() => {
     const status = knockSignaling.occupiedChannelStatus;
-    if (!status || status === 'SUBSCRIBED') {
+    if (status === 'SUBSCRIBED') {
       knockStatusToastRef.current = null;
       return;
     }
 
-    const signature = `occupied-${status}`;
+    const isRecoverableIssue = status === 'TIMED_OUT' || status === 'CHANNEL_ERROR';
+    if (!isRecoverableIssue) {
+      return;
+    }
+
+    const signature = `occupied-${occupiedSpaceId ?? 'unknown'}-${status}`;
     if (knockStatusToastRef.current === signature) {
       return;
     }
@@ -217,7 +235,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     toast.error('Knock listener connection issue', {
       description: `Occupied channel status: ${status}. Notifications may not arrive.`,
     });
-  }, [knockSignaling.occupiedChannelStatus]);
+  }, [knockSignaling.occupiedChannelStatus, occupiedSpaceId]);
 
   // Story 3.16: Handler for knocking on a private space
   const handleKnock = useCallback((spaceId: string) => {
@@ -395,11 +413,14 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     .map(([id]) => id);
 
   return (
-    <div className={cn(
-      floorPlanTokens.floorPlanLayout.container.base,
-      floorPlanTokens.floorPlanLayout.container.scrollBehavior,
-      className
-    )}>
+    <div
+      className={cn(
+        floorPlanTokens.floorPlanLayout.container.base,
+        floorPlanTokens.floorPlanLayout.container.scrollBehavior,
+        className
+      )}
+      onClickCapture={warmUpAudioContext}
+    >
       {/* Error message display */}
       {error && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
