@@ -35,20 +35,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const requesterAvatarUrl = parsed.data.requesterAvatarUrl || undefined;
 
     const supabase = await createSupabaseServerClient();
+    const supabaseAdmin = await createSupabaseServerClient('service_role');
     const { data: authData, error: authError } = await supabase.auth.getUser();
 
     if (authError || !authData.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userRepository = new SupabaseUserRepository(supabase);
+    const userRepository = new SupabaseUserRepository(supabaseAdmin);
     const requester = await userRepository.findBySupabaseUid(authData.user.id);
 
     if (!requester) {
       return NextResponse.json({ error: 'Requester profile not found' }, { status: 404 });
     }
 
-    const { data: space, error: spaceError } = await supabase
+    const { data: space, error: spaceError } = await supabaseAdmin
       .from('spaces')
       .select('id, company_id')
       .eq('id', spaceId)
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Cross-company knock request is not allowed' }, { status: 403 });
     }
 
-    const { count, error: recipientsError } = await supabase
+    const { count, error: recipientsError } = await supabaseAdmin
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('current_space_id', spaceId)
@@ -75,14 +76,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const recipientCount = count ?? 0;
 
     // Clean up old expired/stale knock requests for this space (older than 2 minutes)
-    await supabase
+    const { error: cleanupError } = await supabaseAdmin
       .from('knock_requests')
       .delete()
       .eq('space_id', spaceId)
       .lt('created_at', new Date(Date.now() - 2 * 60 * 1000).toISOString());
+    if (cleanupError) {
+      console.warn('[knock/request] Failed to cleanup stale knock requests:', cleanupError.message);
+    }
 
     // Insert the knock request — triggers postgres_changes for occupants listening
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('knock_requests')
       .insert({
         id: requestId,
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (insertError) {
       console.error('[knock/request] Failed to insert knock request:', insertError.message);
-      return NextResponse.json({ error: 'Failed to create knock request' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create knock request', details: insertError.message }, { status: 500 });
     }
 
     return NextResponse.json(

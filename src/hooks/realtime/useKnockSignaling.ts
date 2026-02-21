@@ -48,6 +48,8 @@ export type OnKnockRequestCallback = (payload: KnockRequestPayload) => void;
 export type OnKnockResponseCallback = (payload: KnockResponsePayload) => void;
 
 type ChannelStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CHANNEL_ERROR' | 'CLOSED' | 'SUBSCRIBING' | null;
+const POLL_INTERVAL_MS = 2000;
+const FRESH_KNOCK_WINDOW_MS = 45 * 1000;
 
 /** Shape of a knock_requests row from postgres_changes */
 interface KnockRequestRow {
@@ -62,6 +64,12 @@ interface KnockRequestRow {
 	status: string;
 	created_at: string;
 	updated_at: string;
+}
+
+function isFreshTimestamp(timestamp: string, maxAgeMs = FRESH_KNOCK_WINDOW_MS): boolean {
+	const parsed = Date.parse(timestamp);
+	if (!Number.isFinite(parsed)) return false;
+	return Date.now() - parsed <= maxAgeMs;
 }
 
 function createRequestId(): string {
@@ -124,6 +132,25 @@ export function useKnockSignaling(options: {
 			return;
 		}
 
+		let latestStatus: ChannelStatus = null;
+		const seenIncomingRequestIds = new Set<string>();
+		const processIncomingKnock = (row: KnockRequestRow) => {
+			if (row.requester_id === currentUserId) return;
+			if (!isFreshTimestamp(row.created_at)) return;
+			if (seenIncomingRequestIds.has(row.id)) return;
+			seenIncomingRequestIds.add(row.id);
+
+			onKnockRequestRef.current?.({
+				type: 'KNOCK_REQUEST',
+				requestId: row.id,
+				requesterId: row.requester_id,
+				requesterName: row.requester_name,
+				requesterAvatarUrl: row.requester_avatar_url ?? undefined,
+				spaceId: row.space_id,
+				timestamp: new Date(row.created_at).getTime(),
+			});
+		};
+
 		const channel = supabase.channel(`knock-occupied:${occupiedSpaceId}`)
 			.on(
 				'postgres_changes',
@@ -134,19 +161,7 @@ export function useKnockSignaling(options: {
 					filter: `space_id=eq.${occupiedSpaceId}`,
 				},
 				(payload: RealtimePostgresInsertPayload<KnockRequestRow>) => {
-					const row = payload.new;
-					// Ignore our own knock requests
-					if (row.requester_id === currentUserId) return;
-
-					onKnockRequestRef.current?.({
-						type: 'KNOCK_REQUEST',
-						requestId: row.id,
-						requesterId: row.requester_id,
-						requesterName: row.requester_name,
-						requesterAvatarUrl: row.requester_avatar_url ?? undefined,
-						spaceId: row.space_id,
-						timestamp: new Date(row.created_at).getTime(),
-					});
+					processIncomingKnock(payload.new);
 				}
 			);
 
@@ -155,14 +170,38 @@ export function useKnockSignaling(options: {
 
 		channel.subscribe((status) => {
 			if (!isActive) return;
+			latestStatus = status as ChannelStatus;
 			setOccupiedChannelStatus(status as ChannelStatus);
-			if (process.env.NODE_ENV === 'development') {
+			if (process.env.NODE_ENV === 'development' && status !== 'TIMED_OUT') {
 				console.log(`[KnockSignaling] Occupied channel (${occupiedSpaceId}) status:`, status);
 			}
 		});
 
+		const pollTimer = setInterval(async () => {
+			if (!isActive) return;
+			if (latestStatus !== 'TIMED_OUT' && latestStatus !== 'CHANNEL_ERROR' && latestStatus !== 'CLOSED') return;
+
+			const cutoffIso = new Date(Date.now() - FRESH_KNOCK_WINDOW_MS).toISOString();
+			const { data, error } = await supabase
+				.from('knock_requests')
+				.select('id, space_id, requester_id, requester_name, requester_avatar_url, responder_id, responder_name, decision, status, created_at, updated_at')
+				.eq('space_id', occupiedSpaceId)
+				.eq('status', 'pending')
+				.gte('created_at', cutoffIso)
+				.order('created_at', { ascending: true })
+				.limit(20);
+
+			if (error) {
+				console.warn('[KnockSignaling] Poll fallback failed for occupied knocks:', error.message);
+				return;
+			}
+
+			(data as KnockRequestRow[] | null)?.forEach(processIncomingKnock);
+		}, POLL_INTERVAL_MS);
+
 		return () => {
 			isActive = false;
+			clearInterval(pollTimer);
 			supabase.removeChannel(channel);
 			occupiedChannelRef.current = null;
 			setOccupiedChannelStatus(null);
@@ -180,6 +219,28 @@ export function useKnockSignaling(options: {
 			return;
 		}
 
+		let latestStatus: ChannelStatus = null;
+		const seenResponseEvents = new Set<string>();
+		const processKnockResponse = (row: KnockRequestRow) => {
+			if (!row.decision || row.space_id !== knockingSpaceId) return;
+			if (!isFreshTimestamp(row.updated_at)) return;
+			const eventKey = `${row.id}:${row.status}:${row.updated_at}`;
+			if (seenResponseEvents.has(eventKey)) return;
+			seenResponseEvents.add(eventKey);
+
+			onKnockResponseRef.current?.({
+				type: 'KNOCK_RESPONSE',
+				requestId: row.id,
+				decision: row.decision,
+				responderId: row.responder_id ?? '',
+				responderName: row.responder_name ?? undefined,
+				responderValidated: true,
+				requesterId: row.requester_id,
+				spaceId: row.space_id,
+				timestamp: new Date(row.updated_at).getTime(),
+			});
+		};
+
 		const channel = supabase.channel(`knock-response:${currentUserId}:${knockingSpaceId}`)
 			.on(
 				'postgres_changes',
@@ -190,21 +251,7 @@ export function useKnockSignaling(options: {
 					filter: `requester_id=eq.${currentUserId}`,
 				},
 				(payload: RealtimePostgresUpdatePayload<KnockRequestRow>) => {
-					const row = payload.new;
-					// Only process rows with a decision for the space we're knocking on
-					if (!row.decision || row.space_id !== knockingSpaceId) return;
-
-					onKnockResponseRef.current?.({
-						type: 'KNOCK_RESPONSE',
-						requestId: row.id,
-						decision: row.decision,
-						responderId: row.responder_id ?? '',
-						responderName: row.responder_name ?? undefined,
-						responderValidated: true,
-						requesterId: row.requester_id,
-						spaceId: row.space_id,
-						timestamp: new Date(row.updated_at).getTime(),
-					});
+					processKnockResponse(payload.new);
 				}
 			);
 
@@ -213,14 +260,39 @@ export function useKnockSignaling(options: {
 
 		channel.subscribe((status) => {
 			if (!isActive) return;
+			latestStatus = status as ChannelStatus;
 			setKnockingChannelStatus(status as ChannelStatus);
-			if (process.env.NODE_ENV === 'development') {
+			if (process.env.NODE_ENV === 'development' && status !== 'TIMED_OUT') {
 				console.log(`[KnockSignaling] Knocking channel (${knockingSpaceId}) status:`, status);
 			}
 		});
 
+		const pollTimer = setInterval(async () => {
+			if (!isActive) return;
+			if (latestStatus !== 'TIMED_OUT' && latestStatus !== 'CHANNEL_ERROR' && latestStatus !== 'CLOSED') return;
+
+			const cutoffIso = new Date(Date.now() - FRESH_KNOCK_WINDOW_MS).toISOString();
+			const { data, error } = await supabase
+				.from('knock_requests')
+				.select('id, space_id, requester_id, requester_name, requester_avatar_url, responder_id, responder_name, decision, status, created_at, updated_at')
+				.eq('requester_id', currentUserId)
+				.eq('space_id', knockingSpaceId)
+				.in('status', ['approved', 'denied'])
+				.gte('updated_at', cutoffIso)
+				.order('updated_at', { ascending: true })
+				.limit(20);
+
+			if (error) {
+				console.warn('[KnockSignaling] Poll fallback failed for knock responses:', error.message);
+				return;
+			}
+
+			(data as KnockRequestRow[] | null)?.forEach(processKnockResponse);
+		}, POLL_INTERVAL_MS);
+
 		return () => {
 			isActive = false;
+			clearInterval(pollTimer);
 			supabase.removeChannel(channel);
 			knockingChannelRef.current = null;
 			setKnockingChannelStatus(null);

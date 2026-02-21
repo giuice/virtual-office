@@ -35,13 +35,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { spaceId, requestId, requesterId, requesterName, decision } = parsed.data;
 
     const supabase = await createSupabaseServerClient();
+    const supabaseAdmin = await createSupabaseServerClient('service_role');
     const { data: authData, error: authError } = await supabase.auth.getUser();
 
     if (authError || !authData.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userRepository = new SupabaseUserRepository(supabase);
+    const userRepository = new SupabaseUserRepository(supabaseAdmin);
     const responder = await userRepository.findBySupabaseUid(authData.user.id);
 
     if (!responder) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { data: requester, error: requesterError } = await supabase
+    const { data: requester, error: requesterError } = await supabaseAdmin
       .from('users')
       .select('id, company_id, display_name')
       .eq('id', requesterId)
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Update the knock_requests row — triggers postgres_changes for knocker listening
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('knock_requests')
       .update({
         responder_id: responder.id,
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Best-effort action logging as a room system message.
-    const { data: conversation } = await supabase
+    const { data: conversation } = await supabaseAdmin
       .from('conversations')
       .select('id')
       .eq('room_id', spaceId)
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ? `${responder.displayName} approved a knock request from ${requester.display_name ?? requesterName}.`
           : `${responder.displayName} denied a knock request from ${requester.display_name ?? requesterName}.`;
 
-      const { error: logError } = await supabase.from('messages').insert({
+      const { error: logError } = await supabaseAdmin.from('messages').insert({
         conversation_id: conversation.id,
         sender_id: responder.id,
         content: logMessage,

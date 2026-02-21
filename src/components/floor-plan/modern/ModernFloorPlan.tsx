@@ -221,7 +221,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       return;
     }
 
-    const isRecoverableIssue = status === 'TIMED_OUT' || status === 'CHANNEL_ERROR';
+    const isRecoverableIssue = status === 'TIMED_OUT' || status === 'CHANNEL_ERROR' || status === 'CLOSED';
     if (!isRecoverableIssue) {
       return;
     }
@@ -232,8 +232,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     }
 
     knockStatusToastRef.current = signature;
-    toast.error('Knock listener connection issue', {
-      description: `Occupied channel status: ${status}. Notifications may not arrive.`,
+    toast.info('Knock listener in fallback mode', {
+      description: 'Realtime is degraded; using polling fallback (may add slight delay).',
     });
   }, [knockSignaling.occupiedChannelStatus, occupiedSpaceId]);
 

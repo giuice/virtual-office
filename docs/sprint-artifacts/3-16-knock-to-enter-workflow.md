@@ -95,16 +95,24 @@ So that I can join private meetings when appropriate.
 ```mermaid
 sequenceDiagram
     participant Requester
-    participant SupabaseRealtime
+    participant Server as API Server
+    participant DB as knock_requests Table
+    participant PGChanges as postgres_changes
     participant Occupants
 
-    Requester->>SupabaseRealtime: Broadcast "KNOCK_REQUEST"
-    SupabaseRealtime->>Occupants: Event "KNOCK_REQUEST"
-    Occupants->>Occupants: Show Toast (Approve/Deny)
-    
-    Occupants->>SupabaseRealtime: Broadcast "KNOCK_RESPONSE" (Approve)
-    SupabaseRealtime->>Requester: Event "KNOCK_RESPONSE"
-    Requester->>Requester: Auto-Join Space
+    Requester->>Server: POST /api/spaces/knock/request
+    Server->>Server: Validate (auth, company, space)
+    Server->>DB: INSERT knock_request (status: pending)
+    DB->>PGChanges: INSERT event
+    PGChanges->>Occupants: postgres_changes callback
+    Occupants->>Occupants: Show KnockToast + play sound
+
+    Occupants->>Server: POST /api/spaces/knock/respond
+    Server->>Server: Validate (occupant, company)
+    Server->>DB: UPDATE knock_request (decision, responder)
+    DB->>PGChanges: UPDATE event
+    PGChanges->>Requester: postgres_changes callback
+    Requester->>Requester: Auto-Join Space (if approved)
 ```
 
 ## Learnings from Previous Stories
@@ -194,3 +202,9 @@ What is still not working:
 - 2026-02-09: Added knock signaling callback stabilization, strict active-request response filtering, and desktop card click routing to knock flow.
 - 2026-02-09: Added knock channel retry/backoff + realtime auth refresh before subscribe; `TIMED_OUT` still reproduced in manual multi-user tests.
 - 2026-02-09: **Architecture fix** — Moved broadcast from ephemeral server-side SSR client to persistent browser client singleton (matching working `useAudioSignaling` pattern). Server endpoints (`/api/spaces/knock/request` and `/api/spaces/knock/respond`) now handle validation + logging only; client broadcasts after server returns validated payload. Added `{ config: { broadcast: { self: false } } }` to knock channels. Pre-warmed AudioContext on first user gesture for sound cue reliability. Removed dead `refreshRealtimeAuth` code.
+- 2026-02-09: **DB-backed architecture rewrite** — Broadcast channels consistently TIMED_OUT even with client-side pattern. Replaced entire broadcast mechanism with `knock_requests` database table + `postgres_changes` listeners (same proven mechanism as presence). Server routes now INSERT (request) / UPDATE (response) rows in `knock_requests` table. Client `useKnockSignaling` subscribes to `postgres_changes` INSERT events (occupant receives knocks) and UPDATE events (knocker receives responses). Removed all broadcast channel code and retry logic. Migration: `migrations/20260209_knock_requests_table.sql`.
+
+### Remaining: DB Migration Required
+- [ ] **🚨 CRITICAL**: Run `migrations/20260209_knock_requests_table.sql` in Supabase SQL Editor
+- [ ] Two-user manual testing after migration
+- [ ] Update `migrations/database-structure.md` with `knock_requests` table
