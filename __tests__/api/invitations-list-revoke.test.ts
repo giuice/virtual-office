@@ -29,27 +29,62 @@ vi.mock('@/lib/supabase/server-client', () => ({
     auth: {
       getUser: () => mockAuthGetUser(),
     },
-    from: (table: string) => ({
-      select: (columns: string, options?: { count?: string; head?: boolean }) => {
-        if (options?.count === 'exact' && options?.head === true) {
-          return {
-            eq: () => mockFromSelectCount(),
-          };
-        }
+    from: (table: string) => {
+      if (table === 'invitations') {
         return {
-          eq: (col: string, val: string) => {
-            if (table === 'invitations' && col === 'id') {
+          update: () => ({
+            eq: () => ({
+              eq: () => ({
+                lte: () => Promise.resolve({ error: null }),
+              }),
+            }),
+          }),
+          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === 'exact' && options?.head === true) {
               return {
-                single: () => mockFromSelectSingle(),
+                eq: () => ({
+                  eq: () => ({
+                    gt: () => mockFromSelectCount(),
+                  }),
+                }),
               };
             }
+
             return {
-              single: () => mockFromSelectSingle(),
+              eq: (_col: string, _val: string) => ({
+                single: () => mockFromSelectSingle(),
+              }),
             };
           },
         };
-      },
-    }),
+      }
+
+      if (table === 'users') {
+        return {
+          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === 'exact' && options?.head === true) {
+              return {
+                eq: () => mockFromSelectCount(),
+              };
+            }
+
+            return {
+              eq: () => ({
+                single: () => mockFromSelectSingle(),
+              }),
+            };
+          },
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => mockFromSelectSingle(),
+          }),
+        }),
+      };
+    },
   }),
 }));
 
@@ -204,7 +239,9 @@ describe('/api/invitations/list', () => {
     mockInvitationRepoMethods.findByCompanyId.mockResolvedValue([
       { id: 'inv-1', email: 'test1@example.com', status: 'pending', token: 'token-1' },
     ]);
-    mockFromSelectCount.mockResolvedValue({ count: 5, error: null });
+    mockFromSelectCount
+      .mockResolvedValueOnce({ count: 5, error: null }) // userCount
+      .mockResolvedValueOnce({ count: 1, error: null }); // pendingCount
 
     const request = createListRequest({ companyId: 'company-1' });
     const response = await GET(request);

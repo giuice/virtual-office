@@ -1,5 +1,5 @@
 // src/components/floor-plan/modern/ModernFloorPlan.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Space, Neighborhood } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
@@ -9,6 +9,11 @@ import { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 import { floorPlanTokens } from './designTokens';
 import { useGroupedSpaces } from '@/hooks/useGroupedSpaces';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+// Story 3.16: Knock to Enter
+import { useKnock } from '@/hooks/useKnock';
+import { useKnockSignaling, KnockRequestPayload, KnockResponsePayload } from '@/hooks/realtime/useKnockSignaling';
+import KnockToast from './KnockToast';
 
 // Perspective types matching UX spec
 export type FloorPlanPerspective = 'orbit' | 'analyst' | 'cinema';
@@ -65,10 +70,230 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const { currentUserProfile } = useCompany();
   const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
   const { speakingUsers, mutedUserIds } = useAudio();
-  const [joiningSpaces, setJoiningSpaces] = useState<Set<string>>(new Set());
-  const [lastRequestedSpaceId, setLastRequestedSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
+  const activeKnockRequestIdRef = useRef<string | null>(null);
+  const approvedKnockSpaceIdRef = useRef<string | null>(null);
+  const knockStatusToastRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextWarmedRef = useRef(false);
+  const respondToKnockRef = useRef<((input: {
+    spaceId: string;
+    requestId: string;
+    requesterId: string;
+    requesterName: string;
+    decision: 'APPROVE' | 'DENY';
+  }) => Promise<unknown>) | null>(null);
+
+  // Story 3.16: Knock to Enter hooks
+  const knock = useKnock();
+
+  // Get current user's occupied space ID
+  const currentUser = users?.find(u => u.id === currentUserProfile?.id);
+  const occupiedSpaceId = currentUser?.currentSpaceId ?? null;
+
+  // Pre-warm AudioContext on first user interaction to satisfy autoplay policy
+  const warmUpAudioContext = useCallback(() => {
+    if (audioContextWarmedRef.current) return;
+    try {
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      void ctx.resume();
+      audioContextRef.current = ctx;
+      audioContextWarmedRef.current = true;
+    } catch {
+      // AudioContext unavailable
+    }
+  }, []);
+
+  const playKnockCue = useCallback(() => {
+    try {
+      const audioContext = audioContextRef.current;
+      if (!audioContext || audioContext.state === 'closed') return;
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(280, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(220, audioContext.currentTime + 0.2);
+      gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.03, audioContext.currentTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.24);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.24);
+    } catch {
+      // Sound cue is best-effort and should never block knock interactions.
+    }
+  }, []);
+
+  // Handle incoming knock requests (for occupants)
+  const handleIncomingKnockRequest = useCallback((payload: KnockRequestPayload) => {
+    playKnockCue();
+    toast.custom(
+      (toastId) => (
+        <KnockToast
+          requesterName={payload.requesterName}
+          requesterAvatarUrl={payload.requesterAvatarUrl}
+          onApprove={() => {
+            void respondToKnockRef.current?.({
+              spaceId: payload.spaceId,
+              requestId: payload.requestId,
+              requesterId: payload.requesterId,
+              requesterName: payload.requesterName,
+              decision: 'APPROVE',
+            }).catch((responseError) => {
+              toast.error('Failed to approve knock', {
+                description: responseError instanceof Error ? responseError.message : 'Unknown error',
+              });
+            });
+            toast.dismiss(toastId);
+            toast.success(`${payload.requesterName} has been let in`);
+          }}
+          onDeny={() => {
+            void respondToKnockRef.current?.({
+              spaceId: payload.spaceId,
+              requestId: payload.requestId,
+              requesterId: payload.requesterId,
+              requesterName: payload.requesterName,
+              decision: 'DENY',
+            }).catch((responseError) => {
+              toast.error('Failed to deny knock', {
+                description: responseError instanceof Error ? responseError.message : 'Unknown error',
+              });
+            });
+            toast.dismiss(toastId);
+            toast.info(`Access denied to ${payload.requesterName}`);
+          }}
+        />
+      ),
+      {
+        duration: 30000, // Match knock timeout
+        id: `knock-${payload.requestId}`,
+      }
+    );
+  }, [playKnockCue]);
+
+  // Handle knock responses (for requester)
+  const handleKnockResponse = useCallback((payload: KnockResponsePayload) => {
+    if (!payload.responderValidated) {
+      return;
+    }
+
+    const activeRequestId = activeKnockRequestIdRef.current;
+    if (!activeRequestId || payload.requestId !== activeRequestId) {
+      return;
+    }
+
+    if (payload.decision === 'APPROVE') {
+      knock.handleApproval();
+      toast.success('Access granted!');
+      // Auto-join the space
+      if (knock.targetSpaceId) {
+        approvedKnockSpaceIdRef.current = knock.targetSpaceId;
+        void handleEnterSpace(knock.targetSpaceId, { allowPrivateBypass: true });
+      }
+      activeKnockRequestIdRef.current = null;
+      knock.reset();
+    } else {
+      knock.handleDenial();
+      activeKnockRequestIdRef.current = null;
+      toast.error('Access denied', {
+        description: `You can knock again in 60 seconds.`,
+      });
+    }
+  }, [knock.handleApproval, knock.handleDenial, knock.reset, knock.targetSpaceId]);
+
+  const knockSignaling = useKnockSignaling({
+    occupiedSpaceId,
+    knockingSpaceId: knock.targetSpaceId,
+    currentUserId: currentUserProfile?.id,
+    onKnockRequest: handleIncomingKnockRequest,
+    onKnockResponse: handleKnockResponse,
+  });
+  respondToKnockRef.current = knockSignaling.respondToKnock;
+
+  useEffect(() => {
+    const status = knockSignaling.occupiedChannelStatus;
+    if (status === 'SUBSCRIBED') {
+      knockStatusToastRef.current = null;
+      return;
+    }
+
+    const isRecoverableIssue = status === 'TIMED_OUT' || status === 'CHANNEL_ERROR' || status === 'CLOSED';
+    if (!isRecoverableIssue) {
+      return;
+    }
+
+    const signature = `occupied-${occupiedSpaceId ?? 'unknown'}-${status}`;
+    if (knockStatusToastRef.current === signature) {
+      return;
+    }
+
+    knockStatusToastRef.current = signature;
+    toast.info('Knock listener in fallback mode', {
+      description: 'Realtime is degraded; using polling fallback (may add slight delay).',
+    });
+  }, [knockSignaling.occupiedChannelStatus, occupiedSpaceId]);
+
+  // Story 3.16: Handler for knocking on a private space
+  const handleKnock = useCallback((spaceId: string) => {
+    if (!currentUserProfile?.id || !currentUserProfile?.displayName) {
+      setError('Cannot knock: user profile not available');
+      return;
+    }
+    if (!knock.canKnock(spaceId)) {
+      const remaining = knock.getCooldownRemaining(spaceId);
+      toast.warning('Cooldown active', {
+        description: `Wait ${remaining}s before knocking again.`,
+      });
+      return;
+    }
+    knock.knock(spaceId);
+    void (async () => {
+      try {
+        const { requestId, recipientCount } = await knockSignaling.sendKnockRequest(spaceId, {
+          id: currentUserProfile.id,
+          name: currentUserProfile.displayName,
+          avatarUrl: currentUserProfile.avatarUrl,
+        });
+
+        activeKnockRequestIdRef.current = requestId;
+        if (recipientCount <= 0) {
+          toast.info('Knocking...', {
+            description: 'No occupants detected in this space yet.',
+            duration: 5000,
+          });
+        } else {
+          toast.info('Knocking...', {
+            description: `Waiting for response from ${recipientCount} occupant${recipientCount > 1 ? 's' : ''}.`,
+            duration: 5000,
+          });
+        }
+      } catch (requestError) {
+        activeKnockRequestIdRef.current = null;
+        knock.reset();
+        toast.error('Failed to send knock request', {
+          description: requestError instanceof Error ? requestError.message : 'Unknown error',
+        });
+      }
+    })();
+  }, [currentUserProfile, knock, knockSignaling]);
+
+  useEffect(() => {
+    if (knock.status !== 'timeout') {
+      return;
+    }
+
+    activeKnockRequestIdRef.current = null;
+    toast.warning('No response', {
+      description: 'Your knock timed out after 30 seconds.',
+    });
+    knock.reset();
+  }, [knock.status, knock.reset]);
 
   // Log space and user data for debugging (only in development)
   useEffect(() => {
@@ -101,7 +326,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     return false;
   };
 
-  const handleEnterSpace = async (spaceId: string) => {
+  const handleEnterSpace = async (spaceId: string, options?: { allowPrivateBypass?: boolean }) => {
     try {
       if (!currentUserProfile?.id) {
         throw new Error('Cannot update location: user ID missing');
@@ -125,22 +350,32 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
 
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
-      if (currentUser && currentUser.currentSpaceId === spaceId) {
+      const isRestrictedSpace = selectedSpace.accessControl?.isPublic === false;
+      const hasApprovedKnock = approvedKnockSpaceIdRef.current === spaceId;
+      const isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;
+      const canDirectEnter = Boolean(isAdmin || options?.allowPrivateBypass || hasApprovedKnock || isAlreadyInSpace);
+
+      if (isRestrictedSpace && !canDirectEnter) {
+        setError('This space is private. Please knock to request access.');
+        return;
+      }
+
+      if (isAlreadyInSpace) {
         if (process.env.NODE_ENV === 'development') {
           console.log(`User already in space ${spaceId}`);
         }
         return;
       }
 
-      setLastRequestedSpaceId(spaceId);  // Set loading state
       setError(null);
 
       try {
         await updateLocation(spaceId);
-        setLastRequestedSpaceId(null);  // Reset after success
+        if (approvedKnockSpaceIdRef.current === spaceId) {
+          approvedKnockSpaceIdRef.current = null;
+        }
       } catch (error) {
         console.error('Error updating location:', error);
-        setLastRequestedSpaceId(null);
         setError('Failed to enter space. Please try again.');
         if (error instanceof Error) {
           throw error;
@@ -193,11 +428,14 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     .map(([id]) => id);
 
   return (
-    <div className={cn(
-      floorPlanTokens.floorPlanLayout.container.base,
-      floorPlanTokens.floorPlanLayout.container.scrollBehavior,
-      className
-    )}>
+    <div
+      className={cn(
+        floorPlanTokens.floorPlanLayout.container.base,
+        floorPlanTokens.floorPlanLayout.container.scrollBehavior,
+        className
+      )}
+      onClickCapture={warmUpAudioContext}
+    >
       {/* Error message display */}
       {error && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
@@ -220,6 +458,13 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           const spaceUsers = usersInSpaces.get(space.id) || [];
           const isHighlighted = highlightedSpaceId === space.id;
           const userInSpace = isUserInSpace(space);
+          const isRestrictedSpace = space.accessControl?.isPublic === false;
+          const hasOccupants = spaceUsers.length > 0;
+          const canKnock = isRestrictedSpace || hasOccupants;
+          const cooldownRemaining = knock.getCooldownRemaining(space.id);
+          const knockStatus = cooldownRemaining > 0
+            ? 'cooldown'
+            : (knock.targetSpaceId === space.id ? knock.status : 'idle');
 
           return (
             <ModernSpaceCard
@@ -239,6 +484,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               variant={perspective}
               speakingUserIds={currentSpeakingIds}
               mutedUserIds={Array.from(mutedUserIds)}
+              canDirectEnter={isAdmin || userInSpace || !isRestrictedSpace || approvedKnockSpaceIdRef.current === space.id}
+              // Story 3.16: Pass onKnock handler
+              onKnock={canKnock ? handleKnock : undefined}
+              knockStatus={knockStatus}
+              knockCooldownRemaining={cooldownRemaining}
             />
           );
         };

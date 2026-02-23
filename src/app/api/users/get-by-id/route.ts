@@ -13,6 +13,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const supabaseUid = searchParams.get('supabase_uid');
 
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !currentUser) {
+      return NextResponse.json(
+        { error: 'Usuário não autenticado' },
+        { status: 401 }
+      );
+    }
+
     if (!supabaseUid) {
       return NextResponse.json(
         { error: 'Missing required parameter: supabase_uid' },
@@ -20,7 +28,14 @@ export async function GET(request: Request) {
       );
     }
 
-  const user = await userRepository.findBySupabaseUid(supabaseUid);
+    if (supabaseUid !== currentUser.id) {
+      return NextResponse.json(
+        { error: 'Acesso negado' },
+        { status: 403 }
+      );
+    }
+
+    const user = await userRepository.findBySupabaseUid(supabaseUid);
 
     if (!user) {
       return NextResponse.json(

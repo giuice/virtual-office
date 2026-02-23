@@ -56,40 +56,40 @@ export async function GET(request: NextRequest) {
 
     // NEW: Handle summary request
     if (summaryOnly) {
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'summary_request', {
-          requesterId: requesterProfile.id,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'summary_request', {
+      //     requesterId: requesterProfile.id,
+      //   });
+      // }
 
       const summary = await conversationRepository.getUnreadSummary(requesterProfile.id);
 
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'summary_success', {
-          requesterId: requesterProfile.id,
-          totalUnread: summary.totalUnread,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'summary_success', {
+      //     requesterId: requesterProfile.id,
+      //     totalUnread: summary.totalUnread,
+      //   });
+      // }
 
       return NextResponse.json({ summary });
     }
 
     // NEW: Handle pinned conversations request
     if (pinnedOnly) {
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'pinned_request', {
-          requesterId: requesterProfile.id,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'pinned_request', {
+      //     requesterId: requesterProfile.id,
+      //   });
+      // }
 
       const pinnedConversations = await conversationRepository.findPinnedByUser(requesterProfile.id);
 
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'pinned_success', {
-          requesterId: requesterProfile.id,
-          count: pinnedConversations.length,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'pinned_success', {
+      //     requesterId: requesterProfile.id,
+      //     count: pinnedConversations.length,
+      //   });
+      // }
 
       return NextResponse.json({
         conversations: pinnedConversations.map((conversation) => serializeConversation(conversation)),
@@ -98,24 +98,24 @@ export async function GET(request: NextRequest) {
 
     // NEW: Handle grouped request
     if (grouped) {
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'grouped_request', {
-          requesterId: requesterProfile.id,
-          includeArchived,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'grouped_request', {
+      //     requesterId: requesterProfile.id,
+      //     includeArchived,
+      //   });
+      // }
 
       const groupedResult = await conversationRepository.findByUserGrouped(requesterProfile.id, {
         includeArchived,
       });
 
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('api.conversations.get', 'grouped_success', {
-          requesterId: requesterProfile.id,
-          directCount: groupedResult.direct.length,
-          roomCount: groupedResult.rooms.length,
-        });
-      }
+      // if (instrumentationEnabled) {
+      //   debugLogger.messaging.event('api.conversations.get', 'grouped_success', {
+      //     requesterId: requesterProfile.id,
+      //     directCount: groupedResult.direct.length,
+      //     roomCount: groupedResult.rooms.length,
+      //   });
+      // }
 
       return NextResponse.json({
         grouped: {
@@ -139,26 +139,26 @@ export async function GET(request: NextRequest) {
       paginationOptions.type = typeParam;
     }
 
-    if (instrumentationEnabled) {
-      debugLogger.messaging.event('api.conversations.get', 'start', {
-        requesterId: requesterProfile.id,
-        limit: paginationOptions.limit,
-        cursor: paginationOptions.cursor,
-        includeArchived,
-        type: paginationOptions.type,
-      });
-    }
+    // if (instrumentationEnabled) {
+    //   debugLogger.messaging.event('api.conversations.get', 'start', {
+    //     requesterId: requesterProfile.id,
+    //     limit: paginationOptions.limit,
+    //     cursor: paginationOptions.cursor,
+    //     includeArchived,
+    //     type: paginationOptions.type,
+    //   });
+    // }
 
     const result = await conversationRepository.findByUser(requesterProfile.id, paginationOptions);
 
-    if (instrumentationEnabled) {
-      debugLogger.messaging.event('api.conversations.get', 'success', {
-        requesterId: requesterProfile.id,
-        returned: result.items.length,
-        hasMore: result.hasMore,
-        nextCursor: result.nextCursor ?? null,
-      });
-    }
+    // if (instrumentationEnabled) {
+    //   debugLogger.messaging.event('api.conversations.get', 'success', {
+    //     requesterId: requesterProfile.id,
+    //     returned: result.items.length,
+    //     hasMore: result.hasMore,
+    //     nextCursor: result.nextCursor ?? null,
+    //   });
+    // }
 
     return NextResponse.json({
       conversations: result.items.map((conversation) => serializeConversation(conversation)),
@@ -167,11 +167,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error getting conversations:', error);
-    if (instrumentationEnabled) {
-      debugLogger.messaging.error('api.conversations.get', 'failure', {
-        error: error instanceof Error ? error.message : error,
-      });
-    }
+    // if (instrumentationEnabled) {
+    //   debugLogger.messaging.error('api.conversations.get', 'failure', {
+    //     error: error instanceof Error ? error.message : error,
+    //   });
+    // }
     return NextResponse.json({ error: 'Failed to retrieve conversations' }, { status: 500 });
   }
 }

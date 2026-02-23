@@ -8,6 +8,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Do not assume code behavior. Ask for or provide tests.
 - Prefer edits to existing code over new files.
 - Run the Anti-Duplication Protocol before proposing changes.
+- **CRITICAL** On any **Plan** or **Story** conception you must verify if feature already exists or partialy exists, this is the most important rule on this app DO NOT DUPLICATE FEATURES or FUNCTIONALITIES.
 - Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
 
 ## Architecture Snapshot (single source)
@@ -26,6 +27,205 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Use `src/lib/supabase/browser-client.ts` only in Client Components.
 - In API routes call `createSupabaseServerClient()` and pass that instance to repositories.
 - Reason: `auth.uid()` requires server context; otherwise RLS fails.
+
+## Database Schema (Supabase Postgres) — CRITICAL: Always verify table/column names before writing SQL
+
+> **📁 Authoritative Source: `migrations/database-structure.md`**
+> 
+> Before writing ANY SQL, migrations, or database queries:
+> 1. **ALWAYS** check `migrations/database-structure.md` for exact table/column names
+> 2. This file contains the complete schema exported from Supabase with all columns, types, constraints, and foreign keys
+> 3. If the file is outdated, use `mcp_supabase_list_tables` to refresh it
+> 4. **NEVER guess table or column names** — verify first!
+
+
+### Enums (PostgreSQL types)
+- `user_status`: online, away, busy, offline
+- `user_role`: admin, member
+- `space_type`: workspace, conference, social, breakout, private_office, open_space, lounge, lab
+- `space_status`: active, available, maintenance, locked, reserved, in_use
+- `conversation_type`: direct, group, room
+- `message_type`: text, image, file, system, announcement
+- `message_status`: sending, sent, delivered, read, failed
+
+### Key Relationships
+- `users.company_id` → `companies.id`
+- `users.current_space_id` → `spaces.id`
+- `spaces.company_id` → `companies.id`
+- `spaces.neighborhood_id` → `neighborhoods.id`
+- `conversations.room_id` → `spaces.id` (links chat to space)
+- `messages.conversation_id` → `conversations.id`
+- `messages.sender_id` → `users.id`
+
+### Common Mistakes to Avoid
+- ❌ `profiles` table — Does NOT exist! Use `users`
+- ❌ `messages.room_id` — Does NOT exist! Messages link via `conversations.room_id`
+- ❌ `users.id = auth.uid()` — Wrong! Use `users.supabase_uid = auth.uid()::text`
+
+### ⛔ CRITICAL: User ID vs Supabase UID — READ THIS BEFORE ANY USER QUERY
+
+> **THIS IS THE #1 SOURCE OF BUGS IN THIS CODEBASE. STOP AND VERIFY.**
+>
+> The `users` table has TWO different ID fields:
+>
+> | Field | Type | Description | When to Use |
+> |-------|------|-------------|-------------|
+> | `users.id` | UUID | Internal app user ID | Foreign keys, relationships between app tables |
+> | `users.supabase_uid` | TEXT | Supabase Auth user ID | Matching with `auth.uid()`, session user identification |
+>
+> **NEVER confuse these:**
+> - ❌ `users.id = auth.uid()` — **ALWAYS WRONG**
+> - ❌ `users.id = session.user.id` — **ALWAYS WRONG**  
+> - ❌ Comparing `users.id` with any Supabase Auth value — **ALWAYS WRONG**
+>
+> **CORRECT patterns:**
+> - ✅ `users.supabase_uid = auth.uid()::text` — For RLS policies
+> - ✅ `userRepository.findBySupabaseUid(authUser.id)` — For API routes
+> - ✅ `WHERE supabase_uid = $supabaseAuthId` — For raw SQL
+>
+> **Before writing ANY query involving users:**
+> 1. ASK: "Am I comparing with a Supabase Auth ID?"
+> 2. If YES → Use `supabase_uid` column
+> 3. If comparing app tables (messages.sender_id, spaces.created_by) → Use `users.id`
+
+### 1. User ID vs Supabase UID (DATABASE)
+```
+users.id          → Internal app UUID (for foreign keys)
+users.supabase_uid → Supabase Auth ID (for auth.uid() matching)
+
+❌ users.id = auth.uid()           → ALWAYS WRONG
+✅ users.supabase_uid = auth.uid()::text → CORRECT
+```
+
+### 2. getSession() vs getUser() (AUTH)
+| Context | Method | Why |
+|---------|--------|-----|
+| Server (API/Actions) | `getUser()` | Validates JWT on Auth server |
+| Client (Browser) | `getSession()` | Fast, from local storage |
+| Middleware | `getSession()` | OK for token refresh only |
+
+```typescript
+// ❌ WRONG - Server trusting getSession
+'use server'
+const { data: { session } } = await supabase.auth.getSession()
+if (session?.user) { /* INSECURE */ }
+
+// ✅ CORRECT - Server using getUser
+'use server'
+const { data: { user }, error } = await supabase.auth.getUser()
+if (error || !user) { return { error: 'Unauthorized' } }
+```
+
+### 3. Client vs Server Supabase Clients
+```typescript
+// Server (API routes, Server Actions, Server Components)
+import { createSupabaseServerClient } from '@/lib/supabase/server-client'
+const supabase = await createSupabaseServerClient()
+
+// Client (React Components in browser)
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client'
+const supabase = createSupabaseBrowserClient()
+```
+
+### 4. Admin Operations (service_role)
+- **NEVER** expose `SUPABASE_SERVICE_ROLE_KEY` to the client
+- **ONLY** use in Server Actions or API Routes
+- Always verify user role in database before admin operations
+
+## Key Patterns
+
+### Server Client (Next.js 15)
+```typescript
+// src/lib/supabase/server-client.ts
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies() // MUST await in Next.js 15
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch { /* Ignore in Server Components */ }
+        },
+      },
+    }
+  )
+}
+```
+
+### Middleware (Official Pattern)
+```typescript
+// middleware.ts
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({ request })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  await supabase.auth.getSession() // Refresh tokens
+  return supabaseResponse
+}
+```
+
+### MFA Flow (Complete)
+```typescript
+// 1. Enroll
+const { data } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
+const factorId = data.id
+
+// 2. Challenge (REQUIRED!)
+const { data: challenge } = await supabase.auth.mfa.challenge({ factorId })
+const challengeId = challenge.id
+
+// 3. Verify
+await supabase.auth.mfa.verify({ factorId, challengeId, code })
+```
+
+## Files Reference
+
+| File | Purpose |
+|------|---------|
+| `src/lib/supabase/server-client.ts` | Server-side Supabase client |
+| `src/lib/supabase/browser-client.ts` | Browser Supabase client |
+| `middleware.ts` | Auth middleware |
+| `src/contexts/AuthContext.tsx` | Client-side auth state |
+| `src/app/actions/auth.ts` | Server Actions for auth |
+
+## Verification Sources
+
+- `/supabase/ssr` - Official SSR package docs
+- `/supabase/supabase-js` - Official JS client docs
+- `/websites/supabase_com-docs` - Official Supabase guides
+
+## Related Documents
+
+- Full implementation guide: `docs/supabase-auth-research.md`
+- Database schema: `migrations/database-structure.md`
+
+
 
 ## Type Registry & Change Control
 - Canonical types live in `src/types/`. Examples: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`.
@@ -92,9 +292,8 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Portal menus (Radix/shadcn): On `DropdownMenuContent`, stop propagation on `onPointerDown`, `onClick`, and `onKeyDown`; on `DropdownMenuItem`, cancel `onSelect` and stop propagation in `onClick`. Also mark the content with `data-avatar-interactive`.
 - Avatars/menus: Wrappers like `UserAvatarPresence` and `UserInteractionMenu` must stop propagation on pointer/click to prevent space navigation when interacting with messaging actions.
 
-## UI Libraries — Migration Note
+## UI Libraries
 - Current: shadcn/ui + Radix.
-- Later: Plan to update/replace shadcn components with DaisyUI equivalents; keep interaction contracts and data attributes stable to simplify the swap.
 
 ## Workflows (concise)
 - Auth & Onboarding: Register → Email/Google → Profile → Company. `src/app/(auth)/`

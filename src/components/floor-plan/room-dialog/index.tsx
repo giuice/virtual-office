@@ -31,7 +31,7 @@ export function RoomDialog({
   companyId, // Added companyId prop
   isAdmin = false // Added isAdmin prop
 }: RoomDialogProps & { companyId: string }) { // Remove onUpdate from props if no longer needed externally
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   // Room state - Use global Space type
   const [roomData, setRoomData] = useState<Partial<Space>>({
     id: '',
@@ -62,7 +62,7 @@ export function RoomDialog({
   const { showSuccess, showError } = useNotification();
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(); // Call the update hook
-  const { loadCompanyData, currentUserProfile } = useCompany(); // Get loadCompanyData from CompanyContext
+  const { currentUserProfile } = useCompany();
 
   // Initialize form with room data if editing
   useEffect(() => {
@@ -152,10 +152,7 @@ export function RoomDialog({
       createSpace.mutate(createPayload, {
         onSuccess: () => {
           showSuccess({ description: "Room created successfully." });
-          // Refresh company data to update spaces in context
-          if (currentUserProfile?.id) {
-            loadCompanyData(currentUserProfile.id);
-          }
+          // React Query invalidates ['spaces'] cache automatically
           onOpenChange(false);
         },
         onError: (error) => {
@@ -181,10 +178,7 @@ export function RoomDialog({
       updateSpace.mutate({ id: roomData.id, updates: updatePayload }, {
         onSuccess: () => {
           showSuccess({ description: "Room updated successfully." });
-          // Refresh company data to update spaces in context
-          if (currentUserProfile?.id) {
-            loadCompanyData(currentUserProfile.id);
-          }
+          // React Query invalidates ['spaces'] cache automatically
           onOpenChange(false);
         },
         onError: (error) => {

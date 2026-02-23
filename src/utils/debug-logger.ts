@@ -70,16 +70,16 @@ const logMessaging = (
   const formattedPayload = payload === undefined ? '' : payload;
 
   if (level === 'warn') {
-    console.warn(`[MSG:${scope}] ${message}`, formattedPayload);
+    console.warn(`[${scope}] ${message}`, formattedPayload);
     return;
   }
 
   if (level === 'error') {
-    console.error(`[MSG:${scope}] ${message}`, formattedPayload);
+    console.error(`[${scope}] ${message}`, formattedPayload);
     return;
   }
 
-  console.log(`[MSG:${scope}] ${message}`, formattedPayload);
+  console.log(`[${scope}] ${message}`, formattedPayload);
 };
 
 const logMessagingMetric = (
@@ -92,7 +92,7 @@ const logMessagingMetric = (
     return;
   }
 
-  console.log(`[MSG:${scope}] ⏱️ ${metric}: ${value.toFixed(2)}ms`, payload ?? '');
+  console.log(`[${scope}] ⏱️ ${metric}: ${value.toFixed(2)}ms`, payload ?? '');
 };
 
 export const debugLogger = {

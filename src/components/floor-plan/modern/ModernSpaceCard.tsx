@@ -58,6 +58,14 @@ interface ModernSpaceCardProps {
   mutedUserIds?: string[];
   /** Story 3.11: Handler for leaving the space */
   onLeaveSpace?: (spaceId: string) => void;
+  /** Story 3.16: Handler for knocking on a private space */
+  onKnock?: (spaceId: string) => void;
+  /** Whether direct enter should be allowed for this space */
+  canDirectEnter?: boolean;
+  /** Story 3.16: Current knock status for this space */
+  knockStatus?: 'idle' | 'knocking' | 'approved' | 'denied' | 'timeout' | 'cooldown';
+  /** Story 3.16: Cooldown remaining for this space */
+  knockCooldownRemaining?: number;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
@@ -80,6 +88,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   presentingUserId,
   mutedUserIds = [],
   onLeaveSpace,
+  // Story 3.16: Knock to Enter
+  onKnock,
+  canDirectEnter = false,
+  knockStatus,
+  knockCooldownRemaining = 0,
 }) => {
   const [hovered, setHovered] = useState(false);
   // Story 3.11: Detail panel state
@@ -175,6 +188,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     // Story 3.11 AC8: Mobile tap opens bottom sheet instead of navigating
     if (isMobile && showDetailPanel && !isAnalyst) {
       setBottomSheetOpen(true);
+      return;
+    }
+
+    if (!isUserInSpace && onKnock && !canDirectEnter) {
+      onKnock(space.id);
       return;
     }
 
@@ -335,7 +353,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
               space={space}
               isAdmin={isAdmin}
               isUserInSpace={isUserInSpace}
-              onEnter={() => onEnterSpace(space.id)}
+              onEnter={canDirectEnter ? () => onEnterSpace(space.id) : undefined}
+              onKnock={onKnock ? () => onKnock(space.id) : undefined}
+              canDirectEnter={canDirectEnter}
               onOpenChat={onOpenChat ? () => onOpenChat(space) : undefined}
               onEdit={onEditSpace ? () => onEditSpace(space) : undefined}
               size="sm"
@@ -453,6 +473,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
             isFull={isFull}
             onJoin={handleJoin}
             onLeave={handleLeave}
+            canDirectEnter={canDirectEnter}
+            onKnock={onKnock ? () => onKnock(space.id) : undefined}
+            knockStatus={knockStatus}
+            knockCooldownRemaining={knockCooldownRemaining}
             onUserClick={onUserClick}
             onClose={() => setShowPanel(false)}
             speakingUserIds={speakingUserIds}
@@ -478,6 +502,10 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           isFull={isFull}
           onJoin={handleJoin}
           onLeave={handleLeave}
+          canDirectEnter={canDirectEnter}
+          onKnock={onKnock ? () => onKnock(space.id) : undefined}
+          knockStatus={knockStatus}
+          knockCooldownRemaining={knockCooldownRemaining}
           onUserClick={onUserClick}
           speakingUserIds={speakingUserIds}
           presentingUserId={presentingUserId}

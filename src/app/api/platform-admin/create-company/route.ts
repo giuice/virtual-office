@@ -9,9 +9,25 @@ import { SupabaseCompanyRepository } from '@/repositories/implementations/supaba
 import { SupabaseInvitationRepository } from '@/repositories/implementations/supabase/SupabaseInvitationRepository';
 import { Company, Invitation, UserRole } from '@/types/database';
 import crypto from 'crypto';
-import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+function resolveAppBaseUrl(request: Request): string {
+	const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+	if (configuredAppUrl) {
+		try {
+			return new URL(configuredAppUrl).origin;
+		} catch (error) {
+			console.warn('[API platform-admin/create-company] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
+		}
+	}
+
+	try {
+		return new URL(request.url).origin;
+	} catch {
+		return 'http://localhost:3000';
+	}
+}
 
 export async function POST(request: Request) {
 	try {
@@ -40,6 +56,7 @@ export async function POST(request: Request) {
 
 		// Parse request body
 		const { companyName, adminEmail, planType } = await request.json();
+		const normalizedAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim().toLowerCase() : '';
 
 		// Validate required fields
 		if (!companyName?.trim()) {
@@ -49,7 +66,7 @@ export async function POST(request: Request) {
 			);
 		}
 
-		if (!adminEmail?.trim()) {
+		if (!normalizedAdminEmail) {
 			return NextResponse.json(
 				{ error: 'Email do admin é obrigatório' },
 				{ status: 400 }
@@ -58,7 +75,7 @@ export async function POST(request: Request) {
 
 		// Validate email format
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(adminEmail)) {
+		if (!emailRegex.test(normalizedAdminEmail)) {
 			return NextResponse.json(
 				{ error: 'Formato de email inválido' },
 				{ status: 400 }
@@ -67,7 +84,7 @@ export async function POST(request: Request) {
 
 		console.log('[API platform-admin/create-company] Creating company:', {
 			companyName,
-			adminEmail,
+			adminEmail: normalizedAdminEmail,
 			planType,
 			platformAdminId: user.id
 		});
@@ -104,7 +121,7 @@ export async function POST(request: Request) {
 		const invitationRepository = new SupabaseInvitationRepository(supabase);
 
 		const invitationData: Omit<Invitation, 'id' | 'createdAt' | 'status'> = {
-			email: adminEmail.trim(),
+			email: normalizedAdminEmail,
 			companyId: newCompany.id,
 			role: 'admin' as UserRole, // Always admin for initial company admin
 			token,
@@ -126,16 +143,14 @@ export async function POST(request: Request) {
 		console.log('[API platform-admin/create-company] Invitation created:', createdInvitation.id);
 
 		// AC 2.3.3: Send invitation email via Supabase Auth
-		const headersList = await headers();
-		const host = headersList.get('host') || 'localhost:3000';
-		const protocol = host.includes('localhost') ? 'http' : 'https';
-		const redirectTo = `${protocol}://${host}/join?token=${token}`;
+		const baseUrl = resolveAppBaseUrl(request);
+		const redirectTo = `${baseUrl}/join?token=${token}`;
 
 		// Use service role client for admin email operations
 		const supabaseAdmin = await createSupabaseServerClient('service_role');
 
 		const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-			adminEmail.trim(),
+			normalizedAdminEmail,
 			{
 				redirectTo,
 				data: {
@@ -155,7 +170,6 @@ export async function POST(request: Request) {
 		}
 
 		// Build the full invite URL for sharing (AC 2.4)
-		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
 		const inviteUrl = `${baseUrl}/join?token=${token}`;
 
 		// Return success response
@@ -169,7 +183,7 @@ export async function POST(request: Request) {
 			},
 			invitation: {
 				id: createdInvitation.id,
-				email: adminEmail.trim(),
+				email: normalizedAdminEmail,
 				token,
 				expiresAt: new Date(expiresAtMs).toISOString(),
 				inviteUrl,

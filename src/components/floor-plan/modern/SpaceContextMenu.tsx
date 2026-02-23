@@ -29,6 +29,10 @@ interface SpaceContextMenuProps {
   isUserInSpace?: boolean;
   /** Handler for entering the space */
   onEnter?: () => void;
+  /** Handler for knocking to request entry */
+  onKnock?: () => void;
+  /** Whether direct entry is currently allowed */
+  canDirectEnter?: boolean;
   /** Handler for opening chat in the space */
   onOpenChat?: () => void;
   /** Handler for editing the space (admin only) */
@@ -58,6 +62,8 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
   isAdmin = false,
   isUserInSpace = false,
   onEnter,
+  onKnock,
+  canDirectEnter = true,
   onOpenChat,
   onEdit,
   onManage,
@@ -66,6 +72,9 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
   size = 'icon',
 }) => {
   const [open, setOpen] = useState(false);
+  const isPrivateSpace = space.accessControl?.isPublic === false;
+  const shouldKnockFirst = isPrivateSpace && !isUserInSpace && !canDirectEnter && Boolean(onKnock);
+  const showOptionalKnock = !isUserInSpace && canDirectEnter && Boolean(onKnock);
   
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -102,13 +111,29 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
+            if (shouldKnockFirst) {
+              onKnock?.();
+              return;
+            }
             onEnter?.();
           }}
-          disabled={isUserInSpace}
+          disabled={isUserInSpace || (!shouldKnockFirst && !onEnter)}
         >
           <DoorOpen className="h-4 w-4 mr-2" />
-          {isUserInSpace ? 'Already Here' : 'Enter Space'}
+          {isUserInSpace ? 'Already Here' : shouldKnockFirst ? 'Knock to Enter' : 'Enter Space'}
         </DropdownMenuItem>
+
+        {showOptionalKnock && (
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onKnock?.();
+            }}
+          >
+            <DoorOpen className="h-4 w-4 mr-2" />
+            Knock Instead
+          </DropdownMenuItem>
+        )}
 
         {/* Open Chat */}
         {onOpenChat && (

@@ -1,6 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { headers } from 'next/headers';
+
+function resolveAppBaseUrl(request: Request): string {
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredAppUrl) {
+    try {
+      return new URL(configuredAppUrl).origin;
+    } catch (error) {
+      console.warn('[API /invitations/resend] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
+    }
+  }
+
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+}
 
 export async function POST(request: Request) {
   // Use service_role client for admin operations (sending invite emails)
@@ -69,13 +85,21 @@ export async function POST(request: Request) {
     // Check if current user is admin of this company
     const { data: currentUserRecord } = await supabaseClient
       .from('users')
-      .select('id, role')
+      .select('id, role, company_id')
       .eq('supabase_uid', currentUser.id)
       .single();
-    
-    const isAdmin = currentUserRecord?.role === 'admin' || 
-                    (company.admin_ids && company.admin_ids.includes(currentUserRecord?.id));
-    
+
+    const isCompanyAdminByRole =
+      currentUserRecord?.role === 'admin' &&
+      currentUserRecord?.company_id === invitation.company_id;
+
+    const isCompanyAdminByList =
+      Array.isArray(company.admin_ids) &&
+      currentUserRecord?.id !== undefined &&
+      company.admin_ids.includes(currentUserRecord.id);
+
+    const isAdmin = Boolean(isCompanyAdminByRole || isCompanyAdminByList);
+
     if (!isAdmin) {
       return NextResponse.json(
         { error: 'Apenas administradores podem reenviar convites' },
@@ -83,17 +107,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const now = Date.now();
+    const expiresAtMs = invitation.expires_at ? new Date(invitation.expires_at).getTime() : 0;
+    if (expiresAtMs !== 0 && expiresAtMs <= now) {
+      await supabaseClient
+        .from('invitations')
+        .update({ status: 'expired' })
+        .eq('id', invitationId);
+
+      return NextResponse.json(
+        { error: 'Este convite expirou. Crie um novo convite.' },
+        { status: 410 }
+      );
+    }
+
     // Build redirect URL for after email confirmation
-    const headersList = await headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const redirectTo = `${protocol}://${host}/join?token=${invitation.token}`;
+    const baseUrl = resolveAppBaseUrl(request);
+    const redirectTo = `${baseUrl}/join?token=${invitation.token}`;
+    const normalizedEmail = String(invitation.email).trim().toLowerCase();
 
     console.log('[API /invitations/resend] Resending invite email via Supabase Auth...');
 
     // Resend invitation email via Supabase Auth Admin API
     const { data: inviteData, error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      invitation.email,
+      normalizedEmail,
       {
         redirectTo,
         data: {

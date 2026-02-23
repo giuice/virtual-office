@@ -39,9 +39,9 @@ export async function proxy(request: NextRequest) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   // Log user status in proxy
-  console.log(
-    `[Proxy] Path: ${request.nextUrl.pathname}, User: ${user?.id || 'None'}, Error: ${userError?.message || 'None'}`
-  );
+  // console.log(
+  //   `[Proxy] Path: ${request.nextUrl.pathname}, User: ${user?.id || 'None'}, Error: ${userError?.message || 'None'}`
+  // );
 
   // Optional: Redirect logic based on auth state and path
   const { pathname } = request.nextUrl;

@@ -1,4 +1,4 @@
-# generated: 2025-11-25T00:00:00.000000+00:00
+# generated: 2026-02-12T20:03:00-03:00
 # project: virtual-office
 # project_key: virtual-office
 # tracking_system: file-system
@@ -7,63 +7,70 @@
 # STATUS DEFINITIONS:
 # ==================
 # Epic Status:
-#   - backlog: Epic exists in epic file but not contexted
-#   - contexted: Epic tech context created (required before drafting stories)
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
 #
 # Story Status:
 #   - backlog: Story only exists in epic file
-#   - drafted: Story file created in stories folder
-#   - ready-for-dev: Draft approved and story context created
+#   - ready-for-dev: Story file created in stories folder
 #   - in-progress: Developer actively working on implementation
-#   - review: Under SM review
+#   - review: Ready for code review
 #   - done: Story completed
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
-#   - completed: Retrospective has been done
+#   - done: Retrospective has been completed
 #
 # WORKFLOW NOTES:
 # ===============
-# - Epics should be 'contexted' before stories can be 'drafted'
+# - Epic transitions to 'in-progress' automatically when first story is created
 # - Stories can be worked in parallel if team capacity allows
-# - SM drafts next story after previous one is 'done'
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 #
-# SPRINT PRIORITY (2025-11-28):
+# SPRINT PRIORITY (2026-02-12):
 # =============================
-# 🚨 HOTFIX: Epic 2 Invitation & Registration Flow is CRITICAL BLOCKER
-# Without working invites/registration, no new users can access the system.
-# Priority: Hotfix 2.X → 2.Y → 2.Z (9-13 hours total)
-#
-# 🎯 After hotfix: Resume Epic 3 remaining stories
-# Epic 4A deferred until visual foundation complete.
+# � Story 3-16 IN PROGRESS - Knock to Enter blocked by channel TIMED_OUT in multi-user tests
+# 🎯 After 3-16: Complete remaining Epic 3 stories (3-14, 3-17, 3-18)
+# Epic 4A partially done (3 stories done, 8 backlog)
+# Epic 8A Audio MVP: DONE
 
-generated: 2025-11-29T00:00:00.000000+00:00
+generated: 2026-02-12T20:03:00-03:00
 project: virtual-office
 project_key: virtual-office
 tracking_system: file-system
 story_location: "{project-root}/docs/sprint-artifacts"
 
 # ============================================
-# Epic Status Overview
+# Development Status
 # ============================================
 
 development_status:
-  epic-1: backlog
+  # ──────────────────────────────────────────
+  # Epic 1: Core Infrastructure & Supabase Migration ✅ COMPLETE
+  # ──────────────────────────────────────────
+  epic-1: done  # ✅ COMPLETE - Foundation delivered (Next.js 15, Supabase, Repository Pattern)
   epic-1-retrospective: optional
-  
-  # 🚨 Epic 2: Authentication - HOTFIX REQUIRED
-  # Invitation flow is non-functional. Business Model: Freemium (10 users free)
+
+  # ──────────────────────────────────────────
+  # Epic 2: Authentication & Company Management ✅ HOTFIX COMPLETE
+  # Business Model: Freemium (10 users free)
   # See: docs/sprint-artifacts/hotfix-epic2-invitation-flow.md
-  epic-2: contexted  # Has tech context from existing code analysis
+  # ──────────────────────────────────────────
+  epic-2: done  # ✅ All hotfix stories complete
   2-1-registration-ux-feedback: done  # ✅ COMPLETE 2025-12-01 - Email confirmation, error mapping, resend inline, server-client fix
   2-2-invitation-accept-flow: done  # ✅ COMPLETE 2025-12-01 - Token validation, auth flow, auto-accept, 38 tests
   2-3-invitation-link-copy-limit: done  # ✅ COMPLETE 2025-12-02 - All 8 ACs implemented, 466 tests
+  story-platform-admin: review  # 🚨 CRITICAL HOTFIX - 2025-12-05 (Platform Admin & Tenant Creation) - Ready for Review
   epic-2-retrospective: optional
-  
-  # 🎯 PRIORITY EPIC - Epic 3: Visual Experience & Floor Plan (Unleashed)
+
+  # ──────────────────────────────────────────
+  # Epic 3: Visual Experience & Floor Plan (Unleashed) 🚧 IN PROGRESS
   # MERGED from Epic 3 + Epic 10 - "Reality Distortion" design system
-  epic-3: contexted
-  story-platform-admin: review # 🚨 CRITICAL HOTFIX - 2025-12-05 (Platform Admin & Tenant Creation) - Ready for Review
+  # 17 stories total (14 original + 3 added: 3.15, 3.16, 3.17, 3.18)
+  # ──────────────────────────────────────────
+  epic-3: in-progress
   3-1-reality-distortion-engine-theme-system: done  # ✅ COMPLETE - 2025-11-25 (4 themes, CSS tokens, ThemeSwitcher, Supabase sync)
   3-2-space-card-v2-orbit-gallery-component: done  # ✅ COMPLETE - 2025-11-25 (Gradients, glass morphism, Orbit/Analyst/Cinema perspectives)
   3-3-avatar-constellation-v2: done  # ✅ COMPLETE - 2025-11-25 (Status rings, stacking -10px, max 4, overflow badge, hover animations, 32 tests)
@@ -79,15 +86,27 @@ development_status:
   3-13-real-time-presence-animation: done  # ✅ COMPLETE - 2025-12-04 (Presence animations, exit tracking, 18 tests)
   3-14-mobile-responsive-floor-plan: backlog
   3-15-dashboard-landing-page-polish: done  # ✅ COMPLETE - 2025-11-26 (Fixed broken links, Coming Soon teasers, Investor Resources, double header fix)
+  3-16-knock-to-enter-workflow: in-progress  # 🚧 2026-02-09 - Blocked by recurring knock occupied-channel TIMED_OUT in multi-user tests
+  3-17-auto-remove-offline-users: backlog
+  3-18-default-space-assignment: backlog
   epic-3-retrospective: optional
-  
-  # 🚨 Epic 8A: Audio MVP (Sococo-Style) - URGENT INVESTOR REQUEST
+
+  # ──────────────────────────────────────────
+  # Epic 8A: Audio MVP (Sococo-Style) ✅ COMPLETE
   # P2P audio chat for spaces using WebRTC + Supabase Realtime signaling
-  epic-8a: contexted
-  8a-audio-mvp: done  # ✅ COMPLETE - 2025-12-09 (WebRTC P2P mesh, VAD, Safari compat, mic controls, speaking animation)
-  
-  # Epic 4A: Messaging Timeline & Composer (DEFERRED - after Epic 3 visual foundation)
-  epic-4a: contexted
+  # ──────────────────────────────────────────
+  epic-8a: done  # ✅ All audio MVP stories complete
+  8a-1-webrtc-manager-and-signaling: done  # ✅ COMPLETE - 2025-12-09 (WebRTC P2P mesh, Supabase Realtime signaling)
+  8a-2-audio-stream-handling-and-permissions: done  # ✅ COMPLETE - 2025-12-09 (getUserMedia, permission handling, audio routing)
+  8a-3-speaking-indicator-visualizer: done  # ✅ COMPLETE - 2025-12-09 (AudioContext VAD, speaking animation)
+  8a-4-mic-controls-and-default-state: done  # ✅ COMPLETE - 2025-12-09 (Default muted, toggle, hotkeys, Safari compat)
+  epic-8a-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 4A: Messaging Timeline & Composer
+  # DEFERRED - after Epic 3 visual foundation
+  # ──────────────────────────────────────────
+  epic-4a: in-progress
   4a-1-render-reply-indicators-and-thread-ui: done
   4a-2-reaction-chips-and-emoji-picker: done
   4a-3-pinned-and-starred-message-indicators: done
@@ -100,6 +119,11 @@ development_status:
   4a-10-conversation-search: backlog
   4a-11-starred-messages-filter: backlog
   epic-4a-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 4B: Real-Time Messaging - Resilience & Scale
+  # Dependencies: Epic 4A complete
+  # ──────────────────────────────────────────
   epic-4b: backlog
   4b-1-offline-message-queue: backlog
   4b-2-realtime-reconnection-with-exponential-backoff: backlog
@@ -109,6 +133,10 @@ development_status:
   4b-6-messaging-analytics-events: backlog
   4b-7-desktop-notifications: backlog
   epic-4b-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 5: Meeting Notes System
+  # ──────────────────────────────────────────
   epic-5: backlog
   5-1-meeting-note-creation-ui: backlog
   5-2-action-item-tracking: backlog
@@ -119,6 +147,10 @@ development_status:
   5-7-meeting-note-search: backlog
   5-8-action-item-notifications-and-reminders: backlog
   epic-5-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 6: Announcement System
+  # ──────────────────────────────────────────
   epic-6: backlog
   6-1-announcement-creation-admin: backlog
   6-2-announcement-display-for-users: backlog
@@ -127,6 +159,11 @@ development_status:
   6-5-announcement-notifications: backlog
   6-6-announcement-analytics-admin: backlog
   epic-6-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 7: AI-Powered Communication Enhancements
+  # Dependencies: Epic 5 complete, AI service selection
+  # ──────────────────────────────────────────
   epic-7: backlog
   7-1-ai-service-integration-setup: backlog
   7-2-real-time-meeting-transcription: backlog
@@ -141,6 +178,11 @@ development_status:
   7-11-ai-cost-monitoring-and-limits: backlog
   7-12-ai-feature-opt-out: backlog
   epic-7-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 8: Enhanced Communication Tools (Video/Screen)
+  # Dependencies: Epic 4 complete
+  # ──────────────────────────────────────────
   epic-8: backlog
   8-1-webrtc-infrastructure-setup: backlog
   8-2-audio-only-calling: backlog
@@ -153,6 +195,11 @@ development_status:
   8-9-picture-in-picture-mode: backlog
   8-10-integration-with-calendar-future: backlog
   epic-8-retrospective: optional
+
+  # ──────────────────────────────────────────
+  # Epic 9: Administrative Dashboard & Analytics
+  # Dependencies: Epic 3, 4 complete
+  # ──────────────────────────────────────────
   epic-9: backlog
   9-1-admin-dashboard-home: backlog
   9-2-presence-report-generation: backlog
