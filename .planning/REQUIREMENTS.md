@@ -1,7 +1,7 @@
 # Requirements: Virtual Office
 
 **Defined:** 2026-02-23
-**Core Value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk — the end-to-end spatial office loop must work flawlessly.
+**Core Value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
 
 ## v1 Requirements
 
@@ -143,41 +143,41 @@ Deferred to future release. Tracked but not in current roadmap.
 | FLOR-02 | Phase 2 | Pending |
 | FLOR-03 | Phase 2 | Pending |
 | FLOR-04 | Phase 2 | Pending |
-| MSG-01 | Phase 3 | Pending |
-| MSG-02 | Phase 3 | Pending |
-| MSG-03 | Phase 3 | Pending |
-| MSG-04 | Phase 3 | Pending |
-| RESIL-01 | Phase 4 | Pending |
-| RESIL-02 | Phase 4 | Pending |
-| RESIL-03 | Phase 4 | Pending |
-| RESIL-04 | Phase 4 | Pending |
-| RESIL-05 | Phase 4 | Pending |
-| RESIL-06 | Phase 4 | Pending |
-| RESIL-07 | Phase 4 | Pending |
-| MEET-01 | Phase 5 | Pending |
-| MEET-02 | Phase 5 | Pending |
-| MEET-03 | Phase 5 | Pending |
-| MEET-04 | Phase 5 | Pending |
-| MEET-05 | Phase 5 | Pending |
-| MEET-06 | Phase 5 | Pending |
-| MEET-07 | Phase 5 | Pending |
-| MEET-08 | Phase 5 | Pending |
-| ANNC-01 | Phase 6 | Pending |
-| ANNC-02 | Phase 6 | Pending |
-| ANNC-03 | Phase 6 | Pending |
-| ANNC-04 | Phase 6 | Pending |
-| ANNC-05 | Phase 6 | Pending |
-| ANNC-06 | Phase 6 | Pending |
-| VID-01 | Phase 7 | Pending |
-| VID-02 | Phase 7 | Pending |
-| VID-03 | Phase 7 | Pending |
-| VID-04 | Phase 7 | Pending |
-| VID-05 | Phase 7 | Pending |
-| VID-06 | Phase 7 | Pending |
-| VID-07 | Phase 7 | Pending |
-| VID-08 | Phase 7 | Pending |
-| VID-09 | Phase 7 | Pending |
-| VID-10 | Phase 7 | Pending |
+| VID-01 | Phase 3 | Pending |
+| VID-02 | Phase 3 | Pending |
+| VID-03 | Phase 3 | Pending |
+| VID-04 | Phase 3 | Pending |
+| VID-05 | Phase 3 | Pending |
+| VID-06 | Phase 3 | Pending |
+| VID-07 | Phase 3 | Pending |
+| VID-08 | Phase 3 | Pending |
+| VID-09 | Phase 3 | Pending |
+| VID-10 | Phase 3 | Pending |
+| MSG-01 | Phase 4 | Pending |
+| MSG-02 | Phase 4 | Pending |
+| MSG-03 | Phase 4 | Pending |
+| MSG-04 | Phase 4 | Pending |
+| RESIL-01 | Phase 5 | Pending |
+| RESIL-02 | Phase 5 | Pending |
+| RESIL-03 | Phase 5 | Pending |
+| RESIL-04 | Phase 5 | Pending |
+| RESIL-05 | Phase 5 | Pending |
+| RESIL-06 | Phase 5 | Pending |
+| RESIL-07 | Phase 5 | Pending |
+| MEET-01 | Phase 6 | Pending |
+| MEET-02 | Phase 6 | Pending |
+| MEET-03 | Phase 6 | Pending |
+| MEET-04 | Phase 6 | Pending |
+| MEET-05 | Phase 6 | Pending |
+| MEET-06 | Phase 6 | Pending |
+| MEET-07 | Phase 6 | Pending |
+| MEET-08 | Phase 6 | Pending |
+| ANNC-01 | Phase 7 | Pending |
+| ANNC-02 | Phase 7 | Pending |
+| ANNC-03 | Phase 7 | Pending |
+| ANNC-04 | Phase 7 | Pending |
+| ANNC-05 | Phase 7 | Pending |
+| ANNC-06 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 41 total
@@ -186,4 +186,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after initial definition*
+*Last updated: 2026-02-23 after phase reorder*
