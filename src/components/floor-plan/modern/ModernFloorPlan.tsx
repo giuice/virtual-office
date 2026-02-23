@@ -72,6 +72,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const { speakingUsers, mutedUserIds } = useAudio();
   const [error, setError] = useState<string | null>(null);
   const activeKnockRequestIdRef = useRef<string | null>(null);
+  const approvedKnockSpaceIdRef = useRef<string | null>(null);
   const knockStatusToastRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioContextWarmedRef = useRef(false);
@@ -192,7 +193,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       toast.success('Access granted!');
       // Auto-join the space
       if (knock.targetSpaceId) {
-        handleEnterSpace(knock.targetSpaceId);
+        approvedKnockSpaceIdRef.current = knock.targetSpaceId;
+        void handleEnterSpace(knock.targetSpaceId, { allowPrivateBypass: true });
       }
       activeKnockRequestIdRef.current = null;
       knock.reset();
@@ -324,7 +326,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     return false;
   };
 
-  const handleEnterSpace = async (spaceId: string) => {
+  const handleEnterSpace = async (spaceId: string, options?: { allowPrivateBypass?: boolean }) => {
     try {
       if (!currentUserProfile?.id) {
         throw new Error('Cannot update location: user ID missing');
@@ -348,7 +350,17 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       }
 
       const currentUser = users?.find(u => u.id === currentUserProfile.id);
-      if (currentUser && currentUser.currentSpaceId === spaceId) {
+      const isRestrictedSpace = selectedSpace.accessControl?.isPublic === false;
+      const hasApprovedKnock = approvedKnockSpaceIdRef.current === spaceId;
+      const isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;
+      const canDirectEnter = Boolean(isAdmin || options?.allowPrivateBypass || hasApprovedKnock || isAlreadyInSpace);
+
+      if (isRestrictedSpace && !canDirectEnter) {
+        setError('This space is private. Please knock to request access.');
+        return;
+      }
+
+      if (isAlreadyInSpace) {
         if (process.env.NODE_ENV === 'development') {
           console.log(`User already in space ${spaceId}`);
         }
@@ -359,6 +371,9 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 
       try {
         await updateLocation(spaceId);
+        if (approvedKnockSpaceIdRef.current === spaceId) {
+          approvedKnockSpaceIdRef.current = null;
+        }
       } catch (error) {
         console.error('Error updating location:', error);
         setError('Failed to enter space. Please try again.');
@@ -443,6 +458,9 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           const spaceUsers = usersInSpaces.get(space.id) || [];
           const isHighlighted = highlightedSpaceId === space.id;
           const userInSpace = isUserInSpace(space);
+          const isRestrictedSpace = space.accessControl?.isPublic === false;
+          const hasOccupants = spaceUsers.length > 0;
+          const canKnock = isRestrictedSpace || hasOccupants;
           const cooldownRemaining = knock.getCooldownRemaining(space.id);
           const knockStatus = cooldownRemaining > 0
             ? 'cooldown'
@@ -466,8 +484,9 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               variant={perspective}
               speakingUserIds={currentSpeakingIds}
               mutedUserIds={Array.from(mutedUserIds)}
+              canDirectEnter={isAdmin || userInSpace || !isRestrictedSpace || approvedKnockSpaceIdRef.current === space.id}
               // Story 3.16: Pass onKnock handler
-              onKnock={handleKnock}
+              onKnock={canKnock ? handleKnock : undefined}
               knockStatus={knockStatus}
               knockCooldownRemaining={cooldownRemaining}
             />

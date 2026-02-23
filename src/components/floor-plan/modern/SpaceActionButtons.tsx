@@ -25,6 +25,8 @@ export interface SpaceActionButtonsProps {
   hasOccupants?: boolean;
   /** Story 3.12 - AC3: Whether the space is at full capacity */
   isFull?: boolean;
+  /** Whether user can directly enter/join right now */
+  canDirectEnter?: boolean;
   onJoin: () => void;
   onLeave: () => void;
   onKnock?: () => void;
@@ -35,7 +37,10 @@ export interface SpaceActionButtonsProps {
 
 export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   isUserInSpace,
+  isPrivate = false,
+  hasOccupants = false,
   isFull = false,
+  canDirectEnter = true,
   onJoin,
   onLeave,
   onKnock,
@@ -43,8 +48,8 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   knockCooldownRemaining = 0,
   className,
 }) => {
-  // Story 3.16 (updated): default action is Knock for any enterable space.
-  const shouldShowKnock = Boolean(onKnock);
+  const shouldShowKnock = Boolean(onKnock) && (!canDirectEnter || hasOccupants);
+  const shouldShowJoin = canDirectEnter;
   const isKnocking = knockStatus === 'knocking';
   const isCooldown = knockStatus === 'cooldown' && knockCooldownRemaining > 0;
   // Common button styles
@@ -103,45 +108,56 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
           <LogOut className="w-4 h-4" />
           Leave
         </button>
-      ) : shouldShowKnock ? (
-        // Default enter flow: show Knock button
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!isKnocking && !isCooldown) {
-              onKnock!();
-            }
-          }}
-          className={cn(knockButton, 'flex-1')}
-          data-space-action="true"
-          disabled={isKnocking || isCooldown}
-          aria-disabled={isKnocking || isCooldown}
-          title={isKnocking ? 'Waiting for response' : isCooldown ? `Try again in ${knockCooldownRemaining}s` : 'Knock to request entry'}
-          aria-label={isKnocking ? 'Knock pending' : isCooldown ? `Knock cooldown active, ${knockCooldownRemaining} seconds remaining` : 'Knock to request entry'}
-        >
-          <DoorOpen className="w-4 h-4" />
-          {isKnocking ? 'Knocking...' : isCooldown ? `Knock (${knockCooldownRemaining}s)` : 'Knock'}
-        </button>
       ) : (
-        // Public space - show Join button
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!isFull) {
-              onJoin();
-            }
-          }}
-          className={cn(primaryButton, 'flex-1', isFull && 'opacity-50 cursor-not-allowed')}
-          data-space-action="true"
-          // Story 3.12 - AC3: Disable when space is full
-          disabled={isFull}
-          aria-disabled={isFull}
-          title={isFull ? 'Space is full - cannot join' : 'Join this space'}
-          aria-label={isFull ? 'Space is full - cannot join' : 'Join this space'}
-        >
-          <LogIn className="w-4 h-4" />
-          {isFull ? 'Full' : 'Join'}
-        </button>
+        <>
+          {shouldShowJoin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isFull) {
+                  onJoin();
+                }
+              }}
+              className={cn(primaryButton, 'flex-1', isFull && 'opacity-50 cursor-not-allowed')}
+              data-space-action="true"
+              disabled={isFull}
+              aria-disabled={isFull}
+              title={isFull ? 'Space is full - cannot join' : 'Join this space'}
+              aria-label={isFull ? 'Space is full - cannot join' : 'Join this space'}
+            >
+              <LogIn className="w-4 h-4" />
+              {isFull ? 'Full' : 'Join'}
+            </button>
+          )}
+
+          {shouldShowKnock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isKnocking && !isCooldown) {
+                  onKnock?.();
+                }
+              }}
+              className={cn(knockButton, shouldShowJoin ? 'flex-1' : 'flex-1')}
+              data-space-action="true"
+              disabled={isKnocking || isCooldown}
+              aria-disabled={isKnocking || isCooldown}
+              title={
+                isKnocking
+                  ? 'Waiting for response'
+                  : isCooldown
+                    ? `Try again in ${knockCooldownRemaining}s`
+                    : isPrivate
+                      ? 'Knock to request entry'
+                      : 'Knock first (optional)'
+              }
+              aria-label={isKnocking ? 'Knock pending' : isCooldown ? `Knock cooldown active, ${knockCooldownRemaining} seconds remaining` : 'Knock to request entry'}
+            >
+              <DoorOpen className="w-4 h-4" />
+              {isKnocking ? 'Knocking...' : isCooldown ? `Knock (${knockCooldownRemaining}s)` : 'Knock'}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

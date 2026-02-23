@@ -10,18 +10,26 @@ describe('SpaceActionButtons', () => {
     onKnock: vi.fn(),
   };
 
-  it('shows Knock as default action when onKnock is available', () => {
-    render(<SpaceActionButtons {...baseProps} hasOccupants={false} isPrivate={false} />);
+  it('shows Join and Knock for public occupied spaces', () => {
+    render(
+      <SpaceActionButtons
+        {...baseProps}
+        isPrivate={false}
+        hasOccupants
+        canDirectEnter
+      />
+    );
 
-    const button = screen.getByRole('button', { name: /knock to request entry/i });
-    expect(button).toBeInTheDocument();
-    expect(button).toHaveTextContent('Knock');
+    expect(screen.getByRole('button', { name: /join this space/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /knock to request entry/i })).toBeInTheDocument();
   });
 
   it('disables knock button and shows pending label while knocking', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
+        hasOccupants
+        canDirectEnter={false}
         knockStatus="knocking"
       />
     );
@@ -35,6 +43,8 @@ describe('SpaceActionButtons', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
+        hasOccupants
+        canDirectEnter={false}
         knockStatus="cooldown"
         knockCooldownRemaining={42}
       />
@@ -60,4 +70,3 @@ describe('SpaceActionButtons', () => {
     expect(baseProps.onLeave).toHaveBeenCalledTimes(1);
   });
 });
-

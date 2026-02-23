@@ -37,6 +37,8 @@ export interface SpaceDetailPanelProps {
   isPrivate?: boolean;
   /** Story 3.12 - AC3: Whether space is at full capacity */
   isFull?: boolean;
+  /** Whether direct join/enter is currently allowed */
+  canDirectEnter?: boolean;
   /** Story 3.16: Current knock status for this space */
   knockStatus?: KnockStatus;
   /** Story 3.16: Current cooldown remaining for this space */
@@ -80,6 +82,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   isUserInSpace,
   isPrivate = false,
   isFull = false,
+  canDirectEnter = true,
   knockStatus = 'idle',
   knockCooldownRemaining = 0,
   onJoin,
@@ -218,6 +221,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
             isPrivate={isPrivate}
             hasOccupants={usersInSpace.length > 0}
             isFull={isFull}
+            canDirectEnter={canDirectEnter}
             onJoin={onJoin}
             onLeave={onLeave}
             onKnock={onKnock}
