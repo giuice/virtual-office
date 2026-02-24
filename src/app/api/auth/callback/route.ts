@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
             // Redirect based on whether the user has a company
             const hasCompany = !!userRow?.company_id;
-            const redirectPath = hasCompany ? '/dashboard' : '/onboarding';
+            const redirectPath = hasCompany ? '/floor-plan' : '/onboarding';
             console.log(`[Callback] User company status: ${hasCompany ? 'has company' : 'no company'} -> ${redirectPath}`);
 
             const redirectUrl = new URL(redirectPath, requestUrl.origin).toString();
