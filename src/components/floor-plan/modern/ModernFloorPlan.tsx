@@ -43,11 +43,18 @@ interface ModernFloorPlanProps {
   isAdmin?: boolean;
 }
 
-// Grid classes for each perspective (from UX spec)
+// Grid classes for each perspective — fluid auto-fill per v3 spec
 const perspectiveGridClasses: Record<FloorPlanPerspective, string> = {
-  orbit: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6',
-  analyst: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4',
-  cinema: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8',
+  orbit: 'grid gap-6',
+  analyst: 'grid gap-4',
+  cinema: 'grid gap-6',
+};
+
+// Inline styles for grid-template-columns (auto-fill + minmax per v3 spec)
+const perspectiveGridStyles: Record<FloorPlanPerspective, React.CSSProperties> = {
+  orbit: { gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' },
+  analyst: { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' },
+  cinema: { gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))' },
 };
 
 const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
@@ -421,6 +428,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 
   // Get grid layout based on perspective (new) or legacy layout prop
   const gridLayoutClass = perspectiveGridClasses[perspective] || floorPlanTokens.floorPlanLayout.grid[layout];
+  const gridLayoutStyle = perspectiveGridStyles[perspective];
 
   // Derive speaking users list
   const currentSpeakingIds = Array.from(speakingUsers.entries())
@@ -529,7 +537,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
                     spaces={sectionSpaces}
                     variant={perspective}
                   >
-                    <div className={gridLayoutClass}>
+                    <div className={gridLayoutClass} style={gridLayoutStyle}>
                       {sectionSpaces.map((space, index) => renderSpaceCard(space, index))}
                     </div>
                   </NeighborhoodSection>
@@ -539,7 +547,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               {/* Render ungrouped section */}
               {ungrouped.length > 0 && (
                 <UngroupedSection spaces={ungrouped} variant={perspective}>
-                  <div className={gridLayoutClass}>
+                  <div className={gridLayoutClass} style={gridLayoutStyle}>
                     {ungrouped.map((space, index) => renderSpaceCard(space, index))}
                   </div>
                 </UngroupedSection>
@@ -557,7 +565,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 
         // Flat rendering (no grouping)
         return (
-          <div className={gridLayoutClass}>
+          <div className={gridLayoutClass} style={gridLayoutStyle}>
             {spaces.map((space, index) => renderSpaceCard(space, index))}
 
             {/* Empty state */}
