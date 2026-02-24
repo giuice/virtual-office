@@ -81,8 +81,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const activeKnockRequestIdRef = useRef<string | null>(null);
   const approvedKnockSpaceIdRef = useRef<string | null>(null);
   const knockStatusToastRef = useRef<string | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioContextWarmedRef = useRef(false);
   const respondToKnockRef = useRef<((input: {
     spaceId: string;
     requestId: string;
@@ -98,42 +96,15 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   const currentUser = users?.find(u => u.id === currentUserProfile?.id);
   const occupiedSpaceId = currentUser?.currentSpaceId ?? null;
 
-  // Pre-warm AudioContext on first user interaction to satisfy autoplay policy
-  const warmUpAudioContext = useCallback(() => {
-    if (audioContextWarmedRef.current) return;
-    try {
-      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) return;
-      const ctx = new AudioContextClass();
-      void ctx.resume();
-      audioContextRef.current = ctx;
-      audioContextWarmedRef.current = true;
-    } catch {
-      // AudioContext unavailable
-    }
-  }, []);
-
   const playKnockCue = useCallback(() => {
     try {
-      const audioContext = audioContextRef.current;
-      if (!audioContext || audioContext.state === 'closed') return;
-
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(280, audioContext.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(220, audioContext.currentTime + 0.2);
-      gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.03, audioContext.currentTime + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.24);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.24);
+      const audio = new Audio('/sounds/knock.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(() => {
+        // Browser autoplay policy prevented playback - not critical
+      });
     } catch {
-      // Sound cue is best-effort and should never block knock interactions.
+      // Sound cue is best-effort, never block knock flow
     }
   }, []);
 
@@ -442,7 +413,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         floorPlanTokens.floorPlanLayout.container.scrollBehavior,
         className
       )}
-      onClickCapture={warmUpAudioContext}
     >
       {/* Error message display */}
       {error && (
