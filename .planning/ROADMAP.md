@@ -31,12 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Floor plan space cards render at sizes matching the v3 design spec (`docs/ux-space-grid-v3.html`)
   3. Knock to Enter channel timeout does not cause stale state or broken UI
   4. Only EnhancedAvatarV2 and UploadableAvatar are used across the codebase -- no references to deprecated avatar components
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md — Avatar cleanup + floor plan grid sizing (STAB-04, STAB-01)
+- [ ] 01-02-PLAN.md — Knock sound fix + auth flow fixes (STAB-03, STAB-02)
 
 ### Phase 2: Floor Plan Completion
 **Goal**: Users experience a complete spatial floor plan with access control, automatic presence cleanup, and smart space assignment
@@ -150,7 +149,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Stabilization | 0/3 | Not started | - |
+| 1. Stabilization | 0/2 | Planned | - |
 | 2. Floor Plan Completion | 0/3 | Not started | - |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
