@@ -9,10 +9,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Stabilization
 
-- [ ] **STAB-01**: Floor plan space cards render at correct size matching v3 design spec (`docs/ux-space-grid-v3.html`)
+- [x] **STAB-01**: Floor plan space cards render at correct size matching v3 design spec (`docs/ux-space-grid-v3.html`)
 - [ ] **STAB-02**: Auth login and signup flows work without errors on current branch
 - [ ] **STAB-03**: Knock to Enter (Story 3-16) channel timeout issue is verified fixed or resolved
-- [ ] **STAB-04**: Avatar components consolidated from 11 to 2 canonical (EnhancedAvatarV2, UploadableAvatar)
+- [x] **STAB-04**: Avatar components consolidated from 11 to 2 canonical (EnhancedAvatarV2, UploadableAvatar)
 
 ### Floor Plan Completion
 
@@ -135,10 +135,10 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAB-01 | Phase 1 | Pending |
+| STAB-01 | Phase 1 | Complete |
 | STAB-02 | Phase 1 | Pending |
 | STAB-03 | Phase 1 | Pending |
-| STAB-04 | Phase 1 | Pending |
+| STAB-04 | Phase 1 | Complete |
 | FLOR-01 | Phase 2 | Pending |
 | FLOR-02 | Phase 2 | Pending |
 | FLOR-03 | Phase 2 | Pending |
