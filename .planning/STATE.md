@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 1 of 7 (Stabilization)
-Plan: 1 of 2 in current phase
-Status: Executing phase
-Last activity: 2026-02-24 -- Completed 01-01-PLAN.md (Avatar cleanup & Grid fix)
+Plan: 2 of 2 in current phase
+Status: Awaiting human verification (01-02 Task 3 checkpoint)
+Last activity: 2026-02-24 -- Executing 01-02-PLAN.md (Knock sound & Auth flows) - checkpoint reached
 
 Progress: [█░░░░░░░░░] 10%
 
@@ -48,6 +48,9 @@ Recent decisions affecting current work:
 - [Roadmap]: Phases 4, 6, 7 can run after Phase 1; Phase 3 requires Phase 2; Phase 5 requires Phase 4
 - [01-01]: Used inline style for gridTemplateColumns (auto-fill + minmax) instead of Tailwind arbitrary values for Tailwind 4 reliability
 - [01-01]: Kept fullWidth prop in DashboardShell but removed from floor plan page to restore max-w-[1600px]
+- [Phase 01-02]: Auth login redirect uses company context check: /floor-plan if company, /onboarding if not
+- [Phase 01-02]: Replaced AudioContext oscillator with new Audio() for knock sound playback
+- [Phase 01-02]: Removed all toast notifications from login/signup, inline-only error display
 
 ### Pending Todos
 
@@ -56,11 +59,11 @@ None yet.
 ### Blockers/Concerns
 
 - ~~Design branch broke floor plan space card sizing (STAB-01)~~ -- RESOLVED in 01-01
-- Auth login/signup has undiagnosed issues (STAB-02)
+- ~~Auth login/signup has undiagnosed issues (STAB-02)~~ -- FIX APPLIED in 01-02, awaiting human verification
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
 
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 01-01-PLAN.md
-Resume file: None
+Stopped at: 01-02-PLAN.md Task 3 (checkpoint:human-verify - knock sound and auth flows)
+Resume file: .planning/phases/01-stabilization/01-02-PLAN.md
