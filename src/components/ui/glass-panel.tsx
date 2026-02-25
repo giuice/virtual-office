@@ -31,7 +31,7 @@ const GlassPanel = React.forwardRef<HTMLDivElement, GlassPanelProps>(
       <div
         ref={ref}
         className={cn(
-          "relative overflow-hidden rounded-2xl border border-vo-card-border bg-vo-card-bg p-6 backdrop-blur-xl",
+          "group relative overflow-hidden rounded-2xl border border-vo-card-border bg-vo-card-bg p-6 backdrop-blur-xl",
           "transition-all duration-vo ease-vo-elastic",
           interactive && "cursor-pointer hover:-translate-y-1 hover:scale-[1.01] hover:border-vo-card-hover-border hover:shadow-vo-card-hover hover:z-10",
           className
