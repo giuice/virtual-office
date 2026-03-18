@@ -53,16 +53,16 @@ Exceptions:
 
 ## Typography
 
-This phase does not introduce new typography roles. All text uses the existing Tailwind utility classes already established in the floor plan components.
+This phase does not introduce new typography roles. All text uses the existing Tailwind utility classes already established in the floor plan components. Exactly 2 weights are used: 400 (`font-normal`) and 600 (`font-semibold`).
 
 | Role | Tailwind Class | Approx Size | Weight | Line Height | Usage in Phase 2 |
 |------|---------------|-------------|--------|-------------|-------------------|
-| Body | `text-sm` | 14px | `font-medium` (500) | 1.43 (Tailwind default) | Knock banner message ("X is knocking"), admin settings labels |
-| Caption | `text-xs` | 12px | `font-normal` (400) | 1.33 (Tailwind default) | Knock banner subtitle, status badges, toast secondary text, countdown timer |
+| Body | `text-sm` | 14px | `font-normal` (400) | 1.43 (Tailwind default) | Knock banner message text, admin settings labels, user names in home space list |
+| Caption | `text-xs` | 12px | `font-normal` (400) | 1.33 (Tailwind default) | Knock banner subtitle, status badges, toast secondary text, countdown timer, "Currently: [space]" labels |
 | Card title | `text-base` / `text-lg` | 16px / 18px | `font-semibold` (600) | 1.5 / 1.56 | Space card names (variant-dependent, already exists) |
 | Section heading | `text-lg` | 18px | `font-semibold` (600) | 1.56 | Admin settings section titles ("Default Space", "Home Spaces") |
 
-Weights used: 400 (`font-normal`), 500 (`font-medium`), 600 (`font-semibold`). No new font weights introduced.
+Weights used: 400 (`font-normal`), 600 (`font-semibold`). No other font weights are permitted in this phase.
 
 ---
 
@@ -87,6 +87,14 @@ This phase uses the existing theme-aware color system. No new color tokens are i
 
 ---
 
+## Visual Focal Point
+
+**Neutral state (no active knock, no user activity):** The primary visual anchor is the user's current active space card, which renders with an accent border (`--vo-active-border`) distinguishing it from other space cards. When the user is not in any space, the floor plan grid itself (the collection of space cards organized by neighborhood) serves as the focal point, with the largest or first neighborhood section drawing the eye via its section heading.
+
+**Active knock state:** The KnockBanner at the top of the relevant space card becomes the focal point, elevated by its success-tinted background and slide-in animation.
+
+---
+
 ## New UI Elements Contract
 
 ### 1. KnockBanner (FLOR-01) -- NEW component
@@ -107,16 +115,16 @@ Replaces KnockToast for occupant notifications. Rendered inside ModernSpaceCard 
 
 **Specifications:**
 - Position: First child inside card content area, full width of card minus card padding
-- Background: `bg-[var(--vo-signal-success)]/10` (subtle green tint, theme-aware)
+- Background: `bg-[var(--vo-signal-success)]/10` (subtle success tint, theme-aware)
 - Border: `border border-[var(--vo-signal-success)]/30` with `rounded-lg`
 - Padding: `p-3` (12px) -- compact to avoid card height explosion
 - Layout: `flex items-center gap-3`
 - Avatar: 40px circle (`w-10 h-10 rounded-full`), fallback shows `DoorOpen` icon from lucide
 - Text block: `flex-1 min-w-0`
-  - Primary: `text-sm font-medium text-foreground` -- "[Name] is knocking"
-  - Secondary: `text-xs text-muted-foreground` -- "Requesting access to this space"
-- Approve button: `w-9 h-9 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-600 dark:text-green-400` -- `Check` icon (lucide)
-- Deny button: `w-9 h-9 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400` -- `X` icon (lucide)
+  - Primary: `text-sm font-semibold text-foreground` for requester name + `text-sm font-normal text-foreground` for " is knocking"
+  - Secondary: `text-xs font-normal text-muted-foreground` -- "Requesting access to this space"
+- Approve button: `w-9 h-9 rounded-lg bg-[var(--vo-signal-success)]/20 hover:bg-[var(--vo-signal-success)]/30 text-[var(--vo-signal-success)]` -- `Check` icon (lucide)
+- Deny button: `w-9 h-9 rounded-lg bg-[var(--vo-signal-critical)]/20 hover:bg-[var(--vo-signal-critical)]/30 text-[var(--vo-signal-critical)]` -- `X` icon (lucide)
 - Click-stop: `data-avatar-interactive="true"`, `onClick={e.stopPropagation()}`, `onPointerDown={e.stopPropagation()}`
 - Accessibility: `role="alert"`, `aria-live="polite"`, `aria-atomic="true"`
 - Sound: `knock.mp3` plays via `new Audio()` when banner appears (already established pattern from Phase 1)
@@ -210,19 +218,19 @@ Replaces KnockToast for occupant notifications. Rendered inside ModernSpaceCard 
 - Company Default Space card:
   - Component: shadcn `Card` with `CardHeader` + `CardContent`
   - Title: "Company Default Space" in `text-lg font-semibold`
-  - Description: "Where new team members land on their first login" in `text-sm text-muted-foreground`
+  - Description: "Where new team members land on their first login" in `text-sm font-normal text-muted-foreground`
   - Select: shadcn `Select` component listing all active spaces, grouped by space type
-  - Fallback text: "Currently: [space name]" in `text-xs text-muted-foreground` below the select
+  - Fallback text: "Currently: [space name]" in `text-xs font-normal text-muted-foreground` below the select
 - Home Space Assignments card:
   - Component: shadcn `Card`
   - Title: "Home Space Assignments" in `text-lg font-semibold`
-  - Description: "Assign each team member their home room (like a desk)" in `text-sm text-muted-foreground`
+  - Description: "Assign each team member their home room (like a desk)" in `text-sm font-normal text-muted-foreground`
   - User rows: `flex items-center gap-3 py-3 border-b border-border last:border-b-0`
     - Avatar: `EnhancedAvatarV2` at size `sm` (32px)
-    - Name: `text-sm font-medium text-foreground flex-1`
+    - Name: `text-sm font-normal text-foreground flex-1`
     - Select: shadcn `Select` with `placeholder="Not assigned"`, listing active spaces
   - Save button: shadcn `Button` variant `default`, placed at bottom-right of card
-  - Empty state: If no users exist, show "No team members found" in `text-sm text-muted-foreground italic`
+  - Empty state: If no users exist, show "No team members found" in `text-sm font-normal text-muted-foreground italic`
 - Maximum scroll height for user list: `max-h-[400px] overflow-y-auto` if more than 10 users
 
 ### 5. Toast Messages (FLOR-01, FLOR-03, FLOR-04) -- Sonner toasts
@@ -259,7 +267,7 @@ All toasts use the existing `sonner` library with default styling. No custom toa
 | Destructive confirmation | Not applicable -- this phase has no destructive actions requiring confirmation. Knock denial is an instant action, not a destructive operation on user data. |
 | Cooldown label | "Wait {N}s" (displayed on knock button during 60-second cooldown) |
 | Knocking state label | "Knocking..." (displayed on knock button while waiting for response) |
-| Banner requester message | "[Name] is knocking" (bold name, normal weight "is knocking") |
+| Banner requester message | "[Name] is knocking" (`font-semibold` on name, `font-normal` on "is knocking") |
 | Banner subtitle | "Requesting access to this space" |
 | Approve button aria-label | "Let [Name] in" |
 | Deny button aria-label | "Deny [Name]" |
