@@ -14,6 +14,10 @@ import { useSpaceDetails } from '@/hooks/useSpaceDetails';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 import { GlassPanel } from '@/components/ui/glass-panel';
+import { KnockBanner } from './KnockBanner';
+import { SpaceActionButtons } from './SpaceActionButtons';
+import type { KnockRequestPayload } from '@/hooks/realtime/useKnockSignaling';
+import type { KnockStatus } from '@/hooks/useKnock';
 
 // ============================================
 // Story 3.2: Gradient utilities
@@ -63,8 +67,14 @@ interface ModernSpaceCardProps {
   onKnock?: (spaceId: string) => void;
   /** Whether direct enter should be allowed for this space */
   canDirectEnter?: boolean;
+  /** Pending knock request for this space (shown as banner for occupants) */
+  pendingKnockRequest?: KnockRequestPayload | null;
+  /** Handler when occupant approves a knock */
+  onKnockApprove?: (request: KnockRequestPayload) => void;
+  /** Handler when occupant denies a knock */
+  onKnockDeny?: (request: KnockRequestPayload) => void;
   /** Story 3.16: Current knock status for this space */
-  knockStatus?: 'idle' | 'knocking' | 'approved' | 'denied' | 'timeout' | 'cooldown';
+  knockStatus?: KnockStatus;
   /** Story 3.16: Cooldown remaining for this space */
   knockCooldownRemaining?: number;
 }
@@ -92,6 +102,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   // Story 3.16: Knock to Enter
   onKnock,
   canDirectEnter = false,
+  pendingKnockRequest = null,
+  onKnockApprove,
+  onKnockDeny,
   knockStatus,
   knockCooldownRemaining = 0,
 }) => {
@@ -247,6 +260,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   const occupancyPercent = space.capacity > 0
     ? Math.min((usersInSpace.length / space.capacity) * 100, 100)
     : 0;
+  const isRestrictedSpace = space.accessControl?.isPublic === false;
 
   return (
     // Story 3.11: Wrapper div handles hover for both card and panel
@@ -317,6 +331,15 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           }
         }}
       >
+        {pendingKnockRequest && isUserInSpace && (
+          <KnockBanner
+            requesterName={pendingKnockRequest.requesterName}
+            requesterAvatarUrl={pendingKnockRequest.requesterAvatarUrl}
+            onApprove={() => onKnockApprove?.(pendingKnockRequest)}
+            onDeny={() => onKnockDeny?.(pendingKnockRequest)}
+          />
+        )}
+
         {/* Header section */}
         <div className={floorPlanTokens.spaceCard.content.header}>
           {/* Story 3.4: Attention Beacon - positioned absolute top-right */}
@@ -473,6 +496,21 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
               Activity: {Math.round(occupancyPercent)}/m
             </div>
           </div>
+        )}
+
+        {isRestrictedSpace && !isUserInSpace && (
+          <SpaceActionButtons
+            layout="inline-card"
+            isUserInSpace={isUserInSpace}
+            isPrivate={isRestrictedSpace}
+            hasOccupants={usersInSpace.length > 0}
+            canDirectEnter={canDirectEnter}
+            onJoin={handleJoin}
+            onLeave={handleLeave}
+            onKnock={onKnock ? () => onKnock(space.id) : undefined}
+            knockStatus={knockStatus}
+            knockCooldownRemaining={knockCooldownRemaining}
+          />
         )}
       </GlassPanel>
 
