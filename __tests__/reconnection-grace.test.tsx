@@ -31,7 +31,7 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 const currentUser: User = {
-  id: 'user-1',
+  id: '11111111-1111-4111-8111-111111111111',
   companyId: 'company-1',
   supabase_uid: 'supabase-user-1',
   email: 'user@example.com',
@@ -88,8 +88,15 @@ const company: Company = {
   settings: {
     defaultSpaceId: 'default-space',
     homeSpaces: {
-      'user-1': 'home-space',
+      '11111111-1111-4111-8111-111111111111': 'home-space',
     },
+  },
+};
+
+const defaultOnlyCompany: Company = {
+  ...company,
+  settings: {
+    defaultSpaceId: 'default-space',
   },
 };
 
@@ -125,9 +132,14 @@ describe('Reconnection Grace Period', () => {
   it('returns home/default when no disconnect timestamp exists', () => {
     localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
 
-    const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
+    const context = getReconnectionContext(
+      currentUser,
+      spaces,
+      defaultOnlyCompany,
+      'private-space'
+    );
 
-    expect(context.type).toBe('home-space');
-    expect(context.spaceId).toBe('home-space');
+    expect(context.type).toBe('default-space');
+    expect(context.spaceId).toBe('default-space');
   });
 });
