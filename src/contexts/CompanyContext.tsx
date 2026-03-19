@@ -274,9 +274,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       const mergedData: Partial<Company> = {
         ...data,
-        settings: data.settings
+        settings: data.settings !== undefined
           ? { ...company.settings, ...data.settings }
-          : data.settings,
+          : undefined,
       };
 
       await updateCompany(company.id, mergedData);
@@ -289,7 +289,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           ...mergedData,
-          settings: mergedData.settings
+          settings: mergedData.settings !== undefined
             ? { ...prev.settings, ...mergedData.settings }
             : prev.settings,
         };

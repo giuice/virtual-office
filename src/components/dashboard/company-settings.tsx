@@ -47,7 +47,7 @@ export function CompanySettings() {
   }, [company]);
 
   const activeSpaces = useMemo(
-    () => spaces.filter((space) => space.status === 'active'),
+    () => spaces.filter((space) => space.status === 'active' || space.status === 'available' || space.status === 'in_use'),
     [spaces]
   );
 
