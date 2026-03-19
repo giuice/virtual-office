@@ -23,11 +23,13 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
 }));
 
 const mockKnockRequest: KnockRequestPayload = {
+  type: 'KNOCK_REQUEST',
   requestId: 'request-1',
   spaceId: 'space-1',
   requesterId: 'user-1',
   requesterName: 'Taylor Knock',
   requesterAvatarUrl: 'https://example.com/avatar.png',
+  timestamp: Date.now(),
 };
 
 const mockKnockStatus: KnockStatus = 'knocking';

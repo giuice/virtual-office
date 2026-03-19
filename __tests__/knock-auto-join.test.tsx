@@ -31,12 +31,15 @@ vi.mock('@/components/floor-plan/modern/ModernFloorPlan', () => ({
 
 const fetchMock = vi.fn();
 const mockApprovalPayload: KnockResponsePayload = {
+  type: 'KNOCK_RESPONSE',
   requestId: 'request-1',
   spaceId: 'space-1',
   requesterId: 'user-1',
   responderId: 'user-2',
   responderName: 'Morgan Approver',
-  decision: 'approved',
+  responderValidated: true,
+  decision: 'APPROVE',
+  timestamp: Date.now(),
 };
 
 const mockDeniedStatus: KnockStatus = 'denied';

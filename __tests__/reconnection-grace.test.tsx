@@ -1,35 +1,133 @@
-import { describe, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  DISCONNECT_TS_KEY,
+  FIRST_LOGIN_KEY,
+  GRACE_PERIOD_MS,
+  getReconnectionContext,
+} from '@/hooks/useLastSpace';
+import type { Company, Space, User } from '@/types/database';
 
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-
-vi.stubGlobal('localStorage', localStorageMock);
-
-vi.mock('@/hooks/useLastSpace', () => ({
-  useLastSpace: () => ({
-    lastSpaceId: 'space-1',
-    saveLastSpace: vi.fn(),
-    clearLastSpace: vi.fn(),
-    isRejoinInProgress: false,
-    rejoinAttempts: 0,
-  }),
+vi.mock('sonner', () => ({
+  toast: vi.fn(),
 }));
 
-vi.stubGlobal('location', {
-  assign: vi.fn(),
-  replace: vi.fn(),
-  reload: vi.fn(),
+const storage = new Map<string, string>();
+const localStorageMock = {
+  getItem: vi.fn((key: string) => storage.get(key) ?? null),
+  setItem: vi.fn((key: string, value: string) => {
+    storage.set(key, value);
+  }),
+  removeItem: vi.fn((key: string) => {
+    storage.delete(key);
+  }),
+  clear: vi.fn(() => {
+    storage.clear();
+  }),
+};
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
 });
 
+const currentUser: User = {
+  id: 'user-1',
+  companyId: 'company-1',
+  supabase_uid: 'supabase-user-1',
+  email: 'user@example.com',
+  displayName: 'Grace Hopper',
+  status: 'online',
+  preferences: {},
+  role: 'member',
+  lastActive: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  currentSpaceId: null,
+};
+
+const spaces: Space[] = [
+  {
+    id: 'private-space',
+    companyId: 'company-1',
+    name: 'Focus Room',
+    type: 'private_office',
+    status: 'active',
+    capacity: 2,
+    features: [],
+    position: { x: 0, y: 0, width: 2, height: 2 },
+    accessControl: { isPublic: false },
+  },
+  {
+    id: 'home-space',
+    companyId: 'company-1',
+    name: 'Engineering Bay',
+    type: 'workspace',
+    status: 'active',
+    capacity: 12,
+    features: [],
+    position: { x: 2, y: 0, width: 4, height: 2 },
+    accessControl: { isPublic: true },
+  },
+  {
+    id: 'default-space',
+    companyId: 'company-1',
+    name: 'Main Workspace',
+    type: 'workspace',
+    status: 'active',
+    capacity: 24,
+    features: [],
+    position: { x: 6, y: 0, width: 4, height: 2 },
+    accessControl: { isPublic: true },
+  },
+];
+
+const company: Company = {
+  id: 'company-1',
+  name: 'Virtual Office',
+  adminIds: [],
+  createdAt: new Date().toISOString(),
+  settings: {
+    defaultSpaceId: 'default-space',
+    homeSpaces: {
+      'user-1': 'home-space',
+    },
+  },
+};
+
 describe('Reconnection Grace Period', () => {
-  it.todo('returns grace-rejoin when within 5-minute window and lastSpaceId exists');
-  it.todo('returns home/default when grace period expired');
-  it.todo('returns home/default when no disconnect timestamp exists');
-  it.todo('clears disconnect timestamp after successful reconnection');
-  it.todo('falls back to home space when last space is full on reconnect');
-  it.todo('falls back to default space when last space no longer exists');
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'));
+    storage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('returns grace-rejoin when within 5-minute window and lastSpaceId exists', () => {
+    localStorageMock.setItem(DISCONNECT_TS_KEY, String(Date.now() - GRACE_PERIOD_MS + 1_000));
+    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
+
+    const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
+
+    expect(context.type).toBe('grace-rejoin');
+    expect(context.spaceId).toBe('private-space');
+    expect(context.reason).toContain('5-minute grace period');
+  });
+
+  it('returns home/default when grace period expired', () => {
+    localStorageMock.setItem(DISCONNECT_TS_KEY, String(Date.now() - GRACE_PERIOD_MS - 1_000));
+    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
+
+    const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
+
+    expect(context.type).toBe('home-space');
+    expect(context.spaceId).toBe('home-space');
+  });
+
+  it('returns home/default when no disconnect timestamp exists', () => {
+    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
+
+    const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
+
+    expect(context.type).toBe('home-space');
+    expect(context.spaceId).toBe('home-space');
+  });
 });
