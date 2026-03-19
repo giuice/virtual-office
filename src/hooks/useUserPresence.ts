@@ -216,7 +216,6 @@ export function useUserPresence(currentUserId?: string) {
             if (!old) return old;
             
             // Find current user and check what their original space was
-            const user = old.find(u => u.id === currentUserId);
             console.log(`[Presence] Reverting failed update for user ${currentUserId}`);
             return old;
           });
@@ -291,24 +290,6 @@ export function useUserPresence(currentUserId?: string) {
       setUpdateInProgress(false);
     }
   }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient]);
-
-  const updateLocation = async (spaceId: string | null) => {
-    if (!currentUserId) {
-      console.error("[Presence] Cannot update location: currentUserId is missing in updateLocation call.");
-      
-      // For debugging: log some helpful context
-      console.warn("[Presence] Debug info: Make sure PresenceProvider has access to the current user ID");
-      console.warn("[Presence] Current state:", {
-        currentUserId,
-        usersCount: presenceAwareUsers?.length || 0,
-        currentUser: currentUser ? { id: currentUser.id, name: currentUser.displayName } : null
-      });
-      
-      return Promise.reject(new Error("Cannot update location: currentUserId is missing"));
-    }
-    
-    return debouncedUpdateLocation(spaceId);
-  };
 
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
