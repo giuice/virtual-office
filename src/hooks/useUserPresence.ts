@@ -19,6 +19,10 @@ type PresencePayload = {
   [key: string]: unknown;
 };
 
+interface PresenceLeavePayload {
+  leftPresences?: PresencePayload[];
+}
+
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
   if (process.env.NODE_ENV === 'development') {
@@ -334,6 +338,43 @@ export function useUserPresence(currentUserId?: string) {
   }, [currentUserId, connectionStatus, buildPresencePayload, computePresenceSignature]);
 
   useEffect(() => {
+    if (!currentUserId) return;
+
+    const handleBeforeUnload = () => {
+      localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
+
+      const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/users/location', payload);
+        return;
+      }
+
+      void fetch('/api/users/location', {
+        method: 'POST',
+        body: payload,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        keepalive: true,
+      }).catch((error) => {
+        console.error('[Presence] Failed to send unload cleanup request:', error);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (!currentUserId) {
       return;
     }
@@ -369,7 +410,38 @@ export function useUserPresence(currentUserId?: string) {
     channel
       .on('presence', { event: 'sync' }, handlePresenceSnapshot)
       .on('presence', { event: 'join' }, handlePresenceSnapshot)
-      .on('presence', { event: 'leave' }, handlePresenceSnapshot)
+      .on('presence', { event: 'leave' }, (payload: PresenceLeavePayload) => {
+        handlePresenceSnapshot();
+
+        const leftUserIds = new Set(
+          (payload.leftPresences ?? [])
+            .map((presence) => presence.user_id)
+            .filter((userId): userId is string => typeof userId === 'string' && userId.length > 0)
+        );
+
+        if (leftUserIds.size === 0) {
+          return;
+        }
+
+        queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (prev) => {
+          if (!prev) return prev;
+
+          return prev.map((user) =>
+            leftUserIds.has(user.id) ? { ...user, status: 'offline' as const } : user
+          );
+        });
+
+        leftUserIds.forEach((userId) => {
+          void fetch('/api/users/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, spaceId: null, offline: true }),
+            keepalive: true,
+          }).catch((error) => {
+            console.error(`[Presence] Failed to cleanup offline user ${userId}:`, error);
+          });
+        });
+      })
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users' },
