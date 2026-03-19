@@ -260,11 +260,13 @@ export function FloorPlan() {
     setHighlightedSpaceId,
   ]);
 
+  // Hydrate visual selection on load -- useLastSpace handles the actual API placement
   useEffect(() => {
     if (!currentUserProfile || spaces.length === 0) {
       return;
     }
 
+    // If user is already in a space (from presence or useLastSpace API call), highlight it
     const targetSpaceId = currentSpaceId
       || getReconnectionContext(currentUserProfile, spaces, company, lastSpaceId).spaceId;
     if (!targetSpaceId) {
@@ -273,8 +275,9 @@ export function FloorPlan() {
 
     const space = spaces.find((candidate) => candidate.id === targetSpaceId);
     if (space) {
+      // Only set visual state -- useLastSpace handles the API call to /api/users/location
       setSelectedSpace(space);
-      handleEnterSpace(space);
+      setHighlightedSpaceId(space.id);
     }
   }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces]);
 

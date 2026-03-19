@@ -19,6 +19,7 @@ const mockSpaceMaybeSingle = vi.fn();
 const mockUsersCount = vi.fn();
 const mockKnockMaybeSingle = vi.fn();
 const mockPresenceMaybeSingle = vi.fn();
+const mockOpenPresenceLogMaybeSingle = vi.fn();
 const mockPresenceInsert = vi.fn();
 const mockPresenceUpdate = vi.fn();
 const mockDeleteEq = vi.fn();
@@ -72,12 +73,21 @@ const mockAdminFrom = vi.fn((table: string) => {
   if (table === 'space_presence_log') {
     return {
       select: vi.fn(() => {
-        const chain = {
+        let isOpenLogPath = false;
+        const chain: Record<string, unknown> = {
           eq: vi.fn(() => chain),
           not: vi.fn(() => chain),
+          is: vi.fn(() => {
+            // .is('exited_at', null) marks this as the open presence log query
+            isOpenLogPath = true;
+            return chain;
+          }),
           order: vi.fn(() => chain),
           limit: vi.fn(() => ({
-            maybeSingle: () => mockPresenceMaybeSingle(),
+            maybeSingle: () =>
+              isOpenLogPath
+                ? mockOpenPresenceLogMaybeSingle()
+                : mockPresenceMaybeSingle(),
           })),
         };
 
@@ -154,18 +164,22 @@ function primeRestrictedSpace(options: {
   currentSpaceId?: string | null;
   approvedKnock?: { id: string; responder_id: string | null } | null;
   priorExitAt?: string | null;
+  lastActive?: string;
+  hasOpenPresenceLog?: boolean;
 } = {}) {
   const {
     currentSpaceId = null,
     approvedKnock = null,
     priorExitAt = null,
+    lastActive = '2026-03-19T10:00:00.000Z',
+    hasOpenPresenceLog = false,
   } = options;
 
   mockAuthGetUser.mockResolvedValue({
     data: { user: { id: AUTH_USER_ID } },
     error: null,
   });
-  mockFindBySupabaseUid.mockResolvedValue(makeAuthenticatedUser({ currentSpaceId }));
+  mockFindBySupabaseUid.mockResolvedValue(makeAuthenticatedUser({ currentSpaceId, lastActive }));
   mockSpaceMaybeSingle.mockResolvedValue({
     data: {
       id: SPACE_ID,
@@ -180,6 +194,10 @@ function primeRestrictedSpace(options: {
   mockKnockMaybeSingle.mockResolvedValue({ data: approvedKnock, error: null });
   mockPresenceMaybeSingle.mockResolvedValue({
     data: priorExitAt ? { exited_at: priorExitAt } : null,
+    error: null,
+  });
+  mockOpenPresenceLogMaybeSingle.mockResolvedValue({
+    data: hasOpenPresenceLog ? { id: 'open-log-1' } : null,
     error: null,
   });
   mockPresenceInsert.mockResolvedValue({ error: null });
@@ -274,6 +292,33 @@ describe('/api/users/location', () => {
         authorized_by: null,
       })
     );
+  });
+
+  it('allows restricted-space grace rejoin via last_active when no exited_at log exists (beacon race)', async () => {
+    primeRestrictedSpace({
+      lastActive: new Date(Date.now() - 30_000).toISOString(),
+    });
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted-space grace rejoin via open presence log when no exited_at and stale last_active', async () => {
+    primeRestrictedSpace({
+      lastActive: '2026-03-01T00:00:00.000Z',
+      hasOpenPresenceLog: true,
+    });
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
   });
 
   it('deletes the consumed approved knock row after a successful restricted join', async () => {

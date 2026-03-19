@@ -240,12 +240,38 @@ async function enforceSpaceAuthorization(params: {
   }
 
   const priorOccupancy = await getMostRecentPriorOccupancy(supabase, spaceId, authenticatedUser.id);
-  const hasGraceRejoin = Boolean(
+
+  // Primary check: exited_at from space_presence_log
+  const hasGraceRejoinByExitLog = Boolean(
     priorOccupancy?.exited_at &&
       Date.now() - new Date(priorOccupancy.exited_at).getTime() < SPACE_REJOIN_GRACE_MS
   );
 
-  if (hasGraceRejoin) {
+  // Secondary check: last_active from users table (handles beacon POST race)
+  // If user was recently active AND had this space as their previous space,
+  // they are likely rejoining after a reload where the beacon hasn't committed yet
+  const hasGraceRejoinByLastActive = Boolean(
+    !hasGraceRejoinByExitLog &&
+      authenticatedUser.lastActive &&
+      Date.now() - new Date(authenticatedUser.lastActive).getTime() < SPACE_REJOIN_GRACE_MS
+  );
+
+  // Also check if there is an OPEN (no exited_at) presence log for this user+space
+  // This handles the case where the user was in the space and reloaded before beacon
+  let hasOpenPresenceLog = false;
+  if (!hasGraceRejoinByExitLog && !hasGraceRejoinByLastActive) {
+    const { data: openLog } = await supabase
+      .from('space_presence_log')
+      .select('id')
+      .eq('user_id', authenticatedUser.id)
+      .eq('space_id', spaceId)
+      .is('exited_at', null)
+      .limit(1)
+      .maybeSingle();
+    hasOpenPresenceLog = Boolean(openLog);
+  }
+
+  if (hasGraceRejoinByExitLog || hasGraceRejoinByLastActive || hasOpenPresenceLog) {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
