@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-18T20:55:56.120Z"
-last_activity: 2026-02-24 -- Executing 01-02-PLAN.md (Knock sound & Auth flows) - checkpoint reached
+current_plan: 3
+status: executing
+stopped_at: Completed 02-floor-plan-completion-02-PLAN.md
+last_updated: "2026-03-19T11:03:02.733Z"
+last_activity: 2026-03-19
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 10
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
-**Current focus:** Phase 1: Stabilization
+**Current focus:** Phase 02 — floor-plan-completion
 
 ## Current Position
 
-Phase: 1 of 7 (Stabilization)
-Plan: 2 of 2 in current phase
-Status: Awaiting human verification (01-02 Task 3 checkpoint)
-Last activity: 2026-02-24 -- Executing 01-02-PLAN.md (Knock sound & Auth flows) - checkpoint reached
-
-Progress: [█░░░░░░░░░] 10%
+Phase: 02 (floor-plan-completion) — EXECUTING
+Plan: 1 of 4
+**Status:** Ready to execute
+**Current Plan:** 3
+**Total Plans in Phase:** 4
+**Last Activity:** 2026-03-19
 
 ## Performance Metrics
 
@@ -52,6 +52,8 @@ Progress: [█░░░░░░░░░] 10%
 - Trend: n/a (insufficient data)
 
 *Updated after each plan completion*
+| Phase 02 P00 | 2m | 2 tasks | 5 files |
+| Phase 02-floor-plan-completion P02 | 9m 5s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -69,6 +71,10 @@ Recent decisions affecting current work:
 - [Phase 01-02]: Auth login redirect uses company context check: /floor-plan if company, /onboarding if not
 - [Phase 01-02]: Replaced AudioContext oscillator with new Audio() for knock sound playback
 - [Phase 01-02]: Removed all toast notifications from login/signup, inline-only error display
+- [Phase 02]: Wave 0 uses runnable todo-only Vitest scaffolds so downstream Phase 2 plans can verify against stable file targets before full implementation exists.
+- [Phase 02]: Planned company default-space settings fields stay local to scaffold tests in Wave 0; production types remain unchanged until implementation plans land.
+- [Phase 02-floor-plan-completion]: Offline users stay in their last space bucket on the client until the fade completes, then server cleanup clears current_space_id.
+- [Phase 02-floor-plan-completion]: The existing users/location API handles both normal location updates and sendBeacon-style POST cleanup to avoid duplicate cleanup paths.
 
 ### Pending Todos
 
@@ -82,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T20:55:56.118Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-floor-plan-completion/02-CONTEXT.md
+Last session: 2026-03-19T11:03:02.731Z
+Stopped at: Completed 02-floor-plan-completion-02-PLAN.md
+Resume file: None
