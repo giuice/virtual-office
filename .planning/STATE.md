@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: Verification
-status: verifying
-stopped_at: Completed 02-floor-plan-completion-04-PLAN.md
-last_updated: "2026-03-19T12:24:11.663Z"
-last_activity: 2026-03-19
+status: unknown
+stopped_at: Completed 02-floor-plan-completion-05-PLAN.md
+last_updated: "2026-03-19T20:18:16.878Z"
 progress:
   total_phases: 7
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 1
+  total_plans: 10
+  completed_plans: 8
 ---
 
 # Project State
@@ -26,11 +24,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 02 (floor-plan-completion) — EXECUTING
-Plan: 5 of 5
-**Status:** Ready for verification
-**Current Plan:** Verification
-**Total Plans in Phase:** 5
-**Last Activity:** 2026-03-19
+Plan: 6 of 8
 
 ## Performance Metrics
 
@@ -58,6 +52,7 @@ Plan: 5 of 5
 | Phase 02-floor-plan-completion P03 | 12m | 2 tasks | 5 files |
 | Phase 02 P04 | 12 min | 2 tasks | 5 files |
 | Phase 02-floor-plan-completion P04 | 10m | 2 tasks | 3 files |
+| Phase 02-floor-plan-completion P05 | 4m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -86,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 02-floor-plan-completion]: Reused getReconnectionContext in both useLastSpace and FloorPlan so placement and selected-space hydration follow the same rule set.
 - [Phase 02-floor-plan-completion]: Kept the existing users/location payload shape for compatibility, but rejected mismatched userId values after resolving the authenticated app user from Supabase Auth.
 - [Phase 02-floor-plan-completion]: Reused knock_requests and space_presence_log as the private-space authorization sources instead of introducing a second access-control table or client-only bypass.
+- [Phase 02-05]: Only users with DB status online who are absent from Realtime after first sync are derived as offline; away/busy users are never force-downgraded
+- [Phase 02-05]: Removed peer leave handler POST to /api/users/location entirely since self-cleanup via beforeunload and server-side cleanup are the correct paths
 
 ### Pending Todos
 
@@ -99,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T12:24:11.661Z
-Stopped at: Completed 02-floor-plan-completion-04-PLAN.md
+Last session: 2026-03-19T20:18:16.876Z
+Stopped at: Completed 02-floor-plan-completion-05-PLAN.md
 Resume file: None
