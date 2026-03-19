@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import type { User } from '@/types/database';
 import { z } from 'zod';
 
 const updateLocationSchema = z.object({
@@ -10,6 +11,28 @@ const updateLocationSchema = z.object({
 });
 
 export const dynamic = 'force-dynamic';
+const SPACE_REJOIN_GRACE_MS = 5 * 60 * 1000;
+
+interface SpaceAccessControl {
+  isPublic?: boolean;
+}
+
+interface SpaceRow {
+  id: string;
+  company_id: string;
+  status: string;
+  capacity: number;
+  access_control: SpaceAccessControl | null;
+}
+
+interface KnockAuthorizationRow {
+  id: string;
+  responder_id: string | null;
+}
+
+interface PriorOccupancyRow {
+  exited_at: string;
+}
 
 async function parseLocationBody(request: Request) {
   const contentType = request.headers.get('content-type') || '';
@@ -28,8 +51,9 @@ async function syncSpacePresenceLog(params: {
   previousSpaceId: string | null;
   nextSpaceId: string | null;
   timestamp: string;
+  authorizedByUserId?: string | null;
 }) {
-  const { supabase, userId, previousSpaceId, nextSpaceId, timestamp } = params;
+  const { supabase, userId, previousSpaceId, nextSpaceId, timestamp, authorizedByUserId = null } = params;
 
   if (previousSpaceId && previousSpaceId !== nextSpaceId) {
     const { error: exitLogError } = await supabase
@@ -51,6 +75,7 @@ async function syncSpacePresenceLog(params: {
         user_id: userId,
         space_id: nextSpaceId,
         entered_at: timestamp,
+        authorized_by: authorizedByUserId,
       });
 
     if (entryLogError) {
@@ -59,11 +84,203 @@ async function syncSpacePresenceLog(params: {
   }
 }
 
+async function getAuthenticatedAppUser() {
+  const supabase = await createSupabaseServerClient();
+  const supabaseAdmin = await createSupabaseServerClient('service_role');
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authData.user) {
+    return {
+      errorResponse: NextResponse.json(
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const userRepository = new SupabaseUserRepository(supabaseAdmin);
+  const authenticatedUser = await userRepository.findBySupabaseUid(authData.user.id);
+
+  if (!authenticatedUser) {
+    return {
+      errorResponse: NextResponse.json(
+        { error: 'Authenticated user profile not found' },
+        { status: 404 }
+      ),
+    };
+  }
+
+  return {
+    supabase,
+    supabaseAdmin,
+    userRepository,
+    authenticatedUser,
+  };
+}
+
+async function getSpaceForValidation(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  spaceId: string
+): Promise<SpaceRow | null> {
+  const { data: space, error } = await supabase
+    .from('spaces')
+    .select('id, company_id, status, capacity, access_control')
+    .eq('id', spaceId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load target space: ${error.message}`);
+  }
+
+  return space;
+}
+
+async function getApprovedKnockAuthorization(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  spaceId: string,
+  userId: string
+): Promise<KnockAuthorizationRow | null> {
+  const { data: knockAuthorization, error } = await supabase
+    .from('knock_requests')
+    .select('id, responder_id')
+    .eq('space_id', spaceId)
+    .eq('requester_id', userId)
+    .eq('status', 'approved')
+    .eq('decision', 'APPROVE')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to verify private space approval: ${error.message}`);
+  }
+
+  return knockAuthorization;
+}
+
+async function getMostRecentPriorOccupancy(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  spaceId: string,
+  userId: string
+): Promise<PriorOccupancyRow | null> {
+  const { data: priorOccupancy, error } = await supabase
+    .from('space_presence_log')
+    .select('exited_at')
+    .eq('user_id', userId)
+    .eq('space_id', spaceId)
+    .not('exited_at', 'is', null)
+    .order('exited_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to verify prior occupancy: ${error.message}`);
+  }
+
+  return priorOccupancy;
+}
+
+async function enforceSpaceAuthorization(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  authenticatedUser: User;
+  targetSpace: SpaceRow;
+  spaceId: string;
+}) {
+  const { supabase, authenticatedUser, targetSpace, spaceId } = params;
+
+  if (!authenticatedUser.companyId || authenticatedUser.companyId !== targetSpace.company_id) {
+    return {
+      errorResponse: NextResponse.json(
+        { error: 'Cross-company space updates are not allowed', code: 'CROSS_COMPANY_SPACE' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  if (targetSpace.capacity > 0) {
+    const { count, error: countError } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('current_space_id', spaceId)
+      .neq('id', authenticatedUser.id);
+
+    if (countError) {
+      throw new Error(`Failed to verify space capacity: ${countError.message}`);
+    }
+
+    if (count !== null && count >= targetSpace.capacity) {
+      return {
+        errorResponse: NextResponse.json(
+          { error: 'Space is full', code: 'SPACE_FULL' },
+          { status: 409 }
+        ),
+      };
+    }
+  }
+
+  if (targetSpace.status !== 'active' && targetSpace.status !== 'available') {
+    return {
+      errorResponse: NextResponse.json(
+        { error: `This space is currently ${targetSpace.status}`, code: 'SPACE_UNAVAILABLE' },
+        { status: 409 }
+      ),
+    };
+  }
+
+  const isRestrictedSpace = targetSpace.access_control?.isPublic === false;
+  if (!isRestrictedSpace) {
+    return { authorizedByUserId: null, consumedKnockRequestId: null };
+  }
+
+  const isAdmin = authenticatedUser.role === 'admin';
+  const isAlreadyInSpace = authenticatedUser.currentSpaceId === spaceId;
+
+  if (isAdmin || isAlreadyInSpace) {
+    return { authorizedByUserId: null, consumedKnockRequestId: null };
+  }
+
+  const priorOccupancy = await getMostRecentPriorOccupancy(supabase, spaceId, authenticatedUser.id);
+  const hasGraceRejoin = Boolean(
+    priorOccupancy?.exited_at &&
+      Date.now() - new Date(priorOccupancy.exited_at).getTime() < SPACE_REJOIN_GRACE_MS
+  );
+
+  if (hasGraceRejoin) {
+    return { authorizedByUserId: null, consumedKnockRequestId: null };
+  }
+
+  const approvedKnock = await getApprovedKnockAuthorization(supabase, spaceId, authenticatedUser.id);
+  if (approvedKnock) {
+    return {
+      authorizedByUserId: approvedKnock.responder_id,
+      consumedKnockRequestId: approvedKnock.id,
+    };
+  }
+
+  return {
+    errorResponse: NextResponse.json(
+      {
+        error: 'This private space requires approval or recent occupancy before you can enter.',
+        code: 'SPACE_ACCESS_DENIED',
+      },
+      { status: 403 }
+    ),
+  };
+}
+
 async function handleLocationUpdate(request: Request) {
   try {
-    // Create server client and repository instance
-    const supabase = await createSupabaseServerClient();
-    const userRepository = new SupabaseUserRepository(supabase);
+    const authContext = await getAuthenticatedAppUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const {
+      supabase,
+      supabaseAdmin,
+      userRepository,
+      authenticatedUser,
+    } = authContext;
 
     let requestBody;
     try {
@@ -83,50 +300,45 @@ async function handleLocationUpdate(request: Request) {
 
     const { userId, spaceId, offline = false } = validationResult.data;
 
-    // Verify user exists before attempting update
-    const existingUser = await userRepository.findById(userId);
-    if (!existingUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (userId !== authenticatedUser.id) {
+      return NextResponse.json(
+        {
+          error: 'Authenticated user does not match requested location update target',
+          code: 'USER_MISMATCH',
+        },
+        { status: 403 }
+      );
     }
 
-    const previousSpaceId = existingUser.currentSpaceId ?? null;
+    const previousSpaceId = authenticatedUser.currentSpaceId ?? null;
     const spaceChanged = previousSpaceId !== spaceId;
     const timestamp = new Date().toISOString();
+    let authorizedByUserId: string | null = null;
+    let consumedKnockRequestId: string | null = null;
 
-    // Story 3.12 - AC5: Capacity Validation Enforced in API
-    // Check if space is at capacity before allowing join
     if (spaceId) {
-      // Get space capacity
-      const { data: space, error: spaceError } = await supabase
-        .from('spaces')
-        .select('capacity')
-        .eq('id', spaceId)
-        .single();
+      const targetSpace = await getSpaceForValidation(supabaseAdmin, spaceId);
 
-      if (spaceError) {
-        console.error('Error fetching space for capacity check:', spaceError);
-        // Continue with update if space not found (fallback behavior)
-      } else if (space?.capacity && space.capacity > 0) {
-        // Count current users in space (excluding the requesting user who might be moving within)
-        const { count, error: countError } = await supabase
-          .from('users')
-          .select('id', { count: 'exact', head: true })
-          .eq('current_space_id', spaceId)
-          .neq('id', userId); // Exclude current user in case of re-join
-
-        if (countError) {
-          console.error('Error counting users in space:', countError);
-        } else if (count !== null && count >= space.capacity) {
-          // Space is at capacity - return 409 Conflict
-          return NextResponse.json(
-            { error: 'Space is full', code: 'SPACE_FULL' },
-            { status: 409 }
-          );
-        }
+      if (!targetSpace) {
+        return NextResponse.json({ error: 'Space not found' }, { status: 404 });
       }
+
+      const authorization = await enforceSpaceAuthorization({
+        supabase: supabaseAdmin,
+        authenticatedUser,
+        targetSpace,
+        spaceId,
+      });
+
+      if ('errorResponse' in authorization) {
+        return authorization.errorResponse;
+      }
+
+      authorizedByUserId = authorization.authorizedByUserId ?? null;
+      consumedKnockRequestId = authorization.consumedKnockRequestId ?? null;
     }
 
-    const updatedUser = await userRepository.updateLocation(userId, spaceId);
+    const updatedUser = await userRepository.updateLocation(authenticatedUser.id, spaceId);
 
     if (!updatedUser) {
       return NextResponse.json({ error: 'Failed to update user location' }, { status: 500 });
@@ -134,17 +346,29 @@ async function handleLocationUpdate(request: Request) {
 
     if (spaceChanged) {
       await syncSpacePresenceLog({
-        supabase,
-        userId,
+        supabase: supabaseAdmin,
+        userId: authenticatedUser.id,
         previousSpaceId,
         nextSpaceId: spaceId,
         timestamp,
+        authorizedByUserId,
       });
+    }
+
+    if (consumedKnockRequestId) {
+      const { error: deleteKnockError } = await supabaseAdmin
+        .from('knock_requests')
+        .delete()
+        .eq('id', consumedKnockRequestId);
+
+      if (deleteKnockError) {
+        throw new Error(`Failed to consume approved knock authorization: ${deleteKnockError.message}`);
+      }
     }
 
     let responseUser = updatedUser;
     if (offline) {
-      const offlineUser = await userRepository.update(userId, {
+      const offlineUser = await userRepository.update(authenticatedUser.id, {
         status: 'offline',
         currentSpaceId: null,
       });
@@ -159,7 +383,7 @@ async function handleLocationUpdate(request: Request) {
     return NextResponse.json({
       success: true,
       user: responseUser,
-      message: 'Location updated successfully'
+      message: 'Location updated successfully',
     }, { status: 200 });
 
   } catch (error) {
