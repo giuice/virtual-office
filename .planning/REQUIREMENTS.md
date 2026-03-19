@@ -18,8 +18,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **FLOR-01**: User can request access to restricted spaces via "Knock to Enter" workflow with approval/denial by any occupant (Story 3-16)
 - [x] **FLOR-02**: Offline users automatically removed from space display within 5 seconds, with fade-out animation and presence log update (Story 3-17)
-- [ ] **FLOR-03**: Admin can assign default spaces to users; first-time users placed in company default space (Story 3-18)
-- [ ] **FLOR-04**: User reconnecting within 5-minute grace period auto-rejoins their last space (Story 3-18)
+- [x] **FLOR-03**: Admin can assign default spaces to users; first-time users placed in company default space (Story 3-18)
+- [x] **FLOR-04**: User reconnecting within 5-minute grace period auto-rejoins their last space (Story 3-18)
 
 ### Messaging Timeline
 
@@ -141,8 +141,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | STAB-04 | Phase 1 | Complete |
 | FLOR-01 | Phase 2 | Complete |
 | FLOR-02 | Phase 2 | Complete |
-| FLOR-03 | Phase 2 | Pending |
-| FLOR-04 | Phase 2 | Pending |
+| FLOR-03 | Phase 2 | Complete |
+| FLOR-04 | Phase 2 | Complete |
 | VID-01 | Phase 3 | Pending |
 | VID-02 | Phase 3 | Pending |
 | VID-03 | Phase 3 | Pending |

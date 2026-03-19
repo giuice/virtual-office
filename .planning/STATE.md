@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 02-floor-plan-completion-01-PLAN.md
-last_updated: "2026-03-19T11:05:36.511Z"
+stopped_at: Completed 02-floor-plan-completion-03-PLAN.md
+last_updated: "2026-03-19T11:20:51.784Z"
 last_activity: 2026-03-19
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 02 (floor-plan-completion) — EXECUTING
 Plan: 3 of 4
 **Status:** Ready to execute
-**Current Plan:** 3
+**Current Plan:** 4
 **Total Plans in Phase:** 4
 **Last Activity:** 2026-03-19
 
@@ -55,6 +55,7 @@ Plan: 3 of 4
 | Phase 02 P00 | 2m | 2 tasks | 5 files |
 | Phase 02-floor-plan-completion P02 | 9m 5s | 2 tasks | 4 files |
 | Phase 02-floor-plan-completion P01 | 11m | 2 tasks | 4 files |
+| Phase 02-floor-plan-completion P03 | 12m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 02-floor-plan-completion]: Reused SpaceActionButtons with an inline-card layout for restricted-space knock CTAs instead of adding a second button component.
 - [Phase 02-floor-plan-completion]: ModernFloorPlan routes incoming knocks to per-space card banners keyed by spaceId rather than global sonner custom toasts.
 - [Phase 02-floor-plan-completion]: Requester timeout presentation is handled in ModernFloorPlan so the inline CTA can briefly show 'No response' before the shared knock hook resets.
+- [Phase 02-floor-plan-completion]: Stored company default space and per-user home space mappings in companies.settings JSONB and protected them with deep merges in CompanyContext.
+- [Phase 02-floor-plan-completion]: Reused getReconnectionContext in both useLastSpace and FloorPlan so placement and selected-space hydration follow the same rule set.
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T11:05:36.509Z
-Stopped at: Completed 02-floor-plan-completion-01-PLAN.md
-Resume file: .planning/phases/02-floor-plan-completion/02-02-PLAN.md
+Last session: 2026-03-19T11:20:51.782Z
+Stopped at: Completed 02-floor-plan-completion-03-PLAN.md
+Resume file: None
