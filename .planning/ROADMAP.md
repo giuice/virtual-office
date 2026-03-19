@@ -46,9 +46,10 @@ Plans:
   2. When a user goes offline, their avatar disappears from the space display within 5 seconds with a fade-out animation
   3. First-time users land in their company default space; admin can configure default space assignments
   4. User who reconnects within 5 minutes automatically rejoins their last occupied space
-**Plans:** 3 plans
+**Plans:** 4 plans
 
 Plans:
+- [ ] 02-00-PLAN.md — Wave 0: Test scaffold stubs for all Phase 2 features (FLOR-01, FLOR-02, FLOR-03, FLOR-04)
 - [ ] 02-01-PLAN.md — Knock-to-enter UX: banner notification, knock button on cards, auto-join on approval (FLOR-01)
 - [ ] 02-02-PLAN.md — Offline user removal: fade-out animation, crash detection, server-side cleanup (FLOR-02)
 - [ ] 02-03-PLAN.md — Default spaces + reconnection: admin UI, auto-placement, 5-min grace period (FLOR-03, FLOR-04)
@@ -150,7 +151,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Stabilization | 0/2 | Planned | - |
-| 2. Floor Plan Completion | 0/3 | Planned | - |
+| 2. Floor Plan Completion | 0/4 | Planned | - |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |

@@ -2,7 +2,7 @@
 phase: 2
 slug: floor-plan-completion
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-03-18
 ---
@@ -38,18 +38,22 @@ created: 2026-03-18
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | FLOR-01 | unit | `npx vitest run __tests__/knock-banner.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | FLOR-01 | unit | `npx vitest run __tests__/knock-auto-join.test.tsx -x` | ❌ W0 | ⬜ pending |
+| 02-00-01 | 00 | 0 | FLOR-01 | scaffold | `npx vitest run __tests__/knock-banner.test.tsx __tests__/knock-auto-join.test.tsx -x` | W0 creates | ⬜ pending |
+| 02-00-02 | 00 | 0 | FLOR-03, FLOR-04 | scaffold | `npx vitest run __tests__/default-space-assignment.test.tsx __tests__/company-settings-default-space.test.tsx __tests__/reconnection-grace.test.tsx -x` | W0 creates | ⬜ pending |
+| 02-01-01 | 01 | 1 | FLOR-01 | unit | `npx vitest run __tests__/knock-banner.test.tsx -x` | W0 creates | ⬜ pending |
+| 02-01-02 | 01 | 1 | FLOR-01 | unit | `npx vitest run __tests__/knock-auto-join.test.tsx -x` | W0 creates | ⬜ pending |
 | 02-02-01 | 02 | 1 | FLOR-02 | unit | `npx vitest run __tests__/presence-animation.test.tsx -x` | ✅ extend | ⬜ pending |
-| 02-03-01 | 03 | 2 | FLOR-03 | unit | `npx vitest run __tests__/default-space-assignment.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 02-03-02 | 03 | 2 | FLOR-03 | unit | `npx vitest run __tests__/company-settings-default-space.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 02-04-01 | 04 | 2 | FLOR-04 | unit | `npx vitest run __tests__/reconnection-grace.test.tsx -x` | ❌ W0 | ⬜ pending |
+| 02-03-01 | 03 | 2 | FLOR-03 | unit | `npx vitest run __tests__/default-space-assignment.test.tsx -x` | W0 creates | ⬜ pending |
+| 02-03-02 | 03 | 2 | FLOR-03 | unit | `npx vitest run __tests__/company-settings-default-space.test.tsx -x` | W0 creates | ⬜ pending |
+| 02-03-03 | 03 | 2 | FLOR-04 | unit | `npx vitest run __tests__/reconnection-grace.test.tsx -x` | W0 creates | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
 ## Wave 0 Requirements
+
+Plan `02-00-PLAN.md` (wave: 0, depends_on: []) creates all stub test files:
 
 - [ ] `__tests__/knock-banner.test.tsx` — stubs for FLOR-01 knock button & banner
 - [ ] `__tests__/knock-auto-join.test.tsx` — stubs for FLOR-01 auto-join flow
@@ -73,9 +77,9 @@ created: 2026-03-18
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
