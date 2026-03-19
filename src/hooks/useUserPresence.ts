@@ -32,6 +32,7 @@ export function useUserPresence(currentUserId?: string) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [isInitialized, setIsInitialized] = useState(false);
   const [updateInProgress, setUpdateInProgress] = useState(false);
+  const [isPresenceReady, setIsPresenceReady] = useState(false);
   const initializationGuard = useRef(false);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const lastPresencePayloadRef = useRef<string | null>(null);
@@ -143,11 +144,15 @@ export function useUserPresence(currentUserId?: string) {
           derivedStatus = 'online';
         }
       } else {
-        if (!user.status || user.status === 'online') {
-          derivedStatus = 'offline';
-        } else if (user.status === 'away' || user.status === 'busy') {
+        // Only override to offline if:
+        // 1. Presence system is ready (first sync received) AND
+        // 2. User's DB status was 'online' (they should be in presence if truly online)
+        // Never override away/busy -- those are intentional DB statuses that don't require Realtime presence
+        if (isPresenceReady && (!user.status || user.status === 'online')) {
           derivedStatus = 'offline';
         }
+        // If isPresenceReady is false, keep the DB status as-is (trust the server)
+        // If user.status is 'away' or 'busy', keep it -- these are explicit user choices
       }
 
       return {
@@ -156,7 +161,7 @@ export function useUserPresence(currentUserId?: string) {
         isOnline,
       };
     });
-  }, [rawUsers, onlineUserIds]);
+  }, [rawUsers, onlineUserIds, isPresenceReady]);
 
   const snapshotPresenceState = useCallback((channel: RealtimeChannel) => {
     const state = channel.presenceState() as Record<string, PresencePayload[]>;
@@ -405,7 +410,10 @@ export function useUserPresence(currentUserId?: string) {
       },
     });
 
-    const handlePresenceSnapshot = () => snapshotPresenceState(channel);
+    const handlePresenceSnapshot = () => {
+      snapshotPresenceState(channel);
+      setIsPresenceReady(true);
+    };
 
     channel
       .on('presence', { event: 'sync' }, handlePresenceSnapshot)
@@ -431,16 +439,10 @@ export function useUserPresence(currentUserId?: string) {
           );
         });
 
-        leftUserIds.forEach((userId) => {
-          void fetch('/api/users/location', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, spaceId: null, offline: true }),
-            keepalive: true,
-          }).catch((error) => {
-            console.error(`[Presence] Failed to cleanup offline user ${userId}:`, error);
-          });
-        });
+        // NOTE: Intentionally NOT posting cleanup to /api/users/location for peer users.
+        // The user's own beforeunload handler and server-side cleanup handle legitimate
+        // offline transitions. Peer clients must never write location state for other users,
+        // as it causes permanent eviction on network hiccups / tab switches / reloads.
       })
       .on(
         'postgres_changes',
@@ -551,6 +553,7 @@ export function useUserPresence(currentUserId?: string) {
       presenceChannelRef.current = null;
       initializationGuard.current = false;
       setIsInitialized(false);
+      setIsPresenceReady(false);
       lastPresencePayloadRef.current = null;
 
       supabase.removeChannel(channel).catch((error) => {
@@ -567,6 +570,7 @@ export function useUserPresence(currentUserId?: string) {
     updateLocation: safeUpdateLocation,
     connectionStatus,
     isInitialized,
+    isPresenceReady,
     updateInProgress,
   };
 }
