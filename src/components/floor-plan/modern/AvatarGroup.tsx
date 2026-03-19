@@ -95,9 +95,30 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
       }, 300);
     }
 
+    // Cancel fade for users that came back online
+    users.forEach((user) => {
+      if (exitingUserIds.has(user.id) && user.status !== 'offline') {
+        const existingTimeout = offlineExitTimeoutsRef.current.get(user.id);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          offlineExitTimeoutsRef.current.delete(user.id);
+        }
+        exitingUsersRef.current.delete(user.id);
+        setExitingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      }
+    });
+
     users.forEach((user) => {
       const prevUser = prevUsers.find((prev) => prev.id === user.id);
       if (!prevUser || prevUser.status === 'offline' || user.status !== 'offline') {
+        return;
+      }
+      // Skip if already fading -- do not reset the timer
+      if (exitingUserIds.has(user.id)) {
         return;
       }
 
