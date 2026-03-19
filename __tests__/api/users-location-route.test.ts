@@ -129,6 +129,10 @@ function createRequest(body: object) {
   } as unknown as Request;
 }
 
+async function putLocation(body: object): Promise<Response> {
+  return (await PUT(createRequest(body))) as Response;
+}
+
 function makeAuthenticatedUser(overrides: Partial<User> = {}): User {
   return {
     id: APP_USER_ID,
@@ -201,7 +205,7 @@ describe('/api/users/location', () => {
       error: null,
     });
 
-    const response = await PUT(createRequest({ userId: APP_USER_ID, spaceId: null }));
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: null });
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -216,7 +220,7 @@ describe('/api/users/location', () => {
     });
     mockFindBySupabaseUid.mockResolvedValue(makeAuthenticatedUser());
 
-    const response = await PUT(createRequest({ userId: OTHER_USER_ID, spaceId: SPACE_ID }));
+    const response = await putLocation({ userId: OTHER_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -227,7 +231,7 @@ describe('/api/users/location', () => {
   it('returns 403 SPACE_ACCESS_DENIED for a restricted space with no approved knock and no recent occupancy', async () => {
     primeRestrictedSpace();
 
-    const response = await PUT(createRequest({ userId: APP_USER_ID, spaceId: SPACE_ID }));
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -240,7 +244,7 @@ describe('/api/users/location', () => {
       approvedKnock: { id: APPROVED_KNOCK_ID, responder_id: RESPONDER_ID },
     });
 
-    const response = await PUT(createRequest({ userId: APP_USER_ID, spaceId: SPACE_ID }));
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -259,7 +263,7 @@ describe('/api/users/location', () => {
       priorExitAt: new Date(Date.now() - (5 * 60 * 1000 - 30_000)).toISOString(),
     });
 
-    const response = await PUT(createRequest({ userId: APP_USER_ID, spaceId: SPACE_ID }));
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -277,7 +281,7 @@ describe('/api/users/location', () => {
       approvedKnock: { id: APPROVED_KNOCK_ID, responder_id: RESPONDER_ID },
     });
 
-    const response = await PUT(createRequest({ userId: APP_USER_ID, spaceId: SPACE_ID }));
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
 
     expect(response.status).toBe(200);
     expect(mockDeleteEq).toHaveBeenCalledWith('id', APPROVED_KNOCK_ID);
