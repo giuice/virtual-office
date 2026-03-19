@@ -302,7 +302,6 @@ async function handleLocationUpdate(request: Request) {
     }
 
     const {
-      supabase,
       supabaseAdmin,
       userRepository,
       authenticatedUser,
