@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
-import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
+import { getReconnectionContext, useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
@@ -39,7 +39,7 @@ import { AudioProvider } from '@/contexts/AudioContext';
 
 export function FloorPlan() {
   // Get data from context
-  const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
+  const { company, spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
   const router = useRouter(); // Add router for navigation
   const { usersInSpaces, updateLocation, users } = usePresence(); // Presence context for real-time user data
   const {
@@ -185,7 +185,7 @@ export function FloorPlan() {
   const [templatePosition, setTemplatePosition] = useState<{ x: number; y: number; width?: number; height?: number } | undefined>(undefined);
 
   // Use the last space hook to persist space selection
-  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserProfile, spaces);
+  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserProfile, spaces, company);
 
   // Handle entering a space (new function)
   const handleEnterSpace = (space: Space) => {
@@ -261,15 +261,22 @@ export function FloorPlan() {
   ]);
 
   useEffect(() => {
-    // If there's a last space ID, try to select it
-    if (lastSpaceId) {
-      const space = spaces.find(space => space.id === lastSpaceId);
-      if (space) {
-        setSelectedSpace(space);
-        handleEnterSpace(space);
-      }
+    if (!currentUserProfile || spaces.length === 0) {
+      return;
     }
-  }, [lastSpaceId, spaces]);
+
+    const targetSpaceId = currentSpaceId
+      || getReconnectionContext(currentUserProfile, spaces, company, lastSpaceId).spaceId;
+    if (!targetSpaceId) {
+      return;
+    }
+
+    const space = spaces.find((candidate) => candidate.id === targetSpaceId);
+    if (space) {
+      setSelectedSpace(space);
+      handleEnterSpace(space);
+    }
+  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces]);
 
   // Story 3.10: Scroll to space when beacon is clicked
   const scrollToSpace = useCallback((spaceId: string) => {
