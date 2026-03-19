@@ -37,6 +37,8 @@ export interface Company {
     maxRooms?: number;
     defaultRoomSettings?: Partial<Space>; // Changed Room to Space
     theme?: string;
+    defaultSpaceId?: string;
+    homeSpaces?: Record<string, string>;
   };
 }
 
@@ -241,4 +243,3 @@ export interface PlatformAdmin {
   userId: string; // References auth.users(id)
   createdAt: string; // ISO timestamp
 }
-
