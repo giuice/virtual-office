@@ -187,9 +187,10 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     exitingUserIds.has(user.id)
   );
 
-  const currentDisplayUsers = users.filter(
-    (user) => user.status !== 'offline' || exitingUserIds.has(user.id)
-  );
+  // Show all users passed to this component. Users are pre-filtered by space via usersInSpaces.
+  // If a user has currentSpaceId set (they're in this space), they should always be visible
+  // regardless of derived status. The fade animation handles the offline transition visually.
+  const currentDisplayUsers = users;
 
   // Combine current users, offline-fading snapshots, and legacy exit-animation users for rendering.
   const allUsers = [

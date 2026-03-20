@@ -393,7 +393,14 @@ export function useUserPresence(currentUserId?: string) {
 
     const handlePresenceSnapshot = () => {
       snapshotPresenceState(channel);
-      setIsPresenceReady(true);
+      // Only mark ready once the current user is tracked in presence state,
+      // so we don't prematurely derive everyone as offline from an empty snapshot
+      if (!isPresenceReady) {
+        const state = channel.presenceState();
+        if (currentUserId && state[currentUserId]) {
+          setIsPresenceReady(true);
+        }
+      }
     };
 
     channel
@@ -412,15 +419,12 @@ export function useUserPresence(currentUserId?: string) {
           return;
         }
 
-        queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (prev) => {
-          if (!prev) return prev;
-
-          return prev.map((user) =>
-            leftUserIds.has(user.id) ? { ...user, status: 'offline' as const } : user
-          );
-        });
-
-        // NOTE: Intentionally NOT posting cleanup to /api/users/location for peer users.
+        // NOTE: We do NOT mutate rawUsers query data here. The presenceAwareUsers
+        // memo derives offline status from onlineUserIds (which updates via presenceState).
+        // Mutating rawUsers would overwrite the DB status and break the derivation logic,
+        // causing users to appear permanently offline even after reconnecting.
+        //
+        // Also intentionally NOT posting cleanup to /api/users/location for peer users.
         // The user's own beforeunload handler and server-side cleanup handle legitimate
         // offline transitions. Peer clients must never write location state for other users,
         // as it causes permanent eviction on network hiccups / tab switches / reloads.
