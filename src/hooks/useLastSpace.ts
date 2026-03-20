@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Company, Space, User } from '@/types/database';
+import type { UserPresenceData } from '@/types/database';
 
 const MAX_REJOIN_ATTEMPTS = 3;
 export const GRACE_PERIOD_MS = 5 * 60 * 1000;
@@ -139,12 +141,15 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+const PRESENCE_QUERY_KEY = ['user-presence'];
+
 export function useLastSpace(currentUser: User | null, spaces: Space[], company: Company | null) {
   const [lastSpaceId, setLastSpaceId] = useLocalStorage<string | null>('lastSpaceId', null);
   const [isRejoinInProgress, setIsRejoinInProgress] = useState(false);
   const [rejoinAttempts, setRejoinAttempts] = useState(0);
   const isUpdatingRef = useRef(false);
   const lastUpdateRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   const markFirstLoginComplete = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -202,6 +207,15 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
           setLastSpaceId(targetSpaceId);
           setRejoinAttempts(0);
           clearDisconnectTimestamp();
+
+          // Optimistically update presence query data so the user appears in their space
+          // immediately, without waiting for Realtime postgres_changes event
+          queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
+            if (!old) return old;
+            return old.map(u =>
+              u.id === userId ? { ...u, currentSpaceId: targetSpaceId, status: u.status === 'offline' ? 'online' : u.status } : u
+            );
+          });
 
           if (contextType === 'first-time') {
             markFirstLoginComplete();

@@ -60,6 +60,10 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
 
   const prevUsersRef = useRef<UserPresenceData[]>(users);
   const isInitialRender = useRef(true);
+  // Settling period: don't trigger offline fade for the first few seconds after mount.
+  // This prevents mass-fade when presence system initializes and derives stale DB 'online' → 'offline'.
+  const isSettledRef = useRef(false);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Story 3.13: Detect user additions/removals and trigger animations
   useEffect(() => {
@@ -68,10 +72,16 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     const currentIds = new Set(currentUsers.map(u => u.id));
     const prevIds = new Set(prevUsers.map(u => u.id));
 
-    // Skip animation on initial render
+    // Skip animation on initial render and during settling period
     if (isInitialRender.current) {
       isInitialRender.current = false;
       prevUsersRef.current = currentUsers;
+      // Start settling timer — don't trigger offline fades until presence stabilizes
+      if (!settleTimerRef.current) {
+        settleTimerRef.current = setTimeout(() => {
+          isSettledRef.current = true;
+        }, 5000);
+      }
       return;
     }
 
@@ -112,6 +122,8 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
       }
     });
 
+    // Only trigger offline fade after settling period to prevent mass-fade on presence init
+    if (isSettledRef.current) {
     users.forEach((user) => {
       const prevUser = prevUsers.find((prev) => prev.id === user.id);
       if (!prevUser || prevUser.status === 'offline' || user.status !== 'offline') {
@@ -142,6 +154,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
 
       offlineExitTimeoutsRef.current.set(user.id, timeoutId);
     });
+    } // end isSettledRef guard
 
     // Find users that were removed
     const removedUsers = prevUsers.filter(
@@ -166,6 +179,9 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
       offlineExitTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
       offlineExitTimeoutsRef.current.clear();
       exitingUsersRef.current.clear();
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+      }
     };
   }, []);
 
