@@ -14,6 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt
 - [ ] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection
+- [ ] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
 - [ ] **Phase 3: Video and Screen Sharing** - WebRTC video calls, screen sharing, whiteboard, recording, backgrounds, and PiP
 - [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
 - [ ] **Phase 5: Messaging Resilience** - Offline queue, reconnection, polling fallback, typing indicators, multi-device sync, analytics, notifications
@@ -54,13 +55,25 @@ Plans:
 - [x] 02-02-PLAN.md — Offline user removal: fade-out animation, crash detection, server-side cleanup (FLOR-02)
 - [x] 02-03-PLAN.md — Default spaces + reconnection: admin UI, auto-placement, 5-min grace period (FLOR-03, FLOR-04)
 - [x] 02-04-PLAN.md — Restricted-space server authorization: authenticated users/location route, approved-knock consumption, grace-rejoin regression coverage (FLOR-01, FLOR-04)
-- [ ] 02-05-PLAN.md — GAP CLOSURE: Fix mass false-offline transitions and peer leave eviction (FLOR-02, FLOR-04)
-- [ ] 02-06-PLAN.md — GAP CLOSURE: Fix Admin Spaces tab API route, space filter, and settings merge (FLOR-03)
-- [ ] 02-07-PLAN.md — GAP CLOSURE: Fix reload user disappearance and grace-rejoin race condition (FLOR-04)
+- [x] 02-05-PLAN.md — GAP CLOSURE: Fix mass false-offline transitions and peer leave eviction (FLOR-02, FLOR-04)
+- [x] 02-06-PLAN.md — GAP CLOSURE: Fix Admin Spaces tab API route, space filter, and settings merge (FLOR-03)
+- [x] 02-07-PLAN.md — GAP CLOSURE: Fix reload user disappearance and grace-rejoin race condition (FLOR-04)
+
+### Phase 2.1: Presence Reload Fixes (INSERTED)
+**Goal**: Fix the remaining critical presence reload bugs identified in research to ensure consistent behavior across automatic and manual placements
+**Depends on**: Phase 2
+**Requirements**: FLOR-04
+**Success Criteria** (what must be TRUE):
+  1. Automatic user placements persist lastSpaceId for proper grace rejoin behavior  
+  2. FloorPlan UI state changes are synchronized with presence database state
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
 
 ### Phase 3: Video and Screen Sharing
 **Goal**: Users can hold video meetings with screen sharing, whiteboard collaboration, and recording within spaces
-**Depends on**: Phase 2
+**Depends on**: Phase 2.1
 **Requirements**: VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
 **Success Criteria** (what must be TRUE):
   1. User can start an audio-only call in a space and upgrade to video with grid layout supporting up to 9 participants
@@ -85,7 +98,8 @@ Plans:
   1. User can see who read their sent messages and when, displayed as read receipt indicators
   2. User can drag files into the composer, see upload progress, and view inline previews of attached files
   3. User can record a voice note, see waveform visualization during recording, and play it back in the message feed
-  4. User can toggle a starred messages filter to see only their starred messages in the feed
+  4. User can receive voice note, see waveform visualization during recording, and play it back in the message feed
+  5. User can toggle a starred messages filter to see only their starred messages in the feed
 **Plans**: TBD
 
 Plans:
@@ -149,13 +163,14 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
-Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run in parallel after Phase 1 completes. Phase 3 depends on Phase 2. Phase 5 depends on Phase 4.
+Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 4 -> 5 -> 6 -> 7
+Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run in parallel after Phase 1 completes. Phase 3 depends on Phase 2.1. Phase 5 depends on Phase 4.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Stabilization | 0/2 | Planned | - |
-| 2. Floor Plan Completion | 5/8 | Gap closure | - |
+| 2. Floor Plan Completion | 8/8 | Complete | 2026-03-19 |
+| 2.1 Presence Reload Fixes | 0/1 | Planned | - |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
@@ -164,4 +179,4 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-23*
