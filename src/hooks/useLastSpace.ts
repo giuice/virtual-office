@@ -26,16 +26,22 @@ interface LocationUpdateOptions {
   spaceName?: string;
 }
 
+const JOINABLE_STATUSES = new Set(['active', 'available', 'in_use']);
+
+function isJoinableSpace(space: Space): boolean {
+  return JOINABLE_STATUSES.has(space.status);
+}
+
 function getActiveSpaceById(spaces: Space[], spaceId: string | null | undefined): Space | undefined {
   if (!spaceId) {
     return undefined;
   }
 
-  return spaces.find((space) => space.id === spaceId && space.status === 'active');
+  return spaces.find((space) => space.id === spaceId && isJoinableSpace(space));
 }
 
 function getFirstActiveWorkspace(spaces: Space[]): Space | undefined {
-  return spaces.find((space) => space.type === 'workspace' && space.status === 'active');
+  return spaces.find((space) => space.type === 'workspace' && isJoinableSpace(space));
 }
 
 function getStandardPlacementContext(
@@ -202,8 +208,11 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
         });
 
         if (response.ok) {
+          console.log('[useLastSpace] API call succeeded, placing user in space:', targetSpaceId);
           const updateKey = `${userId}-${targetSpaceId}`;
           lastUpdateRef.current = updateKey;
+          // BUG 2 Fix: Save lastSpaceId to localStorage for automatic placements
+          // This ensures that all placement paths (not just manual clicks) persist the lastSpaceId
           setLastSpaceId(targetSpaceId);
           setRejoinAttempts(0);
           clearDisconnectTimestamp();
@@ -216,6 +225,13 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
               u.id === userId ? { ...u, currentSpaceId: targetSpaceId, status: u.status === 'offline' ? 'online' : u.status } : u
             );
           });
+
+          // Fallback: if query data wasn't available for optimistic update, force a refetch
+          // so the user appears in the space once the query loads from the (now-updated) DB
+          const currentData = queryClient.getQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY);
+          if (!currentData) {
+            void queryClient.invalidateQueries({ queryKey: PRESENCE_QUERY_KEY });
+          }
 
           if (contextType === 'first-time') {
             markFirstLoginComplete();
@@ -236,6 +252,8 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
           code: 'UNKNOWN',
           message: 'Failed to parse error response',
         }));
+
+        console.error('[useLastSpace] API call failed:', { status: response.status, code: errorData.code, message: errorData.message, targetSpaceId });
 
         if (response.status === 409 && errorData.code === 'SPACE_FULL' && currentUser) {
           const fallbackContext = getStandardPlacementContext(
@@ -319,25 +337,35 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
 
   useEffect(() => {
     if (isUpdatingRef.current || isRejoinInProgress) {
+      console.log('[useLastSpace] Skipped: update in progress');
       return;
     }
 
     if (!currentUser || spaces.length === 0) {
+      console.log('[useLastSpace] Skipped: no currentUser or no spaces', { hasUser: !!currentUser, spacesCount: spaces.length });
       return;
     }
 
     const context = getReconnectionContext(currentUser, spaces, company, lastSpaceId);
+    console.log('[useLastSpace] Reconnection context:', { type: context.type, spaceId: context.spaceId, spaceName: context.spaceName, reason: context.reason, userCurrentSpaceId: currentUser.currentSpaceId, lastSpaceId });
+
     if (!context.spaceId) {
+      console.log('[useLastSpace] Skipped: no target spaceId in context');
       return;
     }
 
     const updateKey = `${currentUser.id}-${context.spaceId}`;
     if (lastUpdateRef.current === updateKey) {
+      console.log('[useLastSpace] Skipped: already updated with this key');
       return;
     }
 
     if (currentUser.currentSpaceId === context.spaceId) {
+      console.log('[useLastSpace] Already in target space, setting updateKey only');
       lastUpdateRef.current = updateKey;
+      // BUG 2 Fix: Save lastSpaceId even when user is already in the correct space
+      // This ensures lastSpaceId is persistent for all automatic placement scenarios
+      setLastSpaceId(context.spaceId);
       if (context.type === 'first-time') {
         markFirstLoginComplete();
       }
@@ -346,9 +374,11 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
     }
 
     if (currentUser.currentSpaceId && currentUser.currentSpaceId !== context.spaceId) {
+      console.log('[useLastSpace] Skipped: user already in different space', { currentSpaceId: currentUser.currentSpaceId, targetSpaceId: context.spaceId });
       return;
     }
 
+    console.log('[useLastSpace] Calling updateUserLocation:', { userId: currentUser.id, spaceId: context.spaceId, contextType: context.type });
     void updateUserLocation(currentUser.id, context.spaceId, {
       contextType: context.type,
       spaceName: context.spaceName,
