@@ -1,17 +1,58 @@
-# Virtual Office — Reference (Tech, Rules, Structure)
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Product Context
 Virtual Office is a digital workspace with floor plans, rooms, presence, messaging, and company management. Built with Next.js 15.3.0, React 19.1.0, Supabase, and TypeScript.
 
-## Immutable Rules
-- Do not guess. Verify. If unknown, say “I don’t know.”
-- Do not assume code behavior. Ask for or provide tests.
-- Prefer edits to existing code over new files.
-- Run the Anti-Duplication Protocol before proposing changes.
-- **CRITICAL** On any **Plan** or **Story** conception you must verify if feature already exists or partialy exists, this is the most important rule on this app DO NOT DUPLICATE FEATURES or FUNCTIONALITIES.
-- Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
+## Core Principles
 
-## Architecture Snapshot (single source)
+### Planning & Execution
+- Enter **plan mode** for any non-trivial task (3+ steps or architectural decisions). Write a plan before coding.
+- If something goes wrong, **STOP and re-plan immediately** — don't keep pushing failed approaches.
+- Use **subagents** frequently for research, exploration, and parallel analysis — keep the main context clean.
+
+### Quality Standards
+- Do not guess. Verify. If unknown, say "I don't know."
+- Do not assume code behavior — ask for or provide tests.
+- Find **root causes**. Avoid temporary fixes. Maintain senior-level standards.
+- For non-trivial changes, ask: *"Is there a more elegant solution?"* — but don't over-engineer simple fixes.
+- Never mark a task complete without proving it works. Run tests, check logs, demonstrate correctness.
+- Completion is **user-gated**. Never state "done" or "fixed". Mark **Status: Pending user confirmation**.
+
+### Bug Fixing Protocol
+- When given a bug report: **DEBUG FIRST** with real runtime evidence (console logs, network requests, DB state).
+- Never edit production code until root cause is confirmed with evidence.
+- "I think the bug is X" is not enough — prove it with runtime data before proposing fixes.
+- Fix failing CI tests autonomously. Require zero context switching from the user.
+
+### Anti-Duplication (execute before coding)
+- **CRITICAL**: Before ANY plan or implementation, verify if feature already exists or partially exists. Do NOT duplicate features or functionality.
+- Search codebase for existing components/hooks/types that match intent. If found, reuse or extend.
+- Prefer edits to existing code over new files. New files only when no suitable target exists.
+
+## Skill Usage — IMPORTANT
+
+Installed skills provide specialized capabilities. **Invoke the relevant skill when the situation matches:**
+
+| Skill | When to Use |
+|-------|-------------|
+| `/refactor-method-complexity-reduce` | **Hooks refactoring**, reducing method complexity, untangling interdependent hooks, simplifying deeply nested logic |
+| `/codebase-cleanup-refactor-clean` | Large-scale cleanup, dead code removal, structural refactoring across multiple files |
+| `/supabase-realtime` | Writing or debugging **realtime subscriptions**, presence channels, broadcast, Supabase Realtime patterns |
+| `/react-best-practices` | After editing multiple TSX components — runs quality checklist for hooks, accessibility, performance |
+| `/vercel-react-best-practices` | React/Next.js performance optimization, bundle size, data fetching patterns |
+| `/nextjs-app-router-patterns` | Server Components, streaming, parallel routes, advanced App Router patterns |
+| `/nextjs-supabase-auth` | Auth middleware, protected routes, Supabase Auth + Next.js integration |
+| `/supabase-postgres-best-practices` | Writing/optimizing SQL queries, schema design, RLS policies |
+| `/code-quality` | General correctness rules, avoiding over-engineering, comment quality |
+| `/code-review-quality` | Conducting thorough code reviews with confidence-based filtering |
+| `/simplify` | After completing changes — review for reuse, quality, and efficiency |
+| `/web-design-guidelines` | UI accessibility audit, UX review, design best practices |
+
+**Proactive skill usage**: Don't wait for the user to ask. If you're refactoring a complex hook, invoke `/refactor-method-complexity-reduce`. If you're writing realtime code, invoke `/supabase-realtime`. If you just edited multiple components, run `/react-best-practices`.
+
+## Architecture
 - Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
 - Runtime: React 19.1.0 / React DOM 19.1.0
 - Lang: TypeScript 5, strict mode
@@ -23,23 +64,42 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 
 ## Supabase & RLS (critical)
 - Never use the browser Supabase client in API routes.
-- Use `src/lib/supabase/server-client.ts` in server code and API routes.
-- Use `src/lib/supabase/browser-client.ts` only in Client Components.
-- In API routes call `createSupabaseServerClient()` and pass that instance to repositories.
-- Reason: `auth.uid()` requires server context; otherwise RLS fails.
+- Server code/API routes: `createSupabaseServerClient()` from `src/lib/supabase/server-client.ts`
+- Client Components only: `createSupabaseBrowserClient()` from `src/lib/supabase/browser-client.ts`
+- `auth.uid()` requires server context; otherwise RLS fails.
+- **NEVER** expose `SUPABASE_SERVICE_ROLE_KEY` to the client. Only Server Actions/API Routes.
 
-## Database Schema (Supabase Postgres) — CRITICAL: Always verify table/column names before writing SQL
+### getSession() vs getUser()
+| Context | Method | Why |
+|---------|--------|-----|
+| Server (API/Actions) | `getUser()` | Validates JWT on Auth server — **REQUIRED** |
+| Client (Browser) | `getSession()` | Fast, from local storage |
+| Middleware | `getSession()` | OK for token refresh only |
 
-> **📁 Authoritative Source: `migrations/database-structure.md`**
-> 
-> Before writing ANY SQL, migrations, or database queries:
-> 1. **ALWAYS** check `migrations/database-structure.md` for exact table/column names
-> 2. This file contains the complete schema exported from Supabase with all columns, types, constraints, and foreign keys
-> 3. If the file is outdated, use `mcp_supabase_list_tables` to refresh it
-> 4. **NEVER guess table or column names** — verify first!
+## Database — CRITICAL
 
+> **Authoritative source: `migrations/database-structure.md`** — ALWAYS verify table/column names before writing SQL. If outdated, use `mcp_supabase_list_tables` to refresh.
 
-### Enums (PostgreSQL types)
+### User ID vs Supabase UID — #1 Source of Bugs
+
+The `users` table has TWO ID fields:
+
+| Field | Type | Use For |
+|-------|------|---------|
+| `users.id` | UUID | Foreign keys between app tables (messages.sender_id, spaces.created_by) |
+| `users.supabase_uid` | TEXT | Matching `auth.uid()`, session user identification |
+
+**Rules:**
+- `users.supabase_uid = auth.uid()::text` — For RLS policies
+- `userRepository.findBySupabaseUid(authUser.id)` — For API routes
+- `WHERE supabase_uid = $supabaseAuthId` — For raw SQL
+- `users.id = auth.uid()` — **ALWAYS WRONG. NEVER DO THIS.**
+
+### Common Schema Mistakes
+- `profiles` table does NOT exist — use `users`
+- `messages.room_id` does NOT exist — messages link via `conversations.room_id`
+
+### Enums
 - `user_status`: online, away, busy, offline
 - `user_role`: admin, member
 - `space_type`: workspace, conference, social, breakout, private_office, open_space, lounge, lab
@@ -48,274 +108,30 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - `message_type`: text, image, file, system, announcement
 - `message_status`: sending, sent, delivered, read, failed
 
-### Key Relationships
-- `users.company_id` → `companies.id`
-- `users.current_space_id` → `spaces.id`
-- `spaces.company_id` → `companies.id`
-- `spaces.neighborhood_id` → `neighborhoods.id`
-- `conversations.room_id` → `spaces.id` (links chat to space)
-- `messages.conversation_id` → `conversations.id`
-- `messages.sender_id` → `users.id`
-
-### Common Mistakes to Avoid
-- ❌ `profiles` table — Does NOT exist! Use `users`
-- ❌ `messages.room_id` — Does NOT exist! Messages link via `conversations.room_id`
-- ❌ `users.id = auth.uid()` — Wrong! Use `users.supabase_uid = auth.uid()::text`
-
-### ⛔ CRITICAL: User ID vs Supabase UID — READ THIS BEFORE ANY USER QUERY
-
-> **THIS IS THE #1 SOURCE OF BUGS IN THIS CODEBASE. STOP AND VERIFY.**
->
-> The `users` table has TWO different ID fields:
->
-> | Field | Type | Description | When to Use |
-> |-------|------|-------------|-------------|
-> | `users.id` | UUID | Internal app user ID | Foreign keys, relationships between app tables |
-> | `users.supabase_uid` | TEXT | Supabase Auth user ID | Matching with `auth.uid()`, session user identification |
->
-> **NEVER confuse these:**
-> - ❌ `users.id = auth.uid()` — **ALWAYS WRONG**
-> - ❌ `users.id = session.user.id` — **ALWAYS WRONG**  
-> - ❌ Comparing `users.id` with any Supabase Auth value — **ALWAYS WRONG**
->
-> **CORRECT patterns:**
-> - ✅ `users.supabase_uid = auth.uid()::text` — For RLS policies
-> - ✅ `userRepository.findBySupabaseUid(authUser.id)` — For API routes
-> - ✅ `WHERE supabase_uid = $supabaseAuthId` — For raw SQL
->
-> **Before writing ANY query involving users:**
-> 1. ASK: "Am I comparing with a Supabase Auth ID?"
-> 2. If YES → Use `supabase_uid` column
-> 3. If comparing app tables (messages.sender_id, spaces.created_by) → Use `users.id`
-
-### 1. User ID vs Supabase UID (DATABASE)
-```
-users.id          → Internal app UUID (for foreign keys)
-users.supabase_uid → Supabase Auth ID (for auth.uid() matching)
-
-❌ users.id = auth.uid()           → ALWAYS WRONG
-✅ users.supabase_uid = auth.uid()::text → CORRECT
-```
-
-### 2. getSession() vs getUser() (AUTH)
-| Context | Method | Why |
-|---------|--------|-----|
-| Server (API/Actions) | `getUser()` | Validates JWT on Auth server |
-| Client (Browser) | `getSession()` | Fast, from local storage |
-| Middleware | `getSession()` | OK for token refresh only |
-
-```typescript
-// ❌ WRONG - Server trusting getSession
-'use server'
-const { data: { session } } = await supabase.auth.getSession()
-if (session?.user) { /* INSECURE */ }
-
-// ✅ CORRECT - Server using getUser
-'use server'
-const { data: { user }, error } = await supabase.auth.getUser()
-if (error || !user) { return { error: 'Unauthorized' } }
-```
-
-### 3. Client vs Server Supabase Clients
-```typescript
-// Server (API routes, Server Actions, Server Components)
-import { createSupabaseServerClient } from '@/lib/supabase/server-client'
-const supabase = await createSupabaseServerClient()
-
-// Client (React Components in browser)
-import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client'
-const supabase = createSupabaseBrowserClient()
-```
-
-### 4. Admin Operations (service_role)
-- **NEVER** expose `SUPABASE_SERVICE_ROLE_KEY` to the client
-- **ONLY** use in Server Actions or API Routes
-- Always verify user role in database before admin operations
-
-## Key Patterns
-
-### Server Client (Next.js 15)
-```typescript
-// src/lib/supabase/server-client.ts
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-export async function createSupabaseServerClient() {
-  const cookieStore = await cookies() // MUST await in Next.js 15
-  
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch { /* Ignore in Server Components */ }
-        },
-      },
-    }
-  )
-}
-```
-
-### Middleware (Official Pattern)
-```typescript
-// middleware.ts
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  await supabase.auth.getSession() // Refresh tokens
-  return supabaseResponse
-}
-```
-
-### MFA Flow (Complete)
-```typescript
-// 1. Enroll
-const { data } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
-const factorId = data.id
-
-// 2. Challenge (REQUIRED!)
-const { data: challenge } = await supabase.auth.mfa.challenge({ factorId })
-const challengeId = challenge.id
-
-// 3. Verify
-await supabase.auth.mfa.verify({ factorId, challengeId, code })
-```
-
-## Files Reference
-
-| File | Purpose |
-|------|---------|
-| `src/lib/supabase/server-client.ts` | Server-side Supabase client |
-| `src/lib/supabase/browser-client.ts` | Browser Supabase client |
-| `middleware.ts` | Auth middleware |
-| `src/contexts/AuthContext.tsx` | Client-side auth state |
-| `src/app/actions/auth.ts` | Server Actions for auth |
-
-## Verification Sources
-
-- `/supabase/ssr` - Official SSR package docs
-- `/supabase/supabase-js` - Official JS client docs
-- `/websites/supabase_com-docs` - Official Supabase guides
-
-## Related Documents
-
-- Full implementation guide: `docs/supabase-auth-research.md`
-- Database schema: `migrations/database-structure.md`
-
-
-
-## Type Registry & Change Control
-- Canonical types live in `src/types/`. Examples: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`.
-- **Do not create new types** if a semantic equivalent exists. Extend existing ones.
-- Allowed user roles: `type UserRole = 'admin' | 'member'`. Do not add roles.
-- To change a type, edit the existing file and include a brief “Change Note” in the PR description:
-  - Why the existing type was insufficient
-  - What fields changed
-  - Impacted modules
-
-## Anti-Duplication Protocol (execute before coding)
-1. Search the codebase for existing components/hooks/types that match the intent.
-2. If found, reuse or extend. Do not create a new file.
-3. If extending, specify the exact file and exported name you will modify.
-4. Output must include:
-   - **Paths touched** (exact)
-   - **Exports used** (exact names)
-   - **Reasoning** (“reuse/extend” and why)
-   - **Deprecations** if replacing prior duplicates
-5. Creating new files is allowed only when no suitable target exists.
+## Type Registry
+- Canonical types in `src/types/`: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`
+- Do not create new types if a semantic equivalent exists. Extend existing ones.
+- Allowed user roles: `'admin' | 'member'` only. Do not add roles.
 
 ## Code Rules
-- Strict TypeScript. Provide explicit types for props, state, params, and returns.
-- Prefer interfaces for object shapes; `type` for unions and function signatures.
-- Keep files under ~500 lines. Split with cohesive subcomponents or hooks.
-- Business logic in utilities/services. UI in components. Data access via repositories.
-- Use composition over monoliths. Extract hooks for complex effects or data flows.
-- Verify if functionality exists before implementing. Reuse shared libs and APIs.
-- Even if all tests pass, keep **Status: Pending user confirmation**.
+- Strict TypeScript with explicit types for props, state, params, returns.
+- Interfaces for object shapes; `type` for unions and function signatures.
+- Files under ~500 lines. Business logic in utilities/services, UI in components, data in repositories.
+- PascalCase: components/filenames. kebab-case: directories. camelCase: variables/functions. Hooks: `use-*.ts`.
+- Prefix: `handle*` handlers, `is/has/can` booleans, `use*` hooks, `UPPER_SNAKE` env/constants.
+- Repository pattern in `src/repositories/`. Construct with **server** Supabase client in API routes.
+- Query hooks in `src/hooks/queries/`, mutations in `src/hooks/mutations/`, realtime in `src/hooks/realtime/`.
 
-## Naming Conventions
-- PascalCase: exported React components and their filenames.
-- kebab-case: directories and non-component filenames.
-- camelCase: variables, functions, methods, hooks.
-- Hooks filenames: `use-*.ts`.
-- UPPER_SNAKE_CASE: env vars and global constants.
-- Prefix patterns: `handle*` for handlers; `is/has/can` for booleans; `use*` for hooks.
-- Prefer full words; allowed abbrev: `err`, `req`, `res`, `props`, `ref`.
+## Avatars
+- Canonical display: `EnhancedAvatarV2`. Canonical upload: `UploadableAvatar`.
+- All other avatar components are **deprecated**. Replace as you touch files.
 
-## Repository & Data Access
-- Repository pattern in `src/repositories/`. Keep interfaces and implementations separate.
-- In API routes, construct repositories with the **server** Supabase client instance.
-- Query hooks in `src/hooks/queries/`. Mutation hooks in `src/hooks/mutations/`. Realtime in `src/hooks/realtime/`.
-
-## Features — Status (concise)
-- Auth: Implemented, pending verification. `src/contexts/AuthContext.tsx`, `src/lib/auth/`
-- Company Mgmt: Partial. `src/contexts/CompanyContext.tsx`, `src/repositories/`
-- Dashboard: Partial. `src/app/(dashboard)/dashboard/`
-- Messaging: Partial realtime integration. `src/components/messaging/`, `src/hooks/realtime/`
-- Presence: Implemented, verify. `src/contexts/PresenceContext.tsx`, `src/hooks/useUserPresence.ts`
-- Invitations: Strong architecture. Acceptance flow needs restoration. `src/components/invitation/`, `src/app/admin/invitations/`
-- Floor Plan: Base structure. `src/components/floor-plan/`
-
-## Avatars — Canonical & Deprecations
-- Canonical display: `EnhancedAvatarV2`
-- Canonical upload: `UploadableAvatar`
-- All other avatar components are **deprecated**. Replace calls with the canonical components as you touch files.
-
-## UI Interaction — Click-Stop Standard (critical)
-- Mark interactive children: Add `data-avatar-interactive` to any child that opens menus or triggers actions (avatars, dropdown triggers, buttons inside cards).
-- Parent guard: In parent clickable containers (e.g., space cards like `SpaceElement`), the click handler must:
-   - Early-return if `!event.currentTarget.contains(event.target as Node)` to ignore events bubbling from Radix/shadcn portals.
-   - Early-return if the target `closest('[data-avatar-interactive]')` or `closest('a, button, [role="button"], [data-space-action]')` matches.
-- Portal menus (Radix/shadcn): On `DropdownMenuContent`, stop propagation on `onPointerDown`, `onClick`, and `onKeyDown`; on `DropdownMenuItem`, cancel `onSelect` and stop propagation in `onClick`. Also mark the content with `data-avatar-interactive`.
-- Avatars/menus: Wrappers like `UserAvatarPresence` and `UserInteractionMenu` must stop propagation on pointer/click to prevent space navigation when interacting with messaging actions.
-
-## UI Libraries
-- Current: shadcn/ui + Radix.
-
-## Workflows (concise)
-- Auth & Onboarding: Register → Email/Google → Profile → Company. `src/app/(auth)/`
-- Dashboard: Login → Dashboard → Quick links. `src/app/(dashboard)/dashboard/`
-- Messaging: Join room → Send → Realtime updates → Presence.
-- Invitations (admin): Create → Send → Accept (restore flow).
-
-## Project Structure (scoped)
-- `src/app/`: App Router routes and layouts  
-- `src/components/`: UI by feature (auth, dashboard, floor-plan, invitation, messaging, profile, ui)  
-- `src/contexts/`: global state (Auth, Company, Presence)  
-- `src/hooks/`: queries, mutations, realtime, shared hooks  
-- `src/lib/`: auth, services, supabase, uploads, utilities  
-- `src/providers/`: app-level providers  
-- `src/repositories/`: interfaces, implementations, factory  
-- `src/types/`: **canonical types**  
-- `migrations/`, `middleware.ts`, `__tests__/`
-
-**New files must live in the existing feature folders. Do not add new top-level directories.**
+## UI Interaction — Click-Stop Standard
+- Add `data-avatar-interactive` to interactive children (avatars, dropdown triggers, buttons in cards).
+- Parent clickable containers must early-return if target `closest('[data-avatar-interactive]')` or `closest('a, button, [role="button"], [data-space-action]')`.
+- Portal menus (Radix/shadcn): stop propagation on `onPointerDown`, `onClick`, `onKeyDown` on DropdownMenuContent.
+- Avatar/menu wrappers must stop propagation to prevent space navigation on messaging interactions.
 
 ## Build & Lint
-- Dev: `npm run dev`, Build: `npm run build`, Start: `npm run start`
-- Lint: `npm run lint`
-- Find errors: `npm run type-check`
-- Search `package.json` for existing commands.
+- Dev: `npm run dev` | Build: `npm run build` | Lint: `npm run lint` | Types: `npm run type-check`
+- New files must live in existing feature folders. Do not add new top-level directories.
