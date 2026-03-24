@@ -155,6 +155,11 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
   const [rejoinAttempts, setRejoinAttempts] = useState(0);
   const isUpdatingRef = useRef(false);
   const lastUpdateRef = useRef<string | null>(null);
+  // When true, the auto-placement effect skips its next run.
+  // Set by saveLastSpace() so that manual space clicks (which already call
+  // updateLocation via PresenceContext) are never overwritten by auto-placement
+  // trying to move the user back to home/default space.
+  const manualChangeRef = useRef(false);
   const queryClient = useQueryClient();
 
   const markFirstLoginComplete = useCallback(() => {
@@ -334,6 +339,15 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
   }, [saveDisconnectTimestamp]);
 
   useEffect(() => {
+    // Skip when saveLastSpace() was just called — the user clicked a space
+    // manually and the API call is already handled by PresenceContext.updateLocation.
+    // Auto-placement must not overwrite it with the home/default space.
+    if (manualChangeRef.current) {
+      manualChangeRef.current = false;
+      console.log('[useLastSpace] Skipped: manual space change in progress');
+      return;
+    }
+
     if (isUpdatingRef.current || isRejoinInProgress) {
       console.log('[useLastSpace] Skipped: update in progress');
       return;
@@ -391,12 +405,12 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
   ]);
 
   const saveLastSpace = useCallback((spaceId: string) => {
+    // Signal that this is a manual space change — the auto-placement effect
+    // must skip its next run so it doesn't overwrite the user's click with
+    // the home/default space. The API call is handled separately by
+    // PresenceContext.updateLocation (called from ModernFloorPlan).
+    manualChangeRef.current = true;
     setLastSpaceId(spaceId);
-    // Do NOT clear lastUpdateRef here. Clearing it causes the placement effect
-    // to re-fire and override the manual space change with auto-placement (home space),
-    // because currentUser.currentSpaceId from CompanyContext is stale (always null).
-    // The ref stays set after initial placement so the effect correctly skips.
-    // Only clearLastSpace() (logout) should reset the ref.
   }, [setLastSpaceId]);
 
   const clearLastSpace = useCallback(() => {

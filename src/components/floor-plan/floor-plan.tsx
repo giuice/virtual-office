@@ -43,7 +43,7 @@ export function FloorPlan() {
   // Context hooks
   const { company, spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany();
   const router = useRouter();
-  const { usersInSpaces, updateLocation, users } = usePresence();
+  const { usersInSpaces, users } = usePresence();
   const {
     getOrCreateRoomConversation,
     setActiveConversation,
@@ -205,7 +205,10 @@ export function FloorPlan() {
   const handleSpaceSelect = (space: Space) => {
     setSelectedSpace(space);
     setHighlightedSpaceId(space.id);
-    handleEnterSpace(space);
+    // Only persist to localStorage for reconnection recovery.
+    // The actual API call (updateLocation) is already handled by
+    // ModernFloorPlan.handleEnterSpace BEFORE this callback fires.
+    saveLastSpace(space.id);
   };
 
   const handleEditSpace = (space: Space) => {
@@ -243,23 +246,6 @@ export function FloorPlan() {
 
   const handleDuplicateRoom = (room: Space) => {
     console.warn("handleDuplicateRoom needs API integration");
-  };
-
-  const handleEnterSpace = (space: Space) => {
-    if (!space || !space.id) {
-      toast({
-        title: "Error",
-        description: "Cannot enter space: Invalid space data.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    saveLastSpace(space.id);
-    updateLocation(space.id);
-    setHighlightedSpaceId(space.id);
-    setSelectedSpace(space);
-    console.log(`User entering space: ${space.name} (${space.id})`);
   };
 
   return (
