@@ -104,9 +104,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260324-e13 | Fix floor-plan space-change regression (missing updateLocation call) | 2026-03-24 | pending | [260324-e13](./quick/260324-e13-diagnose-floor-plan-space-change-regress/) |
+| 260324-k7r | Fix enter-space: eliminate double updateLocation + guard useLastSpace | 2026-03-24 | pending | [260324-k7r](./quick/260324-k7r-fix-enter-space-eliminate-double-updatel/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-24 - Completed quick task 260324-e13: diagnose floor-plan space-change regression and compile findings
-Stopped at: Quick task 260324-e13 complete, pending user verification of space-change fix
+Last activity: 2026-03-24 - Completed quick task 260324-k7r: fix enter-space double updateLocation + useLastSpace guard
+Stopped at: Quick task 260324-k7r complete, pending user verification
 Resume file: None
