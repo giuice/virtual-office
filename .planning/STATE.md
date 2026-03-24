@@ -99,8 +99,14 @@ None yet.
 - ~~Auth login/signup has undiagnosed issues (STAB-02)~~ -- FIX APPLIED in 01-02, awaiting human verification
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260324-e13 | Fix floor-plan space-change regression (missing updateLocation call) | 2026-03-24 | pending | [260324-e13](./quick/260324-e13-diagnose-floor-plan-space-change-regress/) |
+
 ## Session Continuity
 
-Last session: 2026-03-19T20:26:00.292Z
-Stopped at: Completed 02-floor-plan-completion-07-PLAN.md
+Last activity: 2026-03-24 - Completed quick task 260324-e13: diagnose floor-plan space-change regression and compile findings
+Stopped at: Quick task 260324-e13 complete, pending user verification of space-change fix
 Resume file: None

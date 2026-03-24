@@ -115,11 +115,8 @@ export function FloorPlan() {
     if (space) {
       setSelectedSpace(space);
       setHighlightedSpaceId(space.id);
-      // BUG 3 Fix: Call saveLastSpace() during visual hydration to sync UI state with localStorage
-      // This ensures that the UI state change also persists to localStorage, preventing UI/DB divergence
-      saveLastSpace(space.id);
     }
-  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces, saveLastSpace]);
+  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces]);
 
   // Callback: Handle opening chat for a room via unified messaging drawer
   const handleOpenChat = useCallback(async (room: Space) => {
@@ -259,9 +256,10 @@ export function FloorPlan() {
     }
 
     saveLastSpace(space.id);
+    updateLocation(space.id);
     setHighlightedSpaceId(space.id);
     setSelectedSpace(space);
-    console.log(`User viewing space: ${space.name} (${space.id})`);
+    console.log(`User entering space: ${space.name} (${space.id})`);
   };
 
   return (
