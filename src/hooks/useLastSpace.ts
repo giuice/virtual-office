@@ -211,8 +211,6 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
           console.log('[useLastSpace] API call succeeded, placing user in space:', targetSpaceId);
           const updateKey = `${userId}-${targetSpaceId}`;
           lastUpdateRef.current = updateKey;
-          // BUG 2 Fix: Save lastSpaceId to localStorage for automatic placements
-          // This ensures that all placement paths (not just manual clicks) persist the lastSpaceId
           setLastSpaceId(targetSpaceId);
           setRejoinAttempts(0);
           clearDisconnectTimestamp();
@@ -363,8 +361,6 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
     if (currentUser.currentSpaceId === context.spaceId) {
       console.log('[useLastSpace] Already in target space, setting updateKey only');
       lastUpdateRef.current = updateKey;
-      // BUG 2 Fix: Save lastSpaceId even when user is already in the correct space
-      // This ensures lastSpaceId is persistent for all automatic placement scenarios
       setLastSpaceId(context.spaceId);
       if (context.type === 'first-time') {
         markFirstLoginComplete();
@@ -396,7 +392,11 @@ export function useLastSpace(currentUser: User | null, spaces: Space[], company:
 
   const saveLastSpace = useCallback((spaceId: string) => {
     setLastSpaceId(spaceId);
-    lastUpdateRef.current = null;
+    // Do NOT clear lastUpdateRef here. Clearing it causes the placement effect
+    // to re-fire and override the manual space change with auto-placement (home space),
+    // because currentUser.currentSpaceId from CompanyContext is stale (always null).
+    // The ref stays set after initial placement so the effect correctly skips.
+    // Only clearLastSpace() (logout) should reset the ref.
   }, [setLastSpaceId]);
 
   const clearLastSpace = useCallback(() => {
