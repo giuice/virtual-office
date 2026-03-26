@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "skill_name": "presence-safety",
+    "skill_path": "/home/giuice/apps/virtual-office/.claude/skills/presence-safety",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-03-26T01:33:00Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "Beacon Race Trap",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 69.6,
+        "tokens": 35588,
+        "tool_calls": 6,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Explicitly refused. Cited Rule 1 from skill."},
+        {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "5-step explanation of the race condition."},
+        {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Showed route.ts code proving correct behavior."},
+        {"text": "Pushes back on the user's suggested fix", "passed": true, "evidence": "Strong pushback with debugging protocol recommendation."}
+      ],
+      "notes": ["Referenced skill Rule 1 explicitly", "Recommended debugging protocol instead of code changes"]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "Beacon Race Trap",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 110.6,
+        "tokens": 45141,
+        "tool_calls": 11,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Correctly refused the change."},
+        {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "Detailed explanation of why clearing would make bug worse."},
+        {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Identified server already preserves space. Proposed status restoration fix."},
+        {"text": "Pushes back on the user's suggested fix", "passed": true, "evidence": "Strong refusal with concrete alternative fixes."}
+      ],
+      "notes": ["Read code comments that document design intent", "Proposed concrete fixes for real root cause (status restoration)", "60% slower, 27% more tokens"]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Double API Call Trap",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 63.5,
+        "tokens": 33643,
+        "tool_calls": 5,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Cited Common Mistake #1 from skill."},
+        {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Full call flow traced with line numbers."},
+        {"text": "Explains duplicate API requests consequence", "passed": true, "evidence": "Listed 4 consequences including regression."},
+        {"text": "Proposes alternative approaches for lag", "passed": true, "evidence": "Move onSpaceSelect before await for optimistic UI."}
+      ],
+      "notes": ["Cited Rule 2 and Common Mistake #1 by name", "Referenced commit ac5c7bd"]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Double API Call Trap",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 83.4,
+        "tokens": 42764,
+        "tool_calls": 9,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Referenced Pitfall 3 from pitfalls guide."},
+        {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Full 8-step call flow with line numbers."},
+        {"text": "Explains duplicate API requests consequence", "passed": true, "evidence": "4 consequences with recent commit references."},
+        {"text": "Proposes alternative approaches for lag", "passed": true, "evidence": "Two full diffs: optimistic UI + cache update reorder."}
+      ],
+      "notes": ["Found pitfalls guide doc independently", "More detailed alternatives with full diffs", "31% slower, 27% more tokens"]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Mixed Fixes (Good + Bad)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 80.5,
+        "tokens": 34760,
+        "tool_calls": 8,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Correctly handles offline user filtering in usersInSpaces", "passed": true, "evidence": "Identified filter ALREADY EXISTS at line 300. No redundant code."},
+        {"text": "Warns against CompanyContext.currentUserProfile for reactive checks", "passed": true, "evidence": "Cited Rule 5 verbatim with stale-state consequences."},
+        {"text": "Recommends presenceAwareUsers from query cache", "passed": true, "evidence": "Pointed to existing guards in ModernFloorPlan and safeUpdateLocation."},
+        {"text": "Distinguishes between the two requests with nuanced response", "passed": true, "evidence": "Fix 1 = Already implemented, Fix 2 = MUST NOT DO. Clear table."}
+      ],
+      "notes": ["Zero unnecessary code changes", "Identified both requests already handled or dangerous"]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Mixed Fixes (Good + Bad)",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.75,
+        "passed": 3,
+        "failed": 1,
+        "total": 4,
+        "time_seconds": 124.9,
+        "tokens": 49466,
+        "tool_calls": 11,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Correctly handles offline user filtering in usersInSpaces", "passed": true, "evidence": "Found existing filter. Added secondary guard using onlineUserIds."},
+        {"text": "Warns against CompanyContext.currentUserProfile for reactive checks", "passed": true, "evidence": "Explicit section explaining stale-state issues."},
+        {"text": "Recommends presenceAwareUsers from query cache", "passed": true, "evidence": "Used presence data for already-in-space guard."},
+        {"text": "Distinguishes between the two requests with nuanced response", "passed": false, "evidence": "Implemented BOTH changes with code diffs. Added space-blocking UX feature that changes behavior without confirming. With-skill version correctly identified no changes needed."}
+      ],
+      "notes": ["Overshot — proposed unnecessary code changes", "Added risky secondary guard filtering away/busy users", "New space-blocking UX not requested", "55% slower, 42% more tokens"]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0},
+      "time_seconds": {"mean": 71.2, "stddev": 8.6, "min": 63.5, "max": 80.5},
+      "tokens": {"mean": 34664, "stddev": 974, "min": 33643, "max": 35588}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.917, "stddev": 0.144, "min": 0.75, "max": 1.0},
+      "time_seconds": {"mean": 106.3, "stddev": 20.9, "min": 83.4, "max": 124.9},
+      "tokens": {"mean": 45790, "stddev": 3365, "min": 42764, "max": 49466}
+    },
+    "delta": {
+      "pass_rate": "+0.083",
+      "time_seconds": "-35.1",
+      "tokens": "-11126"
+    }
+  },
+  "notes": [
+    "With-skill achieves 100% pass rate vs 91.7% without skill — the difference is in eval 3 (nuanced mixed request)",
+    "With-skill is 33% faster on average (71s vs 106s) — direct rule references avoid exploratory code reading",
+    "With-skill uses 24% fewer tokens (35k vs 46k) — skill provides context upfront instead of agent discovering it",
+    "Evals 1-2 pass 100% in both configs — the codebase's existing comments/docs help the baseline. Skill's value is speed + confidence",
+    "Eval 3 is the discriminating test: with-skill correctly identifies 'no changes needed', without-skill proposes unnecessary/risky changes",
+    "The baseline found the pitfalls guide doc (eval 2) which partially duplicates skill content — skill's advantage is systematic coverage"
+  ]
+}

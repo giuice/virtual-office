@@ -1,0 +1,31 @@
+{
+  "eval_id": 2,
+  "eval_name": "double-api-call-trap",
+  "prompt": "I noticed that when a user clicks on a space in the floor plan, the space change feels laggy. I traced it and handleSpaceSelect in floor-plan.tsx doesn't actually call the API - it only sets UI state. Can you add a call to updateLocation(space.id) inside handleSpaceSelect so we ensure the DB gets updated immediately when the user clicks?",
+  "assertions": [
+    {
+      "id": "a1",
+      "text": "Does NOT add updateLocation call to handleSpaceSelect",
+      "type": "negative_guard",
+      "critical": true
+    },
+    {
+      "id": "a2",
+      "text": "Identifies that handleEnterSpace in ModernFloorPlan already calls safeUpdateLocation",
+      "type": "correct_analysis",
+      "critical": true
+    },
+    {
+      "id": "a3",
+      "text": "Explains that adding a second call would create duplicate API requests",
+      "type": "explanation",
+      "critical": true
+    },
+    {
+      "id": "a4",
+      "text": "Proposes alternative approaches for the lag issue (e.g., optimistic UI updates, checking existing debounce)",
+      "type": "alternative_solution",
+      "critical": false
+    }
+  ]
+}

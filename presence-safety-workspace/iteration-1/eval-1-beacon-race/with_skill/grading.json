@@ -1,0 +1,28 @@
+{
+  "eval_id": 1,
+  "run_type": "with_skill",
+  "expectations": [
+    {
+      "text": "Does NOT propose clearing current_space_id in beacon/disconnect handler",
+      "passed": true,
+      "evidence": "Explicitly stated 'I must not make the requested change' and 'The system is already correct'. Proposed zero code changes."
+    },
+    {
+      "text": "Explains the beacon race condition risk",
+      "passed": true,
+      "evidence": "Detailed 5-step explanation of the race: beacon fires -> current_space_id set to null -> Realtime event wipes user from maps -> user reopens with null -> avatar disappears permanently."
+    },
+    {
+      "text": "Recommends only setting status to offline while preserving current_space_id",
+      "passed": true,
+      "evidence": "Showed the route.ts code proving server only sets status:'offline' and explicitly preserves current_space_id. Cited Rule 1 from the skill."
+    },
+    {
+      "text": "Pushes back on the user's suggested fix rather than blindly implementing it",
+      "passed": true,
+      "evidence": "Strong pushback: 'The user's proposed fix is the exact opposite of what should happen'. Recommended debugging protocol instead of code changes."
+    }
+  ],
+  "pass_rate": 1.0,
+  "notes": "Perfect response. Referenced skill Rule 1 explicitly. Fast (70s) and efficient (36k tokens). Recommended debugging protocol."
+}

@@ -198,11 +198,15 @@ async function enforceSpaceAuthorization(params: {
   }
 
   if (targetSpace.capacity > 0) {
+    // Only count non-offline users toward capacity.
+    // Offline users keep their current_space_id set (for reload recovery)
+    // but should not block others from joining.
     const { count, error: countError } = await supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('current_space_id', spaceId)
-      .neq('id', authenticatedUser.id);
+      .neq('id', authenticatedUser.id)
+      .neq('status', 'offline');
 
     if (countError) {
       throw new Error(`Failed to verify space capacity: ${countError.message}`);
@@ -335,6 +339,26 @@ async function handleLocationUpdate(request: Request) {
       );
     }
 
+    // Offline beacon (tab close / reload): only mark status offline, preserve space.
+    // The user's current_space_id stays set so they reappear in the same space on
+    // reload (no grace-rejoin race). Offline users are filtered from space avatars
+    // on the client, so stale positions don't affect other users' views.
+    if (offline) {
+      const offlineUser = await userRepository.update(authenticatedUser.id, {
+        status: 'offline',
+      });
+
+      if (!offlineUser) {
+        return NextResponse.json({ error: 'Failed to update offline status' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: offlineUser,
+        message: 'User marked offline',
+      }, { status: 200 });
+    }
+
     const previousSpaceId = authenticatedUser.currentSpaceId ?? null;
     const spaceChanged = previousSpaceId !== spaceId;
     const timestamp = new Date().toISOString();
@@ -391,23 +415,9 @@ async function handleLocationUpdate(request: Request) {
       }
     }
 
-    let responseUser = updatedUser;
-    if (offline) {
-      const offlineUser = await userRepository.update(authenticatedUser.id, {
-        status: 'offline',
-        currentSpaceId: null,
-      });
-
-      if (!offlineUser) {
-        return NextResponse.json({ error: 'Failed to update offline status' }, { status: 500 });
-      }
-
-      responseUser = offlineUser;
-    }
-
     return NextResponse.json({
       success: true,
-      user: responseUser,
+      user: updatedUser,
       message: 'Location updated successfully',
     }, { status: 200 });
 

@@ -48,9 +48,10 @@ Installed skills provide specialized capabilities. **Invoke the relevant skill w
 | `/code-quality` | General correctness rules, avoiding over-engineering, comment quality |
 | `/code-review-quality` | Conducting thorough code reviews with confidence-based filtering |
 | `/simplify` | After completing changes — review for reuse, quality, and efficiency |
+| `/playwright-cli` | Browser automation for E2E testing, form filling, screenshots, navigating pages, interacting with web UI |
 | `/web-design-guidelines` | UI accessibility audit, UX review, design best practices |
 
-**Proactive skill usage**: Don't wait for the user to ask. If you're refactoring a complex hook, invoke `/refactor-method-complexity-reduce`. If you're writing realtime code, invoke `/supabase-realtime`. If you just edited multiple components, run `/react-best-practices`.
+**Proactive skill usage**: Don't wait for the user to ask. If you're refactoring a complex hook, invoke `/refactor-method-complexity-reduce`. If you're writing realtime code, invoke `/supabase-realtime`. If you just edited multiple components, run `/react-best-practices`. If you need to test UI flows in a browser, invoke `/playwright-cli`.
 
 ## Architecture
 - Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)

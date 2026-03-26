@@ -45,7 +45,9 @@ const mockAdminFrom = vi.fn((table: string) => {
     return {
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          neq: vi.fn(() => mockUsersCount()),
+          neq: vi.fn(() => ({
+            neq: vi.fn(() => mockUsersCount()),
+          })),
         })),
       })),
     };

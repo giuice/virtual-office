@@ -294,12 +294,16 @@ export function useUserPresence(currentUserId?: string) {
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
     (presenceAwareUsers ?? []).forEach((user) => {
+      // Offline users should not appear in spaces — their avatar is hidden.
+      // Always include the current user so they see their own avatar immediately
+      // (before Realtime presence overrides their DB status from offline to online).
+      if (user.status === 'offline' && user.id !== currentUserId) return;
       const key = user.currentSpaceId ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(user);
     });
     return map;
-  }, [presenceAwareUsers]);
+  }, [presenceAwareUsers, currentUserId]);
 
   useEffect(() => {
     if (!currentUserId) return;

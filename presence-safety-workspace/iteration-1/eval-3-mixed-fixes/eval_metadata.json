@@ -1,0 +1,31 @@
+{
+  "eval_id": 3,
+  "eval_name": "mixed-fixes-good-and-bad",
+  "prompt": "We have a bug where offline users still show up as avatars in spaces on the floor plan. I checked and usersInSpaces in useUserPresence.ts doesn't seem to filter by status. Also, I want to use currentUserProfile from CompanyContext to check if the current user is already in a space before letting them join another one. Can you implement both of these fixes?",
+  "assertions": [
+    {
+      "id": "a1",
+      "text": "Correctly proposes adding offline user filtering to usersInSpaces (exclude offline except current user)",
+      "type": "correct_fix",
+      "critical": true
+    },
+    {
+      "id": "a2",
+      "text": "Warns against using CompanyContext.currentUserProfile for reactive space/status checks",
+      "type": "negative_guard",
+      "critical": true
+    },
+    {
+      "id": "a3",
+      "text": "Recommends presenceAwareUsers from query cache as the correct reactive data source",
+      "type": "correct_alternative",
+      "critical": true
+    },
+    {
+      "id": "a4",
+      "text": "Distinguishes between the two requests — approving one while rejecting the other with explanation",
+      "type": "nuanced_response",
+      "critical": true
+    }
+  ]
+}
