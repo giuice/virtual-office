@@ -65,7 +65,6 @@ cline_utils
 bmad/
 
 # Claude-specific files
-.claude/
 bmad-bak/
 #.bmad/
 /memory-bank
