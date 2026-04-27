@@ -1,0 +1,23 @@
+{
+  "skill_name": "presence-safety",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Users are reporting that when they close the browser tab and reopen the app, their avatar disappears from the space they were in. I think the beacon handler in useUserPresence.ts is clearing their space on disconnect. Can you fix the beforeunload handler to also reset current_space_id to null so we have a clean state when they come back?",
+      "expected_output": "The skill should PREVENT the agent from clearing current_space_id in the beacon handler. It should explain Rule 1 (never clear current_space_id in cleanup paths) and that the beacon race condition will cause avatars to vanish. The correct fix is to only set status to offline.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I noticed that when a user clicks on a space in the floor plan, the space change feels laggy. I traced it and handleSpaceSelect in floor-plan.tsx doesn't actually call the API - it only sets UI state. Can you add a call to updateLocation(space.id) inside handleSpaceSelect so we ensure the DB gets updated immediately when the user clicks?",
+      "expected_output": "The skill should PREVENT adding updateLocation to handleSpaceSelect. It should explain Rule 2 (only ONE updateLocation call per user action) and show that handleEnterSpace already calls safeUpdateLocation upstream. Adding another call creates double API calls.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We have a bug where offline users still show up as avatars in spaces on the floor plan. I checked and usersInSpaces in useUserPresence.ts doesn't seem to filter by status. Also, I want to use currentUserProfile from CompanyContext to check if the current user is already in a space before letting them join another one. Can you implement both of these fixes?",
+      "expected_output": "The skill should guide adding offline filtering to usersInSpaces (Rule 3) while also warning NOT to use CompanyContext.currentUserProfile for reactive guards (Rule 5). Should recommend using presenceAwareUsers from query cache instead.",
+      "files": []
+    }
+  ]
+}

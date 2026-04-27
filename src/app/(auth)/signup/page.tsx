@@ -2,13 +2,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotification } from '@/hooks/useNotification';
 import { Loader2 } from 'lucide-react';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
@@ -38,9 +36,7 @@ export default function SignupPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = useState<{ success: boolean; email: string } | null>(null);
 
-  const router = useRouter();
   const { signUp, signInWithGoogle, loading: authLoading, isAuthReady, actionLoading } = useAuth();
-  const { showSuccess, showError } = useNotification();
   const errorRef = useRef<HTMLDivElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
 
@@ -68,9 +64,7 @@ export default function SignupPage() {
     setFormError(null);
 
     if (password !== confirmPassword) {
-      const mismatchMessage = 'As senhas não conferem. Confirme sua senha.';
-      setFormError(mismatchMessage);
-      showError({ description: mismatchMessage });
+      setFormError('As senhas não conferem. Confirme sua senha.');
       return;
     }
 
@@ -81,10 +75,8 @@ export default function SignupPage() {
     try {
       await signUp(email, password, displayName);
       setSignupSuccess({ success: true, email });
-      showSuccess({ description: 'Conta criada com sucesso!' });
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
-      showError({ description: friendlyMessage });
       setFormError(friendlyMessage);
       setStatusMessage(null);
     } finally {
@@ -101,11 +93,9 @@ export default function SignupPage() {
 
     try {
       await signInWithGoogle();
-      showSuccess({ description: 'Conta criada com Google com sucesso!' });
-      router.push('/onboarding');
+      setStatusMessage('Redirecionando...');
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
-      showError({ description: friendlyMessage });
       setFormError(friendlyMessage);
       setStatusMessage(null);
     } finally {

@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "presence-safety", "runs": [{"id": "eval-1-beacon-race-with_skill", "prompt": "Users are reporting that when they close the browser tab and reopen the app, their avatar disappears from the space they were in. I think the beacon handler in useUserPresence.ts is clearing their space on disconnect. Can you fix the beforeunload handler to also reset current_space_id to null so we have a clean state when they come back?", "eval_id": 1, "outputs": [{"name": "response.md", "type": "text", "content": "# Presence Safety Evaluation: Beacon Race Condition Request\n\n## 1. Analysis of What the User Is Asking\n\nThe user reports that when users close a browser tab and reopen the app, their avatar disappears from the space they were in. Their hypothesis is that the beacon handler in `useUserPresence.ts` is clearing `current_space_id` on disconnect. They request that the `beforeunload` handler be modified to **also reset `current_space_id` to null** so there is a \"clean state\" on return.\n\n## 2. The Correct Approach: REFUSE This Change\n\n**I must not make the requested change. The user's proposed fix is the exact opposite of what should happen, and implementing it would make the bug worse, not better.**\n\nHere is why, based on the presence-safety skill (Rule 1) and the current codebase:\n\n### The system is already correct\n\nLooking at the actual code:\n\n**`useUserPresence.ts` (lines 333-349) -- the beacon handler:**\n```typescript\nconst handleBeforeUnload = () => {\n  localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());\n  const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });\n  if (navigator.sendBeacon) {\n    navigator.sendBeacon('/api/users/location', payload);\n    return;\n  }\n  // fallback fetch...\n};\n```\n\nThe beacon sends `{ offline: true, spaceId: null }`. The `spaceId: null` in the payload looks like it would clear the space, but...\n\n**`route.ts` (lines 346-360) -- the server-side offline handler:**\n```typescript\nif (offline) {\n  const offlineUser = await userRepository.update(authenticatedUser.id, {\n    status: 'offline',\n  });\n  // Returns immediately -- does NOT touch current_space_id\n  return NextResponse.json({ success: true, user: offlineUser, message: 'User marked offline' });\n}\n```\n\nWhen `offline: true`, the server **only** sets `status: 'offline'` and **preserves** `current_space_id`. The `spaceId: null` in the beacon payload is intentionally ignored by the server in this path. This is correct behavior as documented in the skill.\n\n### Why the user's request would cause a regression\n\nIf we modify the `beforeunload` handler to explicitly clear `current_space_id` (e.g., by sending a separate non-offline request, or changing the server to also null out the space), here is what would happen:\n\n1. User closes tab -> beacon fires -> `current_space_id` is set to `null` in DB\n2. A Realtime `postgres_changes` UPDATE event is broadcast to all connected clients\n3. Other users' `usersInSpaces` maps immediately remove the disconnected user from their space (correct so far)\n4. **User reopens the app** -> the DB has `current_space_id = null` -> there is no space to restore\n5. The `useLastSpace` hook might try to place the user via `localStorage.lastSpaceId`, but this is advisory-only and may fail for private spaces, capacity-limited spaces, etc.\n6. **Result: Avatar disappears permanently from the space instead of being restored on reconnect.**\n\nThe current design intentionally keeps `current_space_id` set so that on reload:\n- The DB fetch returns the user with their space intact\n- The user reappears in the same space immediately\n- Offline users are filtered from `usersInSpaces` for OTHER users (line 300: `if (user.status === 'offline' && user.id !== currentUserId) return;`)\n- The current user always sees their own avatar (same line, `user.id !== currentUserId` exception)\n\n### The real bug is elsewhere\n\nIf avatars are disappearing on reload, the root cause is NOT in the beacon handler (which is working correctly). Possible actual causes to investigate:\n\n1. **The query cache is being reset on page reload** and the initial fetch returns the user with `status: 'offline'` before the Realtime presence sync marks them online again. If the `isPresenceReady` flag is not yet `true`, the user might briefly show as offline and get filtered from `usersInSpaces`.\n\n2. **The `useLastSpace` auto-placement effect** might be firing before the user's presence is re-established, causing a race.\n\n3. **A timing issue** where the beacon's `status: 'offline'` DB update arrives via Realtime `postgres_changes` on the NEW page load before the new page has re-tracked the user in the presence channel, causing the derived status to be 'offline' and filtering them out.\n\n**Per the skill's debugging protocol**: I should not guess. The correct next step is to gather runtime evidence (console logs, network tab, DB state) before proposing any code changes.\n\n## 3. Proposed Code Changes\n\n**None.** The correct action is to make zero changes to the beacon handler or the API route.\n\nThe beacon handler in `useUserPresence.ts` is correctly sending `{ offline: true }`, and the server in `route.ts` is correctly preserving `current_space_id` when processing an offline beacon. Modifying either to also clear `current_space_id` would violate **Rule 1** of the presence safety guide and cause the exact bug the user is reporting to become permanent rather than transient.\n\n### What I Would Recommend Instead\n\nTo diagnose the actual root cause of avatar disappearance on reload:\n\n1. **Check the browser console** on reload for `[Presence]` logs -- specifically the timing of:\n   - The initial `/api/users/list` fetch (does it return the user with `status: 'offline'` and `currentSpaceId` still set?)\n   - The Realtime `postgres_changes` event from the beacon's offline update (does it arrive before or after presence tracking?)\n   - The `isPresenceReady` flag transition (does it happen before or after the offline event?)\n\n2. **Check the DB directly** after closing and reopening a tab:\n   ```sql\n   SELECT id, status, current_space_id FROM users WHERE id = '<user-id>';\n   ```\n   If `current_space_id` is `null` after tab close, something else is clearing it (not the beacon handler, based on current code). If it is still set (expected), the issue is in client-side rendering/filtering.\n\n3. **Check the `usersInSpaces` filtering logic** (line 294-306) -- the current user exception (`user.id !== currentUserId`) should prevent self-filtering, but verify `currentUserId` is defined when `usersInSpaces` first computes on reload.\n\nStatus: Pending user confirmation. The requested change was identified as harmful based on the presence-safety skill. No files were modified.\n"}], "grading": {"eval_id": 1, "run_type": "with_skill", "expectations": [{"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Explicitly stated 'I must not make the requested change' and 'The system is already correct'. Proposed zero code changes."}, {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "Detailed 5-step explanation of the race: beacon fires -> current_space_id set to null -> Realtime event wipes user from maps -> user reopens with null -> avatar disappears permanently."}, {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Showed the route.ts code proving server only sets status:'offline' and explicitly preserves current_space_id. Cited Rule 1 from the skill."}, {"text": "Pushes back on the user's suggested fix rather than blindly implementing it", "passed": true, "evidence": "Strong pushback: 'The user's proposed fix is the exact opposite of what should happen'. Recommended debugging protocol instead of code changes."}], "pass_rate": 1.0, "notes": "Perfect response. Referenced skill Rule 1 explicitly. Fast (70s) and efficient (36k tokens). Recommended debugging protocol."}}, {"id": "eval-1-beacon-race-without_skill", "prompt": "Users are reporting that when they close the browser tab and reopen the app, their avatar disappears from the space they were in. I think the beacon handler in useUserPresence.ts is clearing their space on disconnect. Can you fix the beforeunload handler to also reset current_space_id to null so we have a clean state when they come back?", "eval_id": 1, "outputs": [{"name": "response.md", "type": "text", "content": "# Analysis: Beacon Handler and Space Persistence on Tab Close/Reopen\n\n## 1. What the User is Asking\n\nThe user reports that when a user closes their browser tab and reopens the app, their avatar disappears from the space they were in. They believe the beacon handler in `useUserPresence.ts` is clearing `current_space_id` on disconnect, and they want the `beforeunload` handler modified to \"reset current_space_id to null so we have a clean state when they come back.\"\n\n## 2. Why the User's Proposed Fix is Wrong (and Would Make Things Worse)\n\n**The user's diagnosis is partially correct but their proposed solution is backwards.** Let me explain:\n\n### Current behavior (already correct in the server route)\n\nLooking at `src/app/api/users/location/route.ts` lines 342-359, the `offline` branch **already preserves `current_space_id`** -- it only sets `status: 'offline'`:\n\n```typescript\n// Offline beacon (tab close / reload): only mark status offline, preserve space.\n// The user's current_space_id stays set so they reappear in the same space on\n// reload (no grace-rejoin race). Offline users are filtered from space avatars\n// on the client, so stale positions don't affect other users' views.\nif (offline) {\n  const offlineUser = await userRepository.update(authenticatedUser.id, {\n    status: 'offline',\n  });\n  // ...\n}\n```\n\nThis is the **intentional, correct** design. The comment explicitly explains why: keeping `current_space_id` set means the user can reappear in the same space on reload without needing to race through the grace-rejoin flow.\n\n### The client-side beacon payload is misleading\n\nIn `useUserPresence.ts` lines 333-349, the `beforeunload` handler sends:\n\n```typescript\nconst payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });\nnavigator.sendBeacon('/api/users/location', payload);\n```\n\nThe payload includes `spaceId: null`, but this is **irrelevant** because the server-side route's `offline` branch (lines 346-359) short-circuits **before** it ever uses `spaceId`. It only calls `userRepository.update(id, { status: 'offline' })` and returns. The `spaceId: null` in the payload is dead data -- it never gets applied to the database.\n\n### What the user is actually proposing\n\nThe user wants to add `current_space_id = null` to the beforeunload flow. This would **cause the exact problem they're trying to fix**:\n\n1. User closes tab\n2. Beacon fires, clears `current_space_id` to `null` in DB\n3. User reopens app\n4. App loads user from DB -- `current_space_id` is `null`\n5. User has no space, avatar disappears\n\nThe current design intentionally keeps `current_space_id` set so that step 4 returns the user to their space. **Clearing it would break the reload recovery.**\n\n## 3. The Real Root Cause\n\nThe avatar disappearing is caused by a **different mechanism entirely**. After analyzing the full flow, the real problems are:\n\n### Problem A: Client-side filtering of offline users from space avatars\n\nIn `useUserPresence.ts` lines 294-306, the `usersInSpaces` memo filters out offline users:\n\n```typescript\nconst usersInSpaces = useMemo(() => {\n  const map = new Map<string | null, UserPresenceData[]>();\n  (presenceAwareUsers ?? []).forEach((user) => {\n    if (user.status === 'offline' && user.id !== currentUserId) return;\n    // ...\n  });\n  return map;\n}, [presenceAwareUsers, currentUserId]);\n```\n\nNote: it exempts the current user (`user.id !== currentUserId`). So the current user always sees themselves. But **other users** viewing the floor plan will filter out the reloading user because:\n- The beacon sets `status = 'offline'` in the DB\n- The postgres_changes realtime event propagates this to all connected clients\n- Those clients filter the user out of `usersInSpaces`\n\nThis is actually **expected behavior** -- the user IS offline during the reload window. The issue is how quickly the user comes back online.\n\n### Problem B: The `presenceAwareUsers` derivation overrides DB status\n\nIn `useUserPresence.ts` lines 135-164, when `isPresenceReady` is true and a user is not in the Supabase Realtime presence state, their status is derived as `'offline'` (line 152), even if the DB says they have a `current_space_id`. Since `usersInSpaces` filters by `status === 'offline'`, the user disappears from the floor plan even though their `current_space_id` is still set in the DB.\n\n### Problem C: Race between reload and presence re-establishment\n\nThe sequence on tab close + reopen:\n1. Tab closes -- beacon marks user `status: 'offline'` (space preserved in DB)\n2. New tab opens -- React initializes, queries `/api/users/list` (user has `current_space_id` set, `status: 'offline'`)\n3. Supabase Realtime channel subscribes, presence tracks\n4. `useLastSpace` placement effect runs -- but the user already has `currentSpaceId` in the query data (from step 2), so it may skip the update (line 375: `if (currentUser.currentSpaceId === context.spaceId)`)\n5. The user's status remains `'offline'` in the DB until something explicitly sets it to `'online'`\n\n**The missing piece**: Nothing in the reload flow sets `status` back to `'online'`. The beacon sets it to `'offline'`, but the reconnection only updates `current_space_id` (via `updateLocation`), and the Realtime presence `track()` only updates the ephemeral presence state, not the DB `status` column.\n\n## 4. The Correct Fix\n\nThe fix should NOT clear `current_space_id` on disconnect. Instead, it should ensure the user's `status` is set back to `'online'` when they reconnect. Here are the specific changes:\n\n### Change 1: Set user status to 'online' when Realtime presence is established\n\nIn `src/hooks/useUserPresence.ts`, when the channel subscription is established and the user tracks their presence, also update their DB status to 'online':\n\n```diff\n--- a/src/hooks/useUserPresence.ts\n+++ b/src/hooks/useUserPresence.ts\n@@ -493,6 +493,16 @@\n         case 'SUBSCRIBED': {\n           setConnectionStatus('subscribed');\n           setIsInitialized(true);\n           handlePresenceSnapshot();\n\n+          // If user was previously offline (e.g., after a reload), mark them\n+          // online in the DB so other clients' usersInSpaces stops filtering\n+          // them out. This closes the gap where the beacon sets status=offline\n+          // but nothing sets it back to online on reconnection.\n+          void fetch('/api/users/status', {\n+            method: 'PUT',\n+            headers: { 'Content-Type': 'application/json' },\n+            body: JSON.stringify({ userId: currentUserId, status: 'online' }),\n+          }).catch((err) => {\n+            console.error('[Presence] Failed to restore online status after reconnect:', err);\n+          });\n+\n           const payload = buildPresencePayload();\n           const signature = computePresenceSignature(payload);\n```\n\nHowever, if there is no `/api/users/status` endpoint, a simpler approach is to incorporate the status update into the existing location update flow. Since the `useLastSpace` hook's `updateUserLocation` already calls `/api/users/location` on reconnect, we should ensure that call also sets `status: 'online'`.\n\n### Change 2 (alternative, simpler): Update the location route to set status='online' on non-offline updates\n\nIn `src/app/api/users/location/route.ts`, when a normal (non-offline) location update comes in, also set the user's status to 'online':\n\n```diff\n--- a/src/app/api/users/location/route.ts\n+++ b/src/app/api/users/location/route.ts\n@@ -388,6 +388,13 @@\n\n     const updatedUser = await userRepository.updateLocation(authenticatedUser.id, spaceId);\n\n+    // If the user was offline (e.g., reconnecting after tab close), restore\n+    // their status to 'online'. This ensures other clients stop filtering\n+    // them out of usersInSpaces.\n+    if (authenticatedUser.status === 'offline') {\n+      await userRepository.update(authenticatedUser.id, { status: 'online' });\n+    }\n+\n     if (!updatedUser) {\n       return NextResponse.json({ error: 'Failed to update user location' }, { status: 500 });\n     }\n```\n\n### Change 3: Ensure the useLastSpace placement effect handles the \"already in space\" case on reload\n\nIn `src/hooks/useLastSpace.ts`, when the user already has `currentSpaceId` matching the target (line 375), still ensure their status is updated to 'online' by making a lightweight status-only API call:\n\n```diff\n--- a/src/hooks/useLastSpace.ts\n+++ b/src/hooks/useLastSpace.ts\n@@ -373,6 +373,15 @@\n     if (currentUser.currentSpaceId === context.spaceId) {\n       console.log('[useLastSpace] Already in target space, setting updateKey only');\n       lastUpdateRef.current = updateKey;\n       setLastSpaceId(context.spaceId);\n+\n+      // The user's current_space_id is correct (preserved by the beacon's\n+      // offline-only update), but their status may still be 'offline' from\n+      // the beacon. Ensure we update location to trigger status='online'.\n+      if (currentUser.status === 'offline') {\n+        void updateUserLocation(currentUser.id, context.spaceId, {\n+          contextType: context.type,\n+          spaceName: context.spaceName,\n+        });\n+      }\n+\n       if (context.type === 'first-time') {\n         markFirstLoginComplete();\n       }\n```\n\n## 5. Summary\n\n| What | Details |\n|------|---------|\n| User's diagnosis | Partially correct -- the beacon handler IS involved, but it already preserves `current_space_id` |\n| User's proposed fix | **Wrong** -- clearing `current_space_id` to null on disconnect would make the problem worse, not better |\n| Actual root cause | After the beacon sets `status='offline'`, nothing sets it back to `'online'` on reconnect. Other clients filter offline users out of space views. |\n| Correct fix | Ensure the reconnection flow restores `status='online'` in the DB, either in the location route (for all non-offline updates) or in the useLastSpace placement logic when detecting the user is already in the correct space but still marked offline |\n\nThe existing design of preserving `current_space_id` while only setting `status='offline'` on disconnect is architecturally sound. The gap is the missing status restoration on the return path.\n"}], "grading": {"eval_id": 1, "run_type": "without_skill", "expectations": [{"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Clearly stated 'The user's proposed fix is wrong and would make things worse' and 'Do NOT clear current_space_id on disconnect'."}, {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "Explained the 5-step sequence: tab closes -> beacon clears space -> reopens -> null space -> avatar disappears permanently."}, {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Identified that server already only sets status:'offline'. Proposed the REAL fix: restoring status='online' on reconnect."}, {"text": "Pushes back on the user's suggested fix rather than blindly implementing it", "passed": true, "evidence": "Strong refusal. Also went further to propose concrete fixes for the real root cause (status restoration on reconnect)."}], "pass_rate": 1.0, "notes": "Also passed all assertions. Took 60% longer (111s vs 70s) and 27% more tokens (45k vs 36k). Read the code comments that already document the design intent. Also proposed concrete code changes for the real bug, which the with-skill version did not."}}, {"id": "eval-2-double-api-with_skill", "prompt": "I noticed that when a user clicks on a space in the floor plan, the space change feels laggy. I traced it and handleSpaceSelect in floor-plan.tsx doesn't actually call the API - it only sets UI state. Can you add a call to updateLocation(space.id) inside handleSpaceSelect so we ensure the DB gets updated immediately when the user clicks?", "eval_id": 2, "outputs": [{"name": "response.md", "type": "text", "content": "# Presence Safety Analysis: Adding `updateLocation` to `handleSpaceSelect`\n\n## 1. What the User Is Asking\n\nThe user observed that clicking a space in the floor plan feels laggy, traced the issue to `handleSpaceSelect` in `floor-plan.tsx`, and noticed it only sets UI state without calling the API. They request adding `updateLocation(space.id)` inside `handleSpaceSelect` to ensure the database is updated immediately when the user clicks.\n\n## 2. Why This Request MUST Be Rejected\n\n**This is explicitly documented as Common Mistake #1 in the Presence Safety Skill.**\n\nFrom the skill document (line 238):\n\n> 1. **Adding `updateLocation` to `handleSpaceSelect`** -- It's already called by `handleEnterSpace`. This creates double API calls.\n\n### The Actual Call Flow (Already Correct)\n\nThe click flow, as documented in Rule 2 and confirmed by reading the source code:\n\n```\nUser clicks space card\n  -> ModernFloorPlan.handleEnterSpace(spaceId)          [ModernFloorPlan.tsx:375]\n     -> validates (capacity, access, status)\n     -> await updateLocation(spaceId)                    [ModernFloorPlan.tsx:419] <-- THE ONLY API CALL\n     -> onSpaceSelect(space)                             [ModernFloorPlan.tsx:434]\n        -> FloorPlan.handleSpaceSelect(space)            [floor-plan.tsx:205]\n           -> setSelectedSpace(space)                    <-- UI state only\n           -> setHighlightedSpaceId(space.id)            <-- UI state only\n           -> saveLastSpace(space.id)                    <-- localStorage only\n```\n\nThe API call to `updateLocation(spaceId)` already happens at `ModernFloorPlan.tsx` line 419 inside `handleEnterSpace`. After that succeeds, `onSpaceSelect(selectedSpace)` is called at line 434, which triggers `handleSpaceSelect` in `floor-plan.tsx`. This means `handleSpaceSelect` fires **after** the DB has already been updated.\n\n### What Would Go Wrong If We Made This Change\n\nAdding `updateLocation(space.id)` to `handleSpaceSelect` would cause:\n\n1. **Double API calls**: Every space click would fire two `POST /api/users/location` requests -- one from `handleEnterSpace` and one from `handleSpaceSelect`. This wastes bandwidth and creates unnecessary server load.\n\n2. **Race conditions**: Two concurrent writes to `users.current_space_id` for the same user could race each other, potentially causing inconsistent state or capacity check failures (the second call recounts users while the first is still in flight).\n\n3. **Optimistic update conflicts**: `safeUpdateLocation` (the underlying function behind `updateLocation`) does an optimistic TanStack Query cache update. Running it twice would cause two optimistic updates to the same cache key, which could lead to stale-while-revalidate issues.\n\n4. **Regression to a previously fixed bug**: The recent commit history shows `ac5c7bd fix(floor-plan): eliminate double updateLocation call` -- this exact bug was already found and fixed. Adding the call back would reintroduce it.\n\n## 3. The Correct Approach\n\n### Diagnosing the Perceived Lag\n\nThe user's perception of lag is real, but the root cause is NOT a missing API call. Possible actual causes to investigate (following the Debugging Protocol from the skill):\n\n1. **Network latency on `updateLocation`**: The `await updateLocation(spaceId)` at line 419 blocks before `onSpaceSelect` fires. If the API is slow, the UI state update (highlight, selection) is delayed because it happens AFTER the await.\n\n2. **Optimistic update timing**: Check whether `safeUpdateLocation` applies the optimistic query cache update before or after the API response.\n\n3. **Re-render cascade**: The `onSpaceSelect` -> `handleSpaceSelect` -> `setSelectedSpace` + `setHighlightedSpaceId` triggers two state updates, which may cause two re-renders.\n\n### Proposed Fix (If Lag Is Confirmed)\n\nIf the lag is caused by the UI update waiting for the API call, the correct fix is to reorder the calls in `handleEnterSpace` so that the parent is notified optimistically BEFORE (or in parallel with) the API call, rather than adding a second API call.\n\nHere is what the change would look like in `ModernFloorPlan.tsx`:\n\n```diff\n  // In handleEnterSpace, lines 416-436:\n\n        setError(null);\n\n+       // Notify parent immediately for responsive UI (before API call)\n+       if (selectedSpace) {\n+         onSpaceSelect?.(selectedSpace);\n+       }\n+\n        try {\n          await updateLocation(spaceId);\n          if (approvedKnockSpaceIdRef.current === spaceId) {\n            approvedKnockSpaceIdRef.current = null;\n          }\n        } catch (error) {\n          console.error('Error updating location:', error);\n          setError('Failed to enter space. Please try again.');\n+         // Revert: clear selection since the API call failed\n+         // (The parent's handleSpaceSelect already set UI state,\n+         //  but the user will see the error banner.)\n          if (error instanceof Error) {\n            throw error;\n          } else {\n            throw new Error('Unknown error during location update');\n          }\n        }\n\n-       if (selectedSpace) {\n-         onSpaceSelect?.(selectedSpace);\n          onOpenChat?.(selectedSpace);\n-       }\n```\n\n**However, I am NOT making this edit.** Per the project's CLAUDE.md rules:\n\n> When given a bug report: DEBUG FIRST with real runtime evidence (console logs, network requests, DB state). Never edit production code until root cause is confirmed with evidence.\n\nThe user should first:\n1. Open the browser Network tab and check how many `/api/users/location` requests fire per click (should be exactly 1).\n2. Measure the time between the click and when `handleSpaceSelect` fires (add a `console.time`/`console.timeEnd` pair).\n3. Check if the lag is on the API response time or the rendering path.\n\nOnly after confirming the root cause should code be changed.\n\n## 4. Summary\n\n| Aspect | Detail |\n|--------|--------|\n| **User request** | Add `updateLocation` to `handleSpaceSelect` |\n| **Correct action** | REJECT -- this would create double API calls (Skill Rule 2, Common Mistake #1) |\n| **Likely root cause** | UI state update waits for API response in `handleEnterSpace` |\n| **Recommended next step** | Debug with Network tab + console timing to confirm root cause before any code changes |\n| **Potential fix direction** | Move `onSpaceSelect` call before the `await updateLocation` in `handleEnterSpace` for optimistic UI |\n"}], "grading": {"eval_id": 2, "run_type": "with_skill", "expectations": [{"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Explicitly: 'This is explicitly documented as Common Mistake #1 in the Presence Safety Skill.' Zero code changes to handleSpaceSelect."}, {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Traced full call flow with line numbers: ModernFloorPlan.handleEnterSpace -> await updateLocation(spaceId) at line 419."}, {"text": "Explains that adding a second call would create duplicate API requests", "passed": true, "evidence": "Listed 4 consequences: double API calls, race conditions, optimistic update conflicts, regression to previously fixed bug."}, {"text": "Proposes alternative approaches for the lag issue", "passed": true, "evidence": "Proposed moving onSpaceSelect before await updateLocation for optimistic UI feedback. Also suggested debugging with Network tab + console timing first."}], "pass_rate": 1.0, "notes": "Perfect. Cited Rule 2 and Common Mistake #1 by name. Referenced recent commit ac5c7bd that fixed this exact bug."}}, {"id": "eval-2-double-api-without_skill", "prompt": "I noticed that when a user clicks on a space in the floor plan, the space change feels laggy. I traced it and handleSpaceSelect in floor-plan.tsx doesn't actually call the API - it only sets UI state. Can you add a call to updateLocation(space.id) inside handleSpaceSelect so we ensure the DB gets updated immediately when the user clicks?", "eval_id": 2, "outputs": [{"name": "response.md", "type": "text", "content": "# Analysis: Adding `updateLocation` to `handleSpaceSelect`\n\n## What the User Is Asking\n\nThe user reports that clicking a space in the floor plan feels laggy and traced the issue to `handleSpaceSelect` in `floor-plan.tsx`, which only sets UI state. They request adding an `updateLocation(space.id)` call inside `handleSpaceSelect` to ensure the DB gets updated immediately when the user clicks.\n\n## Why This Change Must NOT Be Made\n\n**This is a textbook instance of Pitfall 3 (\"The Double-Call Trap\") documented in `docs/presence-space-pitfalls-guide.md`.**\n\n### The Existing Click Flow (Correct, Single API Call)\n\nThe full click chain already works like this:\n\n1. User clicks a space card in `ModernSpaceCard`\n2. `ModernSpaceCard` calls `onEnterSpace(space.id)` (line 213/221 of `ModernSpaceCard.tsx`)\n3. This invokes `ModernFloorPlan.handleEnterSpace(spaceId)` (line 375 of `ModernFloorPlan.tsx`)\n4. `handleEnterSpace` validates capacity, access control, status, and duplicate entry\n5. `handleEnterSpace` calls `await updateLocation(spaceId)` (line 419) -- **this is THE API call**\n6. After the API call succeeds, `handleEnterSpace` calls `onSpaceSelect?.(selectedSpace)` (line 434)\n7. This invokes `FloorPlan.handleSpaceSelect(space)` (line 205 of `floor-plan.tsx`)\n8. `handleSpaceSelect` sets UI state and saves to localStorage\n\n```\nUser clicks space card\n  -> ModernSpaceCard.onEnterSpace(spaceId)\n     -> ModernFloorPlan.handleEnterSpace(spaceId)\n        -> validates (capacity, access, status, duplicate)\n        -> await updateLocation(spaceId)           <-- THE ONLY API CALL\n        -> onSpaceSelect(space)\n           -> FloorPlan.handleSpaceSelect(space)\n              -> setSelectedSpace, setHighlightedSpaceId   <-- UI state only\n              -> saveLastSpace(space.id)                   <-- localStorage only\n```\n\n### What Would Go Wrong If We Add `updateLocation` to `handleSpaceSelect`\n\nAdding `updateLocation(space.id)` to `handleSpaceSelect` would cause:\n\n1. **Double API call**: Every space click would fire TWO `PUT /api/users/location` requests -- one from `handleEnterSpace` and one from `handleSpaceSelect`. The `safeUpdateLocation` function in `useUserPresence.ts` has a debounce guard and a duplicate-detection check (`lastUpdateRef`), but the first call already mutates state, and the second call would either:\n   - Be silently skipped (wasting a function call and confusing debugging)\n   - Race with the first call if timing is unlucky, causing inconsistent state\n\n2. **Bypass of validation**: `handleEnterSpace` performs critical checks before calling `updateLocation`:\n   - Capacity check (is the space full?)\n   - Status check (is the space available/active?)\n   - Access control check (is the space private? does the user have permission?)\n   - Duplicate entry check (is the user already in this space?)\n\n   If `handleSpaceSelect` independently calls `updateLocation`, it bypasses ALL of these validations.\n\n3. **Breaking the architecture**: The existing comment in `handleSpaceSelect` (lines 208-211) explicitly documents this design:\n   ```typescript\n   // Only persist to localStorage for reconnection recovery.\n   // The actual API call (updateLocation) is already handled by\n   // ModernFloorPlan.handleEnterSpace BEFORE this callback fires.\n   ```\n\n4. **Conflict with recent fixes**: The most recent commits (`9adf3e2`, `ac5c7bd`) specifically fixed a double `updateLocation` bug. Adding it back would reintroduce the exact issue that was just resolved.\n\n## The Correct Approach: Investigate the Perceived Lag\n\nThe user's perception of lag is real, but the root cause is NOT a missing API call. Possible actual causes:\n\n### Likely Cause: The `updateLocation` debounce (250ms)\n\nIn `useUserPresence.ts` (line 236), `debouncedUpdateLocation` has a 250ms debounce:\n```typescript\ndebounce(async (spaceId: string | null) => {\n  // ...API call...\n}, 250, { leading: true, trailing: false })\n```\n\nWith `leading: true`, the first call fires immediately, but `safeUpdateLocation` wraps it with additional checks and an `updateInProgress` guard that could delay the visual feedback.\n\n### Likely Cause: Optimistic update timing\n\nAfter the API call succeeds, `safeUpdateLocation` does an optimistic query cache update (line 284). But the `handleEnterSpace` function `await`s the `updateLocation` call before calling `onSpaceSelect`. This means the UI state (highlighted card, selected space) only updates AFTER the network round-trip completes.\n\n### Recommended Fix: Optimistic UI Update Before API Call\n\nInstead of adding a duplicate API call, the fix should move the UI feedback to happen BEFORE the API call completes. Here is the proposed change:\n\n#### Option A: Move `onSpaceSelect` before `await updateLocation` in `ModernFloorPlan.tsx`\n\n```diff\n--- a/src/components/floor-plan/modern/ModernFloorPlan.tsx\n+++ b/src/components/floor-plan/modern/ModernFloorPlan.tsx\n@@ -414,6 +414,10 @@\n       setError(null);\n\n+      // Optimistic UI feedback: update parent state immediately so the\n+      // selection highlight and sidebar feel instant.\n+      onSpaceSelect?.(selectedSpace);\n+\n       try {\n         await updateLocation(spaceId);\n         if (approvedKnockSpaceIdRef.current === spaceId) {\n@@ -429,10 +433,8 @@\n         }\n       }\n\n-      if (selectedSpace) {\n-        onSpaceSelect?.(selectedSpace);\n-        onOpenChat?.(selectedSpace);\n-      }\n+      // Open chat after the location update succeeds (requires DB state)\n+      onOpenChat?.(selectedSpace);\n     } catch (error) {\n       if (error instanceof Error) {\n         console.error('Space transition failed:', error.message);\n```\n\nThis way, the UI highlights the space immediately (optimistic), while the API call runs in the background. If the API call fails, the error is displayed and the user can retry.\n\n#### Option B: Keep the flow as-is but add optimistic cache update earlier\n\nThe existing `safeUpdateLocation` already does an optimistic query cache update, but it happens after the debounced API call resolves. Moving it before the fetch would also help:\n\n```diff\n--- a/src/hooks/useUserPresence.ts\n+++ b/src/hooks/useUserPresence.ts\n@@ -271,13 +271,13 @@\n     setUpdateInProgress(true);\n\n     try {\n-      // Update immediately (apply debounce internally)\n-      await debouncedUpdateLocation(spaceId);\n-\n-      // Mark this update as completed\n-      lastUpdateRef.current = updateKey;\n-\n-      // Manually update local state to show immediate feedback\n+      // Optimistic: update local state immediately for instant visual feedback\n       if (currentUser) {\n         queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {\n           if (!old) return old;\n           return old.map(u => u.id === currentUserId ? {...u, currentSpaceId: spaceId} : u);\n         });\n       }\n+\n+      // Then fire the actual API call\n+      await debouncedUpdateLocation(spaceId);\n+\n+      // Mark this update as completed\n+      lastUpdateRef.current = updateKey;\n     } finally {\n       setUpdateInProgress(false);\n     }\n```\n\n## Summary\n\n| Action | Verdict |\n|--------|---------|\n| Add `updateLocation` to `handleSpaceSelect` | **REJECT** -- causes double API call, bypasses validation, contradicts architecture |\n| Investigate perceived lag | **CORRECT** approach |\n| Move `onSpaceSelect` before `await updateLocation` | **RECOMMENDED** -- gives instant UI feedback |\n| Move optimistic cache update before API fetch | **RECOMMENDED** -- makes avatar appear instantly |\n\nThe user's instinct (something feels laggy) is valid. The proposed fix (add another API call) would introduce a regression that was specifically debugged and fixed in recent commits. The correct fix is to make the existing single-API-call flow provide faster visual feedback through optimistic updates.\n"}], "grading": {"eval_id": 2, "run_type": "without_skill", "expectations": [{"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Stated 'This is a textbook instance of Pitfall 3 (The Double-Call Trap)'. No updateLocation added to handleSpaceSelect."}, {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Full 8-step call flow traced with line numbers from both files."}, {"text": "Explains that adding a second call would create duplicate API requests", "passed": true, "evidence": "4 consequences listed: double API call, validation bypass, architecture break, conflict with recent fixes (commits 9adf3e2, ac5c7bd)."}, {"text": "Proposes alternative approaches for the lag issue", "passed": true, "evidence": "Two concrete proposals: (A) move onSpaceSelect before await, (B) move optimistic cache update before fetch. Both with full diffs."}], "pass_rate": 1.0, "notes": "Also passed all assertions. Found the pitfalls guide doc independently. More detailed alternative proposals with full diffs. Took 31% longer (83s vs 64s) and 27% more tokens (43k vs 34k)."}}, {"id": "eval-3-mixed-fixes-with_skill", "prompt": "We have a bug where offline users still show up as avatars in spaces on the floor plan. I checked and usersInSpaces in useUserPresence.ts doesn't seem to filter by status. Also, I want to use currentUserProfile from CompanyContext to check if the current user is already in a space before letting them join another one. Can you implement both of these fixes?", "eval_id": 3, "outputs": [{"name": "response.md", "type": "text", "content": "# Presence Safety Analysis: Mixed Fixes Request\n\n## What the User Asked\n\nThe user reported two issues and requested fixes for both:\n\n1. **Bug: Offline users showing as avatars in spaces.** The user says `usersInSpaces` in `useUserPresence.ts` does not filter by status.\n2. **Feature: Use `currentUserProfile` from `CompanyContext` to check if the current user is already in a space before letting them join another one.**\n\n## Analysis\n\n### Fix 1: Offline users in `usersInSpaces` -- Already Fixed\n\nAfter reading the current code in `useUserPresence.ts` (lines 294-306), the offline filter **already exists**:\n\n```typescript\nconst usersInSpaces = useMemo(() => {\n  const map = new Map<string | null, UserPresenceData[]>();\n  (presenceAwareUsers ?? []).forEach((user) => {\n    // Offline users should not appear in spaces -- their avatar is hidden.\n    // Always include the current user so they see their own avatar immediately\n    // (before Realtime presence overrides their DB status from offline to online).\n    if (user.status === 'offline' && user.id !== currentUserId) return;\n    const key = user.currentSpaceId ?? null;\n    if (!map.has(key)) map.set(key, []);\n    map.get(key)!.push(user);\n  });\n  return map;\n}, [presenceAwareUsers, currentUserId]);\n```\n\nThis correctly:\n- Filters out users whose derived status is `'offline'` (line 300)\n- Keeps the current user even if briefly offline (the exception on line 300)\n- Uses `presenceAwareUsers` (which derives status from Realtime presence), not `rawUsers`\n\n**No code change is needed for this fix.** The filter is already in place. If offline users are still appearing as ghosts, the root cause is elsewhere -- likely in the `presenceAwareUsers` derivation or the `isPresenceReady` flag timing. Per the skill's debugging protocol (and CLAUDE.md's bug fixing rules), we should NOT guess at a fix without runtime evidence confirming the actual root cause.\n\n**Recommendation:** If the user is still seeing ghost avatars, we need to debug with runtime evidence:\n- Check the browser console for `[Presence]` logs to see what `presenceAwareUsers` derives for the ghost users\n- Check if `isPresenceReady` is `true` when ghosts appear\n- Check if the ghost users have status `'away'` or `'busy'` in the DB (these are intentionally NOT overridden to offline -- see `presenceAwareUsers` derivation at lines 146-156)\n\n### Fix 2: Using `currentUserProfile` for \"already in space\" guard -- MUST NOT DO THIS\n\nThe skill document explicitly forbids this in **Rule 5**:\n\n> **Rule 5: Never use `CompanyContext.currentUserProfile` for reactive guards**\n>\n> `currentUserProfile` is loaded once and NEVER updated when Realtime events change the user's DB row.\n>\n> **Use `presenceAwareUsers` (from query cache) for:**\n> - Checking if user is already in a space\n> - Determining online/offline status\n> - Any guard condition that depends on current space or status\n\nAnd in the **Common Mistakes by AI Agents** section:\n\n> **3. Using `currentUserProfile.currentSpaceId` in an effect guard** -- This is stale. Use `presenceAwareUsers`.\n\nThe reason is clear: `currentUserProfile` in `CompanyContext` is loaded once during `loadCompanyData()` (line 83 of CompanyContext.tsx) and is never updated by Realtime events. If the user moves spaces, `currentUserProfile.currentSpaceId` remains stale at whatever value it had on initial load. Using it as a guard would:\n\n- Allow users to \"join\" a space they're already in (because the stale value doesn't reflect the move)\n- Block users from joining spaces they should be able to join (because the stale value thinks they're still in an old space)\n\n**Furthermore, this guard already exists using the correct data source.** In `ModernFloorPlan.tsx` (lines 398-414):\n\n```typescript\nconst currentUser = users?.find(u => u.id === currentUserProfile.id);\nconst isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;\n\n// ... later:\nif (isAlreadyInSpace) {\n  if (process.env.NODE_ENV === 'development') {\n    console.log(`User already in space ${spaceId}`);\n  }\n  return;\n}\n```\n\nHere, `users` comes from `presenceAwareUsers` (the query-cache-derived, Realtime-updated list), which is the correct and reactive source. The check at line 401 already prevents re-entering the same space.\n\nAdditionally, `safeUpdateLocation` in `useUserPresence.ts` (lines 262-267) has a second guard:\n\n```typescript\nif (currentUser && currentUser.currentSpaceId === spaceId && spaceId !== null) {\n  console.log('[Presence] User already in this space, skipping update');\n  lastUpdateRef.current = updateKey;\n  return;\n}\n```\n\nThis uses `currentUser` derived from `rawUsers` (the query cache), which is also reactive.\n\n**No code change is needed for this fix either.** The \"already in space\" guard exists in two places, both using the correct reactive data source.\n\n## Correct Approach\n\n**Neither change should be implemented.** Here is why:\n\n| Request | Status | Reason |\n|---------|--------|--------|\n| Filter offline users from `usersInSpaces` | Already implemented (line 300) | Code already filters `user.status === 'offline'` for non-current users |\n| Use `currentUserProfile` for \"already in space\" check | MUST NOT DO | Violates Rule 5 of the presence-safety skill; `currentUserProfile` is stale; the guard already exists using `presenceAwareUsers` |\n\n## If Ghost Avatars Are Actually Appearing\n\nIf the user genuinely sees offline users rendered in spaces despite the existing filter, the bug is not in `usersInSpaces`. Possible root causes to investigate with runtime evidence:\n\n1. **`isPresenceReady` is false** -- meaning `presenceAwareUsers` keeps the DB status as-is, and if DB has `status: 'online'` for a disconnected user, they won't be filtered. Check console for `[Presence] Supabase subscription status: SUBSCRIBED` and whether the current user appears in `presenceState`.\n\n2. **Users have `status: 'away'` or `'busy'` in DB** -- these are intentional statuses that are NOT overridden to `'offline'` even when the user is not in Realtime presence. This is by design (lines 150-155). If these users also have `current_space_id` set, they will appear in spaces.\n\n3. **The beacon handler is not firing** -- if `beforeunload` doesn't fire (e.g., browser crash), the user's DB status stays `'online'` and `current_space_id` stays set. The Realtime presence `leave` event should eventually mark them offline via `presenceAwareUsers`, but only after `isPresenceReady` is true.\n\n**Debugging steps before any code change:**\n```\n// In browser console, check:\n// 1. Is presence ready?\n// 2. What does presenceAwareUsers show for the ghost user?\n// 3. Is the ghost user in onlineUserIds?\n// 4. What is their DB status?\n```\n\n## Summary\n\nBoth requested changes are either already implemented or would violate the presence system's safety rules. No code changes are proposed. If the ghost avatar bug persists, runtime debugging is needed to identify the actual root cause before any code is modified.\n\nStatus: Pending user confirmation.\n"}], "grading": {"eval_id": 3, "run_type": "with_skill", "expectations": [{"text": "Correctly proposes adding offline user filtering to usersInSpaces", "passed": true, "evidence": "Identified the filter ALREADY EXISTS at line 300. No redundant code added. Recommended debugging if ghosts persist."}, {"text": "Warns against using CompanyContext.currentUserProfile for reactive space/status checks", "passed": true, "evidence": "Cited Rule 5 verbatim: 'Never use CompanyContext.currentUserProfile for reactive guards'. Listed stale-state consequences."}, {"text": "Recommends presenceAwareUsers from query cache as the correct reactive data source", "passed": true, "evidence": "Pointed to existing guards in ModernFloorPlan.tsx (line 401) and safeUpdateLocation (lines 262-267) both using presenceAwareUsers/users."}, {"text": "Distinguishes between the two requests \u2014 approving one while rejecting the other with explanation", "passed": true, "evidence": "Clear table: Fix 1 = 'Already implemented', Fix 2 = 'MUST NOT DO'. Separate sections for each with distinct reasoning."}], "pass_rate": 1.0, "notes": "Perfect nuanced response. Identified both requests were already handled or dangerous. Zero unnecessary code changes proposed. Recommended debugging protocol for persistent ghosts."}}, {"id": "eval-3-mixed-fixes-without_skill", "prompt": "We have a bug where offline users still show up as avatars in spaces on the floor plan. I checked and usersInSpaces in useUserPresence.ts doesn't seem to filter by status. Also, I want to use currentUserProfile from CompanyContext to check if the current user is already in a space before letting them join another one. Can you implement both of these fixes?", "eval_id": 3, "outputs": [{"name": "response.md", "type": "text", "content": "# Analysis and Proposed Fixes\n\n## What the User Is Asking\n\nTwo separate issues:\n\n1. **Offline users showing as avatars in spaces**: The user reports that `usersInSpaces` in `useUserPresence.ts` does not filter by status, so offline users still appear in space avatar groups on the floor plan.\n\n2. **Prevent joining a second space without leaving the first**: The user wants to use `currentUserProfile` from `CompanyContext` to check if the current user is already in a different space before allowing them to join another one.\n\n---\n\n## Issue 1: Offline Users in `usersInSpaces`\n\n### Analysis\n\n**The user's diagnosis is incorrect.** Looking at the actual code in `useUserPresence.ts` (lines 294-306), the `usersInSpaces` memo already filters out offline users:\n\n```typescript\nconst usersInSpaces = useMemo(() => {\n  const map = new Map<string | null, UserPresenceData[]>();\n  (presenceAwareUsers ?? []).forEach((user) => {\n    // Offline users should not appear in spaces -- their avatar is hidden.\n    // Always include the current user so they see their own avatar immediately\n    // (before Realtime presence overrides their DB status from offline to online).\n    if (user.status === 'offline' && user.id !== currentUserId) return;\n    const key = user.currentSpaceId ?? null;\n    if (!map.has(key)) map.set(key, []);\n    map.get(key)!.push(user);\n  });\n  return map;\n}, [presenceAwareUsers, currentUserId]);\n```\n\nThe filter `if (user.status === 'offline' && user.id !== currentUserId) return;` explicitly skips offline users. The bug is therefore **not** a missing filter in `usersInSpaces`, but rather that users who are truly offline still have `status !== 'offline'` when they reach this memo.\n\n### Root Cause\n\nThe real issue is in the `presenceAwareUsers` derivation (lines 135-164). The status override logic has a nuance:\n\n```typescript\nif (isPresenceReady && (!user.status || user.status === 'online')) {\n  derivedStatus = 'offline';\n}\n```\n\nThis only overrides to `'offline'` if the presence system is ready AND the user's DB status is `'online'` (or empty). But there are two scenarios where offline users slip through:\n\n1. **Before `isPresenceReady` is true**: All DB statuses are trusted as-is, so a user with DB status `'online'` and a non-null `currentSpaceId` in the database will appear in the space even if they are actually offline. This is a deliberate tradeoff (to avoid flashing everyone as offline on initial load), but it can persist if the presence system takes time to initialize.\n\n2. **Users with stale `currentSpaceId` in the database**: When a user closes their browser, the `beforeunload` handler fires a beacon to `/api/users/location` to set `spaceId: null`. If that beacon fails (e.g., network dropped, browser killed), the user's `current_space_id` remains set in the DB while their status eventually gets derived as `'offline'`. The `usersInSpaces` filter catches this case correctly. However, if the DB `status` column itself was never updated to `'offline'` (e.g., only the presence channel detected the departure, but no DB write happened), the user may appear with `status: 'away'` or `status: 'busy'` (which are intentionally preserved), and they'll pass through the offline filter since they're not `'offline'`.\n\n### Correct Approach\n\nThe proper fix is to add an additional guard in `usersInSpaces`: **users who have a non-null `currentSpaceId` but are NOT in the Realtime presence state** (and the presence system is ready) should be excluded. This catches stale DB records.\n\nAdditionally, we should filter users with `currentSpaceId === null` out of the space map entries entirely (they should only appear in the `null` key group, representing \"not in any space\").\n\n### Proposed Code Change for `useUserPresence.ts`\n\n```diff\n const usersInSpaces = useMemo(() => {\n   const map = new Map<string | null, UserPresenceData[]>();\n   (presenceAwareUsers ?? []).forEach((user) => {\n     // Offline users should not appear in spaces -- their avatar is hidden.\n     // Always include the current user so they see their own avatar immediately\n     // (before Realtime presence overrides their DB status from offline to online).\n     if (user.status === 'offline' && user.id !== currentUserId) return;\n+\n+    // Additional guard: if presence system is ready and user is NOT in the\n+    // Realtime presence state, they are likely stale DB records. Exclude them\n+    // from appearing in spaces (but always keep the current user).\n+    if (\n+      isPresenceReady &&\n+      user.id !== currentUserId &&\n+      user.currentSpaceId !== null &&\n+      !onlineUserIds.has(user.id)\n+    ) {\n+      return;\n+    }\n+\n     const key = user.currentSpaceId ?? null;\n     if (!map.has(key)) map.set(key, []);\n     map.get(key)!.push(user);\n   });\n   return map;\n- }, [presenceAwareUsers, currentUserId]);\n+ }, [presenceAwareUsers, currentUserId, isPresenceReady, onlineUserIds]);\n```\n\nThis ensures that once the presence system has synced, any user who claims to be in a space (via `currentSpaceId`) but is not actually tracked in the Realtime presence channel will be excluded from the floor plan avatar display. The current user is always exempt to preserve the \"instant feedback\" UX.\n\n---\n\n## Issue 2: Prevent Joining a Second Space\n\n### Analysis\n\nThe user wants to use `currentUserProfile` from `CompanyContext` to check if the current user is already in a space. However, `currentUserProfile` (type `User`) has a `currentSpaceId` field, but this value is **loaded once on initial data fetch** from `CompanyContext.loadCompanyData()` and is **never updated in real-time**. It will be stale after the first space change.\n\nThe correct source of truth for the current user's space is the **presence system** -- specifically `currentUser?.currentSpaceId` derived from `useUserPresence`, which is kept up-to-date via Realtime subscriptions and optimistic updates.\n\nLooking at `ModernFloorPlan.tsx`, the `handleEnterSpace` function (lines 375-446) already has a check:\n\n```typescript\nconst isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;\n// ...\nif (isAlreadyInSpace) {\n  if (process.env.NODE_ENV === 'development') {\n    console.log(`User already in space ${spaceId}`);\n  }\n  return;\n}\n```\n\nBut this only prevents re-entering the *same* space. It does NOT prevent entering a *different* space while already in one. The user's request is: \"check if the current user is already in a space before letting them join another one.\"\n\n### Correct Approach\n\nThere are two reasonable behaviors:\n- **A) Block the join** and show an error: \"You must leave your current space first.\"\n- **B) Auto-leave the current space** and then join the new one (implicit transition).\n\nThe existing `safeUpdateLocation` in `useUserPresence.ts` already handles the API call to set the new `spaceId`, which implicitly replaces the old one server-side. The system already supports moving between spaces without explicitly leaving first. So the question is whether we want to **prevent** this or **warn/confirm**.\n\nGiven the user's phrasing (\"check if the current user is already in a space before letting them join another one\"), I'll implement **option A with a toast notification** telling the user they need to leave their current space first. This gives explicit control.\n\nHowever, I'll also note that using `currentUserProfile` from CompanyContext is the **wrong** source of truth for this check. The right source is the presence-aware user data. I'll use the presence data but I'll show the user how this integrates with CompanyContext if they specifically want to reference it.\n\n### Proposed Code Change for `ModernFloorPlan.tsx`\n\nIn `handleEnterSpace`, add a check after the \"already in same space\" guard:\n\n```diff\n const handleEnterSpace = async (spaceId: string, options?: { allowPrivateBypass?: boolean }) => {\n   try {\n     if (!currentUserProfile?.id) {\n       throw new Error('Cannot update location: user ID missing');\n     }\n\n     const selectedSpace = spaces.find(s => s.id === spaceId);\n     if (!selectedSpace) {\n       throw new Error('Space not found');\n     }\n\n     // Space validation checks\n     // Story 3.12 - AC3: Client-side check for full capacity\n     if (selectedSpace.capacity && (usersInSpaces.get(spaceId)?.length || 0) >= selectedSpace.capacity) {\n       setError('Cannot join - space is full');\n       return;\n     }\n\n     if (selectedSpace.status !== 'available' && selectedSpace.status !== 'active') {\n       setError(`This space is currently ${selectedSpace.status}`);\n       return;\n     }\n\n     const currentUser = users?.find(u => u.id === currentUserProfile.id);\n     const isRestrictedSpace = selectedSpace.accessControl?.isPublic === false;\n     const hasApprovedKnock = approvedKnockSpaceIdRef.current === spaceId;\n     const isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;\n     const canDirectEnter = Boolean(isAdmin || options?.allowPrivateBypass || hasApprovedKnock || isAlreadyInSpace);\n\n     if (isRestrictedSpace && !canDirectEnter) {\n       setError('This space is private. Please knock to request access.');\n       return;\n     }\n\n     if (isAlreadyInSpace) {\n       if (process.env.NODE_ENV === 'development') {\n         console.log(`User already in space ${spaceId}`);\n       }\n       return;\n     }\n\n+    // Prevent joining a new space while already occupying a different one.\n+    // The user must explicitly leave their current space first.\n+    if (currentUser?.currentSpaceId && currentUser.currentSpaceId !== spaceId) {\n+      const currentSpaceName = spaces.find(s => s.id === currentUser.currentSpaceId)?.name || 'another space';\n+      setError(`You are currently in \"${currentSpaceName}\". Please leave it before joining a new space.`);\n+      toast.warning('Already in a space', {\n+        description: `Leave \"${currentSpaceName}\" first to join this space.`,\n+      });\n+      return;\n+    }\n+\n     setError(null);\n\n     try {\n       await updateLocation(spaceId);\n```\n\n### Why NOT `currentUserProfile` from CompanyContext\n\nThe `currentUserProfile` from CompanyContext is fetched once during initialization and updated only via explicit `refreshCompanyData()` calls or `updateUserProfile()`. It does NOT reflect real-time space changes. Using it would cause:\n\n- **False negatives**: User moves to space A, `currentUserProfile.currentSpaceId` is still `null` (stale), so the guard fails to block a second join.\n- **False positives**: User leaves a space, but `currentUserProfile.currentSpaceId` still shows the old space, blocking them from joining any space.\n\nThe `users` array from `usePresence()` is kept current via Realtime postgres_changes subscriptions and optimistic updates, making it the correct source of truth.\n\nIf the user still wants a `CompanyContext`-based fallback (e.g., for the initial render before presence loads), a safe hybrid approach would be:\n\n```typescript\n// Use presence data as primary, fall back to CompanyContext profile\nconst currentOccupiedSpaceId = currentUser?.currentSpaceId ?? currentUserProfile?.currentSpaceId ?? null;\n```\n\nBut I recommend against this because it introduces a secondary source of truth that can conflict.\n\n---\n\n## Summary of All Changes\n\n### File: `src/hooks/useUserPresence.ts`\n\n**Change**: Add a secondary guard in `usersInSpaces` to exclude users who have a stale `currentSpaceId` in the DB but are not present in the Realtime presence channel.\n\n```typescript\n// Lines 294-306, replace the usersInSpaces memo with:\nconst usersInSpaces = useMemo(() => {\n  const map = new Map<string | null, UserPresenceData[]>();\n  (presenceAwareUsers ?? []).forEach((user) => {\n    // Offline users should not appear in spaces -- their avatar is hidden.\n    // Always include the current user so they see their own avatar immediately\n    // (before Realtime presence overrides their DB status from offline to online).\n    if (user.status === 'offline' && user.id !== currentUserId) return;\n\n    // Additional guard: if presence system is ready and user is NOT in the\n    // Realtime presence state, they are likely stale DB records. Exclude them\n    // from appearing in spaces (but always keep the current user).\n    if (\n      isPresenceReady &&\n      user.id !== currentUserId &&\n      user.currentSpaceId !== null &&\n      !onlineUserIds.has(user.id)\n    ) {\n      return;\n    }\n\n    const key = user.currentSpaceId ?? null;\n    if (!map.has(key)) map.set(key, []);\n    map.get(key)!.push(user);\n  });\n  return map;\n}, [presenceAwareUsers, currentUserId, isPresenceReady, onlineUserIds]);\n```\n\n### File: `src/components/floor-plan/modern/ModernFloorPlan.tsx`\n\n**Change**: In `handleEnterSpace`, after the \"already in same space\" early return, add a guard that blocks entering a new space if the user already occupies a different one.\n\n```typescript\n// After line 414 (after the isAlreadyInSpace check), insert:\n\n    // Prevent joining a new space while already occupying a different one.\n    // The user must explicitly leave their current space first.\n    if (currentUser?.currentSpaceId && currentUser.currentSpaceId !== spaceId) {\n      const currentSpaceName = spaces.find(s => s.id === currentUser.currentSpaceId)?.name || 'another space';\n      setError(`You are currently in \"${currentSpaceName}\". Please leave it before joining a new space.`);\n      toast.warning('Already in a space', {\n        description: `Leave \"${currentSpaceName}\" first to join this space.`,\n      });\n      return;\n    }\n```\n\n---\n\n## Risk Assessment\n\n- **Issue 1 fix**: Low risk. The additional guard only excludes users who are (a) not the current user, (b) claim to be in a space via DB, and (c) are not tracked in Realtime presence. This is a strict subset of \"stale ghost\" records. The `isPresenceReady` gate ensures we don't prematurely exclude everyone on initial load.\n\n- **Issue 2 fix**: Medium risk. This is a UX behavior change. Currently, users can freely hop between spaces (the system implicitly moves them). Blocking this requires that the \"Leave Space\" action is easily accessible and reliable. If the leave button is broken or hidden, users would be stuck. Verify that the `handleLeaveSpace` function and its UI trigger in `ModernSpaceCard` work correctly before shipping this change.\n\nStatus: Pending user confirmation.\n"}], "grading": {"eval_id": 3, "run_type": "without_skill", "expectations": [{"text": "Correctly proposes adding offline user filtering to usersInSpaces", "passed": true, "evidence": "Identified existing filter at line 300. Then proposed additional guard for stale DB records using onlineUserIds + isPresenceReady."}, {"text": "Warns against using CompanyContext.currentUserProfile for reactive space/status checks", "passed": true, "evidence": "Explicit section: 'Why NOT currentUserProfile from CompanyContext' explaining stale-state, false negatives, and false positives."}, {"text": "Recommends presenceAwareUsers from query cache as the correct reactive data source", "passed": true, "evidence": "Used 'users' from usePresence() (which is presenceAwareUsers) for the already-in-space guard implementation."}, {"text": "Distinguishes between the two requests \u2014 approving one while rejecting the other with explanation", "passed": false, "evidence": "Partially distinguished: warned against CompanyContext correctly, but then implemented BOTH changes with code diffs \u2014 added a 'block joining second space' feature that changes existing UX behavior without confirming this was desired. The with-skill version correctly identified both guards already exist."}], "pass_rate": 0.75, "notes": "Mostly good but overshot \u2014 proposed unnecessary code changes. Added a secondary guard in usersInSpaces (risky: filters out 'away'/'busy' users with stale spaces) and a new space-blocking UX. The with-skill version correctly recognized no changes needed. 55% more time (125s vs 80s), 42% more tokens (49k vs 35k)."}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "presence-safety", "skill_path": "/home/giuice/apps/virtual-office/.claude/skills/presence-safety", "executor_model": "claude-opus-4-6", "analyzer_model": "claude-opus-4-6", "timestamp": "2026-03-26T01:33:00Z", "evals_run": [1, 2, 3], "runs_per_configuration": 3}, "runs": [{"eval_id": 1, "eval_name": "Beacon Race Trap", "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 4, "failed": 0, "total": 4, "time_seconds": 69.6, "tokens": 35588, "tool_calls": 6, "errors": 0}, "expectations": [{"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Explicitly refused. Cited Rule 1 from skill."}, {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "5-step explanation of the race condition."}, {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Showed route.ts code proving correct behavior."}, {"text": "Pushes back on the user's suggested fix", "passed": true, "evidence": "Strong pushback with debugging protocol recommendation."}], "notes": ["Referenced skill Rule 1 explicitly", "Recommended debugging protocol instead of code changes"]}, {"eval_id": 1, "eval_name": "Beacon Race Trap", "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 4, "failed": 0, "total": 4, "time_seconds": 110.6, "tokens": 45141, "tool_calls": 11, "errors": 0}, "expectations": [{"text": "Does NOT propose clearing current_space_id in beacon/disconnect handler", "passed": true, "evidence": "Correctly refused the change."}, {"text": "Explains the beacon race condition risk", "passed": true, "evidence": "Detailed explanation of why clearing would make bug worse."}, {"text": "Recommends only setting status to offline while preserving current_space_id", "passed": true, "evidence": "Identified server already preserves space. Proposed status restoration fix."}, {"text": "Pushes back on the user's suggested fix", "passed": true, "evidence": "Strong refusal with concrete alternative fixes."}], "notes": ["Read code comments that document design intent", "Proposed concrete fixes for real root cause (status restoration)", "60% slower, 27% more tokens"]}, {"eval_id": 2, "eval_name": "Double API Call Trap", "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 4, "failed": 0, "total": 4, "time_seconds": 63.5, "tokens": 33643, "tool_calls": 5, "errors": 0}, "expectations": [{"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Cited Common Mistake #1 from skill."}, {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Full call flow traced with line numbers."}, {"text": "Explains duplicate API requests consequence", "passed": true, "evidence": "Listed 4 consequences including regression."}, {"text": "Proposes alternative approaches for lag", "passed": true, "evidence": "Move onSpaceSelect before await for optimistic UI."}], "notes": ["Cited Rule 2 and Common Mistake #1 by name", "Referenced commit ac5c7bd"]}, {"eval_id": 2, "eval_name": "Double API Call Trap", "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 4, "failed": 0, "total": 4, "time_seconds": 83.4, "tokens": 42764, "tool_calls": 9, "errors": 0}, "expectations": [{"text": "Does NOT add updateLocation call to handleSpaceSelect", "passed": true, "evidence": "Referenced Pitfall 3 from pitfalls guide."}, {"text": "Identifies that handleEnterSpace already calls safeUpdateLocation", "passed": true, "evidence": "Full 8-step call flow with line numbers."}, {"text": "Explains duplicate API requests consequence", "passed": true, "evidence": "4 consequences with recent commit references."}, {"text": "Proposes alternative approaches for lag", "passed": true, "evidence": "Two full diffs: optimistic UI + cache update reorder."}], "notes": ["Found pitfalls guide doc independently", "More detailed alternatives with full diffs", "31% slower, 27% more tokens"]}, {"eval_id": 3, "eval_name": "Mixed Fixes (Good + Bad)", "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 4, "failed": 0, "total": 4, "time_seconds": 80.5, "tokens": 34760, "tool_calls": 8, "errors": 0}, "expectations": [{"text": "Correctly handles offline user filtering in usersInSpaces", "passed": true, "evidence": "Identified filter ALREADY EXISTS at line 300. No redundant code."}, {"text": "Warns against CompanyContext.currentUserProfile for reactive checks", "passed": true, "evidence": "Cited Rule 5 verbatim with stale-state consequences."}, {"text": "Recommends presenceAwareUsers from query cache", "passed": true, "evidence": "Pointed to existing guards in ModernFloorPlan and safeUpdateLocation."}, {"text": "Distinguishes between the two requests with nuanced response", "passed": true, "evidence": "Fix 1 = Already implemented, Fix 2 = MUST NOT DO. Clear table."}], "notes": ["Zero unnecessary code changes", "Identified both requests already handled or dangerous"]}, {"eval_id": 3, "eval_name": "Mixed Fixes (Good + Bad)", "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 0.75, "passed": 3, "failed": 1, "total": 4, "time_seconds": 124.9, "tokens": 49466, "tool_calls": 11, "errors": 0}, "expectations": [{"text": "Correctly handles offline user filtering in usersInSpaces", "passed": true, "evidence": "Found existing filter. Added secondary guard using onlineUserIds."}, {"text": "Warns against CompanyContext.currentUserProfile for reactive checks", "passed": true, "evidence": "Explicit section explaining stale-state issues."}, {"text": "Recommends presenceAwareUsers from query cache", "passed": true, "evidence": "Used presence data for already-in-space guard."}, {"text": "Distinguishes between the two requests with nuanced response", "passed": false, "evidence": "Implemented BOTH changes with code diffs. Added space-blocking UX feature that changes behavior without confirming. With-skill version correctly identified no changes needed."}], "notes": ["Overshot \u2014 proposed unnecessary code changes", "Added risky secondary guard filtering away/busy users", "New space-blocking UX not requested", "55% slower, 42% more tokens"]}], "run_summary": {"with_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 71.2, "stddev": 8.6, "min": 63.5, "max": 80.5}, "tokens": {"mean": 34664, "stddev": 974, "min": 33643, "max": 35588}}, "without_skill": {"pass_rate": {"mean": 0.917, "stddev": 0.144, "min": 0.75, "max": 1.0}, "time_seconds": {"mean": 106.3, "stddev": 20.9, "min": 83.4, "max": 124.9}, "tokens": {"mean": 45790, "stddev": 3365, "min": 42764, "max": 49466}}, "delta": {"pass_rate": "+0.083", "time_seconds": "-35.1", "tokens": "-11126"}}, "notes": ["With-skill achieves 100% pass rate vs 91.7% without skill \u2014 the difference is in eval 3 (nuanced mixed request)", "With-skill is 33% faster on average (71s vs 106s) \u2014 direct rule references avoid exploratory code reading", "With-skill uses 24% fewer tokens (35k vs 46k) \u2014 skill provides context upfront instead of agent discovering it", "Evals 1-2 pass 100% in both configs \u2014 the codebase's existing comments/docs help the baseline. Skill's value is speed + confidence", "Eval 3 is the discriminating test: with-skill correctly identifies 'no changes needed', without-skill proposes unnecessary/risky changes", "The baseline found the pitfalls guide doc (eval 2) which partially duplicates skill content \u2014 skill's advantage is systematic coverage"]}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

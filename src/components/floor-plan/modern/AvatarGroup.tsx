@@ -1,7 +1,7 @@
 // src/components/floor-plan/modern/AvatarGroup.tsx
 // Story 3.3: Avatar Constellation V2 - Smart stacking with negative margin overlap
 // Story 3.13: Real-time presence animations with enter/exit tracking
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserPresenceData } from '@/types/database';
 import ModernUserAvatar from './ModernUserAvatar';
 import {
@@ -53,9 +53,17 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   const [enteringUserIds, setEnteringUserIds] = useState<Set<string>>(new Set());
   // Story 3.13 AC2: Track exiting users for leave animation
   const [exitingUsers, setExitingUsers] = useState<UserPresenceData[]>([]);
+  // Phase 2 (FLOR-02): Track offline users that should fade before leaving the DOM
+  const exitingUsersRef = useRef<Map<string, UserPresenceData>>(new Map());
+  const offlineExitTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [exitingUserIds, setExitingUserIds] = useState<Set<string>>(new Set());
 
   const prevUsersRef = useRef<UserPresenceData[]>(users);
   const isInitialRender = useRef(true);
+  // Settling period: don't trigger offline fade for the first few seconds after mount.
+  // This prevents mass-fade when presence system initializes and derives stale DB 'online' → 'offline'.
+  const isSettledRef = useRef(false);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Story 3.13: Detect user additions/removals and trigger animations
   useEffect(() => {
@@ -64,10 +72,16 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     const currentIds = new Set(currentUsers.map(u => u.id));
     const prevIds = new Set(prevUsers.map(u => u.id));
 
-    // Skip animation on initial render
+    // Skip animation on initial render and during settling period
     if (isInitialRender.current) {
       isInitialRender.current = false;
       prevUsersRef.current = currentUsers;
+      // Start settling timer — don't trigger offline fades until presence stabilizes
+      if (!settleTimerRef.current) {
+        settleTimerRef.current = setTimeout(() => {
+          isSettledRef.current = true;
+        }, 5000);
+      }
       return;
     }
 
@@ -91,8 +105,61 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
       }, 300);
     }
 
+    // Cancel fade for users that came back online
+    users.forEach((user) => {
+      if (exitingUserIds.has(user.id) && user.status !== 'offline') {
+        const existingTimeout = offlineExitTimeoutsRef.current.get(user.id);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          offlineExitTimeoutsRef.current.delete(user.id);
+        }
+        exitingUsersRef.current.delete(user.id);
+        setExitingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      }
+    });
+
+    // Only trigger offline fade after settling period to prevent mass-fade on presence init
+    if (isSettledRef.current) {
+    users.forEach((user) => {
+      const prevUser = prevUsers.find((prev) => prev.id === user.id);
+      if (!prevUser || prevUser.status === 'offline' || user.status !== 'offline') {
+        return;
+      }
+      // Skip if already fading -- do not reset the timer
+      if (exitingUserIds.has(user.id)) {
+        return;
+      }
+
+      exitingUsersRef.current.set(user.id, { ...user });
+      setExitingUserIds((prev) => new Set(prev).add(user.id));
+
+      const existingTimeout = offlineExitTimeoutsRef.current.get(user.id);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      const timeoutId = setTimeout(() => {
+        offlineExitTimeoutsRef.current.delete(user.id);
+        exitingUsersRef.current.delete(user.id);
+        setExitingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      }, 3000);
+
+      offlineExitTimeoutsRef.current.set(user.id, timeoutId);
+    });
+    } // end isSettledRef guard
+
     // Find users that were removed
-    const removedUsers = prevUsers.filter(u => !currentIds.has(u.id));
+    const removedUsers = prevUsers.filter(
+      (user) => !currentIds.has(user.id) && !exitingUsersRef.current.has(user.id)
+    );
 
     // Handle exiting users (animate out)
     if (removedUsers.length > 0) {
@@ -106,6 +173,17 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     // Always update ref for next comparison
     prevUsersRef.current = currentUsers;
   }, [users]);
+
+  useEffect(() => {
+    return () => {
+      offlineExitTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      offlineExitTimeoutsRef.current.clear();
+      exitingUsersRef.current.clear();
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+      }
+    };
+  }, []);
 
   // If no users are present (and no exiting users)
   if (users.length === 0 && exitingUsers.length === 0 && showEmpty) {
@@ -121,9 +199,25 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     return <div className={className} />;
   }
 
-  // Combine current and exiting users for rendering
-  // Note: Exiting users are appended to ensure they don't shift current users
-  const allUsers = [...users, ...exitingUsers];
+  const offlineUsers = Array.from(exitingUsersRef.current.values()).filter((user) =>
+    exitingUserIds.has(user.id)
+  );
+
+  // Show all users passed to this component. Users are pre-filtered by space via usersInSpaces.
+  // If a user has currentSpaceId set (they're in this space), they should always be visible
+  // regardless of derived status. The fade animation handles the offline transition visually.
+  const currentDisplayUsers = users;
+
+  // Combine current users, offline-fading snapshots, and legacy exit-animation users for rendering.
+  const allUsers = [
+    ...currentDisplayUsers,
+    ...offlineUsers.filter((user) => !currentDisplayUsers.some((currentUser) => currentUser.id === user.id)),
+    ...exitingUsers.filter(
+      (user) =>
+        !currentDisplayUsers.some((currentUser) => currentUser.id === user.id) &&
+        !offlineUsers.some((offlineUser) => offlineUser.id === user.id)
+    ),
+  ];
 
   // Calculate how many users to show and how many are remaining
   const visibleUsers = allUsers.slice(0, max);
@@ -137,6 +231,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   const isEntering = (userId: string) => enteringUserIds.has(userId);
   // Story 3.13 AC2: Check if user is exiting
   const isExiting = (userId: string) => exitingUsers.some(u => u.id === userId);
+  const isOfflineExiting = (userId: string) => exitingUserIds.has(userId);
 
   return (
     <div className={cn("flex items-center", className)}>
@@ -151,6 +246,8 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
               isEntering(user.id) && 'vo-avatar-enter',
               // Story 3.13 AC2: Leave animation
               isExiting(user.id) && 'vo-avatar-leave',
+              // Phase 2 (FLOR-02): Offline-only fade-out
+              isOfflineExiting(user.id) && 'vo-avatar-offline-fade',
               // Story 3.3: Status state classes
               isSpeaking(user.id) && 'vo-avatar-speaking',
               isPresenting(user.id) && 'vo-avatar-presenting',
@@ -160,8 +257,10 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
               // Story 3.3: Negative margin overlap (-10px) per UX spec (AC4)
               marginLeft: index > 0 ? '-10px' : '0',
               // Story 3.3: Z-index layering - rightmost avatar on top
-              zIndex: index + 1
+              zIndex: index + 1,
+              pointerEvents: isOfflineExiting(user.id) ? 'none' : undefined,
             }}
+            aria-hidden={isOfflineExiting(user.id) ? 'true' : undefined}
           >
             <ModernUserAvatar
               user={user}

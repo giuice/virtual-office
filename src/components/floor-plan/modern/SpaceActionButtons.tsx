@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { LogIn, LogOut, DoorOpen } from 'lucide-react';
+import { Clock, DoorClosed, DoorOpen, Loader2, LogIn, LogOut, ShieldX, Timer } from 'lucide-react';
 import type { KnockStatus } from '@/hooks/useKnock';
 
 /**
@@ -18,6 +18,7 @@ import type { KnockStatus } from '@/hooks/useKnock';
  * - Join disabled when space is full (AC3)
  */
 export interface SpaceActionButtonsProps {
+  layout?: 'panel' | 'inline-card';
   isUserInSpace: boolean;
   /** @deprecated Use hasOccupants instead for knock logic */
   isPrivate?: boolean;
@@ -36,6 +37,7 @@ export interface SpaceActionButtonsProps {
 }
 
 export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
+  layout = 'panel',
   isUserInSpace,
   isPrivate = false,
   hasOccupants = false,
@@ -52,6 +54,7 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
   const shouldShowJoin = canDirectEnter;
   const isKnocking = knockStatus === 'knocking';
   const isCooldown = knockStatus === 'cooldown' && knockCooldownRemaining > 0;
+  const isInlineCard = layout === 'inline-card';
   // Common button styles
   const buttonBase = cn(
     'flex items-center justify-center gap-2',
@@ -87,6 +90,74 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
     'hover:bg-[var(--vo-hover-bg)]',
     'focus:ring-[var(--ring)]'
   );
+
+  const handleKnockClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!isKnocking && !isCooldown) {
+      onKnock?.();
+    }
+  };
+
+  const handleKnockPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+  };
+
+  if (isInlineCard) {
+    if (!onKnock || isUserInSpace || canDirectEnter) {
+      return null;
+    }
+
+    const inlineIcon = isKnocking
+      ? <Loader2 className="w-4 h-4 animate-spin" />
+      : knockStatus === 'denied'
+        ? <ShieldX className="w-4 h-4" />
+        : knockStatus === 'timeout'
+          ? <Clock className="w-4 h-4" />
+          : isCooldown
+            ? <Timer className="w-4 h-4" />
+            : <DoorClosed className="w-4 h-4" />;
+
+    const inlineLabel = isKnocking
+      ? 'Knocking...'
+      : knockStatus === 'denied'
+        ? 'Denied'
+        : knockStatus === 'timeout'
+          ? 'No response'
+          : isCooldown
+            ? `Wait ${knockCooldownRemaining}s`
+            : 'Knock';
+
+    return (
+      <div
+        className={cn('flex pt-2', className)}
+        data-avatar-interactive="true"
+        data-space-action="true"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={handleKnockClick}
+          onPointerDown={handleKnockPointerDown}
+          className={cn(
+            knockButton,
+            'min-h-9 w-full justify-center rounded-md border-[var(--vo-accent)]/30',
+            isKnocking && 'animate-pulse',
+            (knockStatus === 'denied' || knockStatus === 'timeout') && 'opacity-60',
+            isCooldown && 'text-[var(--vo-signal-warning)]'
+          )}
+          data-avatar-interactive="true"
+          data-space-action="true"
+          disabled={isKnocking || isCooldown}
+          aria-disabled={isKnocking || isCooldown}
+          aria-label={inlineLabel}
+        >
+          {inlineIcon}
+          {inlineLabel}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -132,12 +203,8 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
 
           {shouldShowKnock && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isKnocking && !isCooldown) {
-                  onKnock?.();
-                }
-              }}
+              onClick={handleKnockClick}
+              onPointerDown={handleKnockPointerDown}
               className={cn(knockButton, shouldShowJoin ? 'flex-1' : 'flex-1')}
               data-space-action="true"
               disabled={isKnocking || isCooldown}
@@ -154,7 +221,7 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
               aria-label={isKnocking ? 'Knock pending' : isCooldown ? `Knock cooldown active, ${knockCooldownRemaining} seconds remaining` : 'Knock to request entry'}
             >
               <DoorOpen className="w-4 h-4" />
-              {isKnocking ? 'Knocking...' : isCooldown ? `Knock (${knockCooldownRemaining}s)` : 'Knock'}
+              {isKnocking ? 'Knocking...' : isCooldown ? `Wait ${knockCooldownRemaining}s` : 'Knock'}
             </button>
           )}
         </>

@@ -5,8 +5,43 @@
 	"search.exclude": {
 		"**/node_modules": true,
 		"**/.next": true,
+		"**/.playwright": true,
 		"**/build": true,
 		"**/dist": true,
-		"**/.git": true
+		"**/.git": true,
+		"**/coverage": true,
+		"**/playwright-report": true,
+		"**/test-results": true,
+		"**/.planning": true,
+		"**/_bmad-output": true,
+		"**/presence-safety-workspace": true,
+		"**/temp": true
+	},
+	// Evita que o VS Code fique reprocessando artefatos gerados o tempo todo
+	"files.exclude": {
+		"**/.next": true,
+		"**/.playwright": true,
+		"**/coverage": true,
+		"**/playwright-report": true,
+		"**/test-results": true,
+		"**/.planning": true,
+		"**/_bmad-output": true,
+		"**/presence-safety-workspace": true,
+		"**/temp": true
+	},
+	// Reduz churn de watchers em diretórios grandes e mutáveis
+	"files.watcherExclude": {
+		"**/.git/objects/**": true,
+		"**/.git/subtree-cache/**": true,
+		"**/node_modules/**": true,
+		"**/.next/**": true,
+		"**/.playwright/**": true,
+		"**/coverage/**": true,
+		"**/playwright-report/**": true,
+		"**/test-results/**": true,
+		"**/.planning/**": true,
+		"**/_bmad-output/**": true,
+		"**/presence-safety-workspace/**": true,
+		"**/temp/**": true
 	}
 }

@@ -49,7 +49,7 @@ const AttentionBeacon: React.FC<AttentionBeaconProps> = ({
     <div
       className={cn(
         // Base beacon styles from CSS tokens
-        'vo-beacon',
+        'vo-beacon relative',
         // Critical severity uses different color and faster animation
         isCritical && 'vo-beacon-critical',
         className
@@ -65,6 +65,14 @@ const AttentionBeacon: React.FC<AttentionBeaconProps> = ({
       <span className="sr-only">
         Attention needed: {reason}
       </span>
+      
+      {/* Organic Ripple Animation for Critical State */}
+      {isCritical && (
+        <>
+          <div className="absolute -inset-1 rounded-full border-2 border-[var(--vo-beacon-critical)] animate-organic-ripple" />
+          <div className="absolute -inset-1 rounded-full border-2 border-[var(--vo-beacon-critical)] animate-organic-ripple [animation-delay:1.25s]" />
+        </>
+      )}
     </div>
   );
 };

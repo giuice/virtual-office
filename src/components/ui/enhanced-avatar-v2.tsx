@@ -22,6 +22,7 @@ interface EnhancedAvatarV2Props {
   className?: string;
   showStatus?: boolean;
   status?: 'online' | 'away' | 'busy' | 'offline';
+  isSpeaking?: boolean;
   fallbackName?: string;
   onError?: (error: AvatarLoadError) => void;
   onRetry?: (url: string, attempt: number) => void;
@@ -87,6 +88,7 @@ export function EnhancedAvatarV2({
   className,
   showStatus = false,
   status,
+  isSpeaking = false,
   fallbackName,
   onError,
   onRetry,
@@ -379,12 +381,16 @@ export function EnhancedAvatarV2({
   };
 
   return (
-    <div className="relative inline-block">
+    <div className={cn(
+      "relative inline-block transition-all duration-vo ease-vo-elastic",
+      "hover:-translate-y-1.5 hover:scale-110 hover:z-10 hover:shadow-vo-card-hover",
+      isSpeaking && "animate-speaking-pulse z-10"
+    )}>
       <Avatar 
         className={cn(
           config.avatar,
-          'border border-border transition-all duration-200',
-          onClick && 'hover:ring-2 hover:ring-primary/50 cursor-pointer',
+          'border-2 border-vo-card-bg transition-all duration-200',
+          onClick && 'cursor-pointer',
           className
         )}
         onClick={onClick}

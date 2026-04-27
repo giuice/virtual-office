@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,9 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { Building2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const NO_SPACE_VALUE = '__none__';
 
 export function CompanySettings() {
-  const { company, currentUserProfile, updateCompanyDetails, isLoading } = useCompany();
+  const { company, currentUserProfile, spaces, companyUsers, updateCompanyDetails, isLoading } = useCompany();
   const { showSuccess, showError } = useNotification();
 
   // Check if the current user is an admin
@@ -28,6 +34,40 @@ export function CompanySettings() {
     company?.settings?.maxRooms?.toString() || '10'
   );
   const [theme, setTheme] = useState(company?.settings?.theme || 'light');
+  const [defaultSpaceId, setDefaultSpaceId] = useState(company?.settings?.defaultSpaceId || '');
+  const [homeSpaces, setHomeSpaces] = useState<Record<string, string>>(company?.settings?.homeSpaces || {});
+
+  useEffect(() => {
+    setCompanyName(company?.name || '');
+    setAllowGuestAccess(company?.settings?.allowGuestAccess || false);
+    setMaxRooms(company?.settings?.maxRooms?.toString() || '10');
+    setTheme(company?.settings?.theme || 'light');
+    setDefaultSpaceId(company?.settings?.defaultSpaceId || '');
+    setHomeSpaces(company?.settings?.homeSpaces || {});
+  }, [company]);
+
+  const activeSpaces = useMemo(
+    () => spaces.filter((space) => space.status === 'active' || space.status === 'available' || space.status === 'in_use'),
+    [spaces]
+  );
+
+  const spacesByType = useMemo(
+    () =>
+      activeSpaces.reduce<Record<string, typeof activeSpaces>>((acc, space) => {
+        const type = space.type || 'workspace';
+        if (!acc[type]) {
+          acc[type] = [];
+        }
+        acc[type].push(space);
+        return acc;
+      }, {}),
+    [activeSpaces]
+  );
+
+  const currentDefaultSpaceName = useMemo(
+    () => activeSpaces.find((space) => space.id === defaultSpaceId)?.name,
+    [activeSpaces, defaultSpaceId]
+  );
 
   const handleSaveGeneral = async () => {
     if (!company || !isAdmin) return;
@@ -64,6 +104,27 @@ export function CompanySettings() {
     }
   };
 
+  const handleSaveSpaces = async () => {
+    if (!company || !isAdmin) return;
+
+    try {
+      await updateCompanyDetails({
+        settings: {
+          ...company.settings,
+          defaultSpaceId: defaultSpaceId || undefined,
+          homeSpaces: Object.fromEntries(
+            Object.entries(homeSpaces).filter(([, spaceId]) => Boolean(spaceId))
+          ),
+        },
+      });
+      showSuccess({ description: 'Home space assignments saved' });
+    } catch (error) {
+      showError({
+        description: error instanceof Error ? error.message : 'Failed to save settings',
+      });
+    }
+  };
+
   if (!isAdmin) {
     return (
       <Card>
@@ -90,6 +151,10 @@ export function CompanySettings() {
           <TabsList className="mb-4">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="spaces" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Spaces
+            </TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
           
@@ -165,6 +230,109 @@ export function CompanySettings() {
                   {isLoading ? 'Saving...' : 'Save Feature Settings'}
                 </Button>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="spaces" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Company Default Space</CardTitle>
+                <CardDescription className="text-sm font-normal">
+                  Where new team members land on their first login
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select
+                  value={defaultSpaceId || NO_SPACE_VALUE}
+                  onValueChange={(value) => setDefaultSpaceId(value === NO_SPACE_VALUE ? '' : value)}
+                  disabled={isLoading || activeSpaces.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a space..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_SPACE_VALUE}>No default space</SelectItem>
+                    {Object.entries(spacesByType).map(([type, typeSpaces]) => (
+                      <SelectGroup key={type}>
+                        <SelectLabel className="capitalize">{type.replace(/_/g, ' ')}</SelectLabel>
+                        {typeSpaces.map((space) => (
+                          <SelectItem key={space.id} value={space.id}>
+                            {space.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentDefaultSpaceName ? (
+                  <p className="text-xs font-normal text-muted-foreground">
+                    Currently: {currentDefaultSpaceName}
+                  </p>
+                ) : (
+                  <p className="text-xs font-normal italic text-muted-foreground">
+                    No default space selected. New members will join the first available workspace.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Home Space Assignments</CardTitle>
+                <CardDescription className="text-sm font-normal">
+                  Assign each team member their home room (like a desk)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {companyUsers.length === 0 ? (
+                  <p className="text-sm font-normal italic text-muted-foreground">No team members found</p>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {companyUsers.map((user, index) => (
+                      <div
+                        key={user.id}
+                        className={cn(
+                          'flex items-center gap-3 py-3',
+                          index < companyUsers.length - 1 && 'border-b border-border'
+                        )}
+                      >
+                        <EnhancedAvatarV2 user={user} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-sm font-normal text-foreground">
+                          {user.displayName}
+                        </span>
+                        <Select
+                          value={homeSpaces[user.id] || NO_SPACE_VALUE}
+                          onValueChange={(value) => {
+                            setHomeSpaces((prev) => ({
+                              ...prev,
+                              [user.id]: value === NO_SPACE_VALUE ? '' : value,
+                            }));
+                          }}
+                          disabled={isLoading || activeSpaces.length === 0}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Not assigned" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_SPACE_VALUE}>Not assigned</SelectItem>
+                            {activeSpaces.map((space) => (
+                              <SelectItem key={space.id} value={space.id}>
+                                {space.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveSpaces} disabled={isLoading}>
+                Save Changes
+              </Button>
             </div>
           </TabsContent>
           

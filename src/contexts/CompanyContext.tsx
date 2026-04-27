@@ -272,9 +272,28 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      await updateCompany(company.id, data);
+      const mergedData: Partial<Company> = {
+        ...data,
+        settings: data.settings !== undefined
+          ? { ...company.settings, ...data.settings }
+          : undefined,
+      };
+
+      await updateCompany(company.id, mergedData);
       // Optimistically update local state
-      setCompany(prev => prev ? { ...prev, ...data } : null);
+      setCompany(prev => {
+        if (!prev) {
+          return null;
+        }
+
+        return {
+          ...prev,
+          ...mergedData,
+          settings: mergedData.settings !== undefined
+            ? { ...prev.settings, ...mergedData.settings }
+            : prev.settings,
+        };
+      });
       console.log(`[CompanyContext] Company details updated for ${company.id}`);
     } catch (err) {
       console.error('[CompanyContext] Error updating company:', err);

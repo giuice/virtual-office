@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useNotification } from '@/hooks/useNotification';
 import { Loader2 } from 'lucide-react';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
@@ -35,6 +34,7 @@ export default function LoginPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sent' | 'error'>('idle');
   const errorRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
@@ -46,8 +46,7 @@ export default function LoginPage() {
     isAuthReady,
     actionLoading,
   } = useAuth();
-  const { isLoading: companyLoading } = useCompany();
-  const { showSuccess, showError } = useNotification();
+  const { isLoading: companyLoading, company } = useCompany();
 
   const isBusy = isLoading || actionLoading;
   const isDisabled = isBusy || !isAuthReady;
@@ -65,12 +64,13 @@ export default function LoginPage() {
 
     if (!user || companyLoading) return;
 
+    const redirectPath = company ? '/floor-plan' : '/onboarding';
     const redirectTimer = setTimeout(() => {
-      router.push('/onboarding');
+      router.push(redirectPath);
     }, 400);
 
     return () => clearTimeout(redirectTimer);
-  }, [companyLoading, isAuthReady, router, user]);
+  }, [company, companyLoading, isAuthReady, router, user]);
 
   if (!isAuthReady || authLoading) {
     return <AuthLoadingScreen message="Restaurando sessão..." />;
@@ -85,7 +85,6 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      showSuccess({ description: 'Login realizado com sucesso!' });
       setStatusMessage('Redirecionando...');
     } catch (error) {
       const err = error as any;
@@ -94,7 +93,6 @@ export default function LoginPage() {
         setFormError('Email não confirmado');
       } else {
         const friendlyMessage = mapSupabaseAuthError(error);
-        showError({ description: friendlyMessage });
         setFormError(friendlyMessage);
       }
       setStatusMessage(null);
@@ -111,11 +109,9 @@ export default function LoginPage() {
 
     try {
       await signInWithGoogle();
-      showSuccess({ description: 'Login com Google realizado!' });
       setStatusMessage('Redirecionando...');
     } catch (error) {
       const friendlyMessage = mapSupabaseAuthError(error);
-      showError({ description: friendlyMessage });
       setFormError(friendlyMessage);
       setStatusMessage(null);
       setFormStatus('idle');
@@ -196,15 +192,21 @@ export default function LoginPage() {
                       const supabase = createSupabaseBrowserClient();
                       const { error } = await supabase.auth.resend({ type: 'signup', email: unconfirmedEmail });
                       if (error) throw error;
-                      showSuccess({ description: 'Email reenviado com sucesso!' });
-                    } catch (error) {
-                      showError({ description: 'Erro ao reenviar email.' });
+                      setResendStatus('sent');
+                    } catch {
+                      setResendStatus('error');
                     }
                   }}
                   className="w-full"
                 >
                   Reenviar confirmação
                 </Button>
+                {resendStatus === 'sent' && (
+                  <p className="text-sm text-green-600">Email reenviado com sucesso!</p>
+                )}
+                {resendStatus === 'error' && (
+                  <p className="text-sm text-destructive">Erro ao reenviar email.</p>
+                )}
               </div>
             )}
 

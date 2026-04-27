@@ -36,6 +36,31 @@
   --success-foreground: 355.7 100% 97.3%;
   --warning: 38 92% 50%;
   --warning-foreground: 48 96% 89%;
+
+  /* Custom Animations for Virtual Office v3 */
+  --animate-organic-ripple: organic-ripple 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  --animate-speaking-pulse: speaking-pulse 2s infinite;
+
+  /* Virtual Office Theme Variables */
+  --color-vo-card-bg: var(--vo-card-bg);
+  --color-vo-card-border: var(--vo-card-border);
+  --color-vo-card-hover-border: var(--vo-card-hover-border);
+  --shadow-vo-card-hover: var(--vo-card-hover-shadow);
+  --ease-vo-elastic: var(--vo-ease-elastic);
+  --duration-vo: var(--vo-transition-speed);
+  --color-vo-accent: var(--vo-accent);
+  --color-vo-active-shadow: var(--vo-active-shadow);
+
+  @keyframes organic-ripple {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(3.5); opacity: 0; }
+  }
+
+  @keyframes speaking-pulse {
+    0% { box-shadow: 0 0 0 2px var(--vo-card-bg), 0 0 0 4px var(--vo-accent); }
+    50% { box-shadow: 0 0 0 2px var(--vo-card-bg), 0 0 0 6px var(--vo-active-shadow); }
+    100% { box-shadow: 0 0 0 2px var(--vo-card-bg), 0 0 0 4px var(--vo-accent); }
+  }
 }
 
 @layer base {

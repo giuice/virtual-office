@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
-import { useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
+import { getReconnectionContext, useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
@@ -38,74 +38,51 @@ import { AudioProvider } from '@/contexts/AudioContext';
 
 
 export function FloorPlan() {
-  // Get data from context
-  const { spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany(); // Added currentUserProfile
-  const router = useRouter(); // Add router for navigation
-  const { usersInSpaces, updateLocation, users } = usePresence(); // Presence context for real-time user data
+  // === ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURN (Rules of Hooks) ===
+
+  // Context hooks
+  const { company, spaces, companyUsers, isLoading: isCompanyLoading, currentUserProfile } = useCompany();
+  const router = useRouter();
+  const { usersInSpaces, users } = usePresence();
   const {
     getOrCreateRoomConversation,
     setActiveConversation,
     activeConversation,
     setActiveView,
   } = useMessaging();
-  // State for UI interactions
+  const { isAuthReady } = useAuth();
+
+  // State hooks
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [hoveredUser, setHoveredUser] = useState<User | null>(null);
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useState<boolean>(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState<boolean>(false);
   const [isRoomManagementOpen, setIsRoomManagementOpen] = useState<boolean>(false);
-  const [userTemplates, setUserTemplates] = useState<RoomTemplate[]>([])
-  const [filterType, setFilterType] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false)
+  const [userTemplates, setUserTemplates] = useState<RoomTemplate[]>([]);
+  const [filterType, setFilterType] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isEditingRoom, setIsEditingRoom] = useState<boolean>(false);
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useState<string | null>(null);
   const [useModernUI, setUseModernUI] = useState(false);
   const [perspective, setPerspective] = useState<FloorPlanPerspective>('orbit');
   const [isNeighborhoodManagerOpen, setIsNeighborhoodManagerOpen] = useState(false);
+  const [templatePosition, setTemplatePosition] = useState<{ x: number; y: number; width?: number; height?: number } | undefined>(undefined);
 
-  // Neighborhood data and filters (Story 3.9)
+  // Custom hooks
   const { data: neighborhoods = [] } = useNeighborhoods();
   const neighborhoodFilters = useNeighborhoodFilters(neighborhoods);
-
-  // Beacon aggregation (Story 3.10)
   const beaconAggregation = useBeaconAggregator(spaces, usersInSpaces);
-
-  const { isAuthReady } = useAuth();
-
-  // Check if current user is admin (for showing/hiding admin controls)
-  const isAdmin = currentUserProfile?.role === 'admin';
-
-  if (!isAuthReady || isCompanyLoading) {
-    return (
-      <div className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          Preparing your floor plan...
-        </p>
-      </div>
-    );
-  }
-
-  // Derive current space ID from presence for global audio context
+  const deleteSpaceMutation = useDeleteSpace();
+  const { toast } = useToast();
+  // Derived values needed by hooks below
   const currentUserPresence = users?.find(u => u.id === currentUserProfile?.id);
   const currentSpaceId = currentUserPresence?.currentSpaceId || undefined;
+  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserPresence ?? null, spaces, company);
 
-  // Filter spaces from context based on type, search query, and neighborhood filters
-  const filteredSpaces = spaces.filter(space => {
-    const matchesType = filterType === 'all' || space.type === filterType;
-    const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesSearch;
-  });
-
-  // Apply neighborhood filters (Story 3.9)
-  const neighborhoodFilteredSpaces = neighborhoodFilters.filterSpaces(filteredSpaces);
-
-  // Log spaces for debugging
+  // Effect: Log spaces for debugging
   useEffect(() => {
     debugLogger.log('FloorPlan', `Loaded ${spaces.length} spaces`, spaces);
-    // Check for unusual space data
     if (spaces.length > 0) {
       const spacesWithInvalidPosition = spaces.filter(
         space => !space.position ||
@@ -121,100 +98,26 @@ export function FloorPlan() {
     }
   }, [spaces]);
 
-  const handleSpaceSelect = (space: Space) => {
-    setSelectedSpace(space);
-    setHighlightedSpaceId(space.id);
-    handleEnterSpace(space);
-    // Other handlers...
-  };
-
-  // Handler for editing a space (opens RoomDialog in edit mode)
-  const handleEditSpace = (space: Space) => {
-    setSelectedSpace(space);
-    setIsEditingRoom(true);
-  };
-
-  // TODO: Refactor room management functions (create, update, delete, duplicate)
-  // to interact with the backend API via context or direct API calls,
-  // instead of modifying local state directly.
-  // For now, these functions will not work correctly as they modify the old local state.
-
-  // Room creation is now handled by the mutation hooks in the RoomDialog component
-  // Room updates are now handled by the mutation hooks in the RoomDialog component
-  const deleteSpaceMutation = useDeleteSpace();
-  // Note: updateSpaceMutation removed - now using presence system via updateLocation()
-
-  const { toast } = useToast();
-
-  const handleDeleteRoom = (roomId: string) => {
-    if (!roomId) {
-      toast({
-        title: "Error",
-        description: "Cannot delete room: Missing room ID.",
-        variant: "destructive"
-      });
+  // Effect: Hydrate visual selection on load -- useLastSpace handles the actual API placement
+  useEffect(() => {
+    if (!currentUserProfile || spaces.length === 0) {
       return;
     }
 
-    deleteSpaceMutation.mutate(roomId, {
-      onSuccess: () => {
-        toast({
-          title: "Success",
-          description: "Room deleted successfully"
-        });
-        // Clear selection if the deleted room was selected/active
-        setSelectedSpace(null);
-      },
-      onError: (error: Error) => {
-        toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to delete room",
-          variant: "destructive"
-        });
-      }
-    });
-  };
-
-  const handleDuplicateRoom = (room: Space) => { // Expect global Space
-    console.warn("handleDuplicateRoom needs API integration");
-    // Example API call structure (needs implementation in context/API):
-    // duplicateSpaceInContext(room);
-  };
-
-  // Template position handling
-  const [templatePosition, setTemplatePosition] = useState<{ x: number; y: number; width?: number; height?: number } | undefined>(undefined);
-
-  // Use the last space hook to persist space selection
-  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserProfile, spaces);
-
-  // Handle entering a space (new function)
-  const handleEnterSpace = (space: Space) => {
-    if (!space || !space.id) {
-      toast({
-        title: "Error",
-        description: "Cannot enter space: Invalid space data.",
-        variant: "destructive"
-      });
+    const targetSpaceId = currentSpaceId
+      || getReconnectionContext(currentUserProfile, spaces, company, lastSpaceId).spaceId;
+    if (!targetSpaceId) {
       return;
     }
 
-    // Save this space as the last selected space for the user
-    saveLastSpace(space.id);
+    const space = spaces.find((candidate) => candidate.id === targetSpaceId);
+    if (space) {
+      setSelectedSpace(space);
+      setHighlightedSpaceId(space.id);
+    }
+  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces]);
 
-    // Highlight the selected space
-    setHighlightedSpaceId(space.id);
-
-    // Just select the space without automatically adding the user to it
-    setSelectedSpace(space);
-
-    console.log(`User viewing space: ${space.name} (${space.id})`);
-
-    // NOTE: We've removed the automatic user assignment to spaces
-    // Users should now be explicitly added to spaces through a dedicated UI action
-  };
-
-
-  // Handle opening chat for a room via unified messaging drawer
+  // Callback: Handle opening chat for a room via unified messaging drawer
   const handleOpenChat = useCallback(async (room: Space) => {
     if (!room?.id) {
       toast({
@@ -225,7 +128,6 @@ export function FloorPlan() {
       return;
     }
 
-    // Keep UI context aware of the selected space
     setSelectedSpace(room);
     setHighlightedSpaceId(room.id);
 
@@ -260,30 +162,90 @@ export function FloorPlan() {
     setHighlightedSpaceId,
   ]);
 
-  useEffect(() => {
-    // If there's a last space ID, try to select it
-    if (lastSpaceId) {
-      const space = spaces.find(space => space.id === lastSpaceId);
-      if (space) {
-        setSelectedSpace(space);
-        handleEnterSpace(space);
-      }
-    }
-  }, [lastSpaceId, spaces]);
-
-  // Story 3.10: Scroll to space when beacon is clicked
+  // Callback: Scroll to space when beacon is clicked (Story 3.10)
   const scrollToSpace = useCallback((spaceId: string) => {
     const element = document.querySelector(`[data-space-id="${spaceId}"]`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setHighlightedSpaceId(spaceId);
-      // Find the space and select it
       const space = spaces.find(s => s.id === spaceId);
       if (space) {
         setSelectedSpace(space);
       }
     }
   }, [spaces]);
+
+  // === EARLY RETURN — all hooks have been called above ===
+  if (!isAuthReady || isCompanyLoading) {
+    return (
+      <div className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          Preparing your floor plan...
+        </p>
+      </div>
+    );
+  }
+
+  // === NON-HOOK CODE BELOW (handlers, derived values, render) ===
+  const isAdmin = currentUserProfile?.role === 'admin';
+
+  // Filter spaces from context based on type, search query, and neighborhood filters
+  const filteredSpaces = spaces.filter(space => {
+    const matchesType = filterType === 'all' || space.type === filterType;
+    const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
+
+  // Apply neighborhood filters (Story 3.9)
+  const neighborhoodFilteredSpaces = neighborhoodFilters.filterSpaces(filteredSpaces);
+
+  const handleSpaceSelect = (space: Space) => {
+    setSelectedSpace(space);
+    setHighlightedSpaceId(space.id);
+    // Only persist to localStorage for reconnection recovery.
+    // The actual API call (updateLocation) is already handled by
+    // ModernFloorPlan.handleEnterSpace BEFORE this callback fires.
+    saveLastSpace(space.id);
+  };
+
+  const handleEditSpace = (space: Space) => {
+    setSelectedSpace(space);
+    setIsEditingRoom(true);
+  };
+
+  const handleDeleteRoom = (roomId: string) => {
+    if (!roomId) {
+      toast({
+        title: "Error",
+        description: "Cannot delete room: Missing room ID.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    deleteSpaceMutation.mutate(roomId, {
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Room deleted successfully"
+        });
+        setSelectedSpace(null);
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to delete room",
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  const handleDuplicateRoom = (room: Space) => {
+    console.warn("handleDuplicateRoom needs API integration");
+  };
 
   return (
     <AudioProvider spaceId={currentSpaceId || selectedSpace?.id} userId={currentUserProfile?.id}>

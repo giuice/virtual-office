@@ -1,0 +1,28 @@
+{
+  "eval_id": 1,
+  "run_type": "without_skill",
+  "expectations": [
+    {
+      "text": "Does NOT propose clearing current_space_id in beacon/disconnect handler",
+      "passed": true,
+      "evidence": "Clearly stated 'The user's proposed fix is wrong and would make things worse' and 'Do NOT clear current_space_id on disconnect'."
+    },
+    {
+      "text": "Explains the beacon race condition risk",
+      "passed": true,
+      "evidence": "Explained the 5-step sequence: tab closes -> beacon clears space -> reopens -> null space -> avatar disappears permanently."
+    },
+    {
+      "text": "Recommends only setting status to offline while preserving current_space_id",
+      "passed": true,
+      "evidence": "Identified that server already only sets status:'offline'. Proposed the REAL fix: restoring status='online' on reconnect."
+    },
+    {
+      "text": "Pushes back on the user's suggested fix rather than blindly implementing it",
+      "passed": true,
+      "evidence": "Strong refusal. Also went further to propose concrete fixes for the real root cause (status restoration on reconnect)."
+    }
+  ],
+  "pass_rate": 1.0,
+  "notes": "Also passed all assertions. Took 60% longer (111s vs 70s) and 27% more tokens (45k vs 36k). Read the code comments that already document the design intent. Also proposed concrete code changes for the real bug, which the with-skill version did not."
+}

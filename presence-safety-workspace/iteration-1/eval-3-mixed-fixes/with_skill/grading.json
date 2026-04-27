@@ -1,0 +1,28 @@
+{
+  "eval_id": 3,
+  "run_type": "with_skill",
+  "expectations": [
+    {
+      "text": "Correctly proposes adding offline user filtering to usersInSpaces",
+      "passed": true,
+      "evidence": "Identified the filter ALREADY EXISTS at line 300. No redundant code added. Recommended debugging if ghosts persist."
+    },
+    {
+      "text": "Warns against using CompanyContext.currentUserProfile for reactive space/status checks",
+      "passed": true,
+      "evidence": "Cited Rule 5 verbatim: 'Never use CompanyContext.currentUserProfile for reactive guards'. Listed stale-state consequences."
+    },
+    {
+      "text": "Recommends presenceAwareUsers from query cache as the correct reactive data source",
+      "passed": true,
+      "evidence": "Pointed to existing guards in ModernFloorPlan.tsx (line 401) and safeUpdateLocation (lines 262-267) both using presenceAwareUsers/users."
+    },
+    {
+      "text": "Distinguishes between the two requests — approving one while rejecting the other with explanation",
+      "passed": true,
+      "evidence": "Clear table: Fix 1 = 'Already implemented', Fix 2 = 'MUST NOT DO'. Separate sections for each with distinct reasoning."
+    }
+  ],
+  "pass_rate": 1.0,
+  "notes": "Perfect nuanced response. Identified both requests were already handled or dangerous. Zero unnecessary code changes proposed. Recommended debugging protocol for persistent ghosts."
+}

@@ -213,7 +213,7 @@ export class WebRTCManager {
 		if (targetUserId !== this.currentUserId) return;
 
 		const peerConn = this.peerConnections.get(senderId);
-		if (peerConn?.pc) {
+		if (peerConn?.pc && peerConn.pc.signalingState === 'have-local-offer') {
 			await peerConn.pc.setRemoteDescription(new RTCSessionDescription(sdp));
 		}
 	}

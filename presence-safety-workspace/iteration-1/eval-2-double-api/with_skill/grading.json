@@ -1,0 +1,28 @@
+{
+  "eval_id": 2,
+  "run_type": "with_skill",
+  "expectations": [
+    {
+      "text": "Does NOT add updateLocation call to handleSpaceSelect",
+      "passed": true,
+      "evidence": "Explicitly: 'This is explicitly documented as Common Mistake #1 in the Presence Safety Skill.' Zero code changes to handleSpaceSelect."
+    },
+    {
+      "text": "Identifies that handleEnterSpace already calls safeUpdateLocation",
+      "passed": true,
+      "evidence": "Traced full call flow with line numbers: ModernFloorPlan.handleEnterSpace -> await updateLocation(spaceId) at line 419."
+    },
+    {
+      "text": "Explains that adding a second call would create duplicate API requests",
+      "passed": true,
+      "evidence": "Listed 4 consequences: double API calls, race conditions, optimistic update conflicts, regression to previously fixed bug."
+    },
+    {
+      "text": "Proposes alternative approaches for the lag issue",
+      "passed": true,
+      "evidence": "Proposed moving onSpaceSelect before await updateLocation for optimistic UI feedback. Also suggested debugging with Network tab + console timing first."
+    }
+  ],
+  "pass_rate": 1.0,
+  "notes": "Perfect. Cited Rule 2 and Common Mistake #1 by name. Referenced recent commit ac5c7bd that fixed this exact bug."
+}

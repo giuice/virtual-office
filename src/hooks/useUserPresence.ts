@@ -19,6 +19,10 @@ type PresencePayload = {
   [key: string]: unknown;
 };
 
+interface PresenceLeavePayload {
+  leftPresences?: PresencePayload[];
+}
+
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
   if (process.env.NODE_ENV === 'development') {
@@ -28,6 +32,7 @@ export function useUserPresence(currentUserId?: string) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [isInitialized, setIsInitialized] = useState(false);
   const [updateInProgress, setUpdateInProgress] = useState(false);
+  const [isPresenceReady, setIsPresenceReady] = useState(false);
   const initializationGuard = useRef(false);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const lastPresencePayloadRef = useRef<string | null>(null);
@@ -139,11 +144,15 @@ export function useUserPresence(currentUserId?: string) {
           derivedStatus = 'online';
         }
       } else {
-        if (!user.status || user.status === 'online') {
-          derivedStatus = 'offline';
-        } else if (user.status === 'away' || user.status === 'busy') {
+        // Only override to offline if:
+        // 1. Presence system is ready (first sync received) AND
+        // 2. User's DB status was 'online' (they should be in presence if truly online)
+        // Never override away/busy -- those are intentional DB statuses that don't require Realtime presence
+        if (isPresenceReady && (!user.status || user.status === 'online')) {
           derivedStatus = 'offline';
         }
+        // If isPresenceReady is false, keep the DB status as-is (trust the server)
+        // If user.status is 'away' or 'busy', keep it -- these are explicit user choices
       }
 
       return {
@@ -152,7 +161,7 @@ export function useUserPresence(currentUserId?: string) {
         isOnline,
       };
     });
-  }, [rawUsers, onlineUserIds]);
+  }, [rawUsers, onlineUserIds, isPresenceReady]);
 
   const snapshotPresenceState = useCallback((channel: RealtimeChannel) => {
     const state = channel.presenceState() as Record<string, PresencePayload[]>;
@@ -207,7 +216,6 @@ export function useUserPresence(currentUserId?: string) {
             if (!old) return old;
             
             // Find current user and check what their original space was
-            const user = old.find(u => u.id === currentUserId);
             console.log(`[Presence] Reverting failed update for user ${currentUserId}`);
             return old;
           });
@@ -283,33 +291,19 @@ export function useUserPresence(currentUserId?: string) {
     }
   }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient]);
 
-  const updateLocation = async (spaceId: string | null) => {
-    if (!currentUserId) {
-      console.error("[Presence] Cannot update location: currentUserId is missing in updateLocation call.");
-      
-      // For debugging: log some helpful context
-      console.warn("[Presence] Debug info: Make sure PresenceProvider has access to the current user ID");
-      console.warn("[Presence] Current state:", {
-        currentUserId,
-        usersCount: presenceAwareUsers?.length || 0,
-        currentUser: currentUser ? { id: currentUser.id, name: currentUser.displayName } : null
-      });
-      
-      return Promise.reject(new Error("Cannot update location: currentUserId is missing"));
-    }
-    
-    return debouncedUpdateLocation(spaceId);
-  };
-
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
     (presenceAwareUsers ?? []).forEach((user) => {
+      // Offline users should not appear in spaces — their avatar is hidden.
+      // Always include the current user so they see their own avatar immediately
+      // (before Realtime presence overrides their DB status from offline to online).
+      if (user.status === 'offline' && user.id !== currentUserId) return;
       const key = user.currentSpaceId ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(user);
     });
     return map;
-  }, [presenceAwareUsers]);
+  }, [presenceAwareUsers, currentUserId]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -332,6 +326,43 @@ export function useUserPresence(currentUserId?: string) {
       console.error('[Presence] Error updating presence payload:', error);
     });
   }, [currentUserId, connectionStatus, buildPresencePayload, computePresenceSignature]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const handleBeforeUnload = () => {
+      localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
+
+      const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/users/location', payload);
+        return;
+      }
+
+      void fetch('/api/users/location', {
+        method: 'POST',
+        body: payload,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        keepalive: true,
+      }).catch((error) => {
+        console.error('[Presence] Failed to send unload cleanup request:', error);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -364,12 +395,44 @@ export function useUserPresence(currentUserId?: string) {
       },
     });
 
-    const handlePresenceSnapshot = () => snapshotPresenceState(channel);
+    const handlePresenceSnapshot = () => {
+      snapshotPresenceState(channel);
+      // Only mark ready once the current user is tracked in presence state,
+      // so we don't prematurely derive everyone as offline from an empty snapshot
+      if (!isPresenceReady) {
+        const state = channel.presenceState();
+        if (currentUserId && state[currentUserId]) {
+          setIsPresenceReady(true);
+        }
+      }
+    };
 
     channel
       .on('presence', { event: 'sync' }, handlePresenceSnapshot)
       .on('presence', { event: 'join' }, handlePresenceSnapshot)
-      .on('presence', { event: 'leave' }, handlePresenceSnapshot)
+      .on('presence', { event: 'leave' }, (payload: PresenceLeavePayload) => {
+        handlePresenceSnapshot();
+
+        const leftUserIds = new Set(
+          (payload.leftPresences ?? [])
+            .map((presence) => presence.user_id)
+            .filter((userId): userId is string => typeof userId === 'string' && userId.length > 0)
+        );
+
+        if (leftUserIds.size === 0) {
+          return;
+        }
+
+        // NOTE: We do NOT mutate rawUsers query data here. The presenceAwareUsers
+        // memo derives offline status from onlineUserIds (which updates via presenceState).
+        // Mutating rawUsers would overwrite the DB status and break the derivation logic,
+        // causing users to appear permanently offline even after reconnecting.
+        //
+        // Also intentionally NOT posting cleanup to /api/users/location for peer users.
+        // The user's own beforeunload handler and server-side cleanup handle legitimate
+        // offline transitions. Peer clients must never write location state for other users,
+        // as it causes permanent eviction on network hiccups / tab switches / reloads.
+      })
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users' },
@@ -479,6 +542,7 @@ export function useUserPresence(currentUserId?: string) {
       presenceChannelRef.current = null;
       initializationGuard.current = false;
       setIsInitialized(false);
+      setIsPresenceReady(false);
       lastPresencePayloadRef.current = null;
 
       supabase.removeChannel(channel).catch((error) => {
@@ -495,6 +559,7 @@ export function useUserPresence(currentUserId?: string) {
     updateLocation: safeUpdateLocation,
     connectionStatus,
     isInitialized,
+    isPresenceReady,
     updateInProgress,
   };
 }

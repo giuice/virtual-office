@@ -13,6 +13,11 @@ import { useAttentionBeacon, SpaceBeaconData } from '@/hooks/useAttentionBeacon'
 import { useSpaceDetails } from '@/hooks/useSpaceDetails';
 import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
+import { GlassPanel } from '@/components/ui/glass-panel';
+import { KnockBanner } from './KnockBanner';
+import { SpaceActionButtons } from './SpaceActionButtons';
+import type { KnockRequestPayload } from '@/hooks/realtime/useKnockSignaling';
+import type { KnockStatus } from '@/hooks/useKnock';
 
 // ============================================
 // Story 3.2: Gradient utilities
@@ -62,8 +67,14 @@ interface ModernSpaceCardProps {
   onKnock?: (spaceId: string) => void;
   /** Whether direct enter should be allowed for this space */
   canDirectEnter?: boolean;
+  /** Pending knock request for this space (shown as banner for occupants) */
+  pendingKnockRequest?: KnockRequestPayload | null;
+  /** Handler when occupant approves a knock */
+  onKnockApprove?: (request: KnockRequestPayload) => void;
+  /** Handler when occupant denies a knock */
+  onKnockDeny?: (request: KnockRequestPayload) => void;
   /** Story 3.16: Current knock status for this space */
-  knockStatus?: 'idle' | 'knocking' | 'approved' | 'denied' | 'timeout' | 'cooldown';
+  knockStatus?: KnockStatus;
   /** Story 3.16: Cooldown remaining for this space */
   knockCooldownRemaining?: number;
 }
@@ -91,6 +102,9 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   // Story 3.16: Knock to Enter
   onKnock,
   canDirectEnter = false,
+  pendingKnockRequest = null,
+  onKnockApprove,
+  onKnockDeny,
   knockStatus,
   knockCooldownRemaining = 0,
 }) => {
@@ -246,53 +260,41 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   const occupancyPercent = space.capacity > 0
     ? Math.min((usersInSpace.length / space.capacity) * 100, 100)
     : 0;
+  const isRestrictedSpace = space.accessControl?.isPublic === false;
 
   return (
     // Story 3.11: Wrapper div handles hover for both card and panel
     // This ensures mouse can move from card to panel without closing it
     <div
       ref={wrapperRef}
-      className="relative"
+      className={cn(
+        "relative",
+        // Container query for responsive internal layout
+        "@container/space"
+      )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div
+      <GlassPanel
         ref={cardRef}
+        interactive
+        withGlow
         className={cn(
           // Base card styles
           "flex flex-col relative overflow-visible",
-          // Rounded corners - smaller for analyst
-          isAnalyst ? "rounded-[12px]" : "rounded-[20px]",
-          "border",
           // Padding varies by variant
           isAnalyst ? "p-3 gap-2" : isCinema ? "p-6 gap-4" : "p-4 gap-3",
-          // Shadows and transitions
-          floorPlanTokens.spaceCard.shadow.default,
-          floorPlanTokens.spaceCard.transition,
-          "transition-all duration-300 ease-out",
-          // Hover effects
-          hovered && [
-            floorPlanTokens.spaceCard.shadow.hover,
-            "-translate-y-[5px] scale-[1.01]",
-            "z-10"
-          ],
-          isHighlighted && "ring-2 ring-primary",
-          isUserInSpace && "ring-1 ring-blue-400",
           // Min height varies by variant
           isAnalyst ? "min-h-[100px]" : isCinema ? "min-h-[200px]" : "min-h-[160px]",
-          "cursor-pointer",
           // Story 3.12 - AC2: Dimmed styling when space is full
           isFull && "opacity-70 saturate-[0.7]",
+          isHighlighted && "ring-2 ring-primary",
+          isUserInSpace && "ring-1 ring-blue-400",
           className
         )}
         // Story 3.2: Apply space type gradient and theme styling via inline styles
         style={{
           backgroundImage: gradientVar,
-          backgroundColor: 'var(--vo-card-bg)',
-          borderColor: hovered ? 'var(--vo-card-hover-border)' : 'var(--vo-card-border)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          boxShadow: hovered ? 'var(--vo-card-hover-shadow)' : undefined,
         }}
         data-testid={`space-${space.id}`}
         data-selected={isHighlighted ? 'true' : 'false'}
@@ -329,6 +331,15 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           }
         }}
       >
+        {pendingKnockRequest && isUserInSpace && (
+          <KnockBanner
+            requesterName={pendingKnockRequest.requesterName}
+            requesterAvatarUrl={pendingKnockRequest.requesterAvatarUrl}
+            onApprove={() => onKnockApprove?.(pendingKnockRequest)}
+            onDeny={() => onKnockDeny?.(pendingKnockRequest)}
+          />
+        )}
+
         {/* Header section */}
         <div className={floorPlanTokens.spaceCard.content.header}>
           {/* Story 3.4: Attention Beacon - positioned absolute top-right */}
@@ -411,7 +422,11 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
 
         {/* Description (if not compact mode and has description) */}
         {!isCompact && space.description && (
-          <div className={floorPlanTokens.spaceCard.content.body}>
+          <div className={cn(
+            floorPlanTokens.spaceCard.content.body,
+            // Hide description in cinema mode when container is wide enough
+            "@min-[400px]:hidden"
+          )}>
             <p className={cn(
               "text-muted-foreground line-clamp-2",
               isCinema ? "text-sm" : "text-xs"
@@ -421,36 +436,83 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           </div>
         )}
 
-        {/* User avatars - hidden in analyst mode per UX spec */}
-        {/* Story 3.3: Max 4 visible avatars in default Orbit view per spec */}
-        {!isAnalyst && (
-          <div className={floorPlanTokens.spaceCard.content.footer}>
-            <AvatarGroup
-              users={usersInSpace}
-              max={isCinema ? 6 : 4}
-              size={isCinema ? 'md' : 'sm'}
-              onUserClick={onUserClick}
-              emptyText="Empty"
-              className="mt-2"
-              speakingUserIds={speakingUserIds}
-              mutedUserIds={mutedUserIds}
-            />
+        {/* Cinema Split Layout (Container Query) */}
+        <div className={cn(
+          "flex flex-col gap-4 flex-grow",
+          // When container is wide enough, switch to row layout
+          "@min-[400px]:flex-row @min-[400px]:items-stretch"
+        )}>
+          
+          {/* Log Stream (Only visible in Cinema mode when wide) */}
+          <div className={cn(
+            "hidden",
+            "@min-[400px]:flex @min-[400px]:flex-1 @min-[400px]:items-center",
+            "font-mono text-xs text-vo-text-muted bg-vo-log-bg p-3 rounded-lg border-l-2 border-vo-accent shadow-inner"
+          )}>
+            {">"} {space.description || "No recent activity."}
           </div>
-        )}
+
+          {/* Right side of split (Avatars and Phase) */}
+          <div className={cn(
+            "flex flex-row justify-between items-center",
+            "@min-[400px]:flex-col @min-[400px]:justify-between @min-[400px]:items-end @min-[400px]:min-w-[120px]"
+          )}>
+            {/* User avatars - hidden in analyst mode per UX spec */}
+            {/* Story 3.3: Max 4 visible avatars in default Orbit view per spec */}
+            {!isAnalyst && (
+              <div className={cn(
+                floorPlanTokens.spaceCard.content.footer,
+                "@min-[400px]:mt-2"
+              )}>
+                <AvatarGroup
+                  users={usersInSpace}
+                  max={isCinema ? 6 : 4}
+                  size={isCinema ? 'md' : 'sm'}
+                  onUserClick={onUserClick}
+                  emptyText="Empty"
+                  className="mt-2 @min-[400px]:mt-0"
+                  speakingUserIds={speakingUserIds}
+                  mutedUserIds={mutedUserIds}
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Sparkline - only in analyst mode per UX spec */}
         {isAnalyst && (
-          <div className="h-1 w-full bg-[var(--vo-border-subtle)] rounded-sm overflow-hidden mt-auto">
-            <div
-              className="h-full transition-all duration-500"
-              style={{
-                width: `${occupancyPercent}%`,
-                backgroundColor: 'var(--vo-accent)',
-              }}
-            />
+          <div className="h-8 w-full flex items-end gap-[2px] mt-auto pt-2 cursor-crosshair relative group">
+            {Array(24).fill(0).map((_, i) => {
+              const height = Math.max(15, Math.random() * 100);
+              return (
+                <div
+                  key={i}
+                  className="flex-1 bg-vo-border-subtle rounded-t-[2px] min-h-[4px] transition-all duration-200 hover:bg-vo-accent hover:scale-y-125 origin-bottom"
+                  style={{ height: `${height}%` }}
+                />
+              );
+            })}
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-vo-text-primary text-vo-bg-base px-2 py-1 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 pointer-events-none whitespace-nowrap z-20">
+              Activity: {Math.round(occupancyPercent)}/m
+            </div>
           </div>
         )}
-      </div>
+
+        {isRestrictedSpace && !isUserInSpace && (
+          <SpaceActionButtons
+            layout="inline-card"
+            isUserInSpace={isUserInSpace}
+            isPrivate={isRestrictedSpace}
+            hasOccupants={usersInSpace.length > 0}
+            canDirectEnter={canDirectEnter}
+            onJoin={handleJoin}
+            onLeave={handleLeave}
+            onKnock={onKnock ? () => onKnock(space.id) : undefined}
+            knockStatus={knockStatus}
+            knockCooldownRemaining={knockCooldownRemaining}
+          />
+        )}
+      </GlassPanel>
 
       {/* Story 3.11: Desktop Hover Panel (AC1) - Outside card but inside wrapper */}
       {showPanel && !isMobile && showDetailPanel && (

@@ -149,24 +149,6 @@ export function EnhancedUserMenu() {
               </Link>
             </Button>
             <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
-              <Link href="/avatar-demo">
-                <Settings className="h-4 w-4" />
-                <span>Avatar Demo</span>
-              </Link>
-            </Button>
-            <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
-              <Link href="/floor-plan-test/components">
-                <Settings className="h-4 w-4" />
-                <span>Modern Components Demo</span>
-              </Link>
-            </Button>
-            <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
-              <Link href="/floor-plan-test">
-                <Settings className="h-4 w-4" />
-                <span>Compare old/modern</span>
-              </Link>
-            </Button>
-            <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
               <Link href="/settings">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>

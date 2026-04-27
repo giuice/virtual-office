@@ -1,0 +1,28 @@
+{
+  "eval_id": 3,
+  "run_type": "without_skill",
+  "expectations": [
+    {
+      "text": "Correctly proposes adding offline user filtering to usersInSpaces",
+      "passed": true,
+      "evidence": "Identified existing filter at line 300. Then proposed additional guard for stale DB records using onlineUserIds + isPresenceReady."
+    },
+    {
+      "text": "Warns against using CompanyContext.currentUserProfile for reactive space/status checks",
+      "passed": true,
+      "evidence": "Explicit section: 'Why NOT currentUserProfile from CompanyContext' explaining stale-state, false negatives, and false positives."
+    },
+    {
+      "text": "Recommends presenceAwareUsers from query cache as the correct reactive data source",
+      "passed": true,
+      "evidence": "Used 'users' from usePresence() (which is presenceAwareUsers) for the already-in-space guard implementation."
+    },
+    {
+      "text": "Distinguishes between the two requests — approving one while rejecting the other with explanation",
+      "passed": false,
+      "evidence": "Partially distinguished: warned against CompanyContext correctly, but then implemented BOTH changes with code diffs — added a 'block joining second space' feature that changes existing UX behavior without confirming this was desired. The with-skill version correctly identified both guards already exist."
+    }
+  ],
+  "pass_rate": 0.75,
+  "notes": "Mostly good but overshot — proposed unnecessary code changes. Added a secondary guard in usersInSpaces (risky: filters out 'away'/'busy' users with stale spaces) and a new space-blocking UX. The with-skill version correctly recognized no changes needed. 55% more time (125s vs 80s), 42% more tokens (49k vs 35k)."
+}
