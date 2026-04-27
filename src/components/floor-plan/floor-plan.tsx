@@ -75,11 +75,10 @@ export function FloorPlan() {
   const beaconAggregation = useBeaconAggregator(spaces, usersInSpaces);
   const deleteSpaceMutation = useDeleteSpace();
   const { toast } = useToast();
-  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserProfile, spaces, company);
-
   // Derived values needed by hooks below
   const currentUserPresence = users?.find(u => u.id === currentUserProfile?.id);
   const currentSpaceId = currentUserPresence?.currentSpaceId || undefined;
+  const { lastSpaceId, saveLastSpace, clearLastSpace } = useLastSpace(currentUserPresence ?? null, spaces, company);
 
   // Effect: Log spaces for debugging
   useEffect(() => {

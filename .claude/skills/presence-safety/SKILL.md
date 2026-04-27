@@ -40,10 +40,10 @@ Understanding who does what prevents the most common bug: duplicate API calls.
 
 | Component | File | Does | MUST NOT do |
 |-----------|------|------|-------------|
-| `ModernFloorPlan.handleEnterSpace` | `src/components/floor-plan/modern/ModernFloorPlan.tsx` | Validate + call `updateLocation(spaceId)` + notify parent | Make a second API call, modify localStorage |
+| `ModernFloorPlan.handleEnterSpace` | `src/components/floor-plan/modern/ModernFloorPlan.tsx` | Validate + call `updateLocation(spaceId)` + notify parent for manual clicks | Make a second API call, modify localStorage |
 | `FloorPlan.handleSpaceSelect` | `src/components/floor-plan/floor-plan.tsx` | Set UI state (`selectedSpace`, `highlightedSpaceId`) + call `saveLastSpace` | Call `updateLocation` (already done upstream) |
-| `useLastSpace` | `src/hooks/useLastSpace.ts` | Auto-placement on load/reconnect, grace-rejoin, localStorage persistence | Override a manual click, make duplicate API calls |
-| `useUserPresence.safeUpdateLocation` | `src/hooks/useUserPresence.ts` | Single debounced API call to `/api/users/location` | Be called from multiple paths for the same click |
+| `useLastSpace` | `src/hooks/useLastSpace.ts` | Auto-placement on load/reconnect, grace-rejoin, localStorage persistence; direct API exception for automatic placement only | Override a manual click, make duplicate API calls, read current space from `currentUserProfile` |
+| `useUserPresence.safeUpdateLocation` | `src/hooks/useUserPresence.ts` | Single debounced API call to `/api/users/location` for manual movement | Be called from multiple paths for the same click |
 | `CompanyContext.currentUserProfile` | `src/contexts/CompanyContext.tsx` | Initial user profile from DB (loaded once) | Be treated as live/reactive state |
 | `presenceAwareUsers` | `src/hooks/useUserPresence.ts` | Derive online/offline from Realtime presence state | Mutate DB or query cache directly |
 | `usersInSpaces` | `src/hooks/useUserPresence.ts` | Map users to space buckets for rendering | Include offline users (except current user) |
@@ -70,7 +70,7 @@ if (offline) {
 
 **Why:** On reload, the beacon races the new page. If it clears the space, the Realtime `postgres_changes` event arrives on the new page and wipes the user from their space in the query cache.
 
-### Rule 2: Only ONE `updateLocation` call per user action
+### Rule 2: Only ONE location API call per manual user action
 
 The click flow is:
 ```
@@ -87,7 +87,9 @@ User clicks space card
 **Rules:**
 - `handleSpaceSelect` MUST NEVER call `updateLocation` -- it's already done
 - `saveLastSpace` MUST NEVER trigger an API call -- it only updates localStorage
-- If you add a new entry point that moves users, it must go through `safeUpdateLocation` and nothing else
+- If you add a new manual/user-initiated entry point that moves users, it must go through `safeUpdateLocation` and nothing else
+- `useLastSpace.updateUserLocation` is the ONLY direct `/api/users/location` exception, and only for automatic first-load, grace-rejoin, and home/default placement
+- The auto-placement exception MUST use query-derived current user state from `usePresence().users`, not `CompanyContext.currentUserProfile`, because it checks `currentSpaceId`
 
 ### Rule 3: Filter offline users from `usersInSpaces`
 
@@ -130,6 +132,7 @@ if (manualChangeRef.current) {
 - Checking if user is already in a space
 - Determining online/offline status
 - Any guard condition that depends on current space or status
+- Passing the current user into `useLastSpace` for auto-placement/rejoin decisions
 
 **`currentUserProfile` is OK for:** user ID, company ID, role, email (rarely change).
 
@@ -171,6 +174,8 @@ queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
 
 **Do NOT** invalidate the query unnecessarily — the Realtime subscription handles updates.
 
+`useLastSpace` may optimistically update this same key after an automatic placement/rejoin succeeds. It may invalidate only as a fallback when the query data is not loaded yet.
+
 ---
 
 ## Beacon Handler Details
@@ -198,6 +203,7 @@ Run through this before every change:
 - [ ] **Capacity check**: Server-side capacity excludes offline users.
 - [ ] **Manual click guard**: `saveLastSpace` sets `manualChangeRef` before localStorage update.
 - [ ] **No stale state**: Effects checking `currentSpaceId` use query-derived values, not CompanyContext.
+- [ ] **Live auto-placement input**: `useLastSpace` receives the current user from `usePresence().users`, not `currentUserProfile`.
 - [ ] **Tests pass**: Run `npx vitest run __tests__/api/users-location-route.test.ts`
 - [ ] **Presence derivation intact**: `presenceAwareUsers` logic unchanged or correctly extended.
 
@@ -240,6 +246,7 @@ These are patterns that have caused regressions in the past. If you find yoursel
 3. **Using `currentUserProfile.currentSpaceId` in an effect guard** — This is stale. Use `presenceAwareUsers`.
 4. **Including offline users in `usersInSpaces`** — Creates ghost avatars in spaces.
 5. **Calling `setLastSpaceId` without setting `manualChangeRef` first** — The auto-placement effect will snap the user to their home space.
-6. **Adding a new Realtime subscription for the same data** — Use the existing `postgres_changes` listener in `useUserPresence`. Don't add another.
-7. **Mutating `rawUsers` query data in the presence leave handler** — This breaks the derivation logic. Let `presenceAwareUsers` handle it through `onlineUserIds`.
-8. **Removing the `isPresenceReady` guard** — Without it, everyone appears offline until the first presence sync.
+6. **Passing `currentUserProfile` into `useLastSpace`** — Auto-placement will read stale `currentSpaceId` and may override the live DB/query state.
+7. **Adding a new Realtime subscription for the same data** — Use the existing `postgres_changes` listener in `useUserPresence`. Don't add another.
+8. **Mutating `rawUsers` query data in the presence leave handler** — This breaks the derivation logic. Let `presenceAwareUsers` handle it through `onlineUserIds`.
+9. **Removing the `isPresenceReady` guard** — Without it, everyone appears offline until the first presence sync.

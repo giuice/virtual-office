@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { Company, Space, User } from '@/types/database';
+import { Company, Space } from '@/types/database';
 import type { UserPresenceData } from '@/types/database';
 
 const MAX_REJOIN_ATTEMPTS = 3;
@@ -26,6 +26,11 @@ interface LocationUpdateOptions {
   spaceName?: string;
 }
 
+interface LastSpaceUser {
+  id: string;
+  currentSpaceId: string | null;
+}
+
 const JOINABLE_STATUSES = new Set(['active', 'available', 'in_use']);
 
 function isJoinableSpace(space: Space): boolean {
@@ -45,7 +50,7 @@ function getFirstActiveWorkspace(spaces: Space[]): Space | undefined {
 }
 
 function getStandardPlacementContext(
-  currentUser: User,
+  currentUser: Pick<LastSpaceUser, 'id'>,
   spaces: Space[],
   company: Company | null,
   isFirstTime: boolean
@@ -111,7 +116,7 @@ function getStandardPlacementContext(
 }
 
 export function getReconnectionContext(
-  currentUser: User,
+  currentUser: Pick<LastSpaceUser, 'id'>,
   spaces: Space[],
   company: Company | null,
   lastSpaceId: string | null
@@ -149,7 +154,7 @@ function sleep(ms: number): Promise<void> {
 
 const PRESENCE_QUERY_KEY = ['user-presence'];
 
-export function useLastSpace(currentUser: User | null, spaces: Space[], company: Company | null) {
+export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[], company: Company | null) {
   const [lastSpaceId, setLastSpaceId] = useLocalStorage<string | null>('lastSpaceId', null);
   const [isRejoinInProgress, setIsRejoinInProgress] = useState(false);
   const [rejoinAttempts, setRejoinAttempts] = useState(0);
