@@ -13,7 +13,7 @@ This roadmap takes a brownfield Virtual Office application from its current ~35%
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt
-- [ ] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection
+- [x] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection (completed 2026-05-13)
 - [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
 - [ ] **Phase 3: Video and Screen Sharing** - WebRTC video calls, screen sharing, whiteboard, recording, backgrounds, and PiP
 - [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
@@ -47,7 +47,7 @@ Plans:
   2. When a user goes offline, their avatar disappears from the space display within 5 seconds with a fade-out animation
   3. First-time users land in their company default space; admin can configure default space assignments
   4. User who reconnects within 5 minutes automatically rejoins their last occupied space
-**Plans:** 8 plans
+**Plans:** 8/8 plans complete
 
 Plans:
 - [x] 02-00-PLAN.md — Wave 0: Test scaffold stubs for all Phase 2 features (FLOR-01, FLOR-02, FLOR-03, FLOR-04)
@@ -66,7 +66,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Automatic user placements persist lastSpaceId for proper grace rejoin behavior  
   2. FloorPlan UI state changes are synchronized with presence database state
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
@@ -169,8 +169,8 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Stabilization | 0/2 | Planned | - |
-| 2. Floor Plan Completion | 8/8 | Complete | 2026-03-19 |
-| 2.1 Presence Reload Fixes | 1/1 | Complete | 2026-05-13 |
+| 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
+| 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
