@@ -3,7 +3,7 @@ status: diagnosed
 phase: 02-floor-plan-completion
 source: 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md
 started: 2026-03-19T12:30:00Z
-updated: 2026-03-19T13:15:00Z
+updated: 2026-05-12T21:05:21-03:00
 ---
 
 ## Current Test
@@ -45,21 +45,20 @@ severity: major
 
 ### 7. First-Time / Default Space Placement
 expected: Log in as a user who has no recent space history (or clear localStorage). If a company default space is configured, the floor plan should auto-select or place you in that space. If a personal home space is assigned, that should take priority over the default.
-result: skipped
-reason: Cannot test — the admin Spaces settings UI (Test 5) is broken and cannot save a default space. No default or home space can be configured to validate placement behavior.
+result: pass
+confirmed: "User cleared localStorage keys (vo-first-login-done, lastSpaceId, vo-disconnect-timestamp), retested first-time/default placement, and confirmed it worked."
 
 ### 8. Restricted Space Server Authorization
 expected: Attempt to navigate directly to a restricted space without having an approved knock (e.g., via URL or direct API). The server should reject the join — you should NOT appear as an occupant in that space. Only approved knock recipients should be able to enter.
-result: skipped
-reason: UI enforces knock-only access — no way to attempt a direct unauthorized join through normal user flow without API tooling.
+result: pass
+confirmed: "User confirmed restricted-space server authorization check passed."
 
 ## Summary
 
 total: 8
-passed: 3
+passed: 5
 issues: 3
 pending: 0
-skipped: 2
 skipped: 0
 
 ## Gaps
