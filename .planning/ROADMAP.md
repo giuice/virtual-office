@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt
 - [ ] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection
-- [ ] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
+- [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
 - [ ] **Phase 3: Video and Screen Sharing** - WebRTC video calls, screen sharing, whiteboard, recording, backgrounds, and PiP
 - [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
 - [ ] **Phase 5: Messaging Resilience** - Offline queue, reconnection, polling fallback, typing indicators, multi-device sync, analytics, notifications
@@ -69,7 +69,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
+- [x] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
 
 ### Phase 3: Video and Screen Sharing
 **Goal**: Users can hold video meetings with screen sharing, whiteboard collaboration, and recording within spaces
@@ -170,7 +170,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 |-------|----------------|--------|-----------|
 | 1. Stabilization | 0/2 | Planned | - |
 | 2. Floor Plan Completion | 8/8 | Complete | 2026-03-19 |
-| 2.1 Presence Reload Fixes | 0/1 | Planned | - |
+| 2.1 Presence Reload Fixes | 1/1 | Complete | 2026-05-13 |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
