@@ -114,8 +114,11 @@ export function FloorPlan() {
     if (space) {
       setSelectedSpace(space);
       setHighlightedSpaceId(space.id);
+      // Keep visual hydration aligned with localStorage so grace rejoin uses
+      // the same lastSpaceId whether placement came from UI or auto-placement.
+      saveLastSpace(targetSpaceId, { markManualChange: false });
     }
-  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, spaces]);
+  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, saveLastSpace, spaces]);
 
   // Callback: Handle opening chat for a room via unified messaging drawer
   const handleOpenChat = useCallback(async (room: Space) => {
