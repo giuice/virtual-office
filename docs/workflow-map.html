@@ -1,0 +1,2150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Virtual Office Workflow Map</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --panel-soft: #f0f4f8;
+      --ink: #1d2939;
+      --muted: #667085;
+      --subtle: #98a2b3;
+      --line: #d0d5dd;
+      --active: #0f766e;
+      --active-soft: #ccfbf1;
+      --accent: #b42318;
+      --accent-soft: #fee4e2;
+      --api: #175cd3;
+      --api-soft: #d1e9ff;
+      --store: #7a2e0e;
+      --store-soft: #ffead5;
+      --context: #6941c6;
+      --context-soft: #ebe9fe;
+      --hook: #067647;
+      --hook-soft: #dcfae6;
+      --component: #b54708;
+      --component-soft: #fef0c7;
+      --route: #363f72;
+      --route-soft: #e0eaff;
+      --shadow: 0 14px 40px rgba(16, 24, 40, 0.10);
+      --radius: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .app {
+      height: 100vh;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .title-block {
+      min-width: 260px;
+    }
+
+    .eyebrow {
+      color: var(--active);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      max-width: 900px;
+      margin-top: 7px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .utility-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: var(--radius);
+      padding: 9px 11px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .utility-button[aria-pressed="true"] {
+      background: var(--active);
+      color: #fff;
+      border-color: var(--active);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 300px) minmax(620px, 1fr) minmax(300px, 390px);
+      gap: 16px;
+      padding: 16px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header,
+    .detail-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sidebar-header h2,
+    .detail-header h2 {
+      font-size: 16px;
+    }
+
+    .sidebar-header p,
+    .detail-header p {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .flow-list {
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .flow-button {
+      text-align: left;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 11px;
+      cursor: pointer;
+      display: grid;
+      gap: 6px;
+    }
+
+    .flow-button:hover {
+      border-color: var(--active);
+    }
+
+    .flow-button.active {
+      border-color: var(--active);
+      background: var(--active-soft);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.16);
+    }
+
+    .flow-button strong {
+      display: block;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .flow-button span {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+    }
+
+    .flow-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 118, 110, 0.20);
+      background: #fff;
+      color: var(--active);
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .diagram-wrap {
+      position: relative;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .diagram-surface {
+      position: relative;
+      min-width: 980px;
+      padding: 16px;
+    }
+
+    .edge-layer {
+      position: absolute;
+      inset: 0;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .edge-label-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .nodes-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .lane {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .lane h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 2px 4px 5px;
+    }
+
+    .node {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      min-height: 86px;
+      transition: border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, transform 150ms ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .node:hover {
+      transform: translateY(-1px);
+      border-color: var(--active);
+    }
+
+    .node.active {
+      border-color: var(--active);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
+    }
+
+    .node.dimmed {
+      opacity: 0.34;
+    }
+
+    .node.selected {
+      outline: 2px solid rgba(180, 35, 24, 0.40);
+      outline-offset: 2px;
+    }
+
+    .kind {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      line-height: 1.4;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .kind-route { color: var(--route); background: var(--route-soft); }
+    .kind-component { color: var(--component); background: var(--component-soft); }
+    .kind-context { color: var(--context); background: var(--context-soft); }
+    .kind-hook { color: var(--hook); background: var(--hook-soft); }
+    .kind-api { color: var(--api); background: var(--api-soft); }
+    .kind-repository { color: var(--active); background: var(--active-soft); }
+    .kind-store { color: var(--store); background: var(--store-soft); }
+    .kind-service { color: var(--accent); background: var(--accent-soft); }
+
+    .node-title {
+      display: block;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+
+    .node-path {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+    }
+
+    .chips {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 10px;
+      padding: 2px 6px;
+      white-space: nowrap;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .step-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 23px;
+      height: 23px;
+      border-radius: 999px;
+      background: var(--active);
+      color: #fff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .node.active .step-badge {
+      display: flex;
+    }
+
+    .flow-edge {
+      stroke: rgba(102, 112, 133, 0.38);
+      stroke-width: 2;
+      fill: none;
+      transition: stroke 150ms ease, opacity 150ms ease, stroke-width 150ms ease;
+    }
+
+    .flow-edge.active {
+      stroke: var(--active);
+      stroke-width: 3.5;
+    }
+
+    .edge-label {
+      position: absolute;
+      max-width: 230px;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(15, 118, 110, 0.26);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
+      border-radius: var(--radius);
+      padding: 6px 8px;
+      font-size: 11px;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
+    }
+
+    .edge-label strong {
+      color: var(--active);
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .detail {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .detail-body {
+      padding: 14px 16px 16px;
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .detail-section + .detail-section {
+      margin-top: 18px;
+    }
+
+    .detail-section h3 {
+      font-size: 13px;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--active-soft);
+      color: var(--active);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+      border: 1px solid rgba(15, 118, 110, 0.22);
+    }
+
+    .step-content {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 9px;
+      background: #fff;
+    }
+
+    .step-content strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .step-content p {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .code {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #344054;
+      background: var(--panel-soft);
+      border-radius: 6px;
+      padding: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+      border: 1px solid #e4e7ec;
+    }
+
+    .node-detail {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .node-detail dt {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      margin-top: 10px;
+    }
+
+    .node-detail dt:first-child {
+      margin-top: 0;
+    }
+
+    .node-detail dd {
+      margin: 4px 0 0;
+      color: var(--ink);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--line);
+      padding: 0 16px;
+    }
+
+    .tab {
+      border: 0;
+      border-bottom: 3px solid transparent;
+      background: transparent;
+      padding: 11px 5px 9px;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .tab.active {
+      color: var(--active);
+      border-bottom-color: var(--active);
+    }
+
+    .json-panel {
+      display: none;
+      margin: 0 16px 16px;
+      max-height: 42vh;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #101828;
+      color: #d0d5dd;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: pre;
+    }
+
+    .json-panel.visible {
+      display: block;
+    }
+
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: minmax(220px, 280px) minmax(560px, 1fr);
+      }
+
+      .detail {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        height: auto;
+      }
+
+      .topbar {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .layout {
+        display: block;
+        padding: 10px;
+        overflow: visible;
+      }
+
+      .sidebar,
+      .diagram-wrap,
+      .detail {
+        margin-bottom: 12px;
+      }
+
+      .diagram-wrap {
+        min-height: 520px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title-block">
+        <div class="eyebrow">Virtual Office architecture</div>
+        <h1>Workflow Map</h1>
+        <p class="subtitle">
+          Click an action to highlight the packages and components involved, then inspect the payloads and handoffs that complete the flow.
+        </p>
+      </div>
+      <div class="top-actions">
+        <button class="utility-button" id="fit-active-button" type="button">Focus Active Flow</button>
+        <button class="utility-button" id="json-toggle-button" type="button" aria-pressed="false">Show JSON</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel sidebar">
+        <div class="sidebar-header">
+          <h2>Actions</h2>
+          <p>Each action is defined in the embedded JSON source.</p>
+        </div>
+        <div class="flow-list" id="flow-list"></div>
+      </aside>
+
+      <section class="panel diagram-wrap" id="diagram-wrap" aria-label="Workflow diagram">
+        <div class="diagram-surface" id="diagram-surface">
+          <svg class="edge-layer" id="edge-layer" aria-hidden="true"></svg>
+          <div class="edge-label-layer" id="edge-label-layer"></div>
+          <div class="nodes-grid" id="nodes-grid"></div>
+        </div>
+      </section>
+
+      <aside class="panel detail">
+        <div class="detail-header">
+          <h2 id="detail-title">Flow details</h2>
+          <p id="detail-summary"></p>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Detail tabs">
+          <button class="tab active" type="button" data-tab="steps">Steps</button>
+          <button class="tab" type="button" data-tab="payloads">Payloads</button>
+          <button class="tab" type="button" data-tab="package">Package</button>
+        </div>
+        <div class="detail-body" id="detail-body"></div>
+        <pre class="json-panel" id="json-panel"></pre>
+      </aside>
+    </main>
+  </div>
+
+  <script type="application/json" id="workflow-data">
+{
+  "meta": {
+    "title": "Virtual Office Workflow Map",
+    "source": "Generated from local repo inspection on 2026-05-12",
+    "jsonContract": "nodes define visible packages/components; flows define action buttons, steps, and edges."
+  },
+  "lanes": [
+    {
+      "id": "routes",
+      "title": "Routes and pages",
+      "nodes": [
+        "authRoutes",
+        "joinOnboardingRoutes",
+        "dashboardRoutes",
+        "adminRoutes"
+      ]
+    },
+    {
+      "id": "components",
+      "title": "Feature components",
+      "nodes": [
+        "authComponents",
+        "companyComponents",
+        "floorPlanComponents",
+        "modernFloorComponents",
+        "messagingComponents",
+        "profileComponents",
+        "uiComponents"
+      ]
+    },
+    {
+      "id": "state",
+      "title": "Contexts, hooks, and client APIs",
+      "nodes": [
+        "authContext",
+        "companyContext",
+        "presenceContext",
+        "messagingContext",
+        "audioCallingContexts",
+        "queryHooks",
+        "presenceHooks",
+        "messagingHooks",
+        "knockHooks",
+        "uploadHooks",
+        "clientApi"
+      ]
+    },
+    {
+      "id": "server",
+      "title": "API route packages",
+      "nodes": [
+        "authApi",
+        "usersApi",
+        "companiesApi",
+        "invitationsApi",
+        "spacesApi",
+        "knockApi",
+        "conversationsApi",
+        "messagesApi",
+        "neighborhoodsApi",
+        "platformAdminApi"
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Repositories and data services",
+      "nodes": [
+        "repositoryFactory",
+        "userRepository",
+        "companyRepository",
+        "invitationRepository",
+        "spaceRepository",
+        "conversationRepository",
+        "messageRepository",
+        "neighborhoodRepository",
+        "platformRepository",
+        "supabaseClients",
+        "supabaseAuth",
+        "supabasePostgres",
+        "supabaseRealtime",
+        "storageServices",
+        "browserStorage",
+        "tanstackQuery"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "authRoutes",
+      "label": "Auth routes",
+      "kind": "route",
+      "path": "src/app/(auth)",
+      "details": "Login, signup, forgot password, set password, and create-company pages.",
+      "children": ["login/page.tsx", "signup/page.tsx", "forgot-password/page.tsx", "set-password/page.tsx", "create-company/page.tsx"]
+    },
+    {
+      "id": "joinOnboardingRoutes",
+      "label": "Join and onboarding routes",
+      "kind": "route",
+      "path": "src/app/join + src/app/onboarding",
+      "details": "Invitation acceptance, pending-invite handling, and first-company routing.",
+      "children": ["join/page.tsx", "onboarding/page.tsx", "auth/callback/route.ts"]
+    },
+    {
+      "id": "dashboardRoutes",
+      "label": "Dashboard routes",
+      "kind": "route",
+      "path": "src/app/(dashboard)",
+      "details": "Authenticated app shell, dashboard, company, floor plan, office, profile, settings, and realtime test pages.",
+      "children": ["dashboard/page.tsx", "company/page.tsx", "floor-plan/page.tsx", "office/page.tsx", "settings/page.tsx", "dashboard/profile/page.tsx"]
+    },
+    {
+      "id": "adminRoutes",
+      "label": "Admin and platform routes",
+      "kind": "route",
+      "path": "src/app/admin + src/app/platform-admin",
+      "details": "Company admin invitation management and platform-admin company creation.",
+      "children": ["admin/invitations/page.tsx", "platform-admin/page.tsx", "platform-admin/layout.tsx"]
+    },
+    {
+      "id": "authComponents",
+      "label": "Auth components",
+      "kind": "component",
+      "path": "src/components/auth",
+      "details": "Embedded auth form and email confirmation UI used by join and signup flows.",
+      "children": ["EmbeddedAuthForm.tsx", "EmailConfirmationMessage.tsx"]
+    },
+    {
+      "id": "companyComponents",
+      "label": "Company dashboard components",
+      "kind": "component",
+      "path": "src/components/dashboard",
+      "details": "Company settings, members, invitations, pending invite list, and profile panels.",
+      "children": ["pending-invitations-list.tsx", "invite-user-dialog.tsx", "company-members.tsx", "company-settings.tsx", "user-profile.tsx"]
+    },
+    {
+      "id": "floorPlanComponents",
+      "label": "Floor plan package",
+      "kind": "component",
+      "path": "src/components/floor-plan",
+      "details": "Room creation, room management, templates, audio controls, and the primary FloorPlan wrapper.",
+      "children": ["floor-plan.tsx", "room-dialog", "room-management.tsx", "room-templates.tsx", "SpaceAudioControls.tsx", "space-debug-panel.tsx"]
+    },
+    {
+      "id": "modernFloorComponents",
+      "label": "Modern floor plan components",
+      "kind": "component",
+      "path": "src/components/floor-plan/modern",
+      "details": "Card-based floor plan, space action controls, presence avatars, knock banners, neighborhoods, and Now Board.",
+      "children": ["ModernFloorPlan.tsx", "ModernSpaceCard.tsx", "SpaceActionButtons.tsx", "KnockBanner.tsx", "KnockToast.tsx", "NowBoard.tsx", "NeighborhoodSection.tsx", "AvatarGroup.tsx"]
+    },
+    {
+      "id": "messagingComponents",
+      "label": "Messaging components",
+      "kind": "component",
+      "path": "src/components/messaging",
+      "details": "Global messaging drawer, conversation list/search, feed, composer, reactions, typing, and user interaction menu.",
+      "children": ["MessagingDrawer.tsx", "ConversationList.tsx", "ConversationSearch.tsx", "message-feed.tsx", "EnhancedMessageComposer.tsx", "ReactionChips.tsx", "EmojiPicker.tsx", "TypingIndicator.tsx"]
+    },
+    {
+      "id": "profileComponents",
+      "label": "Profile and avatar components",
+      "kind": "component",
+      "path": "src/components/profile + src/components/ui",
+      "details": "Canonical profile editing, avatar upload, and avatar display surfaces.",
+      "children": ["EnhancedUserProfile.tsx", "ProfileForm.tsx", "UploadableAvatar.tsx", "enhanced-avatar-v2.tsx"]
+    },
+    {
+      "id": "uiComponents",
+      "label": "UI primitives and shell",
+      "kind": "component",
+      "path": "src/components/ui + src/components/shell",
+      "details": "shadcn/Radix primitives, dashboard shell, header, user menu, search, and navigation components.",
+      "children": ["button.tsx", "card.tsx", "dialog.tsx", "dropdown-menu.tsx", "tooltip.tsx", "dashboard-shell.tsx", "dashboard-header.tsx", "global-search.tsx"]
+    },
+    {
+      "id": "authContext",
+      "label": "AuthContext and useSession",
+      "kind": "context",
+      "path": "src/contexts/AuthContext.tsx + src/hooks/useSession.ts",
+      "details": "Supabase session state, password login, signup, Google OAuth, sign out, and Google avatar sync.",
+      "children": ["signIn", "signUp", "signInWithGoogle", "signOut", "useSession"]
+    },
+    {
+      "id": "companyContext",
+      "label": "CompanyContext",
+      "kind": "context",
+      "path": "src/contexts/CompanyContext.tsx",
+      "details": "Loads and mutates the current company, current user profile, company users, and spaces.",
+      "children": ["loadCompanyData", "createNewCompany", "updateCompanyDetails", "updateUserProfile", "refreshCompanyData"]
+    },
+    {
+      "id": "presenceContext",
+      "label": "PresenceContext",
+      "kind": "context",
+      "path": "src/contexts/PresenceContext.tsx",
+      "details": "Wraps useUserPresence and exposes users, usersInSpaces, currentUserSpaceId, and updateLocation.",
+      "children": ["users", "usersInSpaces", "updateLocation", "currentUserSpaceId"]
+    },
+    {
+      "id": "messagingContext",
+      "label": "MessagingContext",
+      "kind": "context",
+      "path": "src/contexts/messaging",
+      "details": "Global drawer state, active conversation, conversation lifecycle, message actions, and realtime status.",
+      "children": ["MessagingContext.tsx", "types.ts", "sendMessage", "getOrCreateRoomConversation", "getOrCreateUserConversation"]
+    },
+    {
+      "id": "audioCallingContexts",
+      "label": "Audio and calling contexts",
+      "kind": "context",
+      "path": "src/contexts/AudioContext.tsx + CallingContext.tsx",
+      "details": "Voice activity, in-room audio controls, and user calling/teleport request state.",
+      "children": ["AudioContext.tsx", "CallingContext.tsx", "useVoiceActivity.ts", "useUserCalling.ts", "WebRTCManager.ts"]
+    },
+    {
+      "id": "queryHooks",
+      "label": "Query and mutation hooks",
+      "kind": "hook",
+      "path": "src/hooks/queries + src/hooks/mutations",
+      "details": "TanStack Query wrappers for spaces, neighborhoods, space mutations, message reactions, and cache invalidation.",
+      "children": ["useSpaces.ts", "useNeighborhoods.ts", "useSpaceMutations.ts", "useNeighborhoodMutations.ts", "useMessageReactions.ts"]
+    },
+    {
+      "id": "presenceHooks",
+      "label": "Presence hooks",
+      "kind": "hook",
+      "path": "src/hooks/useUserPresence.ts + src/hooks/realtime/useSpaceRealtime.ts",
+      "details": "Fetches /api/users/list, tracks Supabase presence, listens to users table changes, and updates location.",
+      "children": ["useUserPresence.ts", "useSpaceRealtime.ts", "useLastSpace.ts", "useBeaconAggregator.ts", "useAttentionBeacon.ts"]
+    },
+    {
+      "id": "messagingHooks",
+      "label": "Messaging hooks and client API",
+      "kind": "hook",
+      "path": "src/hooks/useConversations.ts + useMessages.ts",
+      "details": "Conversation resolution, message pagination, optimistic sends, reactions, uploads, subscriptions, typing indicators.",
+      "children": ["useConversations.ts", "useMessages.ts", "useMessageSubscription.ts", "useConversationRealtime.ts", "useTypingIndicator.ts", "messaging-api.ts"]
+    },
+    {
+      "id": "knockHooks",
+      "label": "Knock state and signaling",
+      "kind": "hook",
+      "path": "src/hooks/useKnock.ts + src/hooks/realtime/useKnockSignaling.ts",
+      "details": "Knock state machine, cooldown, realtime insert/update subscriptions, and polling fallback.",
+      "children": ["useKnock.ts", "useKnockSignaling.ts"]
+    },
+    {
+      "id": "uploadHooks",
+      "label": "Upload hooks and utilities",
+      "kind": "hook",
+      "path": "src/hooks/useImageUpload.ts + src/lib/uploads",
+      "details": "Validates, compresses, previews, uploads images, and reports progress.",
+      "children": ["useImageUpload.ts", "image-upload.ts", "avatar-utils.ts"]
+    },
+    {
+      "id": "clientApi",
+      "label": "Client API wrappers",
+      "kind": "hook",
+      "path": "src/lib/api.ts + src/lib/messaging-api.ts",
+      "details": "Fetch wrappers that normalize API route responses for contexts and hooks.",
+      "children": ["getUserById", "syncUserProfile", "createCompany", "getCompany", "getSpacesByCompany", "messagingApi"]
+    },
+    {
+      "id": "authApi",
+      "label": "Auth API routes",
+      "kind": "api",
+      "path": "src/app/api/auth + src/app/auth",
+      "details": "OAuth callback and legacy signup route surfaces.",
+      "children": ["/api/auth/callback", "/auth/callback", "/api/auth/signup"]
+    },
+    {
+      "id": "usersApi",
+      "label": "Users API routes",
+      "kind": "api",
+      "path": "src/app/api/users",
+      "details": "User sync, lookup, list, update, location, avatar, and company removal endpoints.",
+      "children": ["/api/users/sync-profile", "/api/users/get-by-id", "/api/users/list", "/api/users/location", "/api/users/update", "/api/users/avatar", "/api/users/remove-from-company"]
+    },
+    {
+      "id": "companiesApi",
+      "label": "Companies API routes",
+      "kind": "api",
+      "path": "src/app/api/companies",
+      "details": "Company create/get/update and cleanup endpoints.",
+      "children": ["/api/companies/create", "/api/companies/get", "/api/companies/update", "/api/companies/cleanup"]
+    },
+    {
+      "id": "invitationsApi",
+      "label": "Invitations API routes",
+      "kind": "api",
+      "path": "src/app/api/invitations",
+      "details": "Create, list, validate, accept, pending, resend, and revoke invitation endpoints.",
+      "children": ["/api/invitations/create", "/api/invitations/list", "/api/invitations/validate", "/api/invitations/accept", "/api/invitations/pending", "/api/invitations/resend", "/api/invitations/revoke"]
+    },
+    {
+      "id": "spacesApi",
+      "label": "Spaces API routes",
+      "kind": "api",
+      "path": "src/app/api/spaces",
+      "details": "Space CRUD, details, neighborhood assignment, and compatibility routes.",
+      "children": ["/api/spaces", "/api/spaces/get", "/api/spaces/create", "/api/spaces/update", "/api/spaces/delete", "/api/spaces/[id]/details", "/api/spaces/[id]/neighborhood"]
+    },
+    {
+      "id": "knockApi",
+      "label": "Knock API routes",
+      "kind": "api",
+      "path": "src/app/api/spaces/knock",
+      "details": "Server-validated knock request and response endpoints.",
+      "children": ["/api/spaces/knock/request", "/api/spaces/knock/respond"]
+    },
+    {
+      "id": "conversationsApi",
+      "label": "Conversations API routes",
+      "kind": "api",
+      "path": "src/app/api/conversations",
+      "details": "Resolve, list, join, archive, read, and preferences endpoints.",
+      "children": ["/api/conversations/resolve", "/api/conversations/get", "/api/conversations/join", "/api/conversations/archive", "/api/conversations/read", "/api/conversations/preferences"]
+    },
+    {
+      "id": "messagesApi",
+      "label": "Messages API routes",
+      "kind": "api",
+      "path": "src/app/api/messages",
+      "details": "Create/get messages, reactions, typing, status, pins, stars, attachments, and uploads.",
+      "children": ["/api/messages/create", "/api/messages/get", "/api/messages/react", "/api/messages/typing", "/api/messages/status", "/api/messages/upload", "/api/messages/[messageId]/pin", "/api/messages/[messageId]/star"]
+    },
+    {
+      "id": "neighborhoodsApi",
+      "label": "Neighborhood API routes",
+      "kind": "api",
+      "path": "src/app/api/neighborhoods",
+      "details": "Neighborhood CRUD and neighborhood-to-space listing endpoints.",
+      "children": ["/api/neighborhoods", "/api/neighborhoods/[id]", "/api/neighborhoods/[id]/spaces"]
+    },
+    {
+      "id": "platformAdminApi",
+      "label": "Platform admin API routes",
+      "kind": "api",
+      "path": "src/app/api/platform-admin",
+      "details": "Platform admin tenant/company creation with owner invitation.",
+      "children": ["/api/platform-admin/create-company"]
+    },
+    {
+      "id": "repositoryFactory",
+      "label": "Repository factory",
+      "kind": "repository",
+      "path": "src/repositories/getSupabaseRepositories.ts",
+      "details": "Creates Supabase repository instances for route handlers and server utilities.",
+      "children": ["getSupabaseRepositories"]
+    },
+    {
+      "id": "userRepository",
+      "label": "SupabaseUserRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseUserRepository.ts",
+      "details": "Maps app users to Supabase Auth via users.supabase_uid, handles profile, status, role, avatar, and location updates.",
+      "children": ["findBySupabaseUid", "create", "update", "updateLocation", "getUsersByCompanyId"]
+    },
+    {
+      "id": "companyRepository",
+      "label": "SupabaseCompanyRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseCompanyRepository.ts",
+      "details": "Creates and updates companies and admin user relationships.",
+      "children": ["create", "findById", "update"]
+    },
+    {
+      "id": "invitationRepository",
+      "label": "SupabaseInvitationRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseInvitationRepository.ts",
+      "details": "Creates invitation rows, finds by token or company, and updates pending/accepted/expired status.",
+      "children": ["create", "findByToken", "findByCompanyId", "updateStatus"]
+    },
+    {
+      "id": "spaceRepository",
+      "label": "SupabaseSpaceRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseSpaceRepository.ts",
+      "details": "Space CRUD and company-scoped space retrieval.",
+      "children": ["create", "findByCompanyId", "update", "delete"]
+    },
+    {
+      "id": "conversationRepository",
+      "label": "SupabaseConversationRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseConversationRepository.ts",
+      "details": "Conversation lookup, creation, room/direct resolution, preferences, unread counts, and last activity.",
+      "children": ["findById", "findByUserId", "create", "updateLastActivityTimestamp", "incrementUnreadCount"]
+    },
+    {
+      "id": "messageRepository",
+      "label": "SupabaseMessageRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseMessageRepository.ts",
+      "details": "Message persistence, pagination, reactions, attachments, pins, and stars.",
+      "children": ["create", "findByConversationId", "findById", "addReaction", "removeReaction"]
+    },
+    {
+      "id": "neighborhoodRepository",
+      "label": "SupabaseNeighborhoodRepository",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase/SupabaseNeighborhoodRepository.ts",
+      "details": "Neighborhood CRUD and space grouping persistence.",
+      "children": ["create", "findByCompanyId", "update", "delete"]
+    },
+    {
+      "id": "platformRepository",
+      "label": "Platform and extra repositories",
+      "kind": "repository",
+      "path": "src/repositories/implementations/supabase",
+      "details": "Platform admin, announcements, meeting notes, action items, reservations, and other domain repositories.",
+      "children": ["SupabasePlatformAdminRepository", "SupabaseAnnouncementRepository", "SupabaseMeetingNoteRepository", "SupabaseSpaceReservationRepository"]
+    },
+    {
+      "id": "supabaseClients",
+      "label": "Supabase clients",
+      "kind": "service",
+      "path": "src/lib/supabase",
+      "details": "Browser, server, and service-role client helpers. Server routes must use createSupabaseServerClient().",
+      "children": ["browser-client.ts", "server-client.ts", "client.ts", "service_role"]
+    },
+    {
+      "id": "supabaseAuth",
+      "label": "Supabase Auth",
+      "kind": "service",
+      "path": "Supabase Auth",
+      "details": "Password sessions, invite emails, OAuth, auth.admin.inviteUserByEmail, getUser, and magic-link hashes.",
+      "children": ["signInWithPassword", "signUp", "signInWithOAuth", "auth.admin.inviteUserByEmail", "getUser"]
+    },
+    {
+      "id": "supabasePostgres",
+      "label": "Supabase Postgres and RLS",
+      "kind": "store",
+      "path": "public schema",
+      "details": "Authoritative app data with RLS policies and service-role bypass when server-side authorization is explicit.",
+      "children": ["users", "companies", "invitations", "spaces", "space_presence_log", "knock_requests", "conversations", "messages", "message_reactions", "neighborhoods"]
+    },
+    {
+      "id": "supabaseRealtime",
+      "label": "Supabase Realtime",
+      "kind": "service",
+      "path": "postgres_changes + presence channels",
+      "details": "Presence sync, users table updates, message changes, reaction changes, space changes, and knock request/response events.",
+      "children": ["user-presence-channel", "postgres_changes:users", "postgres_changes:messages", "postgres_changes:message_reactions", "postgres_changes:knock_requests"]
+    },
+    {
+      "id": "storageServices",
+      "label": "Storage and uploads",
+      "kind": "service",
+      "path": "Supabase Storage + sharp",
+      "details": "Avatar processing with sharp, upload to user-uploads bucket, public URL generation, and profile update.",
+      "children": ["user-uploads bucket", "sharp", "publicUrl", "image-upload.ts"]
+    },
+    {
+      "id": "browserStorage",
+      "label": "Browser storage",
+      "kind": "store",
+      "path": "localStorage + sessionStorage",
+      "details": "Persists last space, messaging drawer state, active conversation ID, disconnect timestamp, and password return URL.",
+      "children": ["vo-disconnect-timestamp", "passwordSetReturnUrl", "messaging_active_conversation_id", "vo-knock-cooldown-*"]
+    },
+    {
+      "id": "tanstackQuery",
+      "label": "TanStack Query cache",
+      "kind": "store",
+      "path": "src/providers/query-provider.tsx",
+      "details": "Client-side server state cache for spaces, users, messages, conversations, invitations, neighborhoods, and optimistic updates.",
+      "children": ["queryKey: spaces", "queryKey: user-presence", "queryKey: messages", "queryKey: invitations", "invalidateQueries"]
+    }
+  ],
+  "flows": [
+    {
+      "id": "invite-new-user",
+      "title": "Invite new user",
+      "summary": "Admin creates or reuses a pending invitation, sends a Supabase invite email, and receives a copyable /join URL.",
+      "trigger": "Admin opens /admin/invitations and submits email, role, and current company.",
+      "primaryPayload": {
+        "request": "{ email, role: 'admin' | 'member', companyId }",
+        "token": "crypto.randomBytes(32).toString('hex')",
+        "response": "{ success, invitation: { id, email, token, expiresAt, inviteUrl, emailSent }, limit, remaining }"
+      },
+      "steps": [
+        {
+          "node": "adminRoutes",
+          "title": "Admin route renders invitation UI",
+          "text": "src/app/admin/invitations/page.tsx renders PendingInvitationsList for company admins."
+        },
+        {
+          "node": "companyComponents",
+          "title": "PendingInvitationsList reads company context",
+          "text": "The component gets company.id from CompanyContext, loads current invitations, and posts create/resend/revoke mutations."
+        },
+        {
+          "node": "invitationsApi",
+          "title": "Create endpoint validates the request",
+          "text": "POST /api/invitations/create validates email, role, companyId, current user auth, company admin rights, stale invitations, capacity, and duplicate pending invites."
+        },
+        {
+          "node": "invitationRepository",
+          "title": "Invitation repository persists the token",
+          "text": "SupabaseInvitationRepository.create stores email, companyId, role, token, expiresAt, and pending status."
+        },
+        {
+          "node": "supabaseAuth",
+          "title": "Supabase Auth sends the invite email",
+          "text": "auth.admin.inviteUserByEmail receives redirectTo=/join?token=<token> plus metadata with invitation_token, company_id, and role."
+        },
+        {
+          "node": "tanstackQuery",
+          "title": "Client cache refreshes invitation list",
+          "text": "The mutation response returns inviteUrl and capacity metadata; PendingInvitationsList invalidates the invitations query and exposes copy/resend/revoke actions."
+        }
+      ],
+      "edges": [
+        { "from": "adminRoutes", "to": "companyComponents", "step": "1", "label": "renders", "passes": "PendingInvitationsList" },
+        { "from": "companyComponents", "to": "companyContext", "step": "2", "label": "reads", "passes": "company.id, currentUserProfile.role" },
+        { "from": "companyComponents", "to": "invitationsApi", "step": "3", "label": "POST create", "passes": "{ email, role, companyId }" },
+        { "from": "invitationsApi", "to": "supabaseClients", "step": "3", "label": "server clients", "passes": "regular client for RLS checks, service_role for auth email" },
+        { "from": "invitationsApi", "to": "supabasePostgres", "step": "3", "label": "validates", "passes": "companies.admin_ids, users.supabase_uid, invitations count" },
+        { "from": "invitationsApi", "to": "invitationRepository", "step": "4", "label": "create", "passes": "{ email, companyId, role, token, expiresAt }" },
+        { "from": "invitationRepository", "to": "supabasePostgres", "step": "4", "label": "insert", "passes": "invitations row: pending" },
+        { "from": "invitationsApi", "to": "supabaseAuth", "step": "5", "label": "invite email", "passes": "redirectTo=/join?token=<token>, invite metadata" },
+        { "from": "invitationsApi", "to": "companyComponents", "step": "6", "label": "returns", "passes": "inviteUrl, emailSent, remaining capacity" },
+        { "from": "companyComponents", "to": "tanstackQuery", "step": "6", "label": "invalidate", "passes": "queryKey ['invitations', company.id]" }
+      ],
+      "notes": [
+        "Existing pending invitations for the same email/company are reused to avoid email spam.",
+        "The free tier limit is calculated as current users plus active pending invitations."
+      ]
+    },
+    {
+      "id": "accept-invitation",
+      "title": "Accept invitation",
+      "summary": "Invitee follows /join?token=..., authenticates if needed, then the server attaches their app user to the invited company and marks the invitation accepted.",
+      "trigger": "Invitee clicks the Supabase invite email or opens a copied /join link.",
+      "primaryPayload": {
+        "validate": "GET /api/invitations/validate?token=<token>",
+        "accept": "POST /api/invitations/accept { token, displayName? }",
+        "state": "join page state: loading | show-auth | accepting | success | invalid-token | already-company"
+      },
+      "steps": [
+        {
+          "node": "joinOnboardingRoutes",
+          "title": "Join page processes token and auth hash",
+          "text": "src/app/join/page.tsx reads token, processes Supabase hash/code with the browser client, and redirects invite/recovery hashes to /set-password when needed."
+        },
+        {
+          "node": "invitationsApi",
+          "title": "Token validation is public but server-side",
+          "text": "GET /api/invitations/validate uses service_role to load invitations and company name, rejecting missing, expired, accepted, or invalid tokens."
+        },
+        {
+          "node": "authComponents",
+          "title": "Auth UI is shown when no session exists",
+          "text": "EmbeddedAuthForm signs in, signs up, or starts Google OAuth using AuthContext, then returns to the same invite path."
+        },
+        {
+          "node": "usersApi",
+          "title": "Existing company guard runs before accept",
+          "text": "/join calls /api/users/get-by-id?supabase_uid=... to avoid attaching users who already belong to another company."
+        },
+        {
+          "node": "invitationsApi",
+          "title": "Accept endpoint authorizes the session",
+          "text": "POST /api/invitations/accept uses getUser(), verifies invitation email matches authUser.email, and uses service_role repos because the invitee may not yet belong to the company."
+        },
+        {
+          "node": "userRepository",
+          "title": "User profile is updated",
+          "text": "SupabaseUserRepository.findBySupabaseUid locates the app user, then update sets companyId and role from the invitation."
+        },
+        {
+          "node": "invitationRepository",
+          "title": "Invitation is consumed",
+          "text": "SupabaseInvitationRepository.updateStatus marks the token accepted; the client hard-redirects to /dashboard so CompanyContext reloads cleanly."
+        }
+      ],
+      "edges": [
+        { "from": "joinOnboardingRoutes", "to": "supabaseClients", "step": "1", "label": "process hash", "passes": "access_token, refresh_token, code, type" },
+        { "from": "joinOnboardingRoutes", "to": "invitationsApi", "step": "2", "label": "GET validate", "passes": "token" },
+        { "from": "invitationsApi", "to": "supabasePostgres", "step": "2", "label": "loads", "passes": "invitations + companies.name" },
+        { "from": "joinOnboardingRoutes", "to": "authComponents", "step": "3", "label": "shows auth", "passes": "inviteEmail, oauthNextPath" },
+        { "from": "authComponents", "to": "authContext", "step": "3", "label": "auth action", "passes": "email/password or Google OAuth next path" },
+        { "from": "authContext", "to": "supabaseAuth", "step": "3", "label": "session", "passes": "signIn, signUp, signInWithOAuth" },
+        { "from": "joinOnboardingRoutes", "to": "usersApi", "step": "4", "label": "guard", "passes": "supabase_uid" },
+        { "from": "joinOnboardingRoutes", "to": "invitationsApi", "step": "5", "label": "POST accept", "passes": "{ token }" },
+        { "from": "invitationsApi", "to": "invitationRepository", "step": "5", "label": "find token", "passes": "pending invitation" },
+        { "from": "invitationsApi", "to": "userRepository", "step": "6", "label": "attach user", "passes": "{ companyId, role, displayName? }" },
+        { "from": "userRepository", "to": "supabasePostgres", "step": "6", "label": "update", "passes": "users.company_id, users.role" },
+        { "from": "invitationRepository", "to": "supabasePostgres", "step": "7", "label": "consume", "passes": "invitations.status='accepted'" },
+        { "from": "joinOnboardingRoutes", "to": "dashboardRoutes", "step": "7", "label": "redirect", "passes": "window.location.href='/dashboard'" },
+        { "from": "dashboardRoutes", "to": "companyContext", "step": "7", "label": "reload", "passes": "company, users, spaces" }
+      ],
+      "notes": [
+        "Email mismatch returns 403 and leaves the invite pending.",
+        "Different-company conflicts return 409 and show the already-company state."
+      ]
+    },
+    {
+      "id": "create-company",
+      "title": "Create company",
+      "summary": "A newly authenticated user without company data creates the tenant, becomes admin, then CompanyContext reloads company users and spaces.",
+      "trigger": "Onboarding shows the create-company path when no pending invitation and no company association exist.",
+      "primaryPayload": {
+        "createCompany": "{ name, creatorSupabaseUid, settings }",
+        "userLink": "{ companyId, role: 'admin' }",
+        "reload": "getCompany, getUsersByCompany, getSpacesByCompany"
+      },
+      "steps": [
+        {
+          "node": "joinOnboardingRoutes",
+          "title": "Onboarding decides create vs invite",
+          "text": "src/app/onboarding/page.tsx checks /api/invitations/pending. With no company and no pending invite, it links to /create-company."
+        },
+        {
+          "node": "companyContext",
+          "title": "CompanyContext coordinates the creation",
+          "text": "createNewCompany syncs the user profile, prevents duplicate company creation, calls the company API, patches admin role, and reloads data."
+        },
+        {
+          "node": "usersApi",
+          "title": "User profile is synced first",
+          "text": "/api/users/sync-profile validates the session and creates or returns the users row keyed by supabase_uid."
+        },
+        {
+          "node": "companiesApi",
+          "title": "Company is created server-side",
+          "text": "/api/companies/create checks getUser(), finds the app user by creatorSupabaseUid, creates companies with adminIds=[user.id], and updates users.company_id."
+        },
+        {
+          "node": "companyRepository",
+          "title": "Company repository writes the tenant row",
+          "text": "SupabaseCompanyRepository.create returns the new company; SupabaseUserRepository.update links the creator."
+        },
+        {
+          "node": "clientApi",
+          "title": "Client reloads company data",
+          "text": "CompanyContext calls getCompany, getUsersByCompany, and getSpacesByCompany through src/lib/api.ts, then redirects to /dashboard."
+        }
+      ],
+      "edges": [
+        { "from": "joinOnboardingRoutes", "to": "invitationsApi", "step": "1", "label": "check pending", "passes": "GET /api/invitations/pending by auth email" },
+        { "from": "authRoutes", "to": "companyContext", "step": "2", "label": "createNewCompany", "passes": "company name" },
+        { "from": "companyContext", "to": "usersApi", "step": "3", "label": "sync profile", "passes": "{ supabase_uid, email, displayName, googleAvatarUrl? }" },
+        { "from": "usersApi", "to": "userRepository", "step": "3", "label": "find/create", "passes": "users.supabase_uid" },
+        { "from": "companyContext", "to": "companiesApi", "step": "4", "label": "POST create", "passes": "{ name, creatorSupabaseUid, settings }" },
+        { "from": "companiesApi", "to": "companyRepository", "step": "5", "label": "create", "passes": "{ name, adminIds: [dbUserId], settings }" },
+        { "from": "companiesApi", "to": "userRepository", "step": "5", "label": "link creator", "passes": "{ companyId }" },
+        { "from": "companyRepository", "to": "supabasePostgres", "step": "5", "label": "insert", "passes": "companies row" },
+        { "from": "userRepository", "to": "supabasePostgres", "step": "5", "label": "update", "passes": "users.company_id, role admin" },
+        { "from": "companyContext", "to": "clientApi", "step": "6", "label": "reload", "passes": "companyId" },
+        { "from": "clientApi", "to": "companiesApi", "step": "6", "label": "fetch", "passes": "company, users, spaces" },
+        { "from": "companyContext", "to": "dashboardRoutes", "step": "6", "label": "redirect", "passes": "/dashboard" }
+      ],
+      "notes": [
+        "The guard in CompanyContext avoids creating another company when the user already has companyId.",
+        "users.id is the database UUID; users.supabase_uid is the Supabase Auth UID."
+      ]
+    },
+    {
+      "id": "join-space",
+      "title": "Join or leave a space",
+      "summary": "The floor plan updates user location through PresenceContext, validates access on the server, writes presence logs, then realtime updates every client.",
+      "trigger": "User clicks Join, Leave, or a space card action in the floor plan.",
+      "primaryPayload": {
+        "client": "{ userId: currentUserProfile.id, spaceId: string | null }",
+        "serverValidation": "auth user must map to same users.id, same company, active/available space, capacity available, private access allowed",
+        "writes": "users.current_space_id, users.status, space_presence_log"
+      },
+      "steps": [
+        {
+          "node": "dashboardRoutes",
+          "title": "Floor plan route mounts the workspace",
+          "text": "src/app/(dashboard)/floor-plan/page.tsx renders DashboardShell and FloorPlan."
+        },
+        {
+          "node": "floorPlanComponents",
+          "title": "FloorPlan composes company, presence, and messaging",
+          "text": "FloorPlan reads spaces from CompanyContext, usersInSpaces from PresenceContext, and messaging actions from MessagingContext."
+        },
+        {
+          "node": "modernFloorComponents",
+          "title": "SpaceActionButtons triggers enter or leave",
+          "text": "ModernFloorPlan validates obvious client-side capacity/status/private rules before calling updateLocation."
+        },
+        {
+          "node": "presenceContext",
+          "title": "PresenceContext delegates location update",
+          "text": "PresenceContext exposes updateLocation from useUserPresence."
+        },
+        {
+          "node": "presenceHooks",
+          "title": "useUserPresence sends location mutation",
+          "text": "safeUpdateLocation dedupes in-flight changes and PUTs /api/users/location with { userId, spaceId }."
+        },
+        {
+          "node": "usersApi",
+          "title": "Location API enforces server rules",
+          "text": "/api/users/location validates authenticated user, same database user id, company, capacity, status, and private-space authorization."
+        },
+        {
+          "node": "userRepository",
+          "title": "Repository writes location and status",
+          "text": "updateLocation writes users.current_space_id and syncSpacePresenceLog closes old space log and opens a new one."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "Realtime updates clients",
+          "text": "Supabase presence and postgres_changes on users update the user-presence query and usersInSpaces map."
+        }
+      ],
+      "edges": [
+        { "from": "dashboardRoutes", "to": "floorPlanComponents", "step": "1", "label": "renders", "passes": "FloorPlan" },
+        { "from": "floorPlanComponents", "to": "companyContext", "step": "2", "label": "reads", "passes": "spaces, currentUserProfile" },
+        { "from": "floorPlanComponents", "to": "presenceContext", "step": "2", "label": "reads", "passes": "users, usersInSpaces" },
+        { "from": "floorPlanComponents", "to": "modernFloorComponents", "step": "3", "label": "passes props", "passes": "spaces, usersInSpace, onEnterSpace, onLeaveSpace" },
+        { "from": "modernFloorComponents", "to": "presenceContext", "step": "4", "label": "updateLocation", "passes": "spaceId or null" },
+        { "from": "presenceContext", "to": "presenceHooks", "step": "5", "label": "delegates", "passes": "currentUserId" },
+        { "from": "presenceHooks", "to": "usersApi", "step": "5", "label": "PUT location", "passes": "{ userId, spaceId }" },
+        { "from": "usersApi", "to": "supabaseClients", "step": "6", "label": "auth", "passes": "getUser plus service_role repository client" },
+        { "from": "usersApi", "to": "supabasePostgres", "step": "6", "label": "validate", "passes": "spaces, users, knock_requests, space_presence_log" },
+        { "from": "usersApi", "to": "userRepository", "step": "7", "label": "update", "passes": "users.current_space_id" },
+        { "from": "userRepository", "to": "supabasePostgres", "step": "7", "label": "write", "passes": "users + space_presence_log" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "8", "label": "postgres_changes", "passes": "users updates" },
+        { "from": "supabaseRealtime", "to": "presenceHooks", "step": "8", "label": "sync", "passes": "presence state + users row changes" },
+        { "from": "presenceHooks", "to": "tanstackQuery", "step": "8", "label": "cache update", "passes": "queryKey ['user-presence']" },
+        { "from": "presenceContext", "to": "modernFloorComponents", "step": "8", "label": "rerender", "passes": "usersInSpaces map" }
+      ],
+      "notes": [
+        "Offline tab-close beacons preserve current_space_id but mark status offline, so reload recovery can put the user back without blocking capacity.",
+        "Private-space direct entry is allowed for admins, current occupants, recent rejoin, or approved knock requests."
+      ]
+    },
+    {
+      "id": "knock-to-enter",
+      "title": "Knock to enter",
+      "summary": "A requester knocks on an occupied or private space; occupants receive realtime request banners, respond server-side, and approval unlocks the location update.",
+      "trigger": "User clicks Knock on a space card.",
+      "primaryPayload": {
+        "request": "{ spaceId, requestId, requesterName, requesterAvatarUrl? }",
+        "response": "{ spaceId, requestId, requesterId, requesterName, decision: 'APPROVE' | 'DENY' }",
+        "table": "knock_requests with status pending | approved | denied"
+      },
+      "steps": [
+        {
+          "node": "modernFloorComponents",
+          "title": "Knock button starts local state",
+          "text": "SpaceActionButtons calls ModernFloorPlan.handleKnock; useKnock checks cooldown and moves to knocking."
+        },
+        {
+          "node": "knockHooks",
+          "title": "Knock signaling sends request through API",
+          "text": "useKnockSignaling.sendKnockRequest creates a requestId and POSTs /api/spaces/knock/request."
+        },
+        {
+          "node": "knockApi",
+          "title": "Request endpoint validates and inserts",
+          "text": "The server verifies session, requester profile, target space, same company, recipient count, stale cleanup, then inserts knock_requests."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "Occupants receive insert event",
+          "text": "Occupied clients subscribe to postgres_changes INSERT on knock_requests filtered by occupied space."
+        },
+        {
+          "node": "modernFloorComponents",
+          "title": "Occupant responds from banner",
+          "text": "KnockBanner/KnockToast let occupants approve or deny; respondToKnock POSTs /api/spaces/knock/respond."
+        },
+        {
+          "node": "knockApi",
+          "title": "Response endpoint validates occupant authority",
+          "text": "The server checks responder is currently in the space, same company as requester, updates the knock row, and best-effort logs a room system message."
+        },
+        {
+          "node": "presenceContext",
+          "title": "Approval auto-joins through normal location path",
+          "text": "Requester subscription sees the UPDATE; approval calls handleEnterSpace(..., allowPrivateBypass), then /api/users/location consumes the approved knock."
+        }
+      ],
+      "edges": [
+        { "from": "modernFloorComponents", "to": "knockHooks", "step": "1", "label": "start", "passes": "spaceId, currentUserProfile" },
+        { "from": "knockHooks", "to": "knockApi", "step": "2", "label": "POST request", "passes": "{ spaceId, requestId, requesterName, requesterAvatarUrl }" },
+        { "from": "knockApi", "to": "userRepository", "step": "3", "label": "requester lookup", "passes": "authData.user.id -> users.supabase_uid" },
+        { "from": "knockApi", "to": "supabasePostgres", "step": "3", "label": "insert", "passes": "knock_requests pending row" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "4", "label": "INSERT event", "passes": "knock_requests row" },
+        { "from": "supabaseRealtime", "to": "knockHooks", "step": "4", "label": "occupied channel", "passes": "KNOCK_REQUEST payload" },
+        { "from": "knockHooks", "to": "modernFloorComponents", "step": "4", "label": "render banner", "passes": "requesterName, avatar, requestId" },
+        { "from": "modernFloorComponents", "to": "knockApi", "step": "5", "label": "POST respond", "passes": "{ decision, requesterId, requestId, spaceId }" },
+        { "from": "knockApi", "to": "supabasePostgres", "step": "6", "label": "update", "passes": "status approved/denied, responder_id, decision" },
+        { "from": "knockApi", "to": "messageRepository", "step": "6", "label": "system log", "passes": "room message when conversation exists" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "6", "label": "UPDATE event", "passes": "knock response" },
+        { "from": "supabaseRealtime", "to": "knockHooks", "step": "7", "label": "requester channel", "passes": "KNOCK_RESPONSE payload" },
+        { "from": "knockHooks", "to": "presenceContext", "step": "7", "label": "approved join", "passes": "spaceId, allowPrivateBypass" },
+        { "from": "presenceContext", "to": "usersApi", "step": "7", "label": "normal location update", "passes": "{ userId, spaceId }" }
+      ],
+      "notes": [
+        "Realtime failures fall back to polling recent knock_requests every two seconds.",
+        "Approved knock authorization is consumed by /api/users/location after entry."
+      ]
+    },
+    {
+      "id": "send-room-message",
+      "title": "Open room chat and send message",
+      "summary": "Opening a room chat resolves a room conversation, mounts the global drawer, optimistically sends a message, persists it server-side, and realtime reconciles caches.",
+      "trigger": "User clicks Chat in Room, double-clicks a space, or enters a space with chat opening.",
+      "primaryPayload": {
+        "resolveConversation": "{ type: 'room', roomId }",
+        "sendMessage": "{ conversationId, content, replyToId?, attachments?, type? }",
+        "serverDerived": "senderId comes from users.id after Supabase getUser()"
+      },
+      "steps": [
+        {
+          "node": "floorPlanComponents",
+          "title": "FloorPlan opens room chat explicitly",
+          "text": "handleOpenChat calls getOrCreateRoomConversation(room.id, room.name), then sets activeConversation and activeView."
+        },
+        {
+          "node": "messagingContext",
+          "title": "MessagingContext owns drawer state",
+          "text": "The context stores active conversation, active view, drawer open state, message operations, and realtime status."
+        },
+        {
+          "node": "messagingHooks",
+          "title": "Conversation hook resolves room conversation",
+          "text": "useConversations calls messagingApi.resolveConversation with { type: ROOM, roomId }."
+        },
+        {
+          "node": "conversationsApi",
+          "title": "Conversation API finds or creates the conversation",
+          "text": "/api/conversations/resolve enforces server auth and uses SupabaseConversationRepository."
+        },
+        {
+          "node": "messagingComponents",
+          "title": "Drawer renders feed and composer",
+          "text": "MessagingDrawer renders MessageFeed and EnhancedMessageComposer for the active conversation."
+        },
+        {
+          "node": "messagingHooks",
+          "title": "useMessages optimistically sends",
+          "text": "A temporary sending message is inserted in TanStack Query before POST /api/messages/create."
+        },
+        {
+          "node": "messagesApi",
+          "title": "Message API persists and updates unread counts",
+          "text": "/api/messages/create authenticates, maps auth UID to users.id, checks participant membership, creates the message, updates last activity, and increments unread counts."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "Realtime reconciles message state",
+          "text": "useMessageSubscription listens to messages and message_reactions, replaces matching optimistic messages, and updates conversation caches."
+        }
+      ],
+      "edges": [
+        { "from": "floorPlanComponents", "to": "messagingContext", "step": "1", "label": "open chat", "passes": "room.id, room.name" },
+        { "from": "messagingContext", "to": "messagingHooks", "step": "2", "label": "get/create", "passes": "{ type: ROOM, roomId }" },
+        { "from": "messagingHooks", "to": "conversationsApi", "step": "3", "label": "POST resolve", "passes": "{ type: 'room', roomId }" },
+        { "from": "conversationsApi", "to": "conversationRepository", "step": "4", "label": "find/create", "passes": "room conversation, participants, unread_count" },
+        { "from": "conversationRepository", "to": "supabasePostgres", "step": "4", "label": "read/write", "passes": "conversations row" },
+        { "from": "messagingContext", "to": "messagingComponents", "step": "5", "label": "render drawer", "passes": "activeConversation" },
+        { "from": "messagingComponents", "to": "messagingHooks", "step": "6", "label": "send", "passes": "content, replyToId, attachments" },
+        { "from": "messagingHooks", "to": "tanstackQuery", "step": "6", "label": "optimistic", "passes": "temp-* message in ['messages', conversationId]" },
+        { "from": "messagingHooks", "to": "messagesApi", "step": "7", "label": "POST create", "passes": "{ conversationId, content, type, replyToId, attachments }" },
+        { "from": "messagesApi", "to": "userRepository", "step": "7", "label": "sender lookup", "passes": "auth user id -> users.id" },
+        { "from": "messagesApi", "to": "conversationRepository", "step": "7", "label": "authorize", "passes": "participants includes senderId" },
+        { "from": "messagesApi", "to": "messageRepository", "step": "7", "label": "create", "passes": "messageData" },
+        { "from": "messageRepository", "to": "supabasePostgres", "step": "7", "label": "insert", "passes": "messages row" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "8", "label": "INSERT event", "passes": "messages row" },
+        { "from": "supabaseRealtime", "to": "messagingHooks", "step": "8", "label": "subscription", "passes": "message payload" },
+        { "from": "messagingHooks", "to": "tanstackQuery", "step": "8", "label": "reconcile", "passes": "replace optimistic, update unread" }
+      ],
+      "notes": [
+        "Server derives senderId from the session; the client must not send senderId.",
+        "The drawer is global and persists across route navigation."
+      ]
+    },
+    {
+      "id": "start-direct-message",
+      "title": "Start direct message",
+      "summary": "The messaging drawer search selects a company user, resolves or creates a direct conversation, then uses the same message pipeline as room chat.",
+      "trigger": "User clicks New Message in MessagingDrawer and selects a teammate.",
+      "primaryPayload": {
+        "resolveConversation": "{ type: 'direct', userId: otherUserId }",
+        "guards": "Reject self-DM; require currentUserProfile.id",
+        "conversation": "participants are database user IDs, not Supabase Auth IDs"
+      },
+      "steps": [
+        {
+          "node": "messagingComponents",
+          "title": "Drawer switches to search view",
+          "text": "MessagingDrawer renders ConversationSearch with companyUsers from CompanyContext."
+        },
+        {
+          "node": "messagingContext",
+          "title": "Context requests a direct conversation",
+          "text": "getOrCreateUserConversation(otherUserId) sets activeConversation when the resolver returns."
+        },
+        {
+          "node": "messagingHooks",
+          "title": "useConversations checks local state then calls API",
+          "text": "The hook prevents self-DMs, checks existing conversations, then calls messagingApi.resolveConversation."
+        },
+        {
+          "node": "conversationsApi",
+          "title": "Conversation route resolves the DM",
+          "text": "/api/conversations/resolve finds or creates the direct conversation for the two app user IDs."
+        },
+        {
+          "node": "messagingComponents",
+          "title": "Drawer opens the conversation",
+          "text": "The active view changes to conversation, and MessageFeed plus EnhancedMessageComposer use the same send message path."
+        }
+      ],
+      "edges": [
+        { "from": "messagingComponents", "to": "companyContext", "step": "1", "label": "reads users", "passes": "companyUsers, currentUserProfile" },
+        { "from": "messagingComponents", "to": "messagingContext", "step": "2", "label": "select user", "passes": "otherUserId" },
+        { "from": "messagingContext", "to": "messagingHooks", "step": "3", "label": "get/create DM", "passes": "{ currentUserProfile.id, otherUserId }" },
+        { "from": "messagingHooks", "to": "conversationsApi", "step": "3", "label": "POST resolve", "passes": "{ type: 'direct', userId: otherUserId }" },
+        { "from": "conversationsApi", "to": "conversationRepository", "step": "4", "label": "find/create", "passes": "participants [currentUserId, otherUserId]" },
+        { "from": "conversationRepository", "to": "supabasePostgres", "step": "4", "label": "read/write", "passes": "conversations row" },
+        { "from": "messagingHooks", "to": "messagingContext", "step": "5", "label": "set active", "passes": "conversation" },
+        { "from": "messagingContext", "to": "messagingComponents", "step": "5", "label": "render", "passes": "MessageFeed + composer" },
+        { "from": "messagingComponents", "to": "messagesApi", "step": "5", "label": "send path", "passes": "same /api/messages/create pipeline" }
+      ],
+      "notes": [
+        "Direct conversations use app users.id values in participants.",
+        "Incoming messages can force-open or refresh conversation state through ensureOpenForMessage."
+      ]
+    },
+    {
+      "id": "react-to-message",
+      "title": "React to message",
+      "summary": "Reaction chips optimistically toggle the current user's emoji, the server adds or removes it through MessageRepository, and realtime updates visible message caches.",
+      "trigger": "User clicks an emoji reaction on a message.",
+      "primaryPayload": {
+        "request": "POST /api/messages/react { messageId, emoji }",
+        "repository": "addReaction(messageId, { userId, emoji }) or removeReaction(messageId, userId, emoji)",
+        "realtime": "message_reactions INSERT/DELETE and message row reaction data"
+      },
+      "steps": [
+        {
+          "node": "messagingComponents",
+          "title": "Reaction UI toggles an emoji",
+          "text": "ReactionChips or EmojiPicker calls addReaction/removeReaction from MessagingContext."
+        },
+        {
+          "node": "messagingHooks",
+          "title": "useMessages applies an optimistic cache toggle",
+          "text": "toggleReactionInPages updates all matching message pages and keeps a snapshot for rollback."
+        },
+        {
+          "node": "messagesApi",
+          "title": "Reaction endpoint identifies the app user",
+          "text": "/api/messages/react authenticates, finds users.id by supabase_uid, loads the message, and detects whether this emoji already exists."
+        },
+        {
+          "node": "messageRepository",
+          "title": "Message repository adds or removes the reaction",
+          "text": "SupabaseMessageRepository.addReaction or removeReaction persists the change."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "Realtime reconciles visible caches",
+          "text": "useMessageSubscription listens to message_reactions and updates all cached message pages containing the message."
+        }
+      ],
+      "edges": [
+        { "from": "messagingComponents", "to": "messagingContext", "step": "1", "label": "reaction action", "passes": "messageId, emoji" },
+        { "from": "messagingContext", "to": "messagingHooks", "step": "2", "label": "toggle", "passes": "currentUserProfile.id" },
+        { "from": "messagingHooks", "to": "tanstackQuery", "step": "2", "label": "optimistic", "passes": "toggleReactionInPages snapshot" },
+        { "from": "messagingHooks", "to": "messagesApi", "step": "3", "label": "POST react", "passes": "{ messageId, emoji }" },
+        { "from": "messagesApi", "to": "userRepository", "step": "3", "label": "lookup", "passes": "auth UID -> users.id" },
+        { "from": "messagesApi", "to": "messageRepository", "step": "4", "label": "add/remove", "passes": "messageId, userId, emoji" },
+        { "from": "messageRepository", "to": "supabasePostgres", "step": "4", "label": "write", "passes": "message_reactions or reactions projection" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "5", "label": "reaction event", "passes": "INSERT/DELETE message_reactions" },
+        { "from": "supabaseRealtime", "to": "messagingHooks", "step": "5", "label": "subscription", "passes": "messageId, userId, emoji, eventType" },
+        { "from": "messagingHooks", "to": "tanstackQuery", "step": "5", "label": "reconcile", "passes": "all message caches" }
+      ],
+      "notes": [
+        "The client treats removeReaction as the same toggle path because the API determines add vs remove.",
+        "On API failure, useMessages rolls the optimistic cache back to the snapshot."
+      ]
+    },
+    {
+      "id": "upload-avatar",
+      "title": "Upload avatar",
+      "summary": "UploadableAvatar validates and compresses an image, the server processes it with sharp, uploads it to Supabase Storage, and updates users.avatar_url.",
+      "trigger": "User selects an avatar image from the profile/avatar UI.",
+      "primaryPayload": {
+        "clientFile": "avatar image/jpeg | image/png | image/webp",
+        "formData": "multipart field avatar plus userId",
+        "result": "{ avatarUrl, message: 'Avatar updated successfully' }"
+      },
+      "steps": [
+        {
+          "node": "profileComponents",
+          "title": "UploadableAvatar owns the picker UI",
+          "text": "The component accepts JPEG/PNG/WebP files, previews state, and calls useImageUpload."
+        },
+        {
+          "node": "uploadHooks",
+          "title": "useImageUpload validates and compresses",
+          "text": "The hook validates max size/type, creates a preview URL, compresses client-side, and uploads multipart data."
+        },
+        {
+          "node": "usersApi",
+          "title": "Avatar API authenticates and processes the image",
+          "text": "/api/users/avatar uses getUser(), finds the app user, validates file type/size, processes with sharp, and builds avatars/avatar-<user>-<time>."
+        },
+        {
+          "node": "storageServices",
+          "title": "Storage service receives the processed file",
+          "text": "A service-role Supabase client uploads to the user-uploads bucket and generates the public URL."
+        },
+        {
+          "node": "userRepository",
+          "title": "User repository stores the avatar URL",
+          "text": "The user's avatarUrl is updated so CompanyContext, PresenceContext, and EnhancedAvatarV2 display the new image."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "User table changes update presence views",
+          "text": "useUserPresence listens to users table changes and updates avatarUrl in the user-presence query."
+        }
+      ],
+      "edges": [
+        { "from": "profileComponents", "to": "uploadHooks", "step": "1", "label": "selected file", "passes": "File object" },
+        { "from": "uploadHooks", "to": "usersApi", "step": "2", "label": "multipart POST", "passes": "FormData avatar + userId" },
+        { "from": "usersApi", "to": "supabaseClients", "step": "3", "label": "auth", "passes": "getUser regular client, storage service_role client" },
+        { "from": "usersApi", "to": "repositoryFactory", "step": "3", "label": "repos", "passes": "userRepository" },
+        { "from": "usersApi", "to": "storageServices", "step": "4", "label": "upload", "passes": "processed buffer, contentType, filePath" },
+        { "from": "storageServices", "to": "supabasePostgres", "step": "4", "label": "public URL", "passes": "user-uploads publicUrl" },
+        { "from": "usersApi", "to": "userRepository", "step": "5", "label": "update", "passes": "{ avatarUrl: publicUrl }" },
+        { "from": "userRepository", "to": "supabasePostgres", "step": "5", "label": "write", "passes": "users.avatar_url" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "6", "label": "users UPDATE", "passes": "avatar_url" },
+        { "from": "supabaseRealtime", "to": "presenceHooks", "step": "6", "label": "cache update", "passes": "UserPresenceData.avatarUrl" },
+        { "from": "presenceHooks", "to": "profileComponents", "step": "6", "label": "rerender", "passes": "EnhancedAvatarV2 / UploadableAvatar url" }
+      ],
+      "notes": [
+        "Google avatars can also be synced during AuthContext and CompanyContext profile sync.",
+        "The canonical avatar components are EnhancedAvatarV2 for display and UploadableAvatar for upload."
+      ]
+    },
+    {
+      "id": "manage-space",
+      "title": "Create or update room",
+      "summary": "Admins create, edit, delete, or template rooms from the floor plan; space mutation hooks call API routes and invalidate space caches.",
+      "trigger": "Admin clicks Create Room, Manage Rooms, Use Template, or edit actions.",
+      "primaryPayload": {
+        "create": "Omit<Space, id | createdAt | updatedAt | reservations>",
+        "update": "{ id, ...updates }",
+        "delete": "DELETE /api/spaces/delete?spaceId=<id>"
+      },
+      "steps": [
+        {
+          "node": "floorPlanComponents",
+          "title": "Admin UI opens room dialog or manager",
+          "text": "FloorPlan gates create/edit/delete controls by currentUserProfile.role === 'admin'."
+        },
+        {
+          "node": "queryHooks",
+          "title": "Space mutation hooks call route handlers",
+          "text": "useCreateSpace, useUpdateSpace, useCreateSpaceFromTemplate, and useDeleteSpace wrap fetch calls and invalidate ['spaces']."
+        },
+        {
+          "node": "spacesApi",
+          "title": "Spaces API validates and writes",
+          "text": "Space routes receive normalized space fields such as companyId, name, type, status, capacity, features, position, accessControl, and template metadata."
+        },
+        {
+          "node": "spaceRepository",
+          "title": "Space repository maps app types to DB rows",
+          "text": "SupabaseSpaceRepository persists spaces and returns app-shaped Space objects."
+        },
+        {
+          "node": "supabaseRealtime",
+          "title": "Space realtime invalidates visible lists",
+          "text": "useSpaceRealtime listens to spaces inserts, updates, deletes, and invalidates space queries."
+        }
+      ],
+      "edges": [
+        { "from": "floorPlanComponents", "to": "modernFloorComponents", "step": "1", "label": "admin actions", "passes": "onEditSpace, RoomDialog, RoomManagement, templates" },
+        { "from": "floorPlanComponents", "to": "queryHooks", "step": "2", "label": "mutate", "passes": "SpaceCreateData | SpaceUpdateData | spaceId" },
+        { "from": "queryHooks", "to": "spacesApi", "step": "3", "label": "fetch", "passes": "POST create, PUT update, DELETE delete" },
+        { "from": "spacesApi", "to": "spaceRepository", "step": "4", "label": "repository", "passes": "space fields" },
+        { "from": "spaceRepository", "to": "supabasePostgres", "step": "4", "label": "write", "passes": "spaces row" },
+        { "from": "queryHooks", "to": "tanstackQuery", "step": "5", "label": "invalidate", "passes": "queryKey ['spaces']" },
+        { "from": "supabasePostgres", "to": "supabaseRealtime", "step": "5", "label": "space change", "passes": "INSERT/UPDATE/DELETE" },
+        { "from": "supabaseRealtime", "to": "queryHooks", "step": "5", "label": "invalidate", "passes": "['spaces', companyId]" },
+        { "from": "queryHooks", "to": "companyContext", "step": "5", "label": "refresh surface", "passes": "spaces array" }
+      ],
+      "notes": [
+        "Room templates become normal space create payloads with template defaults for capacity, features, position, and access control.",
+        "Space status changes can create room system messages through SystemMessageService."
+      ]
+    }
+  ]
+}
+  </script>
+
+  <script>
+    const data = JSON.parse(document.getElementById('workflow-data').textContent);
+    const nodesById = new Map(data.nodes.map((node) => [node.id, node]));
+    const flowsById = new Map(data.flows.map((flow) => [flow.id, flow]));
+    const state = {
+      activeFlowId: data.flows[0].id,
+      selectedNodeId: null,
+      activeTab: 'steps'
+    };
+
+    const flowListEl = document.getElementById('flow-list');
+    const nodesGridEl = document.getElementById('nodes-grid');
+    const edgeLayerEl = document.getElementById('edge-layer');
+    const edgeLabelLayerEl = document.getElementById('edge-label-layer');
+    const surfaceEl = document.getElementById('diagram-surface');
+    const wrapEl = document.getElementById('diagram-wrap');
+    const detailTitleEl = document.getElementById('detail-title');
+    const detailSummaryEl = document.getElementById('detail-summary');
+    const detailBodyEl = document.getElementById('detail-body');
+    const jsonPanelEl = document.getElementById('json-panel');
+    const jsonToggleButton = document.getElementById('json-toggle-button');
+    const fitActiveButton = document.getElementById('fit-active-button');
+
+    function getKindClass(kind) {
+      return `kind kind-${kind}`;
+    }
+
+    function unique(values) {
+      return Array.from(new Set(values.filter(Boolean)));
+    }
+
+    function activeFlow() {
+      return flowsById.get(state.activeFlowId);
+    }
+
+    function activeNodeIds(flow) {
+      return unique([
+        ...flow.steps.map((step) => step.node),
+        ...flow.edges.flatMap((edge) => [edge.from, edge.to])
+      ]);
+    }
+
+    function nodeStepMap(flow) {
+      const map = new Map();
+      flow.steps.forEach((step, index) => {
+        if (!map.has(step.node)) {
+          map.set(step.node, String(index + 1));
+        }
+      });
+      return map;
+    }
+
+    function renderFlowList() {
+      flowListEl.innerHTML = '';
+      data.flows.forEach((flow) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `flow-button${flow.id === state.activeFlowId ? ' active' : ''}`;
+        button.dataset.flowId = flow.id;
+        button.innerHTML = `
+          <strong>${escapeHtml(flow.title)}</strong>
+          <span>${escapeHtml(flow.summary)}</span>
+          <span class="flow-meta">
+            <span class="pill">${flow.steps.length} steps</span>
+            <span class="pill">${flow.edges.length} handoffs</span>
+          </span>
+        `;
+        button.addEventListener('click', () => {
+          state.activeFlowId = flow.id;
+          state.activeTab = 'steps';
+          render();
+          focusFirstActiveNode();
+        });
+        flowListEl.appendChild(button);
+      });
+    }
+
+    function renderNodes() {
+      const flow = activeFlow();
+      const activeIds = new Set(activeNodeIds(flow));
+      const stepMap = nodeStepMap(flow);
+      nodesGridEl.innerHTML = '';
+
+      data.lanes.forEach((lane) => {
+        const laneEl = document.createElement('section');
+        laneEl.className = 'lane';
+        laneEl.innerHTML = `<h2>${escapeHtml(lane.title)}</h2>`;
+
+        lane.nodes.forEach((nodeId) => {
+          const node = nodesById.get(nodeId);
+          if (!node) return;
+
+          const nodeEl = document.createElement('article');
+          const isActive = activeIds.has(node.id);
+          const isSelected = state.selectedNodeId === node.id;
+          nodeEl.className = [
+            'node',
+            isActive ? 'active' : 'dimmed',
+            isSelected ? 'selected' : ''
+          ].filter(Boolean).join(' ');
+          nodeEl.dataset.nodeId = node.id;
+          const children = (node.children || []).slice(0, 8);
+          const extraCount = (node.children || []).length - children.length;
+          nodeEl.innerHTML = `
+            <span class="${getKindClass(node.kind)}">${escapeHtml(node.kind)}</span>
+            <span class="step-badge">${escapeHtml(stepMap.get(node.id) || '')}</span>
+            <span class="node-title">${escapeHtml(node.label)}</span>
+            <div class="node-path">${escapeHtml(node.path)}</div>
+            <div class="chips">
+              ${children.map((child) => `<span class="chip">${escapeHtml(child)}</span>`).join('')}
+              ${extraCount > 0 ? `<span class="chip">+${extraCount} more</span>` : ''}
+            </div>
+          `;
+          nodeEl.addEventListener('click', () => {
+            state.selectedNodeId = node.id;
+            state.activeTab = 'package';
+            render();
+          });
+          laneEl.appendChild(nodeEl);
+        });
+
+        nodesGridEl.appendChild(laneEl);
+      });
+    }
+
+    function drawEdges() {
+      const flow = activeFlow();
+      edgeLayerEl.innerHTML = `
+        <defs>
+          <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"></path>
+          </marker>
+        </defs>
+      `;
+      edgeLabelLayerEl.innerHTML = '';
+
+      const surfaceRect = surfaceEl.getBoundingClientRect();
+      const width = Math.max(surfaceEl.scrollWidth, surfaceEl.offsetWidth);
+      const height = Math.max(surfaceEl.scrollHeight, surfaceEl.offsetHeight);
+      edgeLayerEl.setAttribute('width', width);
+      edgeLayerEl.setAttribute('height', height);
+      edgeLayerEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      flow.edges.forEach((edge, index) => {
+        const fromEl = nodesGridEl.querySelector(`[data-node-id="${CSS.escape(edge.from)}"]`);
+        const toEl = nodesGridEl.querySelector(`[data-node-id="${CSS.escape(edge.to)}"]`);
+        if (!fromEl || !toEl) return;
+
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const fromCenterX = fromRect.left - surfaceRect.left + fromRect.width / 2;
+        const fromCenterY = fromRect.top - surfaceRect.top + fromRect.height / 2;
+        const toCenterX = toRect.left - surfaceRect.left + toRect.width / 2;
+        const toCenterY = toRect.top - surfaceRect.top + toRect.height / 2;
+
+        const isForward = fromCenterX <= toCenterX;
+        const x1 = fromRect.left - surfaceRect.left + (isForward ? fromRect.width : 0);
+        const y1 = fromCenterY;
+        const x2 = toRect.left - surfaceRect.left + (isForward ? 0 : toRect.width);
+        const y2 = toCenterY;
+        const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
+        const c1x = x1 + (isForward ? dx : -dx);
+        const c2x = x2 - (isForward ? dx : -dx);
+        const path = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+
+        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathEl.setAttribute('d', path);
+        pathEl.setAttribute('class', 'flow-edge active');
+        pathEl.setAttribute('marker-end', 'url(#arrow-active)');
+        pathEl.style.opacity = String(Math.max(0.36, 1 - index * 0.015));
+        edgeLayerEl.appendChild(pathEl);
+
+        const label = document.createElement('div');
+        label.className = 'edge-label';
+        const labelX = (x1 + x2) / 2;
+        const labelY = (y1 + y2) / 2;
+        label.style.left = `${labelX}px`;
+        label.style.top = `${labelY}px`;
+        label.innerHTML = `<strong>${escapeHtml(edge.step)}. ${escapeHtml(edge.label)}</strong>${escapeHtml(edge.passes)}`;
+        edgeLabelLayerEl.appendChild(label);
+      });
+    }
+
+    function renderDetail() {
+      const flow = activeFlow();
+      detailTitleEl.textContent = flow.title;
+      detailSummaryEl.textContent = flow.summary;
+
+      document.querySelectorAll('.tab').forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.tab === state.activeTab);
+      });
+
+      if (state.activeTab === 'steps') {
+        detailBodyEl.innerHTML = `
+          <div class="detail-section">
+            <h3>Trigger</h3>
+            <div class="code">${escapeHtml(flow.trigger)}</div>
+          </div>
+          <div class="detail-section">
+            <h3>Step Annotations</h3>
+            <div class="step-list">
+              ${flow.steps.map((step, index) => {
+                const node = nodesById.get(step.node);
+                return `
+                  <div class="step">
+                    <div class="step-number">${index + 1}</div>
+                    <div class="step-content">
+                      <strong>${escapeHtml(step.title)}</strong>
+                      <p>${escapeHtml(step.text)}</p>
+                      <div class="node-path">${escapeHtml(node ? node.label : step.node)}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          ${renderNotes(flow)}
+        `;
+        return;
+      }
+
+      if (state.activeTab === 'payloads') {
+        detailBodyEl.innerHTML = `
+          <div class="detail-section">
+            <h3>Primary Payload</h3>
+            <div class="code">${escapeHtml(JSON.stringify(flow.primaryPayload, null, 2))}</div>
+          </div>
+          <div class="detail-section">
+            <h3>Handoffs</h3>
+            <div class="step-list">
+              ${flow.edges.map((edge, index) => {
+                const from = nodesById.get(edge.from);
+                const to = nodesById.get(edge.to);
+                return `
+                  <div class="step">
+                    <div class="step-number">${index + 1}</div>
+                    <div class="step-content">
+                      <strong>${escapeHtml(from?.label || edge.from)} -> ${escapeHtml(to?.label || edge.to)}</strong>
+                      <p>${escapeHtml(edge.label)}: ${escapeHtml(edge.passes)}</p>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const selectedNode = state.selectedNodeId
+        ? nodesById.get(state.selectedNodeId)
+        : nodesById.get(activeNodeIds(flow)[0]);
+      detailBodyEl.innerHTML = renderNodeDetail(selectedNode, flow);
+    }
+
+    function renderNodeDetail(node, flow) {
+      if (!node) {
+        return '<div class="node-detail">Select a package to inspect it.</div>';
+      }
+
+      const touchedBy = data.flows
+        .filter((candidate) => activeNodeIds(candidate).includes(node.id))
+        .map((candidate) => candidate.title);
+
+      const flowEdges = flow.edges.filter((edge) => edge.from === node.id || edge.to === node.id);
+
+      return `
+        <div class="detail-section">
+          <h3>Selected Package</h3>
+          <dl class="node-detail">
+            <dt>Name</dt>
+            <dd>${escapeHtml(node.label)}</dd>
+            <dt>Kind</dt>
+            <dd>${escapeHtml(node.kind)}</dd>
+            <dt>Path</dt>
+            <dd class="node-path">${escapeHtml(node.path)}</dd>
+            <dt>Role</dt>
+            <dd>${escapeHtml(node.details)}</dd>
+            <dt>Visible contents</dt>
+            <dd>${escapeHtml((node.children || []).join(', '))}</dd>
+            <dt>Used by flows</dt>
+            <dd>${escapeHtml(touchedBy.join(', ') || 'Not highlighted by current documented flows')}</dd>
+          </dl>
+        </div>
+        <div class="detail-section">
+          <h3>Current Flow Handoffs</h3>
+          ${flowEdges.length ? `
+            <div class="step-list">
+              ${flowEdges.map((edge, index) => {
+                const from = nodesById.get(edge.from);
+                const to = nodesById.get(edge.to);
+                return `
+                  <div class="step">
+                    <div class="step-number">${index + 1}</div>
+                    <div class="step-content">
+                      <strong>${escapeHtml(from?.label || edge.from)} -> ${escapeHtml(to?.label || edge.to)}</strong>
+                      <p>${escapeHtml(edge.label)}: ${escapeHtml(edge.passes)}</p>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : '<p class="subtitle">This package is visible in the architecture map but is not part of the selected flow.</p>'}
+        </div>
+      `;
+    }
+
+    function renderNotes(flow) {
+      if (!flow.notes || flow.notes.length === 0) return '';
+      return `
+        <div class="detail-section">
+          <h3>Notes</h3>
+          <div class="step-list">
+            ${flow.notes.map((note, index) => `
+              <div class="step">
+                <div class="step-number">${index + 1}</div>
+                <div class="step-content"><p>${escapeHtml(note)}</p></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function focusFirstActiveNode() {
+      const flow = activeFlow();
+      const first = activeNodeIds(flow)[0];
+      const firstEl = first ? nodesGridEl.querySelector(`[data-node-id="${CSS.escape(first)}"]`) : null;
+      if (firstEl) {
+        firstEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    }
+
+    function renderJsonPanel() {
+      jsonPanelEl.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function render() {
+      renderFlowList();
+      renderNodes();
+      renderDetail();
+      requestAnimationFrame(drawEdges);
+    }
+
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        state.activeTab = tab.dataset.tab;
+        render();
+      });
+    });
+
+    jsonToggleButton.addEventListener('click', () => {
+      const isVisible = jsonPanelEl.classList.toggle('visible');
+      jsonToggleButton.setAttribute('aria-pressed', String(isVisible));
+      jsonToggleButton.textContent = isVisible ? 'Hide JSON' : 'Show JSON';
+    });
+
+    fitActiveButton.addEventListener('click', () => {
+      focusFirstActiveNode();
+    });
+
+    wrapEl.addEventListener('scroll', () => requestAnimationFrame(drawEdges));
+    window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+
+    renderJsonPanel();
+    render();
+  </script>
+</body>
+</html>
