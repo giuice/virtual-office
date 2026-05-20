@@ -26,6 +26,7 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 - Floor Plan: Space capacity handling with full badge, disabled join, API 409 validation
 - Floor Plan: Real-time presence animations with exit tracking
 - Floor Plan: Dashboard landing page polish with investor resources
+- Floor Plan: Presence reload recovery with automatic lastSpaceId persistence and synchronized FloorPlan visual hydration
 - Audio: P2P mesh WebRTC audio with Supabase Realtime signaling, speaking indicator via client-side VAD, mic controls with default muted, hotkeys
 - Messaging: Reply indicators and thread UI
 - Messaging: Reaction chips and emoji picker
@@ -110,4 +111,4 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 | Bugs-first stabilization phase | Fix broken floor plan + auth before new features | Pending |
 
 ---
-*Last updated: 2026-02-23 after initialization*
+*Last updated: 2026-05-13 after Phase 02.1 presence reload fixes*

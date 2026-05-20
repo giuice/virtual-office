@@ -54,7 +54,7 @@ describe('SpaceActionButtons', () => {
       name: /knock cooldown active, 42 seconds remaining/i,
     });
     expect(button).toBeDisabled();
-    expect(button).toHaveTextContent('Knock (42s)');
+    expect(button).toHaveTextContent('Wait 42s');
   });
 
   it('shows leave button for users already in space', () => {

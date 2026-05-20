@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { UserPresenceData } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
+import { ACTIVE_PRESENCE_WINDOW_MS, derivePresenceStatus } from './presence-utils';
 
 const PRESENCE_QUERY_KEY = ['user-presence'];
 const PRESENCE_CHANNEL_NAME = 'user-presence-channel';
@@ -58,7 +59,6 @@ export function useUserPresence(currentUserId?: string) {
       
       // Process and validate user data with avatar information
       const now = Date.now();
-      const ACTIVE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes grace window
 
       const mapped: UserPresenceData[] = (json.users || []).map((user: any) => {
         // Validate required fields
@@ -74,6 +74,7 @@ export function useUserPresence(currentUserId?: string) {
           avatarUrl: user.avatarUrl || '',
           status: user.status || 'offline',
           statusMessage: user.statusMessage || '',
+          lastActive: user.lastActive ?? user.last_active,
           // API returns camelCase from SupabaseUserRepository; keep snake_case fallback
           currentSpaceId: user.currentSpaceId ?? user.current_space_id ?? null,
           avatarLoading: false,
@@ -105,7 +106,7 @@ export function useUserPresence(currentUserId?: string) {
         if (inSpace) return true;
         const userRaw = (json.users || []).find((x: any) => x.id === u.id);
         const lastActive = userRaw?.lastActive || userRaw?.last_active;
-        const isRecentlyActive = lastActive ? (now - Date.parse(lastActive)) < ACTIVE_WINDOW_MS : false;
+        const isRecentlyActive = lastActive ? (now - Date.parse(lastActive)) < ACTIVE_PRESENCE_WINDOW_MS : false;
         const isOnlineByStatus = u.status && u.status !== 'offline';
         return isOnlineByStatus || isRecentlyActive;
       });
@@ -137,23 +138,7 @@ export function useUserPresence(currentUserId?: string) {
 
     return rawUsers.map((user) => {
       const isOnline = onlineUserIds.has(user.id);
-      let derivedStatus = user.status ?? 'offline';
-
-      if (isOnline) {
-        if (!user.status || user.status === 'offline') {
-          derivedStatus = 'online';
-        }
-      } else {
-        // Only override to offline if:
-        // 1. Presence system is ready (first sync received) AND
-        // 2. User's DB status was 'online' (they should be in presence if truly online)
-        // Never override away/busy -- those are intentional DB statuses that don't require Realtime presence
-        if (isPresenceReady && (!user.status || user.status === 'online')) {
-          derivedStatus = 'offline';
-        }
-        // If isPresenceReady is false, keep the DB status as-is (trust the server)
-        // If user.status is 'away' or 'busy', keep it -- these are explicit user choices
-      }
+      const derivedStatus = derivePresenceStatus(user, isOnline, isPresenceReady);
 
       return {
         ...user,
@@ -382,6 +367,7 @@ export function useUserPresence(currentUserId?: string) {
       avatarUrl: row.avatar_url ?? row.avatarUrl ?? '',
       status: row.status ?? 'offline',
       statusMessage: row.status_message ?? row.statusMessage ?? '',
+      lastActive: row.last_active ?? row.lastActive,
       currentSpaceId: row.current_space_id ?? row.currentSpaceId ?? null,
       avatarLoading: false,
       avatarError: false,
