@@ -1,90 +1,90 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repo.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Product Context
-Digital workspace: floor plans, rooms, presence, messaging, company mgmt. Next.js 15.3.0, React 19.1.0, Supabase, TypeScript.
+Virtual Office is a digital workspace with floor plans, rooms, presence, messaging, and company management. Built with Next.js 15.3.0, React 19.1.0, Supabase, and TypeScript.
 
 ## Core Principles
 
 ### Planning & Execution
-- **Plan mode** for non-trivial tasks (3+ steps, arch decisions). Plan before code.
-- Failed approach? **STOP, re-plan.** No pushing dead ends.
-- **Subagents** for research, exploration, parallel analysis. Keep main context clean.
+- Enter **plan mode** for any non-trivial task (3+ steps or architectural decisions). Write a plan before coding.
+- If something goes wrong, **STOP and re-plan immediately** — don't keep pushing failed approaches.
+- Use **subagents** frequently for research, exploration, and parallel analysis — keep the main context clean.
 
 ### Quality Standards
-- Don't guess. Verify. Unknown = say "I don't know."
-- Don't assume behavior — ask/provide tests.
-- **Root causes** only. No temp fixes. Senior-level standards.
-- Non-trivial changes: ask *"more elegant solution?"* — but don't over-engineer simple fixes.
-- Never mark complete without proof. Run tests, check logs, demonstrate.
-- Completion **user-gated**. Never say "done"/"fixed". Mark **Status: Pending user confirmation**.
+- Do not guess. Verify. If unknown, say "I don't know."
+- Do not assume code behavior — ask for or provide tests.
+- Find **root causes**. Avoid temporary fixes. Maintain senior-level standards.
+- For non-trivial changes, ask: *"Is there a more elegant solution?"* — but don't over-engineer simple fixes.
+- Never mark a task complete without proving it works. Run tests, check logs, demonstrate correctness.
+- Completion is **user-gated**. Never state "done" or "fixed". Mark **Status: Pending user confirmation**.
 
 ### Bug Fixing Protocol
-- Bug report? **DEBUG FIRST** — runtime evidence (logs, network, DB state).
-- No prod code edits until root cause confirmed with evidence.
-- "I think bug is X" ≠ proof. Prove with runtime data before fixes.
-- Fix CI failures autonomously. Zero user context switching.
+- When given a bug report: **DEBUG FIRST** with real runtime evidence (console logs, network requests, DB state).
+- Never edit production code until root cause is confirmed with evidence.
+- "I think the bug is X" is not enough — prove it with runtime data before proposing fixes.
+- Fix failing CI tests autonomously. Require zero context switching from the user.
 
 ### Anti-Duplication (execute before coding)
-- **CRITICAL**: Before ANY plan/implementation, verify feature doesn't already exist. No duplication.
-- Search for existing components/hooks/types. Reuse or extend if found.
-- Edit existing code > new files. New files only when no target exists.
+- **CRITICAL**: Before ANY plan or implementation, verify if feature already exists or partially exists. Do NOT duplicate features or functionality.
+- Search codebase for existing components/hooks/types that match intent. If found, reuse or extend.
+- Prefer edits to existing code over new files. New files only when no suitable target exists.
 
 ## Skill Usage — IMPORTANT
 
-Skills provide specialized capabilities. **Invoke when situation matches:**
+Installed skills provide specialized capabilities. **Invoke the relevant skill when the situation matches:**
 
 | Skill | When to Use |
 |-------|-------------|
-| `/presence-safety` | Mandatory safety: presence, realtime, space placement |
-| `/refactor-method-complexity-reduce` | **Hooks refactoring**, reduce complexity, untangle interdependent hooks, simplify nested logic |
-| `/codebase-cleanup-refactor-clean` | Large-scale cleanup, dead code removal, structural refactor across files |
-| `/supabase-realtime` | Writing/debugging **realtime subscriptions**, presence channels, broadcast, Supabase Realtime patterns |
-| `/react-best-practices` | After editing multiple TSX components — quality checklist: hooks, a11y, perf |
-| `/vercel-react-best-practices` | React/Next.js perf optimization, bundle size, data fetching |
-| `/nextjs-app-router-patterns` | Server Components, streaming, parallel routes, advanced App Router |
-| `/nextjs-supabase-auth` | Auth middleware, protected routes, Supabase Auth + Next.js |
-| `/supabase-postgres-best-practices` | SQL queries, schema design, RLS policies |
-| `/code-quality` | Correctness, avoid over-engineering, comment quality |
-| `/code-review-quality` | Thorough code reviews with confidence-based filtering |
-| `/simplify` | After changes — review reuse, quality, efficiency |
-| `/playwright-cli` | Browser automation: E2E tests, form filling, screenshots, web UI interaction |
-| `/web-design-guidelines` | UI a11y audit, UX review, design best practices |
+| `/presence-safety` | Mandatory safety guide for the Virtual Office presence, realtime, and space placement system. | 
+| `/refactor-method-complexity-reduce` | **Hooks refactoring**, reducing method complexity, untangling interdependent hooks, simplifying deeply nested logic |
+| `/codebase-cleanup-refactor-clean` | Large-scale cleanup, dead code removal, structural refactoring across multiple files |
+| `/supabase-realtime` | Writing or debugging **realtime subscriptions**, presence channels, broadcast, Supabase Realtime patterns |
+| `/react-best-practices` | After editing multiple TSX components — runs quality checklist for hooks, accessibility, performance |
+| `/vercel-react-best-practices` | React/Next.js performance optimization, bundle size, data fetching patterns |
+| `/nextjs-app-router-patterns` | Server Components, streaming, parallel routes, advanced App Router patterns |
+| `/nextjs-supabase-auth` | Auth middleware, protected routes, Supabase Auth + Next.js integration |
+| `/supabase-postgres-best-practices` | Writing/optimizing SQL queries, schema design, RLS policies |
+| `/code-quality` | General correctness rules, avoiding over-engineering, comment quality |
+| `/code-review-quality` | Conducting thorough code reviews with confidence-based filtering |
+| `/simplify` | After completing changes — review for reuse, quality, and efficiency |
+| `/playwright-cli` | Browser automation for E2E testing, form filling, screenshots, navigating pages, interacting with web UI |
+| `/web-design-guidelines` | UI accessibility audit, UX review, design best practices |
 
-**Proactive**: Don't wait. Refactoring hook → `/refactor-method-complexity-reduce`. Realtime code → `/supabase-realtime`. Edited components → `/react-best-practices`. Test UI flows → `/playwright-cli`.
+**Proactive skill usage**: Don't wait for the user to ask. If you're refactoring a complex hook, invoke `/refactor-method-complexity-reduce`. If you're writing realtime code, invoke `/supabase-realtime`. If you just edited multiple components, run `/react-best-practices`. If you need to test UI flows in a browser, invoke `/playwright-cli`.
 
 ## Architecture
 - Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
 - Runtime: React 19.1.0 / React DOM 19.1.0
-- Lang: TypeScript 5, strict
-- Data: Supabase Postgres + Realtime, RLS
-- Auth: Supabase Auth SSR (`@supabase/ssr` ^0.8.0)
+- Lang: TypeScript 5, strict mode
+- Data: Supabase Postgres + Realtime, RLS enabled
+- Auth: Supabase Auth with SSR (@supabase/ssr ^0.8.0)
 - UI: TailwindCSS 4.1.3, shadcn/ui, Radix
 - State: TanStack Query v5 + React Context
 - Tests: Vitest 4, Playwright, Testing Library
 
 ## Supabase & RLS (critical)
-- No browser Supabase client in API routes.
+- Never use the browser Supabase client in API routes.
 - Server code/API routes: `createSupabaseServerClient()` from `src/lib/supabase/server-client.ts`
 - Client Components only: `createSupabaseBrowserClient()` from `src/lib/supabase/browser-client.ts`
-- `auth.uid()` needs server context or RLS fails.
-- **NEVER** expose `SUPABASE_SERVICE_ROLE_KEY` to client. Server Actions/API Routes only.
+- `auth.uid()` requires server context; otherwise RLS fails.
+- **NEVER** expose `SUPABASE_SERVICE_ROLE_KEY` to the client. Only Server Actions/API Routes.
 
 ### getSession() vs getUser()
 | Context | Method | Why |
 |---------|--------|-----|
 | Server (API/Actions) | `getUser()` | Validates JWT on Auth server — **REQUIRED** |
-| Client (Browser) | `getSession()` | Fast, local storage |
-| Middleware | `getSession()` | Token refresh only |
+| Client (Browser) | `getSession()` | Fast, from local storage |
+| Middleware | `getSession()` | OK for token refresh only |
 
 ## Database — CRITICAL
 
-> **Source: `migrations/database-structure.md`** — ALWAYS verify table/column names before SQL. If outdated, `mcp_supabase_list_tables`.
+> **Authoritative source: `migrations/database-structure.md`** — ALWAYS verify table/column names before writing SQL. If outdated, use `mcp_supabase_list_tables` to refresh.
 
 ### User ID vs Supabase UID — #1 Source of Bugs
 
-`users` table has TWO ID fields:
+The `users` table has TWO ID fields:
 
 | Field | Type | Use For |
 |-------|------|---------|
@@ -111,41 +111,41 @@ Skills provide specialized capabilities. **Invoke when situation matches:**
 - `message_status`: sending, sent, delivered, read, failed
 
 ## Type Registry
-- Types in `src/types/`: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`
-- No new types if semantic equivalent exists. Extend existing.
-- Roles: `'admin' | 'member'` only. No additions.
+- Canonical types in `src/types/`: `auth.ts`, `common.ts`, `database.ts`, `messaging.ts`, `ui.ts`
+- Do not create new types if a semantic equivalent exists. Extend existing ones.
+- Allowed user roles: `'admin' | 'member'` only. Do not add roles.
 
 ## Code Rules
-- Strict TypeScript. Explicit types for props, state, params, returns.
-- Interfaces for object shapes. `type` for unions, function signatures.
-- Files < ~500 lines. Business logic → utilities/services, UI → components, data → repositories.
-- PascalCase: components/filenames. kebab-case: directories. camelCase: vars/functions. Hooks: `use-*.ts`.
-- Prefixes: `handle*` handlers, `is/has/can` booleans, `use*` hooks, `UPPER_SNAKE` env/constants.
-- Repository pattern: `src/repositories/`. Construct with **server** Supabase client in API routes.
-- Query hooks: `src/hooks/queries/`. Mutations: `src/hooks/mutations/`. Realtime: `src/hooks/realtime/`.
+- Strict TypeScript with explicit types for props, state, params, returns.
+- Interfaces for object shapes; `type` for unions and function signatures.
+- Files under ~500 lines. Business logic in utilities/services, UI in components, data in repositories.
+- PascalCase: components/filenames. kebab-case: directories. camelCase: variables/functions. Hooks: `use-*.ts`.
+- Prefix: `handle*` handlers, `is/has/can` booleans, `use*` hooks, `UPPER_SNAKE` env/constants.
+- Repository pattern in `src/repositories/`. Construct with **server** Supabase client in API routes.
+- Query hooks in `src/hooks/queries/`, mutations in `src/hooks/mutations/`, realtime in `src/hooks/realtime/`.
 
 ## Avatars
 - Canonical display: `EnhancedAvatarV2`. Canonical upload: `UploadableAvatar`.
 - All other avatar components are **deprecated**. Replace as you touch files.
 
 ## UI Interaction — Click-Stop Standard
-- `data-avatar-interactive` on interactive children (avatars, dropdown triggers, buttons in cards).
-- Parent click handlers: early-return if target `closest('[data-avatar-interactive]')` or `closest('a, button, [role="button"], [data-space-action]')`.
+- Add `data-avatar-interactive` to interactive children (avatars, dropdown triggers, buttons in cards).
+- Parent clickable containers must early-return if target `closest('[data-avatar-interactive]')` or `closest('a, button, [role="button"], [data-space-action]')`.
 - Portal menus (Radix/shadcn): stop propagation on `onPointerDown`, `onClick`, `onKeyDown` on DropdownMenuContent.
-- Avatar/menu wrappers: stop propagation to prevent space navigation during messaging interactions.
+- Avatar/menu wrappers must stop propagation to prevent space navigation on messaging interactions.
 
 ## Build & Lint
 - Dev: `npm run dev` | Build: `npm run build` | Lint: `npm run lint` | Types: `npm run type-check`
-- New files must live in existing feature folders. No new top-level directories.
+- New files must live in existing feature folders. Do not add new top-level directories.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
 
 ## Golden Rule
 
-**Prefix all commands with `rtk`**. Dedicated filter if available, passthrough if not. Always safe.
+**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
 
-**Important**: Command chains with `&&` need `rtk` on each:
+**Important**: Even in command chains with `&&`, use `rtk`:
 ```bash
 # ❌ Wrong
 git add . && git commit -m "msg" && git push
@@ -196,7 +196,7 @@ rtk git stash           # Compact stash
 rtk git worktree        # Compact worktree
 ```
 
-Git passthrough works for ALL subcommands, even unlisted ones.
+Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
 
 ### GitHub (26-87% savings)
 ```bash
@@ -274,5 +274,5 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 | Infrastructure | docker, kubectl | 85% |
 | Network | curl, wget | 65-70% |
 
-Overall: **60-90% token reduction** on dev operations.
+Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->
