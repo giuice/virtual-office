@@ -7,7 +7,7 @@
         "bash": "PRESENCE_GUARD_HOST=copilot bash .agents/hooks/presence-guard.sh",
         "cwd": ".",
         "timeoutSec": 5,
-        "matcher": "edit|create"
+        "matcher": "Edit|Write|MultiEdit|edit|create"
       }
     ]
   }
