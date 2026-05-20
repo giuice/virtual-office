@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); PRESENCE_GUARD_HOST=codex bash \"$ROOT/.agents/hooks/presence-guard.sh\"'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

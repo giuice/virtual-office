@@ -12,7 +12,6 @@
 		"**/coverage": true,
 		"**/playwright-report": true,
 		"**/test-results": true,
-		"**/.planning": true,
 		"**/_bmad-output": true,
 		"**/presence-safety-workspace": true,
 		"**/temp": true
@@ -24,7 +23,6 @@
 		"**/coverage": true,
 		"**/playwright-report": true,
 		"**/test-results": true,
-		"**/.planning": true,
 		"**/_bmad-output": true,
 		"**/presence-safety-workspace": true,
 		"**/temp": true
@@ -39,7 +37,6 @@
 		"**/coverage/**": true,
 		"**/playwright-report/**": true,
 		"**/test-results/**": true,
-		"**/.planning/**": true,
 		"**/_bmad-output/**": true,
 		"**/presence-safety-workspace/**": true,
 		"**/temp/**": true

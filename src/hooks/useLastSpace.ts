@@ -31,6 +31,10 @@ interface LastSpaceUser {
   currentSpaceId: string | null;
 }
 
+interface SaveLastSpaceOptions {
+  markManualChange?: boolean;
+}
+
 const JOINABLE_STATUSES = new Set(['active', 'available', 'in_use']);
 
 function isJoinableSpace(space: Space): boolean {
@@ -179,6 +183,20 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     }
   }, []);
 
+  const saveLastSpace = useCallback((spaceId: string, options: SaveLastSpaceOptions = {}) => {
+    const { markManualChange = true } = options;
+
+    if (markManualChange) {
+      // Signal that this is a manual space change — the auto-placement effect
+      // must skip its next run so it doesn't overwrite the user's click with
+      // the home/default space. The API call is handled separately by
+      // PresenceContext.updateLocation (called from ModernFloorPlan).
+      manualChangeRef.current = true;
+    }
+
+    setLastSpaceId(spaceId);
+  }, [setLastSpaceId]);
+
   const saveDisconnectTimestamp = useCallback(() => {
     if (typeof window !== 'undefined' && (currentUser?.currentSpaceId || lastSpaceId)) {
       window.localStorage.setItem(DISCONNECT_TS_KEY, Date.now().toString());
@@ -221,7 +239,9 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
           console.log('[useLastSpace] API call succeeded, placing user in space:', targetSpaceId);
           const updateKey = `${userId}-${targetSpaceId}`;
           lastUpdateRef.current = updateKey;
-          setLastSpaceId(targetSpaceId);
+          // Automatic placements also need lastSpaceId persistence for grace rejoin,
+          // but must not trip the manual-change guard that protects user clicks.
+          saveLastSpace(targetSpaceId, { markManualChange: false });
           setRejoinAttempts(0);
           clearDisconnectTimestamp();
 
@@ -321,7 +341,8 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     company,
     currentUser,
     markFirstLoginComplete,
-    setLastSpaceId,
+    queryClient,
+    saveLastSpace,
     spaces,
   ]);
 
@@ -380,7 +401,7 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     if (currentUser.currentSpaceId === context.spaceId) {
       console.log('[useLastSpace] Already in target space, setting updateKey only');
       lastUpdateRef.current = updateKey;
-      setLastSpaceId(context.spaceId);
+      saveLastSpace(context.spaceId, { markManualChange: false });
       if (context.type === 'first-time') {
         markFirstLoginComplete();
       }
@@ -405,18 +426,10 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     isRejoinInProgress,
     lastSpaceId,
     markFirstLoginComplete,
+    saveLastSpace,
     spaces,
     updateUserLocation,
   ]);
-
-  const saveLastSpace = useCallback((spaceId: string) => {
-    // Signal that this is a manual space change — the auto-placement effect
-    // must skip its next run so it doesn't overwrite the user's click with
-    // the home/default space. The API call is handled separately by
-    // PresenceContext.updateLocation (called from ModernFloorPlan).
-    manualChangeRef.current = true;
-    setLastSpaceId(spaceId);
-  }, [setLastSpaceId]);
 
   const clearLastSpace = useCallback(() => {
     saveDisconnectTimestamp();

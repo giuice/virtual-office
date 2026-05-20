@@ -142,7 +142,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | FLOR-01 | Phase 2 | Complete |
 | FLOR-02 | Phase 2 | Complete |
 | FLOR-03 | Phase 2 | Complete |
-| FLOR-04 | Phase 2 | Complete |
+| FLOR-04 | Phase 2 + 2.1 | Complete |
 | VID-01 | Phase 3 | Pending |
 | VID-02 | Phase 3 | Pending |
 | VID-03 | Phase 3 | Pending |

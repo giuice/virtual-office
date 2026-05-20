@@ -70,6 +70,7 @@ export interface UserPresenceData {
   status?: 'online' | 'away' | 'busy' | 'offline';
   statusMessage?: string;
   isOnline?: boolean;
+  lastActive?: TimeStampType;
   currentSpaceId: string | null;
   // Added flag to track avatar loading state
   avatarLoading?: boolean;
