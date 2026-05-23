@@ -2,20 +2,21 @@
 name: presence-safety
 description: >
   Mandatory safety guide for the Virtual Office presence, realtime, and space placement system.
-  This skill MUST be consulted before making ANY changes to presence hooks, realtime subscriptions,
-  space placement logic, user location APIs, floor plan components, or beacon/disconnect handling.
-  Use when: editing useUserPresence, useLastSpace, PresenceContext, location/route.ts,
-  ModernFloorPlan, floor-plan.tsx, usersInSpaces, presenceAwareUsers, or any code involving
-  current_space_id, sendBeacon, Realtime presence channels, space placement, reconnection logic,
-  or online/offline status derivation. Also use when debugging avatar disappearance, ghost users
-  in spaces, double API calls, or snap-back-to-home-space bugs.
+  This skill MUST be consulted for any change in the presence/space subsystem.
+  Use when editing: useUserPresence, useLastSpace, PresenceContext, location/route.ts,
+  ModernFloorPlan, floor-plan.tsx, usersInSpaces, or presenceAwareUsers.
+  Also use for code involving current_space_id, sendBeacon, Realtime presence channels,
+  reconnection logic, or online/offline derivation, and when debugging avatar disappearance,
+  ghost users in spaces, double API calls, or snap-back-to-home-space bugs.
   Even if the change looks small, consult this skill -- the system has 4 interacting sources of truth
   and every past "simple fix" has created cascading regressions.
 ---
 
 # Presence & Space System Safety Guide
 
-This system has 4 interacting sources of truth and tightly coupled hooks. A week of debugging produced these rules. Violating any one of them WILL cause regressions that are hard to diagnose.
+This guide is organized so each section can be applied independently.
+Use this guide section-by-section (you usually need only the section tied to your change).
+Violating the safety rules below WILL cause regressions that are hard to diagnose.
 
 **Read this ENTIRE document before writing any code. Do not skim.**
 
@@ -47,6 +48,19 @@ Understanding who does what prevents the most common bug: duplicate API calls.
 | `CompanyContext.currentUserProfile` | `src/contexts/CompanyContext.tsx` | Initial user profile from DB (loaded once) | Be treated as live/reactive state |
 | `presenceAwareUsers` | `src/hooks/useUserPresence.ts` | Derive online/offline from Realtime presence state | Mutate DB or query cache directly |
 | `usersInSpaces` | `src/hooks/useUserPresence.ts` | Map users to space buckets for rendering | Include offline users (except current user) |
+
+### API Call Decision Steps (use this sequence)
+
+1. **Manual click on a space card?**
+  - Call `ModernFloorPlan.handleEnterSpace(spaceId)`.
+2. **Need to move user from that click?**
+  - Call `safeUpdateLocation(spaceId)` exactly once.
+3. **Updating UI selection state after move?**
+  - Use `FloorPlan.handleSpaceSelect` for UI state only.
+4. **Persisting last selected space?**
+  - Use `saveLastSpace(space.id)` (localStorage only, no API).
+5. **Automatic placement/rejoin (not manual click)?**
+  - `useLastSpace.updateUserLocation` may call `/api/users/location` as the only direct exception.
 
 ---
 

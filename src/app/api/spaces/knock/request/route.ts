@@ -67,7 +67,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('current_space_id', spaceId)
-      .neq('id', requester.id);
+      .neq('id', requester.id)
+      .neq('status', 'offline');
 
     if (recipientsError) {
       return NextResponse.json({ error: 'Failed to determine knock recipients' }, { status: 500 });
