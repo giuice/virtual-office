@@ -177,6 +177,13 @@ describe('KnockBanner', () => {
 
     expect(parentClick).not.toHaveBeenCalled();
   });
+
+  it('has relative positioning with positive z-index to stay above overlaying badges', () => {
+    render(<KnockBanner requesterName="Taylor Knock" onApprove={vi.fn()} onDeny={vi.fn()} />);
+
+    const banner = screen.getByRole('alert');
+    expect(banner).toHaveClass('relative', 'z-10');
+  });
 });
 
 describe('ModernSpaceCard - Knock Button', () => {

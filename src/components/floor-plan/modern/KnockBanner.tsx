@@ -37,7 +37,7 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg border',
+        'relative z-10 flex items-center gap-3 p-3 rounded-lg border',
         'bg-[var(--vo-signal-success)]/10 border-[var(--vo-signal-success)]/30',
         'animate-in slide-in-from-top-2 duration-300 motion-reduce:animate-none'
       )}
