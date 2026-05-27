@@ -164,6 +164,7 @@ function makeAuthenticatedUser(overrides: Partial<User> = {}): User {
 
 function primeRestrictedSpace(options: {
   currentSpaceId?: string | null;
+  accessControl?: Record<string, unknown>;
   approvedKnock?: { id: string; responder_id: string | null } | null;
   priorExitAt?: string | null;
   lastActive?: string;
@@ -171,6 +172,7 @@ function primeRestrictedSpace(options: {
 } = {}) {
   const {
     currentSpaceId = null,
+    accessControl = { isPublic: false },
     approvedKnock = null,
     priorExitAt = null,
     lastActive = '2026-03-19T10:00:00.000Z',
@@ -188,7 +190,7 @@ function primeRestrictedSpace(options: {
       company_id: COMPANY_ID,
       status: 'active',
       capacity: 10,
-      access_control: { isPublic: false },
+      access_control: accessControl,
     },
     error: null,
   });
@@ -276,6 +278,37 @@ describe('/api/users/location', () => {
         authorized_by: RESPONDER_ID,
       })
     );
+  });
+
+  it('allows direct restricted-space entry when access rules allow the user and no online occupants are present', async () => {
+    primeRestrictedSpace({
+      accessControl: { isPublic: false, allowedUsers: [APP_USER_ID] },
+    });
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+    expect(mockPresenceInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: APP_USER_ID,
+        space_id: SPACE_ID,
+        authorized_by: null,
+      })
+    );
+  });
+
+  it('keeps restricted empty spaces locked when access rules do not allow the user', async () => {
+    primeRestrictedSpace();
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.code).toBe('SPACE_ACCESS_DENIED');
+    expect(mockUpdateLocation).not.toHaveBeenCalled();
   });
 
   it('allows restricted-space grace rejoin when the latest matching space_presence_log.exited_at is within 5 minutes', async () => {

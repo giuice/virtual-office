@@ -101,7 +101,7 @@ if (user.status === 'offline' && user.id !== currentUserId) return;
 // Always include current user (may briefly be 'offline' before presence sync)
 ```
 
-**Also applies server-side:** Capacity checks must exclude offline users (`.neq('status', 'offline')`).
+**Also applies server-side:** Capacity checks and knock recipient/responder checks must exclude offline users (`.neq('status', 'offline')` or equivalent route guard).
 
 ### Rule 4: The `manualChangeRef` guard is sacred
 

@@ -68,6 +68,7 @@ export interface UserPresenceData {
   displayName: string;
   avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
+  dbStatus?: UserStatus;
   statusMessage?: string;
   isOnline?: boolean;
   lastActive?: TimeStampType;

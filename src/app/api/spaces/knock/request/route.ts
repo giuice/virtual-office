@@ -76,6 +76,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const recipientCount = count ?? 0;
 
+    if (recipientCount === 0) {
+      return NextResponse.json(
+        {
+          error: 'No one is available to answer in this space',
+          code: 'NO_KNOCK_RECIPIENTS',
+          recipientCount,
+        },
+        { status: 409 }
+      );
+    }
+
     // Clean up old expired/stale knock requests for this space (older than 2 minutes)
     const { error: cleanupError } = await supabaseAdmin
       .from('knock_requests')

@@ -298,17 +298,13 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         });
 
         activeKnockRequestIdRef.current = requestId;
-        if (recipientCount <= 0) {
-          toast.info('Knocking...', {
-            description: 'No occupants detected in this space yet.',
-            duration: 5000,
-          });
-        } else {
-          toast.info('Knocking...', {
-            description: `Waiting for response from ${recipientCount} occupant${recipientCount > 1 ? 's' : ''}.`,
-            duration: 5000,
-          });
-        }
+        toast.info('Knocking...', {
+          description:
+            recipientCount > 0
+              ? `Waiting for response from ${recipientCount} occupant${recipientCount > 1 ? 's' : ''}.`
+              : 'Waiting for a response from occupants in this space.',
+          duration: 5000,
+        });
       } catch (requestError) {
         activeKnockRequestIdRef.current = null;
         activeKnockSpaceIdRef.current = null;
@@ -372,6 +368,24 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     return false;
   };
 
+  const hasSpaceAccess = useCallback((space: Space): boolean => {
+    if (!currentUserProfile?.id) {
+      return false;
+    }
+
+    const accessControl = space.accessControl;
+    if (accessControl?.isPublic !== false) {
+      return true;
+    }
+
+    return Boolean(
+      isAdmin ||
+      accessControl.ownerId === currentUserProfile.id ||
+      accessControl.allowedUsers?.includes(currentUserProfile.id) ||
+      (currentUserProfile.role && accessControl.allowedRoles?.includes(currentUserProfile.role))
+    );
+  }, [currentUserProfile?.id, currentUserProfile?.role, isAdmin]);
+
   const handleEnterSpace = async (spaceId: string, options?: { allowPrivateBypass?: boolean }) => {
     try {
       if (!currentUserProfile?.id) {
@@ -385,7 +399,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
 
       // Space validation checks
       // Story 3.12 - AC3: Client-side check for full capacity
-      if (selectedSpace.capacity && (usersInSpaces.get(spaceId)?.length || 0) >= selectedSpace.capacity) {
+      const activeOccupantCount = (usersInSpaces.get(spaceId) || []).filter(
+        (user) => user.id !== currentUserProfile.id && user.status !== 'offline'
+      ).length;
+
+      if (selectedSpace.capacity && activeOccupantCount >= selectedSpace.capacity) {
         setError('Cannot join - space is full');
         return;
       }
@@ -399,10 +417,22 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       const isRestrictedSpace = selectedSpace.accessControl?.isPublic === false;
       const hasApprovedKnock = approvedKnockSpaceIdRef.current === spaceId;
       const isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;
-      const canDirectEnter = Boolean(isAdmin || options?.allowPrivateBypass || hasApprovedKnock || isAlreadyInSpace);
+      const canDirectEnter = Boolean(
+        hasSpaceAccess(selectedSpace) ||
+        options?.allowPrivateBypass ||
+        hasApprovedKnock ||
+        isAlreadyInSpace
+      );
 
       if (isRestrictedSpace && !canDirectEnter) {
-        setError('This space is private. Please knock to request access.');
+        const hasOnlineResponder = (usersInSpaces.get(spaceId) || []).some(
+          (user) => user.id !== currentUserProfile.id && user.status !== 'offline'
+        );
+        setError(
+          hasOnlineResponder
+            ? 'This space is private. Please knock to request access.'
+            : 'This private space is locked and no one is available to grant access.'
+        );
         return;
       }
 
@@ -505,8 +535,15 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           const isHighlighted = highlightedSpaceId === space.id;
           const userInSpace = isUserInSpace(space);
           const isRestrictedSpace = space.accessControl?.isPublic === false;
-          const hasOccupants = spaceUsers.length > 0;
-          const canKnock = isRestrictedSpace || hasOccupants;
+          const hasOnlineResponder = spaceUsers.some(
+            (user) => user.id !== currentUserProfile?.id && user.status !== 'offline'
+          );
+          const canDirectEnter = Boolean(
+            hasSpaceAccess(space) ||
+            userInSpace ||
+            approvedKnockSpaceIdRef.current === space.id
+          );
+          const canKnock = isRestrictedSpace && !canDirectEnter && hasOnlineResponder;
           const cooldownRemaining = knock.getCooldownRemaining(space.id);
           const knockStatus = cooldownRemaining > 0
             ? 'cooldown'
@@ -532,7 +569,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
               variant={perspective}
               speakingUserIds={currentSpeakingIds}
               mutedUserIds={Array.from(mutedUserIds)}
-              canDirectEnter={isAdmin || userInSpace || !isRestrictedSpace || approvedKnockSpaceIdRef.current === space.id}
+              canDirectEnter={canDirectEnter}
               pendingKnockRequest={pendingKnockRequests.get(space.id) || null}
               onKnockApprove={handleBannerApprove}
               onKnockDeny={handleBannerDeny}

@@ -142,6 +142,7 @@ export function useUserPresence(currentUserId?: string) {
 
       return {
         ...user,
+        dbStatus: user.status,
         status: derivedStatus,
         isOnline,
       };

@@ -15,6 +15,9 @@ const SPACE_REJOIN_GRACE_MS = 5 * 60 * 1000;
 
 interface SpaceAccessControl {
   isPublic?: boolean;
+  allowedUsers?: string[];
+  allowedRoles?: string[];
+  ownerId?: string;
 }
 
 interface SpaceRow {
@@ -32,6 +35,19 @@ interface KnockAuthorizationRow {
 
 interface PriorOccupancyRow {
   exited_at: string;
+}
+
+function userHasDirectSpaceAccess(user: User, accessControl: SpaceAccessControl | null): boolean {
+  if (accessControl?.isPublic !== false) {
+    return true;
+  }
+
+  return Boolean(
+    user.role === 'admin' ||
+    accessControl.ownerId === user.id ||
+    accessControl.allowedUsers?.includes(user.id) ||
+    (user.role && accessControl.allowedRoles?.includes(user.role))
+  );
 }
 
 async function parseLocationBody(request: Request) {
@@ -236,10 +252,9 @@ async function enforceSpaceAuthorization(params: {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
-  const isAdmin = authenticatedUser.role === 'admin';
   const isAlreadyInSpace = authenticatedUser.currentSpaceId === spaceId;
 
-  if (isAdmin || isAlreadyInSpace) {
+  if (userHasDirectSpaceAccess(authenticatedUser, targetSpace.access_control) || isAlreadyInSpace) {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
@@ -393,6 +408,18 @@ async function handleLocationUpdate(request: Request) {
       return NextResponse.json({ error: 'Failed to update user location' }, { status: 500 });
     }
 
+    // Reload beacons mark users offline while preserving current_space_id. Reconnect
+    // refreshes liveness in DB so server-side knock/responder checks stay accurate.
+    let responseUser = updatedUser;
+    if (spaceId && authenticatedUser.status === 'offline') {
+      const reactivatedUser = await userRepository.update(authenticatedUser.id, {
+        status: 'online',
+      });
+      if (reactivatedUser) {
+        responseUser = reactivatedUser;
+      }
+    }
+
     if (spaceChanged) {
       await syncSpacePresenceLog({
         supabase: supabaseAdmin,
@@ -417,7 +444,7 @@ async function handleLocationUpdate(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user: updatedUser,
+      user: responseUser,
       message: 'Location updated successfully',
     }, { status: 200 });
 

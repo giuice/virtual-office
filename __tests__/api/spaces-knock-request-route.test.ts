@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/spaces/knock/request/route';
+import type { NextRequest } from 'next/server';
 
 const AUTH_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -11,6 +12,8 @@ const mockAuthGetUser = vi.fn();
 const mockFindBySupabaseUid = vi.fn();
 const mockSpaceMaybeSingle = vi.fn();
 const mockUsersCount = vi.fn();
+const mockUsersEq = vi.fn();
+const mockUsersNeq = vi.fn();
 const mockCleanupLt = vi.fn();
 const mockKnockInsert = vi.fn();
 
@@ -32,15 +35,25 @@ const mockAdminFrom = vi.fn((table: string) => {
   }
 
   if (table === 'users') {
-    return {
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          neq: vi.fn(() => ({
-            neq: vi.fn(() => mockUsersCount()),
-          })),
-        })),
-      })),
+    const query: {
+      select: ReturnType<typeof vi.fn>;
+      eq: ReturnType<typeof vi.fn>;
+      neq: ReturnType<typeof vi.fn>;
+      then: (resolve: (value: unknown) => void, reject: (reason?: unknown) => void) => Promise<void>;
+    } = {
+      select: vi.fn(() => query),
+      eq: vi.fn((column: string, value: unknown) => {
+        mockUsersEq(column, value);
+        return query;
+      }),
+      neq: vi.fn((column: string, value: unknown) => {
+        mockUsersNeq(column, value);
+        return query;
+      }),
+      then: (resolve, reject) => mockUsersCount().then(resolve, reject),
     };
+
+    return query;
   }
 
   if (table === 'knock_requests') {
@@ -82,7 +95,7 @@ function createRequest(body: object) {
     method: 'POST',
     headers: new Headers({ 'Content-Type': 'application/json' }),
     json: vi.fn().mockResolvedValue(body),
-  } as unknown as Request;
+  } as unknown as NextRequest;
 }
 
 async function postKnock(body: object): Promise<Response> {
@@ -123,6 +136,9 @@ describe('/api/spaces/knock/request', () => {
 
     expect(response.status).toBe(200);
     expect(data.recipientCount).toBe(1);
+    expect(mockUsersEq).toHaveBeenCalledWith('current_space_id', SPACE_ID);
+    expect(mockUsersNeq).toHaveBeenCalledWith('id', APP_USER_ID);
+    expect(mockUsersNeq).toHaveBeenCalledWith('status', 'offline');
     expect(mockUsersCount).toHaveBeenCalledTimes(1);
     expect(mockKnockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -134,19 +150,28 @@ describe('/api/spaces/knock/request', () => {
     );
   });
 
-  it('returns zero recipients when only offline occupants remain in the space', async () => {
+  it('rejects knock when there are no online recipients', async () => {
     mockUsersCount.mockResolvedValueOnce({ count: 0, error: null });
 
     const response = await postKnock({
       spaceId: SPACE_ID,
       requestId: REQUEST_ID,
       requesterName: 'Taylor Knocker',
+      requesterAvatarUrl: 'https://example.com/avatar.png',
     });
     const data = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(409);
+    expect(data).toEqual({
+      error: 'No one is available to answer in this space',
+      code: 'NO_KNOCK_RECIPIENTS',
+      recipientCount: 0,
+    });
     expect(data.recipientCount).toBe(0);
+    expect(mockUsersEq).toHaveBeenCalledWith('current_space_id', SPACE_ID);
+    expect(mockUsersNeq).toHaveBeenCalledWith('status', 'offline');
     expect(mockUsersCount).toHaveBeenCalledTimes(1);
-    expect(mockKnockInsert).toHaveBeenCalledTimes(1);
+    expect(mockCleanupLt).not.toHaveBeenCalled();
+    expect(mockKnockInsert).not.toHaveBeenCalled();
   });
 });

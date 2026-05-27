@@ -29,6 +29,7 @@ interface LocationUpdateOptions {
 interface LastSpaceUser {
   id: string;
   currentSpaceId: string | null;
+  dbStatus?: UserPresenceData['dbStatus'];
 }
 
 interface SaveLastSpaceOptions {
@@ -392,13 +393,26 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
       return;
     }
 
-    const updateKey = `${currentUser.id}-${context.spaceId}`;
-    if (lastUpdateRef.current === updateKey) {
-      console.log('[useLastSpace] Skipped: already updated with this key');
+    if (currentUser.dbStatus === 'offline' && currentUser.currentSpaceId) {
+      const currentSpace = spaces.find((space) => space.id === currentUser.currentSpaceId);
+      console.log('[useLastSpace] Refreshing stale offline status in current DB space', {
+        currentSpaceId: currentUser.currentSpaceId,
+        targetSpaceId: context.spaceId,
+      });
+      void updateUserLocation(currentUser.id, currentUser.currentSpaceId, {
+        contextType: context.type,
+        spaceName: currentSpace?.name,
+      });
       return;
     }
 
     if (currentUser.currentSpaceId === context.spaceId) {
+      const updateKey = `${currentUser.id}-${context.spaceId}`;
+      if (lastUpdateRef.current === updateKey) {
+        console.log('[useLastSpace] Skipped: already updated with this key');
+        return;
+      }
+
       console.log('[useLastSpace] Already in target space, setting updateKey only');
       lastUpdateRef.current = updateKey;
       saveLastSpace(context.spaceId, { markManualChange: false });
@@ -406,6 +420,12 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
         markFirstLoginComplete();
       }
       clearDisconnectTimestamp();
+      return;
+    }
+
+    const updateKey = `${currentUser.id}-${context.spaceId}`;
+    if (lastUpdateRef.current === updateKey) {
+      console.log('[useLastSpace] Skipped: already updated with this key');
       return;
     }
 

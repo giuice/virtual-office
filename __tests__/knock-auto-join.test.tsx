@@ -97,18 +97,24 @@ vi.mock('@/hooks/realtime/useKnockSignaling', () => ({
 vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
   default: ({
     space,
+    onEnterSpace,
     onKnock,
+    canDirectEnter,
     pendingKnockRequest,
     onKnockApprove,
     onKnockDeny,
   }: {
     space: Space;
+    onEnterSpace: (spaceId: string) => void;
     onKnock?: (spaceId: string) => void;
+    canDirectEnter?: boolean;
     pendingKnockRequest?: KnockRequestPayload | null;
     onKnockApprove?: (payload: KnockRequestPayload) => void;
     onKnockDeny?: (payload: KnockRequestPayload) => void;
   }) => (
     <div data-testid={`space-${space.id}`}>
+      <div data-testid={`space-state-${space.id}`}>{`direct:${Boolean(canDirectEnter)} knock:${Boolean(onKnock)}`}</div>
+      <button type="button" onClick={() => onEnterSpace(space.id)}>Enter {space.name}</button>
       <button type="button" onClick={() => onKnock?.(space.id)}>Knock {space.name}</button>
       {pendingKnockRequest && (
         <div role="alert">
@@ -211,6 +217,11 @@ describe('Knock Auto-Join Flow', () => {
     mocks.sendKnockRequest.mockResolvedValue({ requestId: 'request-1', recipientCount: 1 });
     mocks.respondToKnock.mockResolvedValue(undefined);
     mocks.updateLocation.mockResolvedValue(undefined);
+    currentUser.role = 'member';
+    space.capacity = 4;
+    space.accessControl = { isPublic: false };
+    usersInSpaces.clear();
+    usersInSpaces.set(space.id, [{ ...currentUserPresence, id: 'occupant-1', displayName: 'Morgan Occupant', currentSpaceId: space.id }]);
   });
 
   it('auto-joins space when knock is approved', async () => {
@@ -266,6 +277,19 @@ describe('Knock Auto-Join Flow', () => {
     expect(mocks.toast).toHaveBeenCalledWith('No one responded. Try again later.');
   });
 
+  it('resets knock state when the server rejects a zero-recipient knock', async () => {
+    mocks.sendKnockRequest.mockRejectedValueOnce(new Error('No one is available to answer in this space'));
+
+    renderPlan();
+    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
+    expect(mocks.reset).toHaveBeenCalledTimes(1);
+    expect(mocks.toast.error).toHaveBeenCalledWith('Failed to send knock request', {
+      description: 'No one is available to answer in this space',
+    });
+  });
+
   it('starts 60-second cooldown after denial', async () => {
     mocks.knockState.status = 'knocking';
     mocks.knockState.targetSpaceId = 'space-1';
@@ -317,5 +341,68 @@ describe('Knock Auto-Join Flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
 
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('does not make a private space knockable when only a stale offline occupant exists', () => {
+    usersInSpaces.set(space.id, [
+      {
+        ...currentUserPresence,
+        id: 'offline-occupant-1',
+        displayName: 'Offline Occupant',
+        currentSpaceId: space.id,
+        status: 'offline',
+      },
+    ]);
+    renderPlan();
+
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+
+    expect(mocks.sendKnockRequest).not.toHaveBeenCalled();
+    expect(mocks.knock).not.toHaveBeenCalled();
+  });
+
+  it('allows direct entry to an empty private space when access rules allow the user', async () => {
+    usersInSpaces.clear();
+    space.accessControl = { isPublic: false, allowedUsers: [currentUser.id] };
+    renderPlan();
+
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:true knock:false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
+
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
+    expect(mocks.sendKnockRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not count stale offline occupants against client-side capacity', async () => {
+    space.capacity = 1;
+    space.accessControl = { isPublic: false, allowedUsers: [currentUser.id] };
+    usersInSpaces.set(space.id, [
+      {
+        ...currentUserPresence,
+        id: 'offline-occupant-1',
+        displayName: 'Offline Occupant',
+        currentSpaceId: space.id,
+        status: 'offline',
+      },
+    ]);
+
+    renderPlan();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
+
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
+  });
+
+  it('allows knock when an online responder is present and direct access is not allowed', async () => {
+    renderPlan();
+
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
   });
 });
