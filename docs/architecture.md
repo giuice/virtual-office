@@ -10,12 +10,12 @@
 
 ## Executive Summary
 
-Virtual Office has established a solid technical foundation through Epics 1-4, implementing Next.js 15, React 19, Supabase, and the Repository Pattern. The architecture demonstrates excellent patterns in authentication, hooks, repositories, and data access. This review validates existing decisions, identifies integration points for pending Epics 5-9, and provides recommendations for scaling from MVP (4 epics complete) to full feature set (9 epics).
+Virtual Office has strong tech base from Epics 1-4: Next.js 15, React 19, Supabase, Repository Pattern. Auth, hooks, repos, data access patterns solid. Review confirms current choices, marks integration points for Epics 5-9, and guides scale from MVP (4 epics done) to full set (9 epics).
 
-**Current State:** ✅ Production-ready foundation with messaging, floor plans, auth, and company management  
-**Next Phase:** Integration of AI features, video/audio, and admin analytics  
-**Key Strength:** Clean separation of concerns with Repository Pattern  
-**Key Risk:** AI costs and WebRTC complexity require careful planning
+**Current State:** ✅ Prod-ready base: messaging, floor plans, auth, company management  
+**Next Phase:** Add AI, video/audio, admin analytics  
+**Key Strength:** Clean separation via Repository Pattern  
+**Key Risk:** AI costs + WebRTC complexity need tight plan
 
 ---
 
@@ -36,65 +36,65 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 ### Foundation (Epics 1-2): ✅ EXCELLENT
 
 **Completed Components:**
-- Next.js 15.3.0 with App Router and React 19.1.0
-- TypeScript 5 (strict mode) throughout
+- Next.js 15.3.0 with App Router + React 19.1.0
+- TypeScript 5 strict mode everywhere
 - Supabase PostgreSQL with Row-Level Security (RLS)
 - Supabase Auth with SSR (@supabase/ssr ^0.8.0)
-- Repository Pattern with interfaces and implementations
-- Multi-tenancy via company-based data isolation
+- Repository Pattern with interfaces + implementations
+- Multi-tenancy through company data isolation
 
 **Strengths:**
-1. **Repository Pattern**: Clean abstraction between data access and business logic
+1. **Repository Pattern**: Clean split between data access + business logic
    - Interfaces in `src/repositories/interfaces/`
    - Supabase implementations in `src/repositories/implementations/supabase/`
-   - Easy to test and swap data sources
-2. **RLS Enforcement**: All database access uses server-side Supabase client
+   - Easy tests, easy data-source swap
+2. **RLS Enforcement**: All DB access uses server-side Supabase client
    - `src/lib/supabase/server-client.ts` in API routes
    - `src/lib/supabase/browser-client.ts` in Client Components
    - `auth.uid()` context preserved for RLS policies
-3. **Type Safety**: Comprehensive TypeScript types in `src/types/`
+3. **Type Safety**: Full TypeScript types in `src/types/`
    - `auth.ts`, `database.ts`, `messaging.ts`, `common.ts`, `ui.ts`
-   - Prevents type mismatches across 85-120 story implementation
-4. **Authentication Architecture**: ✅ Exemplary (zero duplicates, per system audit)
+   - Prevents mismatches across 85-120 stories
+4. **Authentication Architecture**: ✅ Exemplary; zero duplicates per audit
    - `src/lib/auth/` utilities
    - `src/contexts/AuthContext.tsx`
    - SSR-compatible flows with middleware
 
-**Assessment:** Foundation is production-ready and scalable to 10,000+ DAU target.
+**Assessment:** Foundation prod-ready, scalable to 10,000+ DAU target.
 
 ---
 
 ### Messaging & Floor Plan (Epics 3-4): �� FUNCTIONAL, NEEDS POLISH
 
-**Epic 3 Status:** Basic floor plan complete; 12 UX stories pending (visual design, occupancy viz, templates)
+**Epic 3 Status:** Basic floor plan done; 12 UX stories pending: visual design, occupancy viz, templates.
 
-**Epic 4A Status:** In Progress (Timeline & Composer features)
-- ✅ Foundation (Tasks 1.0 + 2.0): Data contracts, repositories, APIs, drawer shell, conversation grouping
-- 🚧 Tasks 2.5 + 3.0: Timeline UI (replies, reactions, pins), attachments, voice notes, search
+**Epic 4A Status:** In progress (Timeline & Composer)
+- ✅ Foundation (Tasks 1.0 + 2.0): data contracts, repos, APIs, drawer shell, conversation grouping
+- 🚧 Tasks 2.5 + 3.0: timeline UI (replies, reactions, pins), attachments, voice notes, search
 
-**Epic 4B Status:** Planned (Resilience & Scale features)
-- ⏳ Tasks 4.0 + 5.0: Offline queue, reconnection, polling fallback, analytics, notifications
+**Epic 4B Status:** Planned (Resilience & Scale)
+- ⏳ Tasks 4.0 + 5.0: offline queue, reconnect, polling fallback, analytics, notifications
 
 **Strengths:**
-1. **Hooks Organization**: ✅ Excellent (per system audit)
-   - `src/hooks/queries/` for TanStack Query data fetching
-   - `src/hooks/mutations/` for data modifications
+1. **Hooks Organization**: ✅ Excellent per audit
+   - `src/hooks/queries/` for TanStack Query fetches
+   - `src/hooks/mutations/` for data changes
    - `src/hooks/realtime/` for Supabase Realtime subscriptions
-2. **Component Structure**: Feature-based organization
-   - `src/components/messaging/` for chat UI
-   - `src/components/floor-plan/` for Konva.js canvas
-   - `src/components/ui/` for shadcn/Radix primitives
-3. **Real-Time**: Supabase Realtime for presence and messaging
-   - `space_presence_log` table tracks user activity
+2. **Component Structure**: Feature-based
+   - `src/components/messaging/` chat UI
+   - `src/components/floor-plan/` Konva.js canvas
+   - `src/components/ui/` shadcn/Radix primitives
+3. **Real-Time**: Supabase Realtime for presence + messaging
+   - `space_presence_log` tracks activity
    - Message delivery via Realtime channels
 
 **Gaps:**
 - Message threading UI incomplete (Story 4.12-4.13)
-- File attachments not implemented (Story 4.18-4.20)
+- File attachments missing (Story 4.18-4.20)
 - Offline resilience missing (Story 4.23-4.25)
-- Floor plan needs visual polish (Epic 3 Stories 3.1-3.12)
+- Floor plan needs polish (Epic 3 Stories 3.1-3.12)
 
-**Assessment:** Functional MVP; 18 messaging stories + 12 floor plan stories remain for feature parity with Slack/Teams.
+**Assessment:** MVP works; 18 messaging + 12 floor plan stories remain for Slack/Teams parity.
 
 ---
 
@@ -102,18 +102,18 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 
 **System Audit Findings (December 2024):**
 
-**Exemplary Systems (Use as Reference Models):**
+**Exemplary Systems (reference models):**
 1. ✅ **Authentication**: Zero duplicates, industry best practices
-2. ✅ **Hooks**: Excellent organization, clear responsibilities
-3. ✅ **Repositories**: Clean interface-based design
-4. ✅ **Library Directory**: No duplicates, excellent separation
+2. ✅ **Hooks**: Clear organization + responsibilities
+3. ✅ **Repositories**: Clean interface design
+4. ✅ **Library Directory**: No duplicates, strong separation
 
 **Areas Requiring Consolidation:**
-- **Avatar Components**: 11 components → need consolidation to 7 (36% reduction)
+- **Avatar Components**: 11 components → 7 (36% reduction)
   - Canonical display: `EnhancedAvatarV2`
   - Canonical upload: `UploadableAvatar`
-  - All other avatar components deprecated
-- **Messaging Components**: 4 duplicates due to naming inconsistency
+  - Other avatar components deprecated
+- **Messaging Components**: 4 duplicates from naming inconsistency
 
 **Performance Metrics:**
 - Avatar system: 100 resolutions <100ms ✅
@@ -121,7 +121,7 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 - Authentication: 1000 session validations <100ms ✅
 - Test coverage: 71 comprehensive tests ✅
 
-**Assessment:** High-quality codebase; avatar consolidation is highest priority cleanup task.
+**Assessment:** High-quality codebase; avatar consolidation top cleanup.
 
 ---
 
@@ -131,54 +131,54 @@ Virtual Office has established a solid technical foundation through Epics 1-4, i
 
 | Technology | Version | Purpose | Assessment |
 |------------|---------|---------|------------|
-| **Next.js** | 15.3.0 | App Router, Server Components, API routes | ✅ Latest stable; excellent for SSR + client-side |
+| **Next.js** | 15.3.0 | App Router, Server Components, API routes | ✅ Latest stable; strong SSR + client-side |
 | **React** | 19.1.0 | UI framework | ✅ Latest stable; Server Components ready |
-| **TypeScript** | 5 (strict) | Type safety | ✅ Prevents type errors across 85-120 stories |
-| **Supabase** | v2.49.4 | Database, Auth, Realtime, Storage | ✅ All-in-one reduces vendor complexity |
-| **TailwindCSS** | 4.1.3 | Styling | ✅ Latest version; CSS variables for theming |
-| **TanStack Query** | ^5.90.6 | State management | ✅ Intelligent caching, background updates |
-| **Vitest** | ^4.0.7 | Unit testing | ✅ Fast, modern test runner |
+| **TypeScript** | 5 (strict) | Type safety | ✅ Prevents errors across 85-120 stories |
+| **Supabase** | v2.49.4 | Database, Auth, Realtime, Storage | ✅ All-in-one lowers vendor complexity |
+| **TailwindCSS** | 4.1.3 | Styling | ✅ Latest; CSS variables for theming |
+| **TanStack Query** | ^5.90.6 | State management | ✅ Smart caching, background updates |
+| **Vitest** | ^4.0.7 | Unit testing | ✅ Fast modern runner |
 | **Playwright** | ^1.56.1 | E2E testing | ✅ Cross-browser automation |
 
 **Rationale for Supabase:**
 - **Integrated ecosystem**: Auth + DB + Realtime + Storage = fewer vendors
-- **PostgreSQL RLS**: Row-level security enforces multi-tenancy at DB level
-- **Open-source**: Self-hosting option for enterprise customers (Epic 9)
-- **Cost-effective**: Scales to target 10,000 DAU within budget constraints
+- **PostgreSQL RLS**: DB-level multi-tenancy
+- **Open-source**: Self-host path for enterprise customers (Epic 9)
+- **Cost-effective**: Reaches 10,000 DAU target within budget limits
 
 **Alternative Considered & Rejected:**
-- Firebase: Migrated away from Firebase (changelog 2025-04-03)
-  - Reason: Needed PostgreSQL relational model, RLS, and open-source option
+- Firebase: migrated away (changelog 2025-04-03)
+  - Reason: needed PostgreSQL relational model, RLS, open-source option
 
-**Assessment:** Stack is well-chosen and production-proven. No changes needed.
+**Assessment:** Stack fits requirements. No change.
 
 ---
 
 ### Dependencies: ✅ CURRENT, NO BREAKING CHANGES NEEDED
 
 **UI & Interaction:**
-- `@radix-ui/*` v1.x-2.x: Accessible primitives (Dialog, Dropdown, etc.)
-- `lucide-react` v0.546.0: Icon library
-- `react-zoom-pan-pinch` v3.7.0: Floor plan navigation
-- `sonner` v2.0.3: Toast notifications
+- `@radix-ui/*` v1.x-2.x: accessible primitives (Dialog, Dropdown, etc.)
+- `lucide-react` v0.546.0: icons
+- `react-zoom-pan-pinch` v3.7.0: floor plan navigation
+- `sonner` v2.0.3: toasts
 
 **Data & State:**
-- `@tanstack/react-query` ^5.90.6: Caching and background updates
-- `date-fns` v4.1.0: Date formatting
-- `uuid` v13.0.0: ID generation
-- `lodash` v4.17.21: Utility functions
+- `@tanstack/react-query` ^5.90.6: cache + background updates
+- `date-fns` v4.1.0: dates
+- `uuid` v13.0.0: IDs
+- `lodash` v4.17.21: utilities
 
 **Backend & Storage:**
-- `@supabase/supabase-js` v2.49.4: Database client
-- `@supabase/ssr` ^0.8.0: Server-side auth
-- `aws-sdk` v2.1692.0: Avatar uploads to S3
+- `@supabase/supabase-js` v2.49.4: DB client
+- `@supabase/ssr` ^0.8.0: server auth
+- `aws-sdk` v2.1692.0: avatar upload to S3
 
 **Testing:**
 - `vitest` ^4.0.7, `@playwright/test` ^1.56.1
 - `@testing-library/react` v16.3.0
-- `happy-dom` v20.0.0 (fast DOM for tests)
+- `happy-dom` v20.0.0 (fast DOM tests)
 
-**Assessment:** All dependencies are current. No immediate upgrades required.
+**Assessment:** Current deps. No urgent upgrades.
 
 ---
 
@@ -204,9 +204,9 @@ src/repositories/
 ```
 
 **Benefits:**
-1. **Testability**: Mock repositories in unit tests without touching DB
-2. **Flexibility**: Can swap Supabase for another DB without changing business logic
-3. **Type Safety**: Interface contracts enforce consistent API across implementations
+1. **Testability**: Mock repos in unit tests; no DB touch
+2. **Flexibility**: Swap Supabase without business-logic rewrite
+3. **Type Safety**: Interfaces enforce consistent implementation API
 
 **Usage Pattern in API Routes:**
 ```typescript
@@ -220,9 +220,9 @@ export async function GET(request: Request) {
 ```
 
 **Critical Rule:** Always use `createSupabaseServerClient()` in API routes, never `createSupabaseBrowserClient()`.  
-**Reason:** `auth.uid()` requires server context for RLS policies.
+**Reason:** `auth.uid()` needs server context for RLS policies.
 
-**Assessment:** This pattern is the architectural foundation for all data access. Continue using for Epics 5-9.
+**Assessment:** Data-access foundation. Keep for Epics 5-9.
 
 ---
 
@@ -230,21 +230,21 @@ export async function GET(request: Request) {
 
 **Three-Layer Approach:**
 1. **Server State**: TanStack Query v5
-   - `src/hooks/queries/` for GET operations
+   - `src/hooks/queries/` for GET
    - `src/hooks/mutations/` for POST/PUT/DELETE
-   - Automatic caching, background refetching, optimistic updates
+   - Auto cache, background refetch, optimistic updates
 2. **Global Client State**: React Context
-   - `src/contexts/AuthContext.tsx` for authentication
+   - `src/contexts/AuthContext.tsx` for auth
    - `src/contexts/CompanyContext.tsx` for company data
-   - `src/contexts/PresenceContext.tsx` for user presence
+   - `src/contexts/PresenceContext.tsx` for presence
 3. **Local Component State**: React `useState` / `useReducer`
 
 **Real-Time Integration:**
 - `src/hooks/realtime/` manages Supabase Realtime subscriptions
-- Real-time hooks invalidate TanStack Query cache on updates
-- Ensures UI stays in sync with DB changes
+- Realtime hooks invalidate TanStack Query cache on updates
+- UI stays synced with DB changes
 
-**Assessment:** State management is clean and scalable. No changes needed.
+**Assessment:** Clean, scalable. No change.
 
 ---
 
@@ -264,7 +264,7 @@ export async function GET(request: Request) {
 - **Handlers**: `handle*` prefix (`handleSubmit`, `handleDelete`)
 - **Booleans**: `is/has/can` prefix (`isLoading`, `hasPermission`, `canEdit`)
 
-**Assessment:** Conventions are clear and enforced. No changes needed.
+**Assessment:** Clear conventions. No change.
 
 ---
 
@@ -272,7 +272,7 @@ export async function GET(request: Request) {
 
 ### Epic 5: Meeting Notes System (6-10 stories)
 
-**Design Note:** Epic 5 is intentionally designed to work with **external meeting transcripts** (Zoom, Google Meet, Microsoft Teams) initially, providing immediate value without waiting for Epic 8 (native video conferencing). When Epic 8 is implemented, the meeting notes system will seamlessly integrate with Virtual Office's native meetings, enabling automatic transcript capture.
+**Design Note:** Epic 5 starts with **external meeting transcripts** (Zoom, Google Meet, Microsoft Teams). Gives value before Epic 8 native video. Later, native meetings auto-feed transcripts.
 
 **Architecture Needs:**
 1. **New Tables:**
@@ -309,10 +309,10 @@ export async function POST(request: Request) {
 
 **Dependencies:**
 - Add `openai` or `@anthropic-ai/sdk` to `package.json`
-- Environment variables: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
-- Cost monitoring: Track API usage per Story 7.11
+- Env vars: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- Cost monitoring: track API usage per Story 7.11
 
-**Assessment:** Straightforward integration following existing Repository Pattern. AI service abstraction enables easy provider switching.
+**Assessment:** Straightforward Repository Pattern integration. AI abstraction keeps provider swap easy.
 
 ---
 
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
    - `IAnnouncementRepository`
    - `SupabaseAnnouncementRepository`
 3. **Realtime Subscription:**
-   - Subscribe to `announcements` table inserts for live updates
+   - Subscribe to `announcements` inserts for live updates
    - Use existing `src/hooks/realtime/` patterns
 4. **Email Service:**
    - `src/lib/services/email-service.ts` for urgent announcement notifications
@@ -359,7 +359,7 @@ export function useAnnouncementSubscription(companyId: string) {
 }
 ```
 
-**Assessment:** Minimal complexity; follows existing Realtime patterns. Email service is new external dependency.
+**Assessment:** Low complexity; follows Realtime patterns. Email service is new external dependency.
 
 ---
 
