@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
 
     // Test if the URL is immediately accessible
     try {
-      const testResponse = await fetch(publicUrl, { method: 'HEAD' });
+      const testResponse = await fetch(publicUrl, { method: 'HEAD', cache: 'no-store' });
       console.log(`Avatar URL test: ${testResponse.status} ${testResponse.statusText}`);
     } catch (testError) {
       console.warn('Avatar URL test failed:', testError);

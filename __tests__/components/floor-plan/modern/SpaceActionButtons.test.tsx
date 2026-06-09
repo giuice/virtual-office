@@ -4,7 +4,7 @@ import { SpaceActionButtons } from '@/components/floor-plan/modern/SpaceActionBu
 
 describe('SpaceActionButtons', () => {
   const baseProps = {
-    isUserInSpace: false,
+    state: { userInSpace: false },
     onJoin: vi.fn(),
     onLeave: vi.fn(),
     onKnock: vi.fn(),
@@ -14,9 +14,12 @@ describe('SpaceActionButtons', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
-        isPrivate={false}
-        hasOccupants
-        canDirectEnter
+        state={{
+          ...baseProps.state,
+          privateSpace: false,
+          hasOccupants: true,
+          canDirectEnter: true,
+        }}
       />
     );
 
@@ -28,8 +31,11 @@ describe('SpaceActionButtons', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
-        hasOccupants
-        canDirectEnter={false}
+        state={{
+          ...baseProps.state,
+          hasOccupants: true,
+          canDirectEnter: false,
+        }}
         knockStatus="knocking"
       />
     );
@@ -43,8 +49,11 @@ describe('SpaceActionButtons', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
-        hasOccupants
-        canDirectEnter={false}
+        state={{
+          ...baseProps.state,
+          hasOccupants: true,
+          canDirectEnter: false,
+        }}
         knockStatus="cooldown"
         knockCooldownRemaining={42}
       />
@@ -61,7 +70,7 @@ describe('SpaceActionButtons', () => {
     render(
       <SpaceActionButtons
         {...baseProps}
-        isUserInSpace
+        state={{ userInSpace: true }}
       />
     );
 

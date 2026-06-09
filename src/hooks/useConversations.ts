@@ -1,12 +1,12 @@
 // src/contexts/messaging/useConversations.ts
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Conversation, ConversationType } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
 import { debugLogger } from '@/utils/debug-logger';
-import { set } from 'lodash';
+import set from 'lodash/set';
 
 const getTimestamp = (): number => {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -33,7 +33,7 @@ export function useConversations() {
   // State for conversations
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [lastActiveConversation, setLastActiveConversation] = useState<Conversation | null>(null);
+  const lastActiveConversationRef = useRef<Conversation | null>(null);
   const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
   const [refreshingConversations, setRefreshingConversations] = useState<boolean>(false);
   const [hasLoadedConversations, setHasLoadedConversations] = useState<boolean>(false);
@@ -57,18 +57,12 @@ export function useConversations() {
     });
   }, [currentUserProfile?.id]);
 
-  useEffect(() => {
-    if (activeConversation?.type === ConversationType.DIRECT) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useConversations.effect', 'set-last-direct', {
-          conversationId: activeConversation.id,
-        });
-      }
-      setLastActiveConversation(activeConversation);
-    } else if (debugLogger.messaging.enabled() && !activeConversation) {
-      debugLogger.messaging.trace('useConversations.effect', 'clear-active-conversation');
-    }
-  }, [activeConversation]);
+  if (activeConversation?.type === ConversationType.DIRECT) {
+    lastActiveConversationRef.current = activeConversation;
+  }
+  const lastActiveConversation = activeConversation?.type === ConversationType.DIRECT
+    ? activeConversation
+    : lastActiveConversationRef.current;
   
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
@@ -141,7 +135,7 @@ export function useConversations() {
   }, [currentUserProfile?.id, hasLoadedConversations]);
 
   const clearLastActiveConversation = useCallback(() => {
-    setLastActiveConversation(null);
+    lastActiveConversationRef.current = null;
   }, []);
   
   // Function to get or create a room conversation
@@ -369,7 +363,7 @@ export function useConversations() {
       console.error('Error archiving conversation:', error);
       if (reverted) throw error;
     }
-  }, [activeConversation, currentUserProfile?.id]);
+  }, [activeConversation, currentUserProfile]);
   
   // Function to unarchive a conversation
   const unarchiveConversation = useCallback(async (conversationId: string) => {
@@ -419,7 +413,7 @@ export function useConversations() {
       console.error('Error unarchiving conversation:', error);
       if (failed) throw error;
     }
-  }, [currentUserProfile?.id]);
+  }, [currentUserProfile]);
 
   // Pin / Unpin conversations with optimistic updates
   const pinConversation = useCallback(async (conversationId: string) => {

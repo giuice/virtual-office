@@ -84,7 +84,7 @@ export const NowBoard: React.FC<NowBoardProps> = ({
   };
 
   return (
-    <div
+    <section
       className={cn(
         'now-board',
         // Base layout
@@ -104,7 +104,6 @@ export const NowBoard: React.FC<NowBoardProps> = ({
         backdropFilter: 'blur(var(--vo-now-board-backdrop-blur, 12px))',
         WebkitBackdropFilter: 'blur(var(--vo-now-board-backdrop-blur, 12px))',
       }}
-      role="region"
       aria-label="Office pulse summary"
     >
       {/* Left section: Metrics */}
@@ -152,7 +151,7 @@ export const NowBoard: React.FC<NowBoardProps> = ({
           className="w-full sm:w-[200px]"
         />
       </div>
-    </div>
+    </section>
   );
 };
 

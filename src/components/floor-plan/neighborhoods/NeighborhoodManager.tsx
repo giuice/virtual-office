@@ -86,7 +86,7 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
   if (isLoading) {
     return (
       <div className={cn('flex items-center justify-center p-8', className)}>
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -119,7 +119,7 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
         <h3 className="text-lg font-semibold">Neighborhoods</h3>
         {mode === 'manage' && (
           <Button size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="size-4 mr-2" />
             Add Neighborhood
           </Button>
         )}
@@ -129,13 +129,13 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
       {neighborhoods.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-            <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
+            <FolderOpen className="size-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">
               No neighborhoods created yet.
             </p>
             {mode === 'manage' && (
               <Button onClick={() => setShowForm(true)}>
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Create Your First Neighborhood
               </Button>
             )}
@@ -155,7 +155,7 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
               <CardContent className="flex items-center gap-4 py-3">
                 {/* Color Indicator */}
                 <div
-                  className="w-4 h-4 rounded-full flex-shrink-0"
+                  className="size-4 rounded-full flex-shrink-0"
                   style={{ background: `var(${neighborhood.color})` }}
                   aria-hidden="true"
                 />
@@ -187,7 +187,7 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
                       }}
                       aria-label={`Edit ${neighborhood.name}`}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="size-4" />
                     </Button>
                     <Button
                       size="sm"
@@ -198,7 +198,7 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
                       }}
                       aria-label={`Delete ${neighborhood.name}`}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="size-4 text-destructive" />
                     </Button>
                   </div>
                 )}
@@ -220,5 +220,3 @@ export const NeighborhoodManager: React.FC<NeighborhoodManagerProps> = ({
     </div>
   );
 };
-
-export default NeighborhoodManager;

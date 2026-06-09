@@ -1,7 +1,7 @@
 // src/hooks/realtime/useMessageSubscription.ts
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
@@ -218,9 +218,29 @@ export function useMessageSubscription(
   const isActive = options?.isActive ?? true;
   const ignoreSenderId = options?.ignoreSenderId;
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<string | null>(null);
+  const statusRef = useRef<string | null>(null);
+  const statusListenersRef = useRef<Set<() => void> | null>(null);
+  if (statusListenersRef.current === null) {
+    statusListenersRef.current = new Set();
+  }
+  const statusListeners = statusListenersRef.current;
 
   const onInsertRef = useRef(options?.onInsert);
+
+  const publishStatus = useCallback((nextStatus: string | null) => {
+    statusRef.current = nextStatus;
+    statusListeners.forEach((listener) => listener());
+  }, [statusListeners]);
+
+  const subscribeStatus = useCallback((listener: () => void) => {
+    statusListeners.add(listener);
+    return () => {
+      statusListeners.delete(listener);
+    };
+  }, [statusListeners]);
+
+  const getStatusSnapshot = useCallback(() => statusRef.current, []);
+  const status = useSyncExternalStore(subscribeStatus, getStatusSnapshot, getStatusSnapshot);
 
   useEffect(() => {
     onInsertRef.current = options?.onInsert;
@@ -239,7 +259,6 @@ export function useMessageSubscription(
 
   useEffect(() => {
     if (!isActive) {
-      setStatus(null);
       return;
     }
 
@@ -293,7 +312,7 @@ export function useMessageSubscription(
         channel.subscribe((channelStatus) => {
           if (!isMounted) return;
 
-          setStatus(channelStatus);
+          publishStatus(channelStatus);
 
           if (debugLogger.messaging.enabled()) {
             debugLogger.messaging.trace('useMessageSubscription', 'status', {
@@ -438,9 +457,8 @@ export function useMessageSubscription(
     return () => {
       isMounted = false;
       teardownFns.forEach((teardown) => teardown());
-      setStatus(null);
     };
-  }, [subscriptionKey, ignoreSenderId, isActive, queryClient]);
+  }, [subscriptionKey, ignoreSenderId, isActive, queryClient, publishStatus, stableIds]);
 
-  return { status };
+  return { status: isActive ? status : null };
 }

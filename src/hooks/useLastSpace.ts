@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -342,12 +342,13 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     company,
     currentUser,
     markFirstLoginComplete,
-    queryClient,
-    saveLastSpace,
-    spaces,
-  ]);
+	    queryClient,
+	    saveLastSpace,
+	    setLastSpaceId,
+	    spaces,
+	  ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') {
       return undefined;
     }
@@ -365,7 +366,7 @@ export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[],
     };
   }, [saveDisconnectTimestamp]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Skip when saveLastSpace() was just called — the user clicked a space
     // manually and the API call is already handled by PresenceContext.updateLocation.
     // Auto-placement must not overwrite it with the home/default space.

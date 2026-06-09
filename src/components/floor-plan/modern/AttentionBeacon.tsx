@@ -46,7 +46,7 @@ const AttentionBeacon: React.FC<AttentionBeaconProps> = ({
   const isCritical = severity === 'critical';
 
   return (
-    <div
+    <output
       className={cn(
         // Base beacon styles from CSS tokens
         'vo-beacon relative',
@@ -55,7 +55,6 @@ const AttentionBeacon: React.FC<AttentionBeaconProps> = ({
         className
       )}
       // Accessibility attributes (AC7)
-      role="status"
       aria-live="polite"
       aria-label={`Attention needed: ${reason}`}
       data-testid="attention-beacon"
@@ -73,7 +72,7 @@ const AttentionBeacon: React.FC<AttentionBeaconProps> = ({
           <div className="absolute -inset-1 rounded-full border-2 border-[var(--vo-beacon-critical)] animate-organic-ripple [animation-delay:1.25s]" />
         </>
       )}
-    </div>
+    </output>
   );
 };
 

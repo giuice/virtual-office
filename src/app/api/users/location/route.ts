@@ -101,8 +101,10 @@ async function syncSpacePresenceLog(params: {
 }
 
 async function getAuthenticatedAppUser() {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = await createSupabaseServerClient('service_role');
+  const [supabase, supabaseAdmin] = await Promise.all([
+    createSupabaseServerClient(),
+    createSupabaseServerClient('service_role'),
+  ]);
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData.user) {

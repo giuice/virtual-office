@@ -69,8 +69,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">
             Replying to {originalSenderName}: "{originalContentSnippet}"
           </div>
-          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onCancelReply}>
-            <X className="h-3 w-3" />
+          <Button variant="ghost" size="icon" className="size-5" onClick={onCancelReply}>
+            <X className="size-3" />
             <span className="sr-only">Cancel reply</span>
           </Button>
         </div>
@@ -88,7 +88,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         disabled={isLoading}
       />
       <Button onClick={handleSend} disabled={!messageContent.trim() || isLoading} size="icon">
-        <Send className="h-4 w-4" />
+        <Send className="size-4" />
         <span className="sr-only">Send message</span>
       </Button>
     </div>

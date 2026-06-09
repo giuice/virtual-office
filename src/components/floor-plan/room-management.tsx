@@ -1,6 +1,6 @@
 // src/components/floor-plan/room-management.tsx
 // src/components/floor-plan/room-management.tsx
-'use client'
+'use client';
 
 import { useState } from 'react';
 // Import global Space type and local types if still needed
@@ -9,21 +9,82 @@ import { RoomTemplate } from './types'; // Keep local RoomTemplate for now
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Copy, Edit, Plus, Settings, MessageSquare } from 'lucide-react';
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePresence } from '@/contexts/PresenceContext';
+// Get room type label
+const getRoomTypeLabel = (type: SpaceType) => {
+  switch (type) {
+    case 'workspace':
+      return 'Workspace';
+    case 'conference':
+      return 'Conference Room';
+    case 'social':
+      return 'Social Space';
+    case 'breakout':
+      return 'Breakout Room';
+    case 'private_office':
+      return 'Private Office';
+    case 'open_space':
+      return 'Open Space';
+    case 'lounge':
+      return 'Lounge';
+    case 'lab':
+      return 'Lab';
+    default:
+      return 'Room';
+  }
+};
 
+// Get room status label
+// Get room status label
+const getRoomStatusLabel = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'available':
+      return 'Available';
+    case 'maintenance':
+      return 'Maintenance';
+    case 'locked':
+      return 'Locked';
+    case 'reserved':
+      return 'Reserved';
+    case 'in_use':
+      return 'In Use';
+    default:
+      return status;
+  }
+};
+
+// Get badge variant based on room type
+// Get badge variant based on room type
+const getBadgeVariant = (type: SpaceType) => {
+  switch (type) {
+    case 'workspace':
+      return 'success';
+    case 'conference':
+      return 'default';
+    case 'social':
+      return 'warning';
+    case 'breakout':
+      return 'secondary';
+    case 'private_office':
+      return 'destructive';
+    case 'open_space':
+      return 'outline';
+    case 'lounge':
+      return 'default';
+    case 'lab':
+      return 'secondary';
+    default:
+      return 'outline';
+  }
+};
 export interface RoomManagementProps {
   spaces: Space[]; // Expect global Space[]
   onCreateRoom: () => void;
@@ -31,11 +92,10 @@ export interface RoomManagementProps {
   onDeleteRoom: (roomId: string) => void;
   onDuplicateRoom: (room: Space) => void; // Expect global Space
   onOpenChat?: (room: Space) => void; // Expect global Space
-  open: boolean
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   isAdmin?: boolean;
 }
-
 export function RoomManagement({
   spaces,
   onCreateRoom,
@@ -45,22 +105,22 @@ export function RoomManagement({
   onOpenChat,
   open,
   onOpenChange,
-  isAdmin = false,
+  isAdmin = false
 }: RoomManagementProps) {
-  const [filterType, setFilterType] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [selectedRooms, setSelectedRooms] = useState<string[]>([])
-  
-  const { usersInSpaces } = usePresence();
+  const [filterType, setFilterType] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const {
+    usersInSpaces
+  } = usePresence();
 
   // Filter spaces based on type and search query
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
-    const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) || (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
-  
+
   // Handle bulk room deletion
   const handleBulkDelete = () => {
     selectedRooms.forEach(roomId => {
@@ -68,7 +128,7 @@ export function RoomManagement({
     });
     setSelectedRooms([]);
   };
-  
+
   // Handle room selection toggle for bulk operations
   const handleRoomSelectionToggle = (roomId: string) => {
     if (selectedRooms.includes(roomId)) {
@@ -77,52 +137,14 @@ export function RoomManagement({
       setSelectedRooms(prev => [...prev, roomId]);
     }
   };
-  
+
   // Get room type label
-  const getRoomTypeLabel = (type: SpaceType) => {
-    switch (type) {
-      case 'workspace': return 'Workspace';
-      case 'conference': return 'Conference Room';
-      case 'social': return 'Social Space';
-      case 'breakout': return 'Breakout Room';
-      case 'private_office': return 'Private Office';
-      case 'open_space': return 'Open Space';
-      case 'lounge': return 'Lounge';
-      case 'lab': return 'Lab';
-      default: return 'Room';
-    }
-  };
-  
+
   // Get room status label
-  const getRoomStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Active';
-      case 'available': return 'Available';
-      case 'maintenance': return 'Maintenance';
-      case 'locked': return 'Locked';
-      case 'reserved': return 'Reserved';
-      case 'in_use': return 'In Use';
-      default: return status;
-    }
-  };
-  
+
   // Get badge variant based on room type
-  const getBadgeVariant = (type: SpaceType) => {
-    switch (type) {
-      case 'workspace': return 'success';
-      case 'conference': return 'default';
-      case 'social': return 'warning';
-      case 'breakout': return 'secondary';
-      case 'private_office': return 'destructive';
-      case 'open_space': return 'outline';
-      case 'lounge': return 'default';
-      case 'lab': return 'secondary';
-      default: return 'outline';
-    }
-  };
-  
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Room Management</DialogTitle>
@@ -134,17 +156,9 @@ export function RoomManagement({
         <div className="mt-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Input
-                placeholder="Search rooms..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-[250px]"
-              />
+              <Input placeholder="Search rooms..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-[250px]" />
               
-              <Select 
-                value={filterType} 
-                onValueChange={setFilterType}
-              >
+              <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
@@ -162,39 +176,17 @@ export function RoomManagement({
               </Select>
             </div>
             
-            {selectedRooms.length > 0 && isAdmin && (
-              <Button 
-                variant="destructive" 
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={handleBulkDelete}
-              >
-                <Trash2 className="h-4 w-4" />
+            {selectedRooms.length > 0 && isAdmin && <Button variant="destructive" size="sm" className="flex items-center gap-2" onClick={handleBulkDelete}>
+                <Trash2 className="size-4" />
                 Delete Selected ({selectedRooms.length})
-              </Button>
-            )}
+              </Button>}
           </div>
           
           <ScrollArea className="h-[400px] border rounded-md">
             <div className="p-4 space-y-2">
-              {filteredSpaces.length > 0 ? (
-                filteredSpaces.map(space => (
-                  <div 
-                    key={space.id} 
-                    className={`flex items-center justify-between p-3 rounded-md border ${
-                      selectedRooms.includes(space.id) ? 'bg-muted border-primary' : ''
-                    }`}
-                  >
+              {filteredSpaces.length > 0 ? filteredSpaces.map(space => <div key={space.id} className={`flex items-center justify-between p-3 rounded-md border ${selectedRooms.includes(space.id) ? 'bg-muted border-primary' : ''}`}>
                     <div className="flex items-center gap-3">
-                      {isAdmin && (
-                        <input
-                          type="checkbox"
-                          checked={selectedRooms.includes(space.id)}
-                          onChange={() => handleRoomSelectionToggle(space.id)}
-                          className="rounded border-gray-300 text-primary focus:ring-primary"
-                          aria-label={`Select ${space.name} for bulk actions`}
-                        />
-                      )}
+                      {isAdmin && <input type="checkbox" checked={selectedRooms.includes(space.id)} onChange={() => handleRoomSelectionToggle(space.id)} className="rounded border-gray-300 text-primary focus:ring-primary" aria-label={`Select ${space.name} for bulk actions`} />}
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium">{space.name}</h3>
@@ -207,66 +199,32 @@ export function RoomManagement({
                           <span>•</span>
                           <span>{getRoomStatusLabel(space.status)}</span>
                           
-                          {usersInSpaces.get(space.id)?.length || 0 > 0 && ( 
-                            <>
+                          {usersInSpaces.get(space.id)?.length || 0 > 0 && <>
                               <span>•</span>
                               <span>{usersInSpaces.get(space.id)?.length} users</span>
-                            </>
-                          )}
+                            </>}
                         </div>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => onEditRoom(space)}
-                          aria-label={`Edit ${space.name}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => onDuplicateRoom(space)}
-                          aria-label={`Duplicate ${space.name}`}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {onOpenChat && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => onOpenChat(space)}
-                          aria-label={`Open chat for ${space.name}`}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => onDeleteRoom(space.id)}
-                          aria-label={`Delete ${space.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      {isAdmin && <Button variant="ghost" size="icon" onClick={() => onEditRoom(space)} aria-label={`Edit ${space.name}`}>
+                          <Edit className="size-4" />
+                        </Button>}
+                      {isAdmin && <Button variant="ghost" size="icon" onClick={() => onDuplicateRoom(space)} aria-label={`Duplicate ${space.name}`}>
+                          <Copy className="size-4" />
+                        </Button>}
+                      {onOpenChat && <Button variant="ghost" size="icon" onClick={() => onOpenChat(space)} aria-label={`Open chat for ${space.name}`}>
+                          <MessageSquare className="size-4" />
+                        </Button>}
+                      {isAdmin && <Button variant="ghost" size="icon" onClick={() => onDeleteRoom(space.id)} aria-label={`Delete ${space.name}`}>
+                          <Trash2 className="size-4" />
+                        </Button>}
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                  </div>) : <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
                   <p>No rooms found</p>
                   <p className="text-sm">Try adjusting your filters or create a new room</p>
-                </div>
-              )}
+                </div>}
             </div>
           </ScrollArea>
         </div>
@@ -275,14 +233,11 @@ export function RoomManagement({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          {isAdmin && (
-            <Button onClick={onCreateRoom}>
-              <Plus className="h-4 w-4 mr-2" />
+          {isAdmin && <Button onClick={onCreateRoom}>
+              <Plus className="size-4 mr-2" />
               Create Room
-            </Button>
-          )}
+            </Button>}
         </DialogFooter>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 }

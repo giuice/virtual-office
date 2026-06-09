@@ -13,7 +13,7 @@ export default function InvitationsPage() {
     <div className="container mx-auto py-10">
       <div className="mb-6">
         <Link href="/company" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4 mr-1" />
+          <ArrowLeft className="size-4 mr-1" />
           Voltar para Empresa
         </Link>
       </div>

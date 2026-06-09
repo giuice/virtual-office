@@ -36,7 +36,7 @@ export async function openDrawer(page: Page): Promise<void> {
 /**
  * Closes the messaging drawer.
  */
-export async function closeDrawer(page: Page): Promise<void> {
+async function closeDrawer(page: Page): Promise<void> {
   const closeButton = page.locator('[data-testid="messaging-drawer-close"]');
   await closeButton.click();
 

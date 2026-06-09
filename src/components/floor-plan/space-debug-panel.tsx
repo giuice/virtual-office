@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { X } from 'lucide-react';
 import { usePresence } from '@/contexts/PresenceContext';
 
@@ -21,12 +21,30 @@ interface SpaceDebugPanelProps {
   onHidePanel?: () => void;
 }
 
+function subscribeToDebugClock(onStoreChange: () => void) {
+  const intervalId = window.setInterval(onStoreChange, 1000);
+  return () => window.clearInterval(intervalId);
+}
+
+function getDebugClockSnapshot() {
+  return new Date().toLocaleTimeString();
+}
+
+function getServerDebugClockSnapshot() {
+  return '';
+}
+
 export function SpaceDebugPanel({ 
   spaces, 
   onHighlightSpace,
   onHidePanel
 }: SpaceDebugPanelProps) {
   const [expandedSpaceId, setExpandedSpaceId] = useState<string | null>(null);
+  const debugClock = useSyncExternalStore(
+    subscribeToDebugClock,
+    getDebugClockSnapshot,
+    getServerDebugClockSnapshot
+  );
   
   const toggleExpand = (spaceId: string) => {
     setExpandedSpaceId(expandedSpaceId === spaceId ? null : spaceId);
@@ -45,10 +63,10 @@ export function SpaceDebugPanel({
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-8 w-8 p-0" 
+          className="size-8 p-0" 
           onClick={onHidePanel}
         >
-          <X className="h-4 w-4" />
+          <X className="size-4" />
         </Button>
       </CardHeader>
       <CardContent className="max-h-[70vh] overflow-y-auto">
@@ -108,7 +126,7 @@ export function SpaceDebugPanel({
       </CardContent>
       <CardFooter className="pt-1 pb-3 flex justify-between text-xs text-muted-foreground">
         <span>Click to highlight • Double-click to expand</span>
-        <span>{new Date().toLocaleTimeString()}</span>
+        <span>{debugClock}</span>
       </CardFooter>
     </Card>
   );

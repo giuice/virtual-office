@@ -2,8 +2,9 @@
 // Story 3.11 - AC3, AC4, AC5: Data Fetching Hook for Space Details
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { ActivityLogEntry } from '@/components/floor-plan/modern/ActivityLogPreview';
+import { useReducerState } from '@/hooks/useReducerState';
 
 /**
  * Story 3.11 - useSpaceDetails Hook
@@ -40,24 +41,27 @@ export interface UseSpaceDetailsReturn {
  * @returns Space details including agenda, activity log, and transcript
  */
 export function useSpaceDetails(spaceId: string | null): UseSpaceDetailsReturn {
-  const [agenda, setAgenda] = useState<SpaceAgenda | null>(null);
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-  const [transcript, setTranscript] = useState<SpaceTranscript | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [details, setDetails] = useReducerState<Pick<UseSpaceDetailsReturn, 'agenda' | 'activityLog' | 'transcript' | 'isLoading' | 'error'>>({
+    agenda: null,
+    activityLog: [],
+    transcript: null,
+    isLoading: false,
+    error: null,
+  });
 
   const fetchDetails = useCallback(async () => {
     if (!spaceId) {
-      // Clear state when no space selected
-      setAgenda(null);
-      setActivityLog([]);
-      setTranscript(null);
-      setError(null);
+      setDetails((prev) => ({
+        ...prev,
+        agenda: null,
+        activityLog: [],
+        transcript: null,
+        error: null,
+      }));
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    setDetails((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
       // Fetch space details from API
@@ -68,10 +72,13 @@ export function useSpaceDetails(spaceId: string | null): UseSpaceDetailsReturn {
         // If endpoint doesn't exist yet, use mock/fallback data
         if (response.status === 404) {
           // Return empty data - graceful degradation
-          setAgenda(null);
-          setActivityLog([]);
-          setTranscript(null);
-          setIsLoading(false);
+          setDetails({
+            agenda: null,
+            activityLog: [],
+            transcript: null,
+            isLoading: false,
+            error: null,
+          });
           return;
         }
         throw new Error(`Failed to fetch space details: ${response.statusText}`);
@@ -79,22 +86,17 @@ export function useSpaceDetails(spaceId: string | null): UseSpaceDetailsReturn {
 
       const data = await response.json();
 
-      // Parse agenda data from space metadata
-      if (data.agenda) {
-        setAgenda({
+      const nextAgenda = data.agenda
+        ? {
           current: data.agenda.current ?? 1,
           total: data.agenda.total ?? 1,
           name: data.agenda.name ?? 'Current Phase',
           description: data.agenda.description,
-        });
-      } else {
-        setAgenda(null);
-      }
+        }
+        : null;
 
-      // Parse activity log entries
-      if (data.activityLog && Array.isArray(data.activityLog)) {
-        setActivityLog(
-          data.activityLog.map((entry: Record<string, unknown>) => ({
+      const nextActivityLog = data.activityLog && Array.isArray(data.activityLog)
+        ? data.activityLog.map((entry: Record<string, unknown>) => ({
             id: entry.id as string,
             timestamp: new Date(entry.timestamp as string),
             author: entry.author as string,
@@ -102,34 +104,38 @@ export function useSpaceDetails(spaceId: string | null): UseSpaceDetailsReturn {
             summary: entry.summary as string,
             type: (entry.type as ActivityLogEntry['type']) ?? 'note',
           }))
-        );
-      } else {
-        setActivityLog([]);
-      }
+        : [];
 
-      // Parse transcript snippet
-      if (data.transcript) {
-        setTranscript({
+      const nextTranscript = data.transcript
+        ? {
           text: data.transcript.text ?? '',
           speaker: data.transcript.speaker ?? 'Unknown',
           timestamp: new Date(data.transcript.timestamp as string),
-        });
-      } else {
-        setTranscript(null);
-      }
+        }
+        : null;
+
+      setDetails({
+        agenda: nextAgenda,
+        activityLog: nextActivityLog,
+        transcript: nextTranscript,
+        isLoading: false,
+        error: null,
+      });
 
     } catch (err) {
       // Handle errors gracefully - don't break the UI
       console.warn('Failed to fetch space details:', err);
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-      // Set empty data on error
-      setAgenda(null);
-      setActivityLog([]);
-      setTranscript(null);
+      setDetails({
+        agenda: null,
+        activityLog: [],
+        transcript: null,
+        isLoading: false,
+        error: err instanceof Error ? err : new Error('Unknown error'),
+      });
     } finally {
-      setIsLoading(false);
+      setDetails((prev) => ({ ...prev, isLoading: false }));
     }
-  }, [spaceId]);
+  }, [spaceId, setDetails]);
 
   // Fetch on mount and when spaceId changes
   useEffect(() => {
@@ -137,11 +143,11 @@ export function useSpaceDetails(spaceId: string | null): UseSpaceDetailsReturn {
   }, [fetchDetails]);
 
   return {
-    agenda,
-    activityLog,
-    transcript,
-    isLoading,
-    error,
+    agenda: details.agenda,
+    activityLog: details.activityLog,
+    transcript: details.transcript,
+    isLoading: details.isLoading,
+    error: details.error,
     refetch: fetchDetails,
   };
 }

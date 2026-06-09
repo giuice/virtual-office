@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 /**
  * A hook that manages state with localStorage persistence
@@ -48,20 +48,6 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
       console.error(`Error setting localStorage key "${key}":`, error);
     }
   };
-
-  // Update stored value if the key changes
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      const item = window.localStorage.getItem(key);
-      setStoredValue(item ? JSON.parse(item) : initialValue);
-    } catch (error) {
-      console.error(`Error updating localStorage key "${key}":`, error);
-    }
-  }, [key, initialValue]);
 
   return [storedValue, setValue];
 }

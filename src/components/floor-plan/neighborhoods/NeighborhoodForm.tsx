@@ -1,7 +1,7 @@
 // src/components/floor-plan/neighborhoods/NeighborhoodForm.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { Neighborhood, CreateNeighborhoodData, UpdateNeighborhoodData } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,8 @@ interface NeighborhoodFormProps {
   usedColors?: string[];
 }
 
+const EMPTY_USED_COLORS: string[] = [];
+
 /**
  * NeighborhoodForm provides a form for creating/editing neighborhoods.
  * 
@@ -38,7 +40,7 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
   onSubmit,
   onCancel,
   isSubmitting = false,
-  usedColors = [],
+  usedColors = EMPTY_USED_COLORS,
 }) => {
   const isEditing = !!neighborhood;
   const colors = getAllNeighborhoodColors();
@@ -46,19 +48,19 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
   // Memoize the initial color suggestion to avoid recalculating on every render
   const initialColor = React.useMemo(
     () => neighborhood?.color || suggestNeighborhoodColor(usedColors),
-    // Only recalculate when neighborhood changes, not on usedColors array reference change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [neighborhood?.id]
+    [neighborhood?.color, usedColors]
   );
 
   const [name, setName] = useState(neighborhood?.name || '');
   const [description, setDescription] = useState(neighborhood?.description || '');
   const [color, setColor] = useState(initialColor);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const previousNeighborhoodIdRef = useRef(neighborhood?.id);
 
   // Reset form only when the neighborhood ID changes (switching between edit targets)
   // Not on every parent re-render
-  useEffect(() => {
+  if (previousNeighborhoodIdRef.current !== neighborhood?.id) {
+    previousNeighborhoodIdRef.current = neighborhood?.id;
     if (neighborhood) {
       setName(neighborhood.name);
       setDescription(neighborhood.description || '');
@@ -69,8 +71,7 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
       setColor(suggestNeighborhoodColor(usedColors));
     }
     setErrors({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [neighborhood?.id]);
+  }
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -168,7 +169,7 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
                 aria-checked={isSelected}
                 aria-label={label}
                 className={cn(
-                  'w-8 h-8 rounded-full border-2 transition-all',
+                  'size-8 rounded-full border-2 transition-all',
                   'hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   isSelected 
                     ? 'border-foreground ring-2 ring-ring ring-offset-2' 
@@ -200,7 +201,7 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="size-4 mr-2 animate-spin" />
               {isEditing ? 'Saving...' : 'Creating...'}
             </>
           ) : (
@@ -211,5 +212,3 @@ export const NeighborhoodForm: React.FC<NeighborhoodFormProps> = ({
     </form>
   );
 };
-
-export default NeighborhoodForm;

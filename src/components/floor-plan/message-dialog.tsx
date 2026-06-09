@@ -1,7 +1,7 @@
 // src/components/floor-plan/message-dialog.tsx
 'use client';
 
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useLayoutEffect } from 'react';
 import { UIUser as User } from './types';
 // Removed Avatar imports as they are handled within ChatWindow/MessageList
 import { Button } from '@/components/ui/button';
@@ -28,25 +28,22 @@ interface MessageDialogProps {
 
 export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) {
   const { currentUserProfile } = useCompany();
-  const { sendMessage, getOrCreateUserConversation, setActiveConversation } = useMessaging();
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { activeConversation, sendMessage, getOrCreateUserConversation, setActiveConversation } = useMessaging();
+  const conversationId = open ? activeConversation?.id ?? null : null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (user && currentUserProfile && open) {
       // Create or get existing conversation with the target user
       const initializeConversation = async () => {
         try {
           const conversation = await getOrCreateUserConversation(String(user.id));
           setActiveConversation(conversation);
-          setConversationId(conversation.id);
         } catch (error) {
           console.error('Failed to initialize conversation:', error);
         }
       };
       
       initializeConversation();
-    } else {
-      setConversationId(null);
     }
   }, [user, currentUserProfile, open, getOrCreateUserConversation, setActiveConversation]);
 
@@ -75,7 +72,7 @@ export function MessageDialog({ user, open, onOpenChange }: MessageDialogProps) 
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-            Initializing conversation...
+            Initializing conversation…
           </div>
         )}
       </DialogContent>

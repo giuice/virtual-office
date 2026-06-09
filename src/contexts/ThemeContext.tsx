@@ -1,7 +1,7 @@
 // src/contexts/ThemeContext.tsx
 'use client';
 
-import { createContext, useContext, useCallback, useEffect, useState, useMemo } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme as useNextTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserById } from '@/lib/api';
@@ -72,8 +72,7 @@ export const VO_THEME_METADATA: Record<VOTheme, VOThemeMetadata> = {
   },
 };
 
-interface VOThemeContextType {
-  /** Current active theme */
+interface VOThemeContextType { /** Current active theme */
   theme: VOTheme;
   /** Set theme (persists to Supabase for authenticated users) */
   setTheme: (theme: VOTheme) => void;
@@ -88,8 +87,7 @@ interface VOThemeContextType {
   /** Whether system preference is being used */
   isSystemPreference: boolean;
   /** Whether theme is loading/syncing */
-  isLoading: boolean;
-}
+  isLoading: boolean; }
 
 const VOThemeContext = createContext<VOThemeContextType | undefined>(undefined);
 
@@ -116,7 +114,7 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
   const { user, isAuthReady } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
-  const [initialSyncDone, setInitialSyncDone] = useState(false);
+  const initialSyncDone = useRef(false);
 
   // Map system theme to VO theme (light -> paper, dark -> obsidian)
   const mapSystemTheme = useCallback((sysTheme: string | undefined): VOTheme => {
@@ -145,23 +143,18 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
   // Persist theme to Supabase (debounced)
   const persistThemeToSupabase = useMemo(
     () =>
-      debounce(async (userId: string, themeValue: VOTheme) => {
-        try {
+      debounce(async (userId: string, themeValue: VOTheme) => { try {
           // Get user profile first to get the database ID
           const userProfile = await getUserById(userId);
           if (!userProfile) {
             console.warn('No user profile found for theme persistence');
-            return;
-          }
+            return; }
 
-          const response = await fetch(`/api/users/update?id=${userProfile.id}`, {
+          const response = await fetch(`/api/users/update?id=${ userProfile.id }`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              preferences: {
-                ...userProfile.preferences,
-                theme: themeValue,
-              },
+            body: JSON.stringify({ preferences: {
+                ...userProfile.preferences, theme: themeValue },
             }),
           });
 
@@ -176,9 +169,8 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
   );
 
   // Load user's theme preference on auth ready
-  useEffect(() => {
-    async function loadUserTheme() {
-      if (!isAuthReady || !user || initialSyncDone) return;
+  useEffect(() => { async function loadUserTheme() {
+      if (!isAuthReady || !user || initialSyncDone.current) return;
 
       setIsLoading(true);
       try {
@@ -186,26 +178,21 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
         if (userProfile?.preferences?.theme) {
           const savedTheme = userProfile.preferences.theme as string;
           if (VO_THEMES.includes(savedTheme as VOTheme)) {
-            setNextTheme(savedTheme);
-          }
+            setNextTheme(savedTheme); }
         }
-      } catch (error) {
-        console.error('Error loading user theme preference:', error);
-      } finally {
+      } catch (error) { console.error('Error loading user theme preference:', error); } finally {
         setIsLoading(false);
-        setInitialSyncDone(true);
+        initialSyncDone.current = true;
       }
     }
 
     loadUserTheme();
-  }, [isAuthReady, user, initialSyncDone, setNextTheme]);
+  }, [isAuthReady, user, setNextTheme]);
 
   // Mark loading complete for unauthenticated users
-  useEffect(() => {
-    if (isAuthReady && !user) {
+  useEffect(() => { if (isAuthReady && !user) {
       setIsLoading(false);
-      setInitialSyncDone(true);
-    }
+      initialSyncDone.current = true; }
   }, [isAuthReady, user]);
 
   // Apply theme to HTML element
@@ -213,7 +200,7 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
     const html = document.documentElement;
     
     // Enable transitions after initial load
-    if (initialSyncDone) {
+    if (initialSyncDone.current) {
       html.setAttribute('data-theme-transition', 'true');
       // Remove after transitions complete to prevent interference with other animations
       const timeout = setTimeout(() => {
@@ -221,16 +208,14 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
       }, 500);
       return () => clearTimeout(timeout);
     }
-  }, [currentTheme, initialSyncDone]);
+  }, [currentTheme]);
 
   const setTheme = useCallback(
-    (newTheme: VOTheme) => {
-      setNextTheme(newTheme);
+    (newTheme: VOTheme) => { setNextTheme(newTheme);
 
       // Persist to Supabase for authenticated users
       if (user) {
-        persistThemeToSupabase(user.id, newTheme);
-      }
+        persistThemeToSupabase(user.id, newTheme); }
     },
     [setNextTheme, user, persistThemeToSupabase]
   );
@@ -252,10 +237,8 @@ export function VOThemeProvider({ children, defaultTheme = 'paper' }: VOThemePro
   return <VOThemeContext.Provider value={value}>{children}</VOThemeContext.Provider>;
 }
 
-export function useVOThemeContext() {
-  const context = useContext(VOThemeContext);
+export function useVOThemeContext() { const context = use(VOThemeContext);
   if (context === undefined) {
-    throw new Error('useVOThemeContext must be used within a VOThemeProvider');
-  }
+    throw new Error('useVOThemeContext must be used within a VOThemeProvider'); }
   return context;
 }

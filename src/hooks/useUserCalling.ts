@@ -123,7 +123,7 @@ export function useUserCalling(): UseUserCallingReturn {
     } catch (error) {
       console.error('[useUserCalling] Failed to send call invitation:', error);
     }
-  }, [user, generateCallId, getOrCreateUserConversation, sendMessage]);
+  }, [user, generateCallId, getDisplayName, getOrCreateUserConversation, sendMessage]);
 
   /**
    * Send a teleportation invitation to bring user to your current space
@@ -175,7 +175,7 @@ export function useUserCalling(): UseUserCallingReturn {
     } catch (error) {
       console.error('[useUserCalling] Failed to send teleport invitation:', error);
     }
-  }, [user, generateCallId, getOrCreateUserConversation, sendMessage]);
+  }, [user, generateCallId, getDisplayName, getOrCreateUserConversation, sendMessage]);
 
   /**
    * Accept an incoming call or teleport invitation
@@ -230,7 +230,7 @@ export function useUserCalling(): UseUserCallingReturn {
     } catch (error) {
       console.error('[useUserCalling] Failed to accept call:', error);
     }
-  }, [user, incomingCalls, updateLocation, getOrCreateUserConversation, sendMessage]);
+  }, [user, incomingCalls, updateLocation, getDisplayName, getOrCreateUserConversation, sendMessage]);
 
   /**
    * Decline an incoming call or teleport invitation
@@ -265,7 +265,7 @@ export function useUserCalling(): UseUserCallingReturn {
     } catch (error) {
       console.error('[useUserCalling] Failed to decline call:', error);
     }
-  }, [user, incomingCalls, getOrCreateUserConversation, sendMessage]);
+  }, [user, incomingCalls, getDisplayName, getOrCreateUserConversation, sendMessage]);
 
   /**
    * End an active call

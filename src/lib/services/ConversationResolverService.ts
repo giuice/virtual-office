@@ -129,8 +129,10 @@ export class ConversationResolverService {
     requesterId,
     roomId,
   }: RoomConversationResolutionParams): Promise<Conversation> {
-    const requester = await this.requireUser(requesterId, 'requester');
-    const space = await this.spaceRepository.findById(roomId);
+    const [requester, space] = await Promise.all([
+      this.requireUser(requesterId, 'requester'),
+      this.spaceRepository.findById(roomId),
+    ]);
 
     if (!space) {
       throw new ConversationResolverError('Room not found', 404);
@@ -224,7 +226,7 @@ export class ConversationResolverService {
       throw new ConversationResolverError('Participants are required to compute fingerprint', 400);
     }
 
-    const sorted = [...participants].sort();
+    const sorted = participants.toSorted();
     const fingerprintSource = sorted.join(':');
     return createHash('md5').update(fingerprintSource).digest('hex');
   }

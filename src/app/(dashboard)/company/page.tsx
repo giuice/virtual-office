@@ -1,8 +1,8 @@
 // src/app/(dashboard)/company/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { redirect, useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/shell/dashboard-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompanySettings } from '@/components/dashboard/company-settings';
@@ -36,14 +36,6 @@ export default function CompanyPage() {
   // Check if the user is an admin (only admins can access settings tab)
   const isAdmin = company?.adminIds?.includes(currentUserProfile?.id || '') || false;
 
-  // Redirect to create-company page if user doesn't have a company
-  useEffect(() => {
-    if (!isLoading && !hasCompany) {
-      console.log('Redirecting from dashboard to create-company...');
-      router.push('/create-company');
-    }
-  }, [hasCompany, isLoading, router]);
-
   // If still loading, show loading state
   if (isLoading) {
     return (
@@ -67,6 +59,10 @@ export default function CompanyPage() {
         </div>
       </DashboardShell>
     );
+  }
+
+  if (!hasCompany) {
+    redirect('/create-company');
   }
 
   // If no company, show placeholder (should redirect, but just in case)

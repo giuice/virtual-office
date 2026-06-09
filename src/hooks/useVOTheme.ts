@@ -29,7 +29,7 @@ export function useVOTheme() {
  * Hook for getting theme metadata without setting capabilities.
  * Useful for components that only need to read theme info.
  */
-export function useVOThemeMetadata(): VOThemeMetadata {
+function useVOThemeMetadata(): VOThemeMetadata {
   const { themeMetadata } = useVOThemeContext();
   return themeMetadata;
 }
@@ -37,7 +37,7 @@ export function useVOThemeMetadata(): VOThemeMetadata {
 /**
  * Hook for checking if current theme is dark.
  */
-export function useIsDarkTheme(): boolean {
+function useIsDarkTheme(): boolean {
   const { themeMetadata } = useVOThemeContext();
   return themeMetadata.isDark;
 }
@@ -45,17 +45,17 @@ export function useIsDarkTheme(): boolean {
 /**
  * Utility to get theme metadata by name.
  */
-export function getThemeMetadata(theme: VOTheme): VOThemeMetadata {
+function getThemeMetadata(theme: VOTheme): VOThemeMetadata {
   return VO_THEME_METADATA[theme];
 }
 
 /**
  * Check if a string is a valid VO theme.
  */
-export function isValidVOTheme(value: string): value is VOTheme {
+function isValidVOTheme(value: string): value is VOTheme {
   return VO_THEMES.includes(value as VOTheme);
 }
 
 // Re-export types for convenience
 export type { VOTheme, VOThemeMetadata };
-export { VO_THEMES, VO_THEME_METADATA };
+export { VO_THEME_METADATA };

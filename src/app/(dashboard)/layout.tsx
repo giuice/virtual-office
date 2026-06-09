@@ -17,9 +17,9 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
         <div className="text-center text-sm text-muted-foreground">
-          Restoring your workspace session...
+          Restoring your workspace session…
         </div>
       </div>
     );

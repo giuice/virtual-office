@@ -5,12 +5,12 @@
 /**
  * Maximum image size in bytes (2MB)
  */
-export const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 
 /**
  * Allowed image MIME types
  */
-export const ALLOWED_IMAGE_TYPES = [
+const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
   'image/png',
   'image/gif',
@@ -82,7 +82,7 @@ export function validateImage(
  * @param file The image file
  * @returns A URL that can be used to preview the image
  */
-export function createImagePreview(file: File): string {
+function createImagePreview(file: File): string {
   return URL.createObjectURL(file);
 }
 
@@ -90,7 +90,7 @@ export function createImagePreview(file: File): string {
  * Revokes a preview URL created with createImagePreview
  * @param url The preview URL to revoke
  */
-export function revokeImagePreview(url: string): void {
+function revokeImagePreview(url: string): void {
   URL.revokeObjectURL(url);
 }
 
@@ -186,7 +186,7 @@ export async function compressImage(
  * @param options Upload options
  * @returns A promise that resolves to the server response
  */
-export async function uploadImage<T = any>(
+async function uploadImage<T = any>(
   file: File,
   endpoint: string,
   options: {

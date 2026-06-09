@@ -14,7 +14,7 @@ import { UIUser } from '@/types/ui';
 /**
  * Maps database UserStatus to UIUserStatus
  */
-export function mapUserStatusToUIStatus(status: UserStatus): UIUserStatus {
+function mapUserStatusToUIStatus(status: UserStatus): UIUserStatus {
   switch (status) {
     case 'online':
       return 'active';
@@ -32,7 +32,7 @@ export function mapUserStatusToUIStatus(status: UserStatus): UIUserStatus {
 /**
  * Maps UIUserStatus to database UserStatus
  */
-export function mapUIStatusToUserStatus(status: UIUserStatus): UserStatus {
+function mapUIStatusToUserStatus(status: UIUserStatus): UserStatus {
   switch (status) {
     case 'active':
       return 'online';
@@ -50,7 +50,7 @@ export function mapUIStatusToUserStatus(status: UIUserStatus): UserStatus {
 /**
  * Converts a database User to a UIUser
  */
-export function dbUserToUIUser(user: User): UIUser {
+function dbUserToUIUser(user: User): UIUser {
   return {
     id: user.id,
     displayName: user.displayName,
@@ -78,7 +78,7 @@ export function presenceDataToUIUser(presenceData: UserPresenceData): UIUser {
  * Converts a UIUser to a partial database User
  * (useful for updates)
  */
-export function uiUserToPartialDbUser(uiUser: UIUser): Partial<User> {
+function uiUserToPartialDbUser(uiUser: UIUser): Partial<User> {
   return {
     displayName: uiUser.displayName || uiUser.displayName,
     avatarUrl: uiUser.avatarUrl || uiUser.avatarUrl || null || undefined,

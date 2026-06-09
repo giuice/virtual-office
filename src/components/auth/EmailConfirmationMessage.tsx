@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Mail, RefreshCw } from 'lucide-react';
 import { useNotification } from '@/hooks/useNotification';
@@ -14,14 +14,7 @@ export function EmailConfirmationMessage({ email, onResend }: EmailConfirmationM
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const alertRef = useRef<HTMLDivElement>(null);
   const { showSuccess, showError } = useNotification();
-
-  useEffect(() => {
-    if (resendMessage) {
-      alertRef.current?.focus();
-    }
-  }, [resendMessage]);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) return;
@@ -83,10 +76,9 @@ export function EmailConfirmationMessage({ email, onResend }: EmailConfirmationM
       role="alert"
       aria-live="polite"
       tabIndex={-1}
-      ref={alertRef}
     >
       <div className="mb-4 flex items-center gap-3">
-        <CheckCircle className="h-6 w-6 text-green-500" />
+        <CheckCircle className="size-6 text-green-500" />
         <h2 className="text-lg font-semibold">Conta criada com sucesso!</h2>
       </div>
       <div className="space-y-4">
@@ -95,15 +87,15 @@ export function EmailConfirmationMessage({ email, onResend }: EmailConfirmationM
         </p>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-muted-foreground" />
+            <Mail className="size-4 text-muted-foreground" />
             <span>Abra seu email (verifique spam também)</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="size-4 text-muted-foreground" />
             <span>Clique no link de confirmação</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="size-4 text-muted-foreground" />
             <span>Você será redirecionado para continuar o cadastro</span>
           </div>
         </div>
@@ -116,8 +108,8 @@ export function EmailConfirmationMessage({ email, onResend }: EmailConfirmationM
           >
             {isResending ? (
               <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Reenviando...
+                <RefreshCw className="mr-2 size-4 animate-spin" />
+                Reenviando…
               </>
             ) : (
               resendLabel
@@ -129,7 +121,7 @@ export function EmailConfirmationMessage({ email, onResend }: EmailConfirmationM
             </p>
           )}
           {resendMessage && (
-            <p className="text-center text-xs text-muted-foreground">{resendMessage}</p>
+            <p className="text-center text-xs text-muted-foreground" tabIndex={-1}>{resendMessage}</p>
           )}
         </div>
       </div>

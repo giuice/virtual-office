@@ -83,13 +83,13 @@ export async function POST(request: NextRequest) {
       const reader = (file as any).stream?.().getReader?.();
       const chunks: Uint8Array[] = [];
       if (reader) {
-        // Read all chunks
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
+        const readNextChunk = async (): Promise<void> => {
           const { done, value } = await reader.read();
-            if (done) break;
-            if (value) chunks.push(value);
-        }
+          if (done) return;
+          if (value) chunks.push(value);
+          await readNextChunk();
+        };
+        await readNextChunk();
         const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
         buffer = new Uint8Array(totalLength);
         let offset = 0;

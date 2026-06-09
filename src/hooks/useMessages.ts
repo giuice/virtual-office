@@ -53,7 +53,7 @@ export function useMessages(activeConversationId: string | null) {
   // Realtime is handled by a dedicated hook: useMessageSubscription
 
   // Clear cache when conversation changes to prevent stale data
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (activeConversationId) {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.trace('useMessages.cache', 'conversation-change', {
@@ -105,7 +105,7 @@ export function useMessages(activeConversationId: string | null) {
     // So we reverse the pages array before flattening
     const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
     return flattened;
-  }, [data, activeConversationId]);
+  }, [data]);
 
   const loadingMessages = isLoading || isFetching;
   const errorMessages = error ? (error as Error).message : null;

@@ -36,13 +36,13 @@ export function MessagingTrigger({ className }: MessagingTriggerProps) {
       data-testid="messaging-drawer-trigger"
       onClick={openDrawer}
       className={cn(
-        'fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg',
+        'fixed bottom-6 right-6 z-40 size-14 rounded-full shadow-lg',
         className
       )}
       size="icon"
       aria-label="Open messages"
     >
-      <MessageSquare className="h-6 w-6" />
+      <MessageSquare className="size-6" />
       {totalUnread > 0 && (
         <Badge
           variant="destructive"

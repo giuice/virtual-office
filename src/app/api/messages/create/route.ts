@@ -9,20 +9,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    // Authenticate the user
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
-    }
-    
-  // Use service role client for DB operations to work around RLS mismatches
-  // but perform explicit authorization checks before mutating.
-  const serviceClient = await createSupabaseServerClient('service_role');
-  const messageRepository: IMessageRepository = new SupabaseMessageRepository(serviceClient);
-  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(serviceClient);
 
     // Validate required fields
     if (!body.conversationId || typeof body.content !== 'string') {
@@ -39,6 +25,20 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Authenticate the user
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
+    }
+    
+  // Use service role client for DB operations to work around RLS mismatches
+  // but perform explicit authorization checks before mutating.
+  const serviceClient = await createSupabaseServerClient('service_role');
+  const messageRepository: IMessageRepository = new SupabaseMessageRepository(serviceClient);
+  const conversationRepository: IConversationRepository = new SupabaseConversationRepository(serviceClient);
+
     // Get the database user record using Supabase UID
     const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
     

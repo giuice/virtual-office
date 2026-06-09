@@ -9,7 +9,9 @@ import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { useCompany } from '@/contexts/CompanyContext';
 import { RoomPeopleTabProps } from '../types';
 
-export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProps) {
+const EMPTY_USER_IDS: string[] = [];
+
+export function PeopleTab({ userIds = EMPTY_USER_IDS, handleMessageUser }: RoomPeopleTabProps) {
   // Get companyUsers from context to resolve user details
   const { companyUsers } = useCompany();
 
@@ -33,7 +35,7 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
             return (
               <div key={user.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <EnhancedAvatarV2 user={user} size="sm" showStatus={true} />
+                  <EnhancedAvatarV2 user={user} size="sm" display={{ status: true }} />
                   <div>
                     <p className="font-medium">{user.displayName}</p>
                     <p className="text-xs text-muted-foreground">{user.statusMessage || user.status}</p>
@@ -46,7 +48,7 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
                     title="Message user"
                     onClick={() => handleMessageUser(localUser)}
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <MessageSquare className="size-4" />
                   </Button>
                 </div>
               </div>
@@ -54,7 +56,7 @@ export function PeopleTab({ userIds = [], handleMessageUser }: RoomPeopleTabProp
           })
         ) : (
           <div className="flex flex-col items-center justify-center h-full py-8 text-center text-muted-foreground">
-            <Users className="h-10 w-10 mb-2 opacity-20" />
+            <Users className="size-10 mb-2 opacity-20" />
             <p>No one is in this room yet</p>
             <p className="text-sm">Be the first to join!</p>
           </div>

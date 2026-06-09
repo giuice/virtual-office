@@ -81,7 +81,7 @@ export const userStatusColors = {
 // Type utilities for user type consolidation
 
 // Convert database User to UIUser
-export function dbUserToUIUser(user: User): UIUser {
+function dbUserToUIUser(user: User): UIUser {
   return {
     id: user.id,
     displayName: user.displayName,
@@ -94,7 +94,7 @@ export function dbUserToUIUser(user: User): UIUser {
 }
 
 // Convert UIUser to partial User data (for updates)
-export function uiUserToDbUser(uiUser: UIUser): Partial<User> {
+function uiUserToDbUser(uiUser: UIUser): Partial<User> {
   return {
     id: uiUser.id,
     displayName: uiUser.displayName,
@@ -117,7 +117,7 @@ function convertUserStatusToUIStatus(status: 'online' | 'away' | 'busy' | 'offli
 }
 
 // Legacy support functions (for backward compatibility during transition)
-export function legacyUserToUIUser(legacyUser: any): UIUser {
+function legacyUserToUIUser(legacyUser: any): UIUser {
   return {
     id: legacyUser.id,
     displayName: legacyUser.displayName || legacyUser.name,

@@ -121,7 +121,10 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       throw error;
     }
 
-    return (data || []).map((row) => mapToCamelCase(row)).filter(Boolean) as Invitation[];
+    return (data || []).flatMap((row) => {
+      const invitation = mapToCamelCase(row);
+      return invitation ? [invitation] : [];
+    }) as Invitation[];
   }
 
   // Optional: Implement deleteByToken if needed

@@ -92,7 +92,7 @@ export class WebRTCManager {
 	private async addLocalStreamToPeers(): Promise<void> {
 		if (!this.localStream) return;
 
-		const promises = Array.from(this.peerConnections.entries()).map(async ([peerId, { pc }]) => {
+		const promises = Array.from(this.peerConnections.entries()).map(([peerId, { pc }]) => {
 			try {
 				// Add tracks to the connection
 				this.localStream!.getTracks().forEach(track => {
@@ -100,21 +100,27 @@ export class WebRTCManager {
 				});
 
 				// Create new offer (renegotiation)
-				const offer = await pc.createOffer();
-				await pc.setLocalDescription(offer);
-
-				// Send offer to peer
-				await this.signalingChannel?.send({
-					type: 'broadcast',
-					event: 'offer',
-					payload: {
-						targetUserId: peerId,
-						senderId: this.currentUserId,
-						sdp: offer,
-					},
-				});
+				return pc
+					.createOffer()
+					.then((offer) =>
+						pc.setLocalDescription(offer).then(() =>
+							this.signalingChannel?.send({
+								type: 'broadcast',
+								event: 'offer',
+								payload: {
+									targetUserId: peerId,
+									senderId: this.currentUserId,
+									sdp: offer,
+								},
+							})
+						)
+					)
+					.catch((err) => {
+						console.error(`[WebRTC] Failed to renegotiate with peer ${peerId}:`, err);
+					});
 			} catch (err) {
 				console.error(`[WebRTC] Failed to renegotiate with peer ${peerId}:`, err);
+				return Promise.resolve();
 			}
 		});
 
@@ -190,20 +196,22 @@ export class WebRTCManager {
 			pc = await this.createPeerConnection(senderId);
 		}
 
-		await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-
-		const answer = await pc.createAnswer();
-		await pc.setLocalDescription(answer);
-
-		await this.signalingChannel?.send({
-			type: 'broadcast',
-			event: 'answer',
-			payload: {
-				targetUserId: senderId,
-				senderId: this.currentUserId,
-				sdp: answer,
-			},
-		});
+		await pc
+			.setRemoteDescription(new RTCSessionDescription(sdp))
+			.then(() => pc.createAnswer())
+			.then((answer) =>
+				pc.setLocalDescription(answer).then(() =>
+					this.signalingChannel?.send({
+						type: 'broadcast',
+						event: 'answer',
+						payload: {
+							targetUserId: senderId,
+							senderId: this.currentUserId,
+							sdp: answer,
+						},
+					})
+				)
+			);
 	}
 
 	/**

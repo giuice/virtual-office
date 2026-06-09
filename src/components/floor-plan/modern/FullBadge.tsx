@@ -16,7 +16,7 @@ export interface FullBadgeProps {
 
 export const FullBadge: React.FC<FullBadgeProps> = ({ className }) => {
   return (
-    <span
+    <output
       className={cn(
         // Base layout
         'inline-flex items-center px-2 py-0.5',
@@ -31,11 +31,10 @@ export const FullBadge: React.FC<FullBadgeProps> = ({ className }) => {
         className
       )}
       // AC8: Accessibility
-      role="status"
       aria-label="Space is full"
     >
       Full
-    </span>
+    </output>
   );
 };
 

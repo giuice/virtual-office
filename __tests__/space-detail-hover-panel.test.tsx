@@ -129,7 +129,7 @@ describe('SpaceDetailPanel', () => {
         agendaPhase={agenda}
         activityLog={activityLog}
         transcript={transcript}
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
       />
@@ -160,7 +160,7 @@ describe('SpaceDetailPanel', () => {
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={mockUsers}
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
       />
@@ -178,7 +178,7 @@ describe('SpaceDetailPanel', () => {
         <SpaceDetailPanel
           space={mockSpace}
           usersInSpace={mockUsers}
-          isUserInSpace={false}
+          state={{ userInSpace: false }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -196,10 +196,9 @@ describe('SpaceDetailPanel', () => {
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={mockUsers}
-        isUserInSpace={false}
+        state={{ userInSpace: false, loading: true }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
-        isLoading={true}
       />
     );
 
@@ -212,7 +211,7 @@ describe('SpaceDetailPanel', () => {
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={mockUsers}
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
       />
@@ -417,12 +416,14 @@ describe('ActivityLogPreview', () => {
 // ============================================
 
 describe('TranscriptSnippet', () => {
+  const transcriptTimestamp = new Date('2024-01-01T12:00:00.000Z');
+
   it('shows speaker and text (AC5)', () => {
     render(
       <TranscriptSnippet
         text="This is a test message that should be displayed"
         speaker="Alice"
-        timestamp={new Date()}
+        timestamp={transcriptTimestamp}
       />
     );
 
@@ -437,7 +438,7 @@ describe('TranscriptSnippet', () => {
       <TranscriptSnippet
         text={longText}
         speaker="Alice"
-        timestamp={new Date()}
+        timestamp={transcriptTimestamp}
       />
     );
 
@@ -450,7 +451,7 @@ describe('TranscriptSnippet', () => {
       <TranscriptSnippet
         text="Test message"
         speaker="Alice"
-        timestamp={new Date()}
+        timestamp={transcriptTimestamp}
       />
     );
 
@@ -463,7 +464,7 @@ describe('TranscriptSnippet', () => {
       <TranscriptSnippet
         text=""
         speaker="Alice"
-        timestamp={new Date()}
+        timestamp={transcriptTimestamp}
       />
     );
 
@@ -482,7 +483,7 @@ describe('SpaceActionButtons', () => {
     
     render(
       <SpaceActionButtons
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={onJoin}
         onLeave={onLeave}
       />
@@ -498,7 +499,7 @@ describe('SpaceActionButtons', () => {
     
     render(
       <SpaceActionButtons
-        isUserInSpace={true}
+        state={{ userInSpace: true }}
         onJoin={onJoin}
         onLeave={onLeave}
       />
@@ -515,8 +516,7 @@ describe('SpaceActionButtons', () => {
     
     render(
       <SpaceActionButtons
-        isUserInSpace={false}
-        isPrivate={true}
+        state={{ userInSpace: false, privateSpace: true }}
         onJoin={onJoin}
         onLeave={onLeave}
         onKnock={onKnock}
@@ -532,7 +532,7 @@ describe('SpaceActionButtons', () => {
     
     render(
       <SpaceActionButtons
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={onJoin}
         onLeave={onLeave}
       />
@@ -551,7 +551,7 @@ describe('SpaceActionButtons', () => {
     render(
       <div onClick={parentClick}>
         <SpaceActionButtons
-          isUserInSpace={false}
+          state={{ userInSpace: false }}
           onJoin={onJoin}
           onLeave={onLeave}
         />
@@ -570,7 +570,7 @@ describe('SpaceActionButtons', () => {
     
     render(
       <SpaceActionButtons
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={onJoin}
         onLeave={onLeave}
       />
@@ -605,7 +605,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
         onKnock={mockOnKnock}
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
       />
     );
 
@@ -624,7 +624,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
-        showDetailPanel={true}
+        state={{ detailPanel: true }}
       />
     );
 
@@ -655,7 +655,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
-        showDetailPanel={true}
+        state={{ detailPanel: true }}
       />
     );
 
@@ -678,7 +678,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
-        showDetailPanel={true}
+        state={{ detailPanel: true }}
       />
     );
 
@@ -704,7 +704,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
-        showDetailPanel={true}
+        state={{ detailPanel: true }}
         variant="analyst"
       />
     );
@@ -731,7 +731,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
-        showDetailPanel={true}
+        state={{ detailPanel: true }}
       />
     );
 
@@ -772,7 +772,7 @@ describe('Theme Compatibility (AC9)', () => {
         <SpaceDetailPanel
           space={mockSpace}
           usersInSpace={mockUsers}
-          isUserInSpace={false}
+          state={{ userInSpace: false }}
           onJoin={vi.fn()}
           onLeave={vi.fn()}
         />
@@ -804,7 +804,7 @@ describe('Accessibility (AC10)', () => {
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={[]}
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={vi.fn()}
         onLeave={vi.fn()}
       />
@@ -845,7 +845,7 @@ describe('Accessibility (AC10)', () => {
   it('SpaceActionButtons have proper aria-labels', () => {
     render(
       <SpaceActionButtons
-        isUserInSpace={false}
+        state={{ userInSpace: false }}
         onJoin={vi.fn()}
         onLeave={vi.fn()}
       />

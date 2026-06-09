@@ -1,6 +1,7 @@
 // src/components/messaging/CallNotification.tsx
 'use client';
 
+import { useReducerState } from '@/hooks/useReducerState';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ interface CallNotificationProps {
  * Displays incoming call notifications with accept/decline options
  * Includes countdown timer and auto-dismiss functionality
  */
-export function CallNotification({
+function CallNotification({
   callId,
   callerName,
   callerId,
@@ -50,19 +51,19 @@ export function CallNotification({
   className,
 }: CallNotificationProps) {
   const { acceptCall, declineCall } = useCalling();
-  const [timeLeft, setTimeLeft] = useState(30); // 30 seconds for calls, 60 for teleport
-  const [isVisible, setIsVisible] = useState(true);
+  const [timeLeft, updateTimeLeft] = useReducerState(30); // 30 seconds for calls, 60 for teleport
+  const [isVisible, updateIsVisible] = useReducerState(true);
 
   // Different timeout for different call types
   const initialTime = type === 'teleport' ? 60 : 30;
 
   useEffect(() => {
-    setTimeLeft(initialTime);
+    updateTimeLeft(initialTime);
     
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
+      updateTimeLeft((prev) => {
         if (prev <= 1) {
-          setIsVisible(false);
+          updateIsVisible(false);
           clearInterval(timer);
           return 0;
         }
@@ -71,16 +72,16 @@ export function CallNotification({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [initialTime]);
+  }, [initialTime, updateTimeLeft, updateIsVisible]);
 
   const handleAccept = async () => {
-    setIsVisible(false);
+    updateIsVisible(false);
     await acceptCall(callId);
     onAccept?.();
   };
 
   const handleDecline = async () => {
-    setIsVisible(false);
+    updateIsVisible(false);
     await declineCall(callId);
     onDecline?.();
   };
@@ -91,11 +92,11 @@ export function CallNotification({
   const getCallIcon = () => {
     switch (type) {
       case 'voice':
-        return <Phone className="h-5 w-5" />;
+        return <Phone className="size-5" />;
       case 'video':
-        return <Video className="h-5 w-5" />;
+        return <Video className="size-5" />;
       case 'teleport':
-        return <Zap className="h-5 w-5" />;
+        return <Zap className="size-5" />;
     }
   };
 
@@ -142,9 +143,9 @@ export function CallNotification({
       )}
     >
       <CardContent className="p-4">
-        <div className="flex items-center space-x-3 mb-3">
+        <div className="flex items-center gap-x-3 mb-3">
           <div className="relative">
-            <Avatar className="h-12 w-12">
+            <Avatar className="size-12">
               <AvatarImage src={avatarSrc} alt={callerName} />
               <AvatarFallback className="text-sm">
                 {initials}
@@ -153,7 +154,7 @@ export function CallNotification({
             
             {/* Pulsing call indicator */}
             <div className={cn(
-              "absolute -top-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-white animate-pulse",
+              "absolute -top-1 -right-1 size-6 rounded-full flex items-center justify-center text-white animate-pulse",
               getCallTypeColor()
             )}>
               {getCallIcon()}
@@ -177,7 +178,7 @@ export function CallNotification({
             )}
             
             <div className="flex items-center gap-2 mt-1">
-              <Volume2 className="h-3 w-3 text-muted-foreground animate-pulse" />
+              <Volume2 className="size-3 text-muted-foreground animate-pulse" />
               <p className="text-xs text-muted-foreground">
                 {timeLeft}s remaining
               </p>
@@ -197,15 +198,15 @@ export function CallNotification({
           >
             {type === 'teleport' ? (
               <>
-                <Zap className="h-4 w-4 mr-2" />
+                <Zap className="size-4 mr-2" />
                 Join
               </>
             ) : (
               <>
                 {type === 'video' ? (
-                  <Video className="h-4 w-4 mr-2" />
+                  <Video className="size-4 mr-2" />
                 ) : (
-                  <Phone className="h-4 w-4 mr-2" />
+                  <Phone className="size-4 mr-2" />
                 )}
                 Accept
               </>
@@ -220,15 +221,15 @@ export function CallNotification({
           >
             {type === 'teleport' ? (
               <>
-                <X className="h-4 w-4 mr-2" />
+                <X className="size-4 mr-2" />
                 Decline
               </>
             ) : (
               <>
                 {type === 'video' ? (
-                  <VideoOff className="h-4 w-4 mr-2" />
+                  <VideoOff className="size-4 mr-2" />
                 ) : (
-                  <PhoneOff className="h-4 w-4 mr-2" />
+                  <PhoneOff className="size-4 mr-2" />
                 )}
                 Decline
               </>
@@ -266,7 +267,7 @@ export function CallNotifications() {
   const pendingCalls = incomingCalls.filter(call => call.status === 'pending');
 
   return (
-    <div className="fixed top-0 right-0 z-50 p-4 space-y-2">
+    <div className="fixed top-0 right-0 z-50 p-4 gap-y-2">
       {pendingCalls.map((call) => (
         <CallNotification
           key={call.id}

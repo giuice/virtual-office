@@ -61,9 +61,9 @@ vi.mock('@/hooks/useSpaceDetails', () => ({
 }));
 
 vi.mock('@/components/ui/glass-panel', () => ({
-  GlassPanel: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => (
+  GlassPanel: ({ ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) => (
     <div ref={ref} {...props} />
-  )),
+  ),
 }));
 
 const mockKnockRequest = {
@@ -111,8 +111,7 @@ function renderSpaceCard(overrides: Partial<React.ComponentProps<typeof ModernSp
       usersInSpace={[occupant]}
       onEnterSpace={vi.fn()}
       onKnock={vi.fn()}
-      canDirectEnter={false}
-      showDetailPanel={false}
+      state={{ directEnter: false, detailPanel: false }}
       {...overrides}
     />
   );
@@ -194,13 +193,13 @@ describe('ModernSpaceCard - Knock Button', () => {
   });
 
   it('does not render knock button on public spaces', () => {
-    renderSpaceCard({ space: publicSpace, canDirectEnter: true });
+    renderSpaceCard({ space: publicSpace, state: { directEnter: true } });
 
     expect(screen.queryByRole('button', { name: 'Knock' })).not.toBeInTheDocument();
   });
 
   it('does not render knock button for occupants of the space', () => {
-    renderSpaceCard({ isUserInSpace: true, canDirectEnter: true });
+    renderSpaceCard({ state: { userInSpace: true, directEnter: true } });
 
     expect(screen.queryByRole('button', { name: 'Knock' })).not.toBeInTheDocument();
   });

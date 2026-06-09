@@ -10,13 +10,15 @@ interface InteractiveUserAvatarProps {
   user: User;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showStatus?: boolean;
-  showInteractionMenu?: boolean;
+  display?: {
+    status?: boolean;
+    interactionMenu?: boolean;
+    callActions?: boolean;
+    teleportActions?: boolean;
+  };
   onCall?: (userId: string) => void;
   onTeleport?: (spaceId: string) => void;
   onViewProfile?: (userId: string) => void;
-  showCallActions?: boolean;
-  showTeleportActions?: boolean;
   'aria-label'?: string;
 }
 
@@ -43,15 +45,16 @@ export function InteractiveUserAvatar({
   user,
   size = 'md',
   className,
-  showStatus = true,
-  showInteractionMenu = true,
+  display,
   onCall,
   onTeleport,
   onViewProfile,
-  showCallActions = true,
-  showTeleportActions = true,
   'aria-label': ariaLabel,
 }: InteractiveUserAvatarProps) {
+  const showStatus = display?.status ?? true;
+  const showInteractionMenu = display?.interactionMenu ?? true;
+  const showCallActions = display?.callActions ?? true;
+  const showTeleportActions = display?.teleportActions ?? true;
   
   // console.log('[InteractiveUserAvatar] Debug:', {
   //   userDisplayName: user.displayName,
@@ -68,7 +71,7 @@ export function InteractiveUserAvatar({
         user={user}
         size={size}
         className={className}
-        showStatus={showStatus}
+        display={{ status: showStatus }}
         status={user.status}
         aria-label={ariaLabel || `${user.displayName}'s avatar`}
       />
@@ -101,7 +104,7 @@ export function InteractiveUserAvatar({
         <EnhancedAvatarV2
           user={user}
           size={size}
-          showStatus={showStatus}
+          display={{ status: showStatus }}
           status={user.status}
         />
       </button>

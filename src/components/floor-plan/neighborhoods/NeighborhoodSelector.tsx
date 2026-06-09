@@ -98,7 +98,7 @@ export const NeighborhoodSelector: React.FC<NeighborhoodSelectorProps> = ({
           disabled={!newName.trim() || createNeighborhood.isPending}
         >
           {createNeighborhood.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
             'Add'
           )}
@@ -113,7 +113,7 @@ export const NeighborhoodSelector: React.FC<NeighborhoodSelectorProps> = ({
           }}
           disabled={createNeighborhood.isPending}
         >
-          <X className="h-4 w-4" />
+          <X className="size-4" />
         </Button>
       </div>
     );
@@ -137,7 +137,7 @@ export const NeighborhoodSelector: React.FC<NeighborhoodSelectorProps> = ({
           <SelectItem key={neighborhood.id} value={neighborhood.id}>
             <div className="flex items-center gap-2">
               <span
-                className="w-2 h-2 rounded-full"
+                className="size-2 rounded-full"
                 style={{ background: `var(${neighborhood.color})` }}
               />
               {neighborhood.name}
@@ -156,12 +156,10 @@ export const NeighborhoodSelector: React.FC<NeighborhoodSelectorProps> = ({
             setShowCreateForm(true);
           }}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="size-4" />
           Create New
         </button>
       </SelectContent>
     </Select>
   );
 };
-
-export default NeighborhoodSelector;

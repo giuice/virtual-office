@@ -18,6 +18,40 @@ interface MessageComposerProps {
   onValueChange?: (value: string) => void;
 }
 
+function MessageComposerReplyPreview({
+  replyToMessage,
+  currentUserProfile,
+  companyUsers,
+  onCancelReply,
+}: {
+  replyToMessage: Message | null | undefined;
+  currentUserProfile: { id: string; displayName?: string } | null | undefined;
+  companyUsers: Array<{ id: string; displayName?: string }>;
+  onCancelReply?: () => void;
+}) {
+  if (!replyToMessage) return null;
+
+  const replySender = replyToMessage.senderId
+    ? (replyToMessage.senderId === currentUserProfile?.id
+        ? currentUserProfile
+        : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
+    : null;
+
+  return (
+    <div className="flex items-start p-2 rounded-md bg-secondary mb-2" data-testid="reply-composer-preview">
+      <div className="flex-1 text-sm">
+        <div className="font-semibold">
+          Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
+        </div>
+        <div className="truncate text-muted-foreground">{replyToMessage.content}</div>
+      </div>
+      <Button variant="ghost" size="sm" className="size-6 p-0" onClick={onCancelReply} data-testid="reply-preview-dismiss">
+        <X className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
 export function MessageComposer({
   onSendMessage,
   replyToMessage,
@@ -31,11 +65,6 @@ export function MessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { companyUsers, currentUserProfile } = useCompany();
-  
-  // Update content when initialValue changes
-  useEffect(() => {
-    setContent(initialValue);
-  }, [initialValue]);
   
   // Set focus on textarea when reply mode is activated
   useEffect(() => {
@@ -82,43 +111,14 @@ export function MessageComposer({
     fileInputRef.current?.click();
   };
 
-  // Render reply preview
-  const renderReplyPreview = () => {
-    if (!replyToMessage) return null;
-
-    const replySender = replyToMessage.senderId
-      ? (replyToMessage.senderId === currentUserProfile?.id
-          ? currentUserProfile
-          : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
-      : null;
-
-    return (
-      <div
-        className="flex items-start p-2 rounded-md bg-secondary mb-2"
-        data-testid="reply-composer-preview"
-      >
-        <div className="flex-1 text-sm">
-          <div className="font-semibold">
-            Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
-          </div>
-          <div className="truncate text-muted-foreground">{replyToMessage.content}</div>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          onClick={onCancelReply}
-          data-testid="reply-preview-dismiss"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    );
-  };
-  
   return (
     <div className="flex flex-col w-full" data-testid="composer">
-      {renderReplyPreview()}
+      <MessageComposerReplyPreview
+        replyToMessage={replyToMessage}
+        currentUserProfile={currentUserProfile}
+        companyUsers={companyUsers}
+        onCancelReply={onCancelReply}
+      />
 
       <form onSubmit={handleSubmit} className="w-full">
         <div className="relative">
@@ -132,52 +132,55 @@ export function MessageComposer({
             disabled={disabled}
           />
           
-          <div className="absolute bottom-2 right-2 flex items-center space-x-1">
+          <div className="absolute bottom-2 right-2 flex items-center gap-x-1">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="size-8"
               onClick={handleFileUpload}
               disabled={disabled}
               data-testid="composer-attach-button"
             >
-              <Paperclip className="h-4 w-4" />
+              <Paperclip className="size-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="size-8"
               disabled={disabled}
               data-testid="composer-image-button"
             >
-              <Image className="h-4 w-4" />
+              <Image className="size-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="size-8"
               disabled={disabled}
+              aria-label="Insert emoji"
               data-testid="composer-emoji-button"
             >
-              <Smile className="h-4 w-4" />
+              <Smile className="size-4" />
             </Button>
             <input
               type="file"
               ref={fileInputRef}
               className="hidden"
               disabled={disabled}
+              aria-label="Attach files"
               data-testid="composer-file-input"
             />
             <Button
               type="submit"
               disabled={!content.trim() || disabled}
-              className="h-8 w-8 p-0"
+              aria-label="Send message"
+              className="size-8 p-0"
               data-testid="message-send-button"
             >
-              <Send className="h-4 w-4" />
+              <Send className="size-4" />
             </Button>
           </div>
         </div>

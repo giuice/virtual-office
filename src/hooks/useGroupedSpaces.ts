@@ -78,7 +78,7 @@ export type GroupedSpaceItem =
   | { type: 'space'; space: Space }
   | { type: 'ungrouped-header'; count: number };
 
-export function flattenGroupedSpaces(
+function flattenGroupedSpaces(
   groupedResult: GroupedSpacesResult
 ): GroupedSpaceItem[] {
   const items: GroupedSpaceItem[] = [];

@@ -64,9 +64,7 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
       render(
         <UserAvatarPresence 
           user={mockUser} 
-          isSpeaking={true}
-          isPresenting={false}
-          isMuted={false}
+          state={{ speaking: true, presenting: false, muted: false }}
         />
       );
       
@@ -138,7 +136,7 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
 
   describe('AC3 - Animated Status Rings', () => {
     it('applies vo-avatar-speaking class when isSpeaking is true', () => {
-      render(<UserAvatarPresence user={mockUser} isSpeaking={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ speaking: true }} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
@@ -147,7 +145,7 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
     });
 
     it('applies vo-avatar-presenting class when isPresenting is true', () => {
-      render(<UserAvatarPresence user={mockUser} isPresenting={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ presenting: true }} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
@@ -156,7 +154,7 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
     });
 
     it('applies vo-avatar-muted class when isMuted is true', () => {
-      render(<UserAvatarPresence user={mockUser} isMuted={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ muted: true }} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
@@ -168,9 +166,7 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
       render(
         <UserAvatarPresence 
           user={mockUser} 
-          isSpeaking={false}
-          isPresenting={false}
-          isMuted={false}
+          state={{ speaking: false, presenting: false, muted: false }}
         />
       );
       
@@ -213,21 +209,21 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
     });
 
     it('shows Speaking status in tooltip when isSpeaking', () => {
-      render(<UserAvatarPresence user={mockUser} isSpeaking={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ speaking: true }} />);
       
       const tooltipContent = screen.getByTestId('tooltip-content');
       expect(tooltipContent.textContent).toContain('Speaking');
     });
 
     it('shows Presenting status in tooltip when isPresenting', () => {
-      render(<UserAvatarPresence user={mockUser} isPresenting={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ presenting: true }} />);
       
       const tooltipContent = screen.getByTestId('tooltip-content');
       expect(tooltipContent.textContent).toContain('Presenting');
     });
 
     it('shows Muted status in tooltip when isMuted', () => {
-      render(<UserAvatarPresence user={mockUser} isMuted={true} />);
+      render(<UserAvatarPresence user={mockUser} state={{ muted: true }} />);
       
       const tooltipContent = screen.getByTestId('tooltip-content');
       expect(tooltipContent.textContent).toContain('Muted');

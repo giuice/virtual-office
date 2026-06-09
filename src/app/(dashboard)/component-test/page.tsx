@@ -110,7 +110,7 @@ export default function ComponentTestPage() {
                 space={sampleSpace}
                 usersInSpace={sampleUsers.slice(0, 3)}
                 onEnterSpace={() => console.log('Enter space')}
-                compact={false}
+                state={{ compact: false }}
               />
             </div>
             
@@ -120,7 +120,7 @@ export default function ComponentTestPage() {
                 space={{...sampleSpace, name: 'Compact Card'}}
                 usersInSpace={sampleUsers.slice(0, 1)}
                 onEnterSpace={() => console.log('Enter space')}
-                compact={true}
+                state={{ compact: true }}
               />
             </div>
           </CardContent>

@@ -1,34 +1,25 @@
 'use client';
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, use, ReactNode, useMemo } from 'react';
 import { useUserPresence } from '@/hooks/useUserPresence';
 import { useAutoRoomConversation } from '@/hooks/useAutoRoomConversation';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { UserPresenceData } from '@/types/database';
 
-interface PresenceContextType {
-  users: UserPresenceData[] | undefined;
+interface PresenceContextType { users: UserPresenceData[] | undefined;
   usersInSpaces: Map<string | null, UserPresenceData[]>;
   isLoading: boolean;
   error: unknown;
   updateLocation: (spaceId: string | null) => Promise<void>;
-  currentUserSpaceId: string | null;
-}
+  currentUserSpaceId: string | null; }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
 
-export const PresenceProvider = ({ children }: { children: ReactNode }) => {
-  // Get current user ID from CompanyContext
+export const PresenceProvider = ({ children }: { children: ReactNode }) => { // Get current user ID from CompanyContext
   const { currentUserProfile } = useCompany();
   const currentUserId = currentUserProfile?.id;
 
   // Pass the current user ID to useUserPresence
-  const {
-    users,
-    usersInSpaces,
-    isLoading,
-    error,
-    updateLocation,
-  } = useUserPresence(currentUserId);
+  const { users, usersInSpaces, isLoading, error, updateLocation } = useUserPresence(currentUserId);
 
   // Get current user's space ID for messaging integration
   const currentUserSpaceId = users?.find(u => u.id === currentUserId)?.currentSpaceId || null;
@@ -39,31 +30,33 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => {
   // useAutoRoomConversation(currentUserSpaceId);
 
   // Log for debugging purposes
-  if (process.env.NODE_ENV === 'development') {
-    // console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set'}`);
+  if (process.env.NODE_ENV === 'development') { // console.log(`[PresenceContext] Current user ID: ${currentUserId || 'not set' }`);
     // console.log(`[PresenceContext] Current user space ID: ${currentUserSpaceId || 'not in space'}`);
   }
 
+  const value = useMemo(
+    () => ({
+      users,
+      usersInSpaces,
+      isLoading,
+      error,
+      updateLocation,
+      currentUserSpaceId
+    }),
+    [currentUserSpaceId, error, isLoading, updateLocation, users, usersInSpaces]
+  );
+
   return (
     <PresenceContext.Provider
-      value={{
-        users,
-        usersInSpaces,
-        isLoading,
-        error,
-        updateLocation,
-        currentUserSpaceId,
-      }}
+      value={value}
     >
       {children}
     </PresenceContext.Provider>
   );
 };
 
-export function usePresence(): PresenceContextType {
-  const context = useContext(PresenceContext);
+export function usePresence(): PresenceContextType { const context = use(PresenceContext);
   if (!context) {
-    throw new Error('usePresence must be used within a PresenceProvider');
-  }
+    throw new Error('usePresence must be used within a PresenceProvider'); }
   return context;
 }

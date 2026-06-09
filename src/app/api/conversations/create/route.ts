@@ -59,15 +59,17 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate all participant IDs exist in the database
-    const updatedParticipants = [];
-    for (const participantId of participants) {
-      const participantUser = await userRepository.findById(participantId);
-      if (participantUser) {
-        updatedParticipants.push(participantUser.id);
-      } else {
-        console.warn(`Participant not found: ${participantId} - skipping`);
-      }
-    }
+    const participantUsers = await Promise.all(
+      participants.map(async (participantId: string) => {
+        const participantUser = await userRepository.findById(participantId);
+        if (!participantUser) {
+          console.warn(`Participant not found: ${participantId} - skipping`);
+          return null;
+        }
+        return participantUser.id;
+      })
+    );
+    const updatedParticipants = participantUsers.filter((participantId): participantId is string => Boolean(participantId));
     
     if (updatedParticipants.length === 0) {
       return NextResponse.json({ error: 'No valid participants found' }, { status: 400 });
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
     // NEW: DM Deduplication - Check if direct conversation already exists
     if (body.type === ConversationType.DIRECT) {
       // Sort participant IDs to create consistent fingerprint
-      const sortedParticipants = [...updatedParticipants].sort();
+      const sortedParticipants = updatedParticipants.toSorted();
       const fingerprint = sortedParticipants.join(':');
 
       console.log('Checking for existing DM with fingerprint:', fingerprint);
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // NEW: Add fingerprint for direct conversations
     if (body.type === ConversationType.DIRECT) {
-      const sortedParticipants = [...updatedParticipants].sort();
+      const sortedParticipants = updatedParticipants.toSorted();
       conversationData.participantsFingerprint = sortedParticipants.join(':');
     }
 

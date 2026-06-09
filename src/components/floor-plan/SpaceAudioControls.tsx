@@ -88,10 +88,10 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 						<Button
 							variant="ghost"
 							size="icon"
-							className={cn('h-9 w-9 text-destructive', className)}
+							className={cn('size-9 text-destructive', className)}
 							disabled
 						>
-							<MicOff className="h-4 w-4" />
+							<MicOff className="size-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
@@ -111,14 +111,14 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 						<Button
 							variant="ghost"
 							size="icon"
-							className={cn('h-9 w-9', className)}
+							className={cn('size-9', className)}
 							onClick={handleEnableAudio}
 							disabled={isInitializing}
 						>
 							{isInitializing ? (
-								<span className="h-4 w-4 animate-pulse">●</span>
+								<span className="size-4 animate-pulse">●</span>
 							) : (
-								<Mic className="h-4 w-4 text-muted-foreground" />
+								<Mic className="size-4 text-muted-foreground" />
 							)}
 						</Button>
 					</TooltipTrigger>
@@ -139,10 +139,10 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 						<Button
 							variant="ghost"
 							size="icon"
-							className={cn('h-9 w-9 text-amber-500', className)}
+							className={cn('size-9 text-amber-500', className)}
 							onClick={handleEnableAudio}
 						>
-							<AlertCircle className="h-4 w-4" />
+							<AlertCircle className="size-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
@@ -163,16 +163,16 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 						size="icon"
 						onClick={toggleMute}
 						className={cn(
-							'h-9 w-9 transition-all duration-200',
+							'size-9 transition-all duration-200',
 							!isMuted && isSpeaking && 'ring-2 ring-green-500 ring-offset-2',
 							className
 						)}
 					>
 						{isMuted ? (
-							<MicOff className="h-4 w-4 text-muted-foreground" />
+							<MicOff className="size-4 text-muted-foreground" />
 						) : (
 							<Mic className={cn(
-								'h-4 w-4',
+								'size-4',
 								isSpeaking ? 'text-green-500' : 'text-foreground'
 							)} />
 						)}
@@ -188,5 +188,3 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 		</TooltipProvider>
 	);
 }
-
-export default SpaceAudioControls;

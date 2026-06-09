@@ -123,14 +123,13 @@ export function useKnockSignaling(options: {
 
 	// Subscribe to INSERT events on knock_requests for the occupied space (occupant receives knocks)
 	useEffect(() => {
-		if (!occupiedSpaceId || !currentUserId) {
-			if (occupiedChannelRef.current) {
-				supabase.removeChannel(occupiedChannelRef.current);
-				occupiedChannelRef.current = null;
+			if (!occupiedSpaceId || !currentUserId) {
+				if (occupiedChannelRef.current) {
+					supabase.removeChannel(occupiedChannelRef.current);
+					occupiedChannelRef.current = null;
+				}
+				return;
 			}
-			setOccupiedChannelStatus(null);
-			return;
-		}
 
 		let latestStatus: ChannelStatus = null;
 		const seenIncomingRequestIds = new Set<string>();
@@ -200,24 +199,22 @@ export function useKnockSignaling(options: {
 		}, POLL_INTERVAL_MS);
 
 		return () => {
-			isActive = false;
-			clearInterval(pollTimer);
-			supabase.removeChannel(channel);
-			occupiedChannelRef.current = null;
-			setOccupiedChannelStatus(null);
-		};
-	}, [occupiedSpaceId, currentUserId]);
+				isActive = false;
+				clearInterval(pollTimer);
+				supabase.removeChannel(channel);
+				occupiedChannelRef.current = null;
+			};
+		}, [occupiedSpaceId, currentUserId]);
 
 	// Subscribe to UPDATE events on knock_requests for our requests (knocker receives responses)
 	useEffect(() => {
-		if (!knockingSpaceId || !currentUserId) {
-			if (knockingChannelRef.current) {
-				supabase.removeChannel(knockingChannelRef.current);
-				knockingChannelRef.current = null;
+			if (!knockingSpaceId || !currentUserId) {
+				if (knockingChannelRef.current) {
+					supabase.removeChannel(knockingChannelRef.current);
+					knockingChannelRef.current = null;
+				}
+				return;
 			}
-			setKnockingChannelStatus(null);
-			return;
-		}
 
 		let latestStatus: ChannelStatus = null;
 		const seenResponseEvents = new Set<string>();
@@ -291,13 +288,12 @@ export function useKnockSignaling(options: {
 		}, POLL_INTERVAL_MS);
 
 		return () => {
-			isActive = false;
-			clearInterval(pollTimer);
-			supabase.removeChannel(channel);
-			knockingChannelRef.current = null;
-			setKnockingChannelStatus(null);
-		};
-	}, [knockingSpaceId, currentUserId]);
+				isActive = false;
+				clearInterval(pollTimer);
+				supabase.removeChannel(channel);
+				knockingChannelRef.current = null;
+			};
+		}, [knockingSpaceId, currentUserId]);
 
 	/**
 	 * Send a knock request to a space.
@@ -364,8 +360,8 @@ export function useKnockSignaling(options: {
 	return {
 		sendKnockRequest,
 		respondToKnock,
-		occupiedChannelStatus,
-		knockingChannelStatus,
+		occupiedChannelStatus: occupiedSpaceId && currentUserId ? occupiedChannelStatus : null,
+		knockingChannelStatus: knockingSpaceId && currentUserId ? knockingChannelStatus : null,
 	};
 }
 

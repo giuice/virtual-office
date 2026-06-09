@@ -1,7 +1,8 @@
 // src/hooks/useAttentionBeacon.ts
 // Story 3.4: Attention Beacon System - Hook for beacon trigger logic
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useReducerState } from '@/hooks/useReducerState';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { UserPresenceData } from '@/types/database';
 
 /**
@@ -100,7 +101,7 @@ export function useAttentionBeacon(
     lastChange: null,
   });
 
-  const [beaconState, setBeaconState] = useState<BeaconState>({
+  const [beaconState, updateBeaconState] = useReducerState<BeaconState>({
     active: false,
     severity: 'normal',
     reason: '',
@@ -186,7 +187,7 @@ export function useAttentionBeacon(
           severity: escalatedSeverity,
           lastChange: new Date(),
         };
-        setBeaconState(newState);
+        updateBeaconState(newState);
         prevStateRef.current = newState;
       }
       return;
@@ -215,7 +216,7 @@ export function useAttentionBeacon(
         lastChange: now,
       };
 
-      setBeaconState(newState);
+      updateBeaconState(newState);
       prevStateRef.current = newState;
     }, opts.debounceMs);
 
@@ -225,7 +226,7 @@ export function useAttentionBeacon(
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [evaluateTriggers, checkEscalation, opts.debounceMs]);
+  }, [evaluateTriggers, checkEscalation, opts.debounceMs, updateBeaconState]);
 
   // Escalation timer - check periodically if we need to escalate
   useEffect(() => {
@@ -242,13 +243,13 @@ export function useAttentionBeacon(
           reason: `${beaconState.reason} (escalated)`,
           lastChange: new Date(),
         };
-        setBeaconState(newState);
+        updateBeaconState(newState);
         prevStateRef.current = newState;
       }
     }, 10000); // Check every 10 seconds
 
     return () => clearInterval(checkInterval);
-  }, [beaconState, checkEscalation]);
+  }, [beaconState, checkEscalation, updateBeaconState]);
 
   return beaconState;
 }

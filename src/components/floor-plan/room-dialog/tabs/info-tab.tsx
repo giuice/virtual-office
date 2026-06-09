@@ -54,8 +54,8 @@ export function InfoTab({
         <h3 className="text-sm font-medium">Features</h3>
         <div className="flex flex-wrap gap-1 mt-1">
           {features && features.length > 0 ? (
-            features.map((feature, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
+            features.map((feature) => (
+              <Badge key={feature} variant="secondary" className="text-xs">
                 {feature}
               </Badge>
             ))

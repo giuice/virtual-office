@@ -48,7 +48,7 @@ const EntryTypeIcon: React.FC<{ type: ActivityLogEntry['type']; className?: stri
   type, 
   className 
 }) => {
-  const iconClass = cn('w-3 h-3', className);
+  const iconClass = cn('size-3', className);
   
   switch (type) {
     case 'decision':
@@ -115,7 +115,7 @@ export const ActivityLogPreview: React.FC<ActivityLogPreviewProps> = ({
           Activity Log
         </span>
         {onViewAll && (
-          <button
+          <button type="button"
             onClick={onViewAll}
             className={cn(
               'text-[10px] text-[var(--vo-accent)] hover:underline',
@@ -123,7 +123,7 @@ export const ActivityLogPreview: React.FC<ActivityLogPreviewProps> = ({
             )}
           >
             View All
-            <ChevronRight className="w-3 h-3" />
+            <ChevronRight className="size-3" />
           </button>
         )}
       </div>

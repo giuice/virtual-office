@@ -56,29 +56,26 @@ export function useNeighborhoodFilters(
     return new Set();
   });
 
+  const validatedActiveFilters = useMemo(() => {
+    if (neighborhoods.length > 0 && activeFilters.size > 0) {
+      const validIds = new Set(neighborhoods.map(n => n.id));
+      return new Set(
+        [...activeFilters].filter(id => validIds.has(id))
+      );
+    }
+    return activeFilters;
+  }, [neighborhoods, activeFilters]);
+
   // Persist to sessionStorage when filters change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...activeFilters]));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...validatedActiveFilters]));
       } catch {
         // Ignore storage errors
       }
     }
-  }, [activeFilters]);
-
-  // Clean up filters when neighborhoods change (remove invalid IDs)
-  useEffect(() => {
-    if (neighborhoods.length > 0 && activeFilters.size > 0) {
-      const validIds = new Set(neighborhoods.map(n => n.id));
-      const cleanedFilters = new Set(
-        [...activeFilters].filter(id => validIds.has(id))
-      );
-      if (cleanedFilters.size !== activeFilters.size) {
-        setActiveFilters(cleanedFilters);
-      }
-    }
-  }, [neighborhoods, activeFilters]);
+  }, [validatedActiveFilters]);
 
   const toggleFilter = useCallback((neighborhoodId: string) => {
     setActiveFilters(prev => {
@@ -101,16 +98,14 @@ export function useNeighborhoodFilters(
   }, []);
 
   const isActive = useCallback((neighborhoodId: string) => {
-    return activeFilters.has(neighborhoodId);
-  }, [activeFilters]);
+    return validatedActiveFilters.has(neighborhoodId);
+  }, [validatedActiveFilters]);
 
-  const isShowingAll = useMemo(() => {
-    return activeFilters.size === 0;
-  }, [activeFilters]);
+  const isShowingAll = validatedActiveFilters.size === 0;
 
   const filterSpaces = useCallback((spaces: Space[]): Space[] => {
     // If no filters active, show all spaces
-    if (activeFilters.size === 0) {
+    if (validatedActiveFilters.size === 0) {
       return spaces;
     }
 
@@ -118,19 +113,19 @@ export function useNeighborhoodFilters(
     return spaces.filter(space => {
       // If space has a neighborhoodId, check if it's in active filters
       if (space.neighborhoodId) {
-        return activeFilters.has(space.neighborhoodId);
+        return validatedActiveFilters.has(space.neighborhoodId);
       }
       // Ungrouped spaces are hidden when specific filters are active
       return false;
     });
-  }, [activeFilters]);
+  }, [validatedActiveFilters]);
 
   const activeCount = useMemo(() => {
-    return activeFilters.size;
-  }, [activeFilters]);
+    return validatedActiveFilters.size;
+  }, [validatedActiveFilters]);
 
   return {
-    activeFilters,
+    activeFilters: validatedActiveFilters,
     toggleFilter,
     showAll,
     showOnly,

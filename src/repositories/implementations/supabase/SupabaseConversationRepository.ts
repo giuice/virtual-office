@@ -69,6 +69,22 @@ function mapPreferencesToCamelCase(data: ConversationPreferencesRow): Conversati
   };
 }
 
+function getPreferenceForUser(
+  preferences: ConversationPreferencesRow[] | ConversationPreferencesRow | null | undefined,
+  userId: string
+): ConversationPreferencesRow | null {
+  if (Array.isArray(preferences)) {
+    for (const preference of preferences) {
+      if (preference.user_id === userId) {
+        return preference;
+      }
+    }
+    return null;
+  }
+
+  return preferences?.user_id === userId ? preferences : null;
+}
+
 
 export class SupabaseConversationRepository implements IConversationRepository {
   private TABLE_NAME = 'conversations';
@@ -164,9 +180,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
         const conversation = mapToCamelCase(row as ConversationRow);
         
         // Find the user's preference from the joined result
-        const userPrefs = Array.isArray(row.conversation_preferences)
-          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
-          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
+        const userPrefs = getPreferenceForUser(row.conversation_preferences, userId);
         
         if (userPrefs) {
           conversation.preferences = mapPreferencesToCamelCase(userPrefs);
@@ -629,9 +643,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
 
       for (const row of data) {
         // Find the user's preference (join result is an array)
-        const userPrefs = Array.isArray(row.conversation_preferences)
-          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
-          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
+        const userPrefs = getPreferenceForUser(row.conversation_preferences, userId);
 
         // Filter by archive status if needed
         if (!options?.includeArchived) {

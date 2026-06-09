@@ -3,8 +3,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export async function createSupabaseServerClient(role?: 'service_role'): Promise<SupabaseClient> {
-  const cookieStore = await cookies()
-  
   // If service_role is requested, use the service role key instead of the anon key
   if (role === 'service_role') {
     // Make sure the SUPABASE_SERVICE_ROLE_KEY is set in your environment variables
@@ -24,6 +22,8 @@ export async function createSupabaseServerClient(role?: 'service_role'): Promise
       }
     )
   }
+
+  const cookieStore = await cookies()
   
   // Regular SSR client with cookie handling
   return createServerClient(

@@ -125,7 +125,7 @@ export function EnhancedMessageFeed({
           className="absolute -top-12 right-4 rounded-full shadow-lg"
           onClick={scrollToBottom}
         >
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-4" />
         </Button>
       </div>
     </div>

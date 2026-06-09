@@ -41,14 +41,13 @@ const MetricItem: React.FC<MetricItemProps> = ({
   highlight = false,
   className,
 }) => (
-  <div
+  <address
     className={cn(
-      'flex items-center gap-2 px-3 py-2 rounded-lg',
+      'flex items-center gap-2 px-3 py-2 rounded-lg not-italic',
       'transition-colors duration-200',
       highlight && 'bg-red-500/10',
       className
     )}
-    role="group"
     aria-label={`${label}: ${value}`}
   >
     <span className={cn('flex-shrink-0', iconColor)} aria-hidden="true">
@@ -63,7 +62,7 @@ const MetricItem: React.FC<MetricItemProps> = ({
         {value}
       </span>
     </div>
-  </div>
+  </address>
 );
 
 /**
@@ -92,17 +91,16 @@ export const NowBoardMetrics: React.FC<NowBoardMetricsProps> = ({
   const summaryText = `Office pulse: ${totalSpaces} spaces, ${onlineUsers} online, ${activeMeetings} in meetings, ${totalBeacons} beacons${hasCritical ? ` including ${criticalBeacons} critical` : ''}`;
 
   return (
-    <div
+    <address
       className={cn(
-        'flex items-center gap-1 flex-wrap',
+        'flex items-center gap-1 flex-wrap not-italic',
         className
       )}
-      role="group"
       aria-label={summaryText}
     >
       {/* Spaces count */}
       <MetricItem
-        icon={<LayoutGrid className="h-4 w-4" />}
+        icon={<LayoutGrid className="size-4" />}
         label="Spaces"
         value={totalSpaces}
         iconColor="text-blue-500"
@@ -110,7 +108,7 @@ export const NowBoardMetrics: React.FC<NowBoardMetricsProps> = ({
 
       {/* Online users */}
       <MetricItem
-        icon={<Users className="h-4 w-4" />}
+        icon={<Users className="size-4" />}
         label="Online"
         value={onlineUsers}
         iconColor="text-green-500"
@@ -118,7 +116,7 @@ export const NowBoardMetrics: React.FC<NowBoardMetricsProps> = ({
 
       {/* Active meetings */}
       <MetricItem
-        icon={<Video className="h-4 w-4" />}
+        icon={<Video className="size-4" />}
         label="Meetings"
         value={activeMeetings}
         iconColor="text-purple-500"
@@ -127,7 +125,7 @@ export const NowBoardMetrics: React.FC<NowBoardMetricsProps> = ({
       {/* Beacons - only show if there are any */}
       {hasBeacons && (
         <MetricItem
-          icon={<AlertCircle className="h-4 w-4" />}
+          icon={<AlertCircle className="size-4" />}
           label="Beacons"
           value={totalBeacons}
           iconColor={hasCritical ? 'text-red-500' : 'text-amber-500'}
@@ -137,7 +135,7 @@ export const NowBoardMetrics: React.FC<NowBoardMetricsProps> = ({
 
       {/* Screen reader only summary */}
       <span className="sr-only">{summaryText}</span>
-    </div>
+    </address>
   );
 };
 

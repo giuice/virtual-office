@@ -85,8 +85,8 @@ export function EnhancedUserMenu() {
   // If we don't have a user profile yet, show a simple loading state
   if (!currentUserProfile) {
     return (
-      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-        <div className="h-10 w-10 animate-pulse rounded-full bg-muted" />
+      <Button variant="ghost" className="relative size-10 rounded-full">
+        <div className="size-10 animate-pulse rounded-full bg-muted" />
       </Button>
     );
   }
@@ -101,10 +101,9 @@ export function EnhancedUserMenu() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="relative h-10 w-10 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        <button
+          type="button"
+          className="relative size-10 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <UploadableAvatar
             user={combinedUser}
@@ -112,7 +111,7 @@ export function EnhancedUserMenu() {
             className="cursor-pointer"
             showUploadButton={false}
           />
-        </div>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-64" align="end">
         <div className="grid gap-4">
@@ -130,7 +129,7 @@ export function EnhancedUserMenu() {
               </p>
               <div className="flex items-center mt-1">
                 <span className={`
-                  h-2 w-2 rounded-full mr-1
+                  size-2 rounded-full mr-1
                   ${currentStatus === 'online' ? 'bg-emerald-500' : 
                     currentStatus === 'away' ? 'bg-amber-500' : 
                     currentStatus === 'busy' ? 'bg-rose-500' : 
@@ -144,13 +143,13 @@ export function EnhancedUserMenu() {
           <div className="grid gap-2">
             <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
               <Link href="/dashboard/profile">
-                <Settings className="h-4 w-4" />
+                <Settings className="size-4" />
                 <span>Meu Perfil</span>
               </Link>
             </Button>
             <Button variant="ghost" className="flex items-center justify-start gap-2 h-9" asChild>
               <Link href="/settings">
-                <Settings className="h-4 w-4" />
+                <Settings className="size-4" />
                 <span>Settings</span>
               </Link>
             </Button>
@@ -160,7 +159,7 @@ export function EnhancedUserMenu() {
               onClick={handleSignOut}
               disabled={isSigningOut}
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="size-4" />
               <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
             </Button>
           </div>

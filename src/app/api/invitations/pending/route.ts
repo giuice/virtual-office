@@ -49,18 +49,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<PendingInvitat
 
 		console.log('[API /invitations/pending] Searching for:', { userEmail, nowIso });
 
-		// Use admin client for invitation operations (RLS bypass)
-		const { error: expireError } = await supabaseAdmin
-			.from('invitations')
-			.update({ status: 'expired' })
-			.eq('email', userEmail)
-			.eq('status', 'pending')
-			.lte('expires_at', nowIso);
-
-		if (expireError) {
-			console.warn('[API /invitations/pending] Failed to expire stale invitations:', expireError);
-		}
-
 		// Find pending invitation for this email (use admin client - RLS bypass)
 		const { data: invitation, error: invitationError } = await supabaseAdmin
 			.from('invitations')

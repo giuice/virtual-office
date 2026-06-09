@@ -24,7 +24,7 @@ export type NeighborhoodColor = typeof NEIGHBORHOOD_COLORS[number];
  * @param index Zero-based index
  * @returns CSS variable name for the neighborhood color
  */
-export function getNeighborhoodColor(index: number): NeighborhoodColor {
+function getNeighborhoodColor(index: number): NeighborhoodColor {
   const safeIndex = Math.abs(index) % NEIGHBORHOOD_COLORS.length;
   return NEIGHBORHOOD_COLORS[safeIndex];
 }
@@ -97,7 +97,7 @@ export function suggestNeighborhoodColor(usedColors: string[]): NeighborhoodColo
  * @param element Optional element to compute style from (defaults to document.documentElement)
  * @returns The computed color value (e.g., '#3B82F6')
  */
-export function resolveNeighborhoodColor(
+function resolveNeighborhoodColor(
   colorToken: string,
   element?: HTMLElement
 ): string {

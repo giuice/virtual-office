@@ -17,17 +17,18 @@ import { cn } from '@/lib/utils';
 export interface UserAvatarPresenceProps {
   user: UserPresenceData;
   onClick?: (userId: string) => void;
-  /** Avatar is actively speaking (shows animated glow ring) */
-  isSpeaking?: boolean;
-  /** Avatar is presenting/sharing screen (shows solid accent border) */
-  isPresenting?: boolean;
-  /** Avatar is muted/observer mode (shows dimmed state) */
-  isMuted?: boolean;
+  state?: {
+    /** Avatar is actively speaking (shows animated glow ring) */
+    speaking?: boolean;
+    /** Avatar is presenting/sharing screen (shows solid accent border) */
+    presenting?: boolean;
+    /** Avatar is muted/observer mode (shows dimmed state) */
+    muted?: boolean;
+    /** Show status text in tooltip */
+    showStatusInTooltip?: boolean;
+  };
   /** Avatar size - defaults to 'md' (36px per UX spec) */
   size?: 'sm' | 'md' | 'lg';
-  /** Show status text in tooltip */
-  showStatusInTooltip?: boolean;
-
 }
 
 // Size mapping to EnhancedAvatarV2 sizes
@@ -40,12 +41,13 @@ const sizeMap = {
 const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
   user,
   onClick,
-  isSpeaking = false,
-  isPresenting = false,
-  isMuted = false,
+  state,
   size = 'md',
-  showStatusInTooltip = true,
 }) => {
+  const isSpeaking = state?.speaking ?? false;
+  const isPresenting = state?.presenting ?? false;
+  const isMuted = state?.muted ?? false;
+  const showStatusInTooltip = state?.showStatusInTooltip ?? true;
   // Status color for presence indicator dot
   const statusColor = {
     online: 'bg-green-500',
@@ -54,7 +56,7 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
     offline: 'bg-gray-400',
   }[user.status || 'offline'] || 'bg-gray-400';
 
-  const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+  const handleAvatarPress: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     e.stopPropagation();
     if (onClick) {
       onClick(user.id);
@@ -73,7 +75,8 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
+          <button
+            type="button"
             className={cn(
               // Base styles - vo-avatar-item for constellation integration
               'vo-avatar-item relative inline-block',
@@ -90,22 +93,15 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
             )}
             data-avatar-interactive
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={handleClick}
+            onClick={handleAvatarPress}
             onPointerDown={(e) => e.stopPropagation()}
-            role={onClick ? 'button' : undefined}
             aria-label={onClick ? `User ${user.displayName}` : undefined}
-            tabIndex={onClick ? 0 : undefined}
-            onKeyDown={(e) => {
-              if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault();
-                onClick(user.id);
-              }
-            }}
+            tabIndex={onClick ? 0 : -1}
           >
             <EnhancedAvatarV2
               user={user}
               size={sizeMap[size]}
-              showStatus={false}
+              display={{ status: false }}
               className={cn(
                 // Photo-first design with 2px border (AC2)
                 'border-2',
@@ -119,12 +115,12 @@ const UserAvatarPresence: React.FC<UserAvatarPresenceProps> = ({
             {/* Presence status indicator dot */}
             <span
               className={cn(
-                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background',
+                'absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border border-background',
                 statusColor
               )}
               aria-hidden="true"
             />
-          </div>
+          </button>
         </TooltipTrigger>
         <TooltipContent>
           {/* Tooltip shows name, role, and status (AC6) */}

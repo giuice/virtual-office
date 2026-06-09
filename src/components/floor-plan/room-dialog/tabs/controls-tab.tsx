@@ -4,34 +4,43 @@
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Lock, Mic, MicOff, Monitor, Unlock } from 'lucide-react';
-import { RoomControlsProps } from '../types';
+export interface RoomControlState {
+  micActive: boolean;
+  screenSharing: boolean;
+  locked: boolean;
+  admin?: boolean;
+}
 
-interface ControlsTabProps extends RoomControlsProps {
-  /** Whether current user is an admin - controls room locking visibility */
-  isAdmin?: boolean;
+export interface RoomControlActions {
+  setIsMicActive: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsScreenSharing: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsRoomLocked: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+interface ControlsTabProps {
+  controls: RoomControlState;
+  actions: RoomControlActions;
 }
 
 export function ControlsTab({
-  isMicActive,
-  setIsMicActive,
-  isScreenSharing,
-  setIsScreenSharing,
-  isRoomLocked,
-  setIsRoomLocked,
-  isAdmin = false
+  controls,
+  actions
 }: ControlsTabProps) {
+  const { micActive, screenSharing, locked, admin = false } = controls;
+  const { setIsMicActive, setIsScreenSharing, setIsRoomLocked } = actions;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isMicActive ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+          {micActive ? <Mic className="size-4" /> : <MicOff className="size-4" />}
           <span>Microphone</span>
         </div>
         <Button 
-          variant={isMicActive ? "default" : "outline"}
-          onClick={() => setIsMicActive(!isMicActive)}
+          variant={micActive ? "default" : "outline"}
+          onClick={() => setIsMicActive(!micActive)}
         >
-          {isMicActive ? "Active" : "Muted"}
+          {micActive ? "Active" : "Muted"}
         </Button>
       </div>
       
@@ -39,32 +48,32 @@ export function ControlsTab({
       
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Monitor className="h-4 w-4" />
+          <Monitor className="size-4" />
           <span>Screen Sharing</span>
         </div>
         <Button 
-          variant={isScreenSharing ? "default" : "outline"}
-          onClick={() => setIsScreenSharing(!isScreenSharing)}
+          variant={screenSharing ? "default" : "outline"}
+          onClick={() => setIsScreenSharing(!screenSharing)}
         >
-          {isScreenSharing ? "Sharing" : "Share Screen"}
+          {screenSharing ? "Sharing" : "Share Screen"}
         </Button>
       </div>
       
       {/* Room locking is admin-only */}
-      {isAdmin && (
+      {admin && (
         <>
           <Separator />
           
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {isRoomLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              {locked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
               <span>Room Access</span>
             </div>
             <Button 
-              variant={isRoomLocked ? "destructive" : "outline"}
-              onClick={() => setIsRoomLocked(!isRoomLocked)}
+              variant={locked ? "destructive" : "outline"}
+              onClick={() => setIsRoomLocked(!locked)}
             >
-              {isRoomLocked ? "Locked" : "Unlocked"}
+              {locked ? "Locked" : "Unlocked"}
             </Button>
           </div>
         </>

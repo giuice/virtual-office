@@ -24,9 +24,11 @@ function resolveAppBaseUrl(request: Request): string {
 
 export async function POST(request: Request) {
   // Use service_role client for admin operations (sending invite emails)
-  const supabaseAdmin = await createSupabaseServerClient('service_role');
   // Use regular client for DB operations with RLS
-  const supabaseClient = await createSupabaseServerClient();
+  const [supabaseAdmin, supabaseClient] = await Promise.all([
+    createSupabaseServerClient('service_role'),
+    createSupabaseServerClient(),
+  ]);
   const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabaseClient);
   
   try {

@@ -64,17 +64,17 @@ export const floorPlanTokens = {
   // User avatar design tokens
   avatar: {
     size: {
-      xs: "h-6 w-6",
-      sm: "h-8 w-8", 
-      md: "h-10 w-10",
-      lg: "h-12 w-12"
+      xs: "size-6",
+      sm: "size-8", 
+      md: "size-10",
+      lg: "size-12"
     },
     
     border: "border-2 border-background",
     
     // Status indicator
     statusIndicator: {
-      size: "h-3 w-3",
+      size: "size-3",
       position: "-bottom-0.5 -right-0.5",
       online: "bg-emerald-500",
       away: "bg-amber-500",
@@ -105,7 +105,7 @@ export const floorPlanTokens = {
   capacityIndicator: {
     container: "flex items-center gap-1 text-xs text-muted-foreground",
     icon: {
-      base: "h-3.5 w-3.5",
+      base: "size-3.5",
       low: "text-emerald-500",  // <33% full
       medium: "text-amber-500", // 33-66% full
       high: "text-rose-500"     // >66% full
@@ -132,7 +132,7 @@ export const floorPlanTokens = {
 /**
  * Helper functions to work with the design system
  */
-export const floorPlanHelpers = {
+const floorPlanHelpers = {
   // Get space type styling
   getSpaceTypeClasses: (type: string): string => {
     return floorPlanTokens.spaceCard.typeColors[type as keyof typeof floorPlanTokens.spaceCard.typeColors] || 

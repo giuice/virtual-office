@@ -1,7 +1,8 @@
-// src/components/floor-plan/room-dialog/index.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+// src/components/floor-plan/room-dialog/index.tsx
+import { useReducerState } from '@/hooks/useReducerState';
+import { useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Space } from '@/types/database';
 import { UIUser as LocalUser } from '../types';
@@ -20,6 +21,47 @@ type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservati
 // Define the type for the update payload based on the hook
 type SpaceUpdateData = Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>>;
 
+function getInitialRoomData(room: Space | null, isCreating: boolean): Partial<Space> {
+  if (room && !isCreating) {
+    return {
+      ...room,
+      accessControl: room.accessControl || { isPublic: true },
+      reservations: room.reservations || [],
+    };
+  }
+
+  return {
+    name: '',
+    type: 'workspace',
+    status: 'available',
+    capacity: 4,
+    features: [],
+    position: { x: 100, y: 100, width: 200, height: 150 },
+    description: '',
+    accessControl: { isPublic: true },
+    reservations: [],
+  };
+}
+
+function validateRoomData(roomData: Partial<Space>): Record<string, string> {
+  const newErrors: Record<string, string> = {};
+
+  if (!roomData.name?.trim()) {
+    newErrors.name = 'Room name is required';
+  } else if (roomData.name.length > 30) {
+    newErrors.name = 'Room name must be 30 characters or less';
+  }
+
+  if (roomData.capacity && (roomData.capacity < 1 || roomData.capacity > 50)) {
+    newErrors.capacity = 'Capacity must be between 1 and 50';
+  }
+
+  if (roomData.description && roomData.description.length > 200) {
+    newErrors.description = 'Description must be 200 characters or less';
+  }
+
+  return newErrors;
+}
 
 export function RoomDialog({
   room,
@@ -32,85 +74,32 @@ export function RoomDialog({
   isAdmin = false // Added isAdmin prop
 }: RoomDialogProps & { companyId: string }) { // Remove onUpdate from props if no longer needed externally
   const { user } = useAuth();
+  const previousRoomInput = useRef({ room, isCreating });
   // Room state - Use global Space type
-  const [roomData, setRoomData] = useState<Partial<Space>>({
-    id: '',
-    name: '',
-    type: 'workspace',
-    status: 'available',
-    capacity: 4,
-    features: [],
-    position: { x: 100, y: 100, width: 200, height: 150 },
-    description: '',
-    accessControl: { isPublic: true },
-    reservations: []
-  });
-
-  // Form validation
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formValid, setFormValid] = useState(false);
+  const [roomData, setRoomData] = useReducerState<Partial<Space>>(() => getInitialRoomData(room, isCreating));
 
   // UI state
-  const [isMicActive, setIsMicActive] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isRoomLocked, setIsRoomLocked] = useState(false);
+  const [isMicActive, setIsMicActive] = useReducerState(false);
+  const [isScreenSharing, setIsScreenSharing] = useReducerState(false);
+  const [isRoomLocked, setIsRoomLocked] = useReducerState(false);
 
   // For direct messaging
-  const [messageUser, setMessageUser] = useState<LocalUser | null>(null);
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+  const [messageUser, setMessageUser] = useReducerState<LocalUser | null>(null);
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useReducerState(false);
 
   const { showSuccess, showError } = useNotification();
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(); // Call the update hook
   const { currentUserProfile } = useCompany();
 
-  // Initialize form with room data if editing
-  useEffect(() => {
-    if (room && !isCreating) {
-      setRoomData({
-        ...room,
-        accessControl: room.accessControl || { isPublic: true },
-        reservations: room.reservations || []
-      });
-      setIsRoomLocked(room.status === 'locked');
-    } else {
-      // Reset form for new room
-      setRoomData({
-        name: '',
-        type: 'workspace',
-        status: 'available',
-        capacity: 4,
-        features: [],
-        position: { x: 100, y: 100, width: 200, height: 150 },
-        description: '',
-        accessControl: { isPublic: true },
-        reservations: []
-      });
-      setIsRoomLocked(false);
-    }
-  }, [room, isCreating]);
+  if (previousRoomInput.current.room !== room || previousRoomInput.current.isCreating !== isCreating) {
+    previousRoomInput.current = { room, isCreating };
+    setRoomData(getInitialRoomData(room, isCreating));
+    setIsRoomLocked(room && !isCreating ? room.status === 'locked' : false);
+  }
 
-  // Validate form
-  useEffect(() => {
-    const newErrors: Record<string, string> = {};
-
-    if (!roomData.name?.trim()) {
-      newErrors.name = 'Room name is required';
-    } else if (roomData.name.length > 30) {
-      newErrors.name = 'Room name must be 30 characters or less';
-    }
-
-    if (roomData.capacity && (roomData.capacity < 1 || roomData.capacity > 50)) {
-      newErrors.capacity = 'Capacity must be between 1 and 50';
-    }
-
-    if (roomData.description && roomData.description.length > 200) {
-      newErrors.description = 'Description must be 200 characters or less';
-    }
-
-    setErrors(newErrors);
-    setFormValid(Object.keys(newErrors).length === 0);
-  }, [roomData]);
+  const errors = validateRoomData(roomData);
+  const formValid = Object.keys(errors).length === 0;
 
   // Handle sending a direct message to a user
   const handleMessageUser = (user: LocalUser) => {
@@ -214,17 +203,21 @@ export function RoomDialog({
               roomData={roomData}
               setRoomData={setRoomData}
               initialRoomData={room || undefined} // Handle null case by converting to undefined
-              isMicActive={isMicActive}
-              setIsMicActive={setIsMicActive}
-              isScreenSharing={isScreenSharing}
-              setIsScreenSharing={setIsScreenSharing}
-              isRoomLocked={isRoomLocked}
-              setIsRoomLocked={setIsRoomLocked}
+              controls={{
+                micActive: isMicActive,
+                screenSharing: isScreenSharing,
+                locked: isRoomLocked,
+                admin: isAdmin,
+              }}
+              controlActions={{
+                setIsMicActive,
+                setIsScreenSharing,
+                setIsRoomLocked,
+              }}
               handleMessageUser={handleMessageUser}
               handleJoinRoom={handleJoinRoom}
               onSave={handleSaveRoom}
               isSaving={updateSpace.isPending}
-              isAdmin={isAdmin}
             />
           )}
         </DialogContent>

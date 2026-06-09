@@ -535,13 +535,11 @@ export class GoogleAvatarService {
 
     const results: GoogleAvatarStorageResult[] = [];
 
-    for (const { userId, oauthData } of userOAuthDataPairs) {
+    const settledResults = await Promise.all(userOAuthDataPairs.map(async ({ userId, oauthData }, index) => {
       try {
+        await new Promise(resolve => setTimeout(resolve, index * 100));
         const result = await this.syncGoogleAvatar(userId, oauthData);
-        results.push(result);
-        
-        // Add a small delay to avoid overwhelming the database
-        await new Promise(resolve => setTimeout(resolve, 100));
+        return result;
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -550,12 +548,14 @@ export class GoogleAvatarService {
           error: errorMessage
         });
         
-        results.push({
+        return {
           success: false,
           error: `Bulk sync failed for user ${userId}: ${errorMessage}`
-        });
+        };
       }
-    }
+    }));
+
+    results.push(...settledResults);
 
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.length - successCount;

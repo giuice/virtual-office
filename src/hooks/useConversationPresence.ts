@@ -1,5 +1,6 @@
 // src/hooks/useConversationPresence.ts
-import { useEffect, useState, useCallback } from 'react';
+import { useReducerState } from '@/hooks/useReducerState';
+import { useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -9,8 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 export function useConversationPresence(conversationId: string | null) {
   const { user } = useAuth();
-  const [presenceState, setPresenceState] = useState<Record<string, any>>({});
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [presenceState, updatePresenceState] = useReducerState<Record<string, any>>({});
+  const [typingUsers, updateTypingUsers] = useReducerState<string[]>([]);
 
   // Send typing indicator
   const sendTypingIndicator = useCallback((isTyping: boolean) => {
@@ -49,8 +50,6 @@ export function useConversationPresence(conversationId: string | null) {
 
   useEffect(() => {
     if (!conversationId || !user) {
-      setPresenceState({});
-      setTypingUsers([]);
       return;
     }
 
@@ -66,7 +65,7 @@ export function useConversationPresence(conversationId: string | null) {
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         console.log('[useConversationPresence] Presence synced:', state);
-        setPresenceState(state);
+        updatePresenceState(state);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         console.log('[useConversationPresence] User joined:', key, newPresences);
@@ -82,7 +81,7 @@ export function useConversationPresence(conversationId: string | null) {
         // Don't show typing indicator for current user
         if (userId === user.id) return;
         
-        setTypingUsers(prev => {
+        updateTypingUsers(prev => {
           if (isTyping) {
             return prev.includes(userId) ? prev : [...prev, userId];
           } else {
@@ -93,7 +92,7 @@ export function useConversationPresence(conversationId: string | null) {
         // Auto-clear typing indicator after 3 seconds
         if (isTyping) {
           setTimeout(() => {
-            setTypingUsers(prev => prev.filter(id => id !== userId));
+            updateTypingUsers(prev => prev.filter(id => id !== userId));
           }, 3000);
         }
       })
@@ -115,24 +114,26 @@ export function useConversationPresence(conversationId: string | null) {
     return () => {
       console.log(`[useConversationPresence] Cleaning up presence for conversation ${conversationId}`);
       channel.unsubscribe();
-      setPresenceState({});
-      setTypingUsers([]);
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, updatePresenceState, updateTypingUsers]);
+
+  const activePresenceState = conversationId && user ? presenceState : {};
+  const activeTypingUsers = conversationId && user ? typingUsers : [];
 
   // Get list of users currently present in conversation
-  const presentUsers = Object.keys(presenceState).map(userId => {
-    const presence = presenceState[userId][0]; // Get the first presence record
-    return {
+  const presentUsers = Object.keys(activePresenceState).flatMap(userId => {
+    if (userId === user?.id) return [];
+    const presence = activePresenceState[userId][0]; // Get the first presence record
+    return [{
       userId,
       userDisplayName: presence?.userDisplayName,
       joinedAt: presence?.joinedAt
-    };
-  }).filter(u => u.userId !== user?.id); // Exclude current user
+    }];
+  });
 
   return {
     presentUsers,
-    typingUsers,
+    typingUsers: activeTypingUsers,
     sendTypingIndicator,
     handleTypingTimeout,
     isPresenceActive: !!conversationId && !!user

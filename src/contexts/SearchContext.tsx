@@ -1,7 +1,7 @@
 // src/contexts/SearchContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, use, useCallback, useMemo, useRef, useState } from 'react';
 import { UserPresenceData as User } from '@/types/database';
 import { usePresence } from './PresenceContext'; 
 
@@ -17,8 +17,7 @@ interface SearchContextType {
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 
-export function SearchProvider({ children }: { children: React.ReactNode }) {
-  const { users } = usePresence(); // To get real-time user presence data
+export function SearchProvider({ children }: { children: React.ReactNode }) { const { users } = usePresence(); // To get real-time user presence data
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[] | undefined>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -26,7 +25,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   // Function to handle search
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSearch = (query: string) => {
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current);
@@ -47,34 +46,37 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   
       setSearchResults(filteredUsers);
     }, 300);
-  };
+  }, [users]);
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
     setIsSearching(false);
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      searchQuery,
+      searchResults,
+      isSearching,
+      setSearchQuery: handleSearch,
+      setSearchResults,
+      clearSearch
+    }),
+    [clearSearch, handleSearch, isSearching, searchQuery, searchResults]
+  );
 
   return (
     <SearchContext.Provider
-      value={{
-        searchQuery,
-        searchResults,
-        isSearching,
-        setSearchQuery: handleSearch,
-        setSearchResults,
-        clearSearch
-      }}
+      value={value}
     >
       {children}
     </SearchContext.Provider>
   );
 }
 
-export const useSearch = () => {
-  const context = useContext(SearchContext);
+export const useSearch = () => { const context = use(SearchContext);
   if (context === undefined) {
-    throw new Error('useSearch must be used within a SearchProvider');
-  }
+    throw new Error('useSearch must be used within a SearchProvider'); }
   return context;
 };

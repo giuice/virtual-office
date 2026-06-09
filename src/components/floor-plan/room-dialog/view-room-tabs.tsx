@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Space } from '@/types/database';
 import { UIUser as LocalUser } from '../types';
 import { PeopleTab } from './tabs/people-tab';
-import { ControlsTab } from './tabs/controls-tab';
+import { ControlsTab, RoomControlActions, RoomControlState } from './tabs/controls-tab';
 import { ReservationsTab } from './tabs/reservations-tab';
 import { InfoTab } from './tabs/info-tab';
 import { getRoomTypeLabel } from './utils';
@@ -16,36 +16,26 @@ interface ViewRoomTabsProps {
   roomData: Partial<Space>;
   setRoomData: React.Dispatch<React.SetStateAction<Partial<Space>>>; // Added for neighborhood editing
   initialRoomData?: Partial<Space>; // Add initial room data for comparison
-  isMicActive: boolean;
-  setIsMicActive: React.Dispatch<React.SetStateAction<boolean>>;
-  isScreenSharing: boolean;
-  setIsScreenSharing: React.Dispatch<React.SetStateAction<boolean>>;
-  isRoomLocked: boolean;
-  setIsRoomLocked: React.Dispatch<React.SetStateAction<boolean>>;
+  controls: RoomControlState;
+  controlActions: RoomControlActions;
   handleMessageUser: (user: LocalUser) => void;
   handleJoinRoom: () => void;
   onSave: () => void;
   isSaving: boolean;
-  /** Whether current user is an admin */
-  isAdmin?: boolean;
 }
 
 export function ViewRoomTabs({
   roomData,
   setRoomData,
   initialRoomData,
-  isMicActive,
-  setIsMicActive,
-  isScreenSharing,
-  setIsScreenSharing,
-  isRoomLocked,
-  setIsRoomLocked,
+  controls,
+  controlActions,
   handleMessageUser,
   handleJoinRoom,
   onSave,
-  isSaving,
-  isAdmin = false
+  isSaving
 }: ViewRoomTabsProps) {
+  const isAdmin = controls.admin ?? false;
   // Compare current room data with initial data to detect changes
   const hasChanges = (() => {
     if (!initialRoomData) return false;
@@ -94,13 +84,8 @@ export function ViewRoomTabs({
 
         <TabsContent value="controls" className="mt-4">
           <ControlsTab
-            isMicActive={isMicActive}
-            setIsMicActive={setIsMicActive}
-            isScreenSharing={isScreenSharing}
-            setIsScreenSharing={setIsScreenSharing}
-            isRoomLocked={isRoomLocked}
-            setIsRoomLocked={setIsRoomLocked}
-            isAdmin={isAdmin}
+            controls={controls}
+            actions={controlActions}
           />
         </TabsContent>
 

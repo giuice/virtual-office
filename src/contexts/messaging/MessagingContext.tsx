@@ -1,7 +1,7 @@
 // src/contexts/messaging/MessagingContext.tsx
 'use client';
 
-import { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
   Message,
@@ -24,9 +24,7 @@ const DRAWER_STORAGE_KEYS = {
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
 
-// Provider component
-export function MessagingProvider({ children }: { children: React.ReactNode }) {
-  // Get conversation management hooks
+function useMessagingProviderValue(): MessagingContextType { // Get conversation management hooks
   const conversationsManager = useConversations();
   const { currentUserProfile } = useCompany();
   const [isMessagingV2Enabled, setIsMessagingV2Enabled] = useState(() => messagingFeatureFlags.isV2Enabled());
@@ -116,8 +114,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (currentUserProfile?.id) {
+  useEffect(() => { if (currentUserProfile?.id) {
       debugLogger.messaging.event('MessagingContext', 'refreshConversations:on-mount', { userId: currentUserProfile.id });
       void refreshConversations();
     }
@@ -182,6 +179,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const pollMs = Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : defaultMs;
 
     let stopped = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     const tick = async () => {
       if (stopped) return;
@@ -209,13 +207,18 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         debugLogger.messaging.warn('MessagingContext.poll', 'error', e);
       } finally {
-        if (!stopped) setTimeout(tick, pollMs);
+        if (!stopped) {
+          pollTimer = setTimeout(tick, pollMs);
+        }
       }
     };
 
-    setTimeout(tick, pollMs);
+    pollTimer = setTimeout(tick, pollMs);
     return () => {
       stopped = true;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
     };
   }, [currentUserProfile?.id, conversationsManager.conversations, refreshConversations]);
 
@@ -280,10 +283,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
     // 5) Retry loop with backoff in case replication delay prevents immediate discovery
     const delays = [200, 500, 1000];
-    for (const delay of delays) {
+    const retryFindConversation = async (attempt: number): Promise<boolean> => {
+      const delay = delays[attempt];
+      if (delay === undefined) {
+        return false;
+      }
+
       await new Promise((r) => setTimeout(r, delay));
       await refreshConversations();
-      const found = conversationsManager.conversations.find((c) => c.id === message.conversationId);
+      const conversationsById = new Map(conversationsManager.conversations.map((conversation) => [conversation.id, conversation]));
+      const found = conversationsById.get(message.conversationId);
       if (found) {
         if (debugLogger.messaging.enabled()) {
           debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:retry', {
@@ -294,19 +303,22 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         conversationsManager.updateConversationWithMessage(found.id, message as any, message.senderId);
         setActiveConversation(found);
         setIsDrawerOpen(true);
-        return;
+        return true;
       }
-    }
+      return retryFindConversation(attempt + 1);
+    };
+
+    if (await retryFindConversation(0)) return;
 
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.warn('MessagingContext.ensureOpenForMessage', 'miss:unresolved', {
         conversationId: message.conversationId,
       });
     }
-  }, [activeConversation?.id, conversationsManager, currentUserProfile?.id, refreshConversations, setActiveConversation]);
+  }, [activeConversation?.id, conversationsManager, refreshConversations, setActiveConversation]);
 
   const conversationIds = useMemo(() => {
-    const ids = conversationsManager.conversations.map((c) => c.id).filter(Boolean) as string[];
+    const ids = conversationsManager.conversations.flatMap((c) => c.id ? [c.id] : []);
     ids.sort();
     return ids;
   }, [conversationsManager.conversations]);
@@ -432,18 +444,19 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     isMessagingV2Enabled,
   };
 
-  return (
-    <MessagingContext.Provider value={value}>
-      {children}
-    </MessagingContext.Provider>
-  );
+  return value;
+}
+
+// Provider component
+export function MessagingProvider({ children }: { children: React.ReactNode }) {
+  const value = useMessagingProviderValue();
+
+  return <MessagingContext.Provider value={value}>{children}</MessagingContext.Provider>;
 }
 
 // Custom hook to use the messaging context
-export function useMessaging() {
-  const context = useContext(MessagingContext);
+export function useMessaging() { const context = use(MessagingContext);
   if (context === undefined) {
-    throw new Error('useMessaging must be used within a MessagingProvider');
-  }
+    throw new Error('useMessaging must be used within a MessagingProvider'); }
   return context;
 }

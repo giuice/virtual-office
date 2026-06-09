@@ -79,7 +79,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
       {/* Search input */}
       <div className="p-3 border-b">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search users or rooms..."
@@ -98,11 +98,11 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
       >
         <TabsList className="w-full grid grid-cols-2 mx-3 mt-2">
           <TabsTrigger value="users" className="flex items-center gap-1.5">
-            <MessageSquare className="h-3.5 w-3.5" />
+            <MessageSquare className="size-3.5" />
             Users ({filteredUsers.length})
           </TabsTrigger>
           <TabsTrigger value="rooms" className="flex items-center gap-1.5">
-            <Hash className="h-3.5 w-3.5" />
+            <Hash className="size-3.5" />
             Rooms ({filteredRooms.length})
           </TabsTrigger>
         </TabsList>
@@ -117,7 +117,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
                 </div>
               ) : (
                 filteredUsers.map((user) => (
-                  <button
+                  <button type="button"
                     key={user.id}
                     onClick={() => onSelectUser(user.id)}
                     className={cn(
@@ -128,7 +128,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
                       <EnhancedAvatarV2
                         user={user}
                         size="sm"
-                        showStatus
+                        display={{ status: true }}
                         status={user.status}
                       />
                     </div>
@@ -157,15 +157,15 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
                 </div>
               ) : (
                 filteredRooms.map((room) => (
-                  <button
+                  <button type="button"
                     key={room.id}
                     onClick={() => onSelectRoom(room.id, room.name)}
                     className={cn(
                       'flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent w-full'
                     )}
                   >
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
-                      <Hash className="h-4 w-4" />
+                    <div className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+                      <Hash className="size-4" />
                     </div>
                     <div className="flex-1 overflow-hidden min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">

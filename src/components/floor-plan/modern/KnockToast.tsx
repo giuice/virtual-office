@@ -3,6 +3,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { DoorOpen, Check, X } from 'lucide-react';
 
@@ -60,14 +61,16 @@ export const KnockToast: React.FC<KnockToastProps> = ({
 			{/* Knock icon or avatar */}
 			<div className="flex-shrink-0">
 				{requesterAvatarUrl ? (
-					<img
+					<Image
 						src={requesterAvatarUrl}
 						alt={`${requesterName}'s avatar`}
-						className="w-10 h-10 rounded-full object-cover border-2 border-[var(--vo-border-subtle)]"
+						width={40}
+						height={40}
+						className="size-10 rounded-full object-cover border-2 border-[var(--vo-border-subtle)]"
 					/>
 				) : (
-					<div className="w-10 h-10 rounded-full bg-[var(--vo-pill-bg)] flex items-center justify-center">
-						<DoorOpen className="w-5 h-5 text-[var(--vo-pill-text)]" />
+					<div className="size-10 rounded-full bg-[var(--vo-pill-bg)] flex items-center justify-center">
+						<DoorOpen className="size-5 text-[var(--vo-pill-text)]" />
 					</div>
 				)}
 			</div>
@@ -84,14 +87,14 @@ export const KnockToast: React.FC<KnockToastProps> = ({
 
 			{/* Action buttons */}
 			<div className="flex gap-2 flex-shrink-0">
-				<button
+				<button type="button"
 					onClick={(e) => {
 						e.stopPropagation();
 						onApprove();
 					}}
 					className={cn(
 						'flex items-center justify-center',
-						'w-9 h-9 rounded-lg',
+						'size-9 rounded-lg',
 						'bg-green-500/20 hover:bg-green-500/30',
 						'text-green-600 dark:text-green-400',
 						'transition-colors duration-150',
@@ -100,16 +103,16 @@ export const KnockToast: React.FC<KnockToastProps> = ({
 					aria-label={`Let ${requesterName} in`}
 					title="Let in"
 				>
-					<Check className="w-5 h-5" />
+					<Check className="size-5" />
 				</button>
-				<button
+				<button type="button"
 					onClick={(e) => {
 						e.stopPropagation();
 						onDeny();
 					}}
 					className={cn(
 						'flex items-center justify-center',
-						'w-9 h-9 rounded-lg',
+						'size-9 rounded-lg',
 						'bg-red-500/20 hover:bg-red-500/30',
 						'text-red-600 dark:text-red-400',
 						'transition-colors duration-150',
@@ -118,11 +121,9 @@ export const KnockToast: React.FC<KnockToastProps> = ({
 					aria-label={`Deny ${requesterName}`}
 					title="Deny"
 				>
-					<X className="w-5 h-5" />
+					<X className="size-5" />
 				</button>
 			</div>
 		</div>
 	);
 };
-
-export default KnockToast;
