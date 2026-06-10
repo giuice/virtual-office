@@ -9,6 +9,21 @@
 
 ---
 
+## Implementation Progress (update as fixes land)
+
+### Phase 0 — Stop the bleeding
+- [x] **S-01** — authorization on `/api/conversations/join` → commit `b17a696` (+ shared helper `src/lib/auth/authorize.ts`)
+- [x] **S-02 / B-09** — legacy `/api/conversations/create` deleted (removes the debug-leak 500 path) → commit `eb70105`
+- [x] **S-04** — `messages/create` hardened: `status='sent'` forced server-side, `replyToId` validated same-conversation, 8 KB content cap, authz via `requireConversationParticipant`; route tests added (`__tests__/api/messages-create-route.test.ts`, 6 pass) → commit `3772c70`
+- [x] **X-01 (verification)** — **CONFIRMED 2026-06-10 with runtime evidence**: anonymous REST request (anon key only, no session) reads `users` rows including `email`, `status`, `role`, `current_space_id` (HTTP 200 + data), reads `spaces`, and an anonymous `PATCH` on `users` returns **204 (write permitted)**. Dedicated task opened: `docs/rls-enablement-task.md`. Remediation itself is a separate track (touches presence — consult `/presence-safety` first).
+- [ ] **S-03** — attachments bucket (private + signed URLs, size/MIME limits) — not yet started
+
+### Phase 1 — pending (not started)
+### Phase 2 — pending (not started)
+### Phase 3 — pending (not started)
+
+---
+
 ## Executive Summary
 
 The messaging system works for the happy path (send/receive text in an open conversation) but has **2 critical security holes**, **~8 features that are silently broken end-to-end** (unread counts, mark-as-read, typing indicators, reaction-removal sync, message status, grouped/summary endpoints), and a **split-brain architecture**: conversations live in `useState` + 5-second polling while a parallel realtime layer invalidates TanStack Query keys nobody uses. There are also three overlapping, mutually inconsistent read-tracking mechanisms. A separate, **platform-wide critical** RLS gap was found outside messaging (see §6).
