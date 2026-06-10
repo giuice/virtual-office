@@ -157,10 +157,6 @@ export class SupabaseConversationRepository implements IConversationRepository {
         query = query.eq('type', options.type);
       }
 
-      if (!options?.includeArchived) {
-        query = query.eq('is_archived', false);
-      }
-
       const { data, error, count } = await query.range(from, to);
 
       if (error) {
@@ -171,19 +167,30 @@ export class SupabaseConversationRepository implements IConversationRepository {
       // Map DB response array with preferences
       const items: Conversation[] = [];
       for (const row of (data || [])) {
-        const conversation = mapToCamelCase(row as ConversationRow);
-        
-        // Find the user's preference from the joined result
         const userPrefs = getPreferenceForUser(row.conversation_preferences, userId);
-        
+
+        // Audit M-02: archiving is per-user — the archive route writes
+        // conversation_preferences.is_archived, so that is what hides a
+        // conversation here. The global column only acts as a fallback.
+        if (!options?.includeArchived) {
+          const isArchived = userPrefs?.is_archived ?? row.is_archived ?? false;
+          if (isArchived) continue;
+        }
+
+        const conversation = mapToCamelCase(row as ConversationRow);
         if (userPrefs) {
           conversation.preferences = mapPreferencesToCamelCase(userPrefs);
         }
-        
+        // Serialize the effective per-user archive state so the client reads
+        // one coherent flag.
+        conversation.isArchived = userPrefs?.is_archived ?? conversation.isArchived ?? false;
+
         items.push(conversation);
       }
 
-      const nextCursor = items.length === limit ? (to + 1).toString() : null;
+      // Advance the cursor by rows consumed (not rows kept after the
+      // per-user archive filter), or pagination would skip records.
+      const nextCursor = (data?.length ?? 0) === limit ? (to + 1).toString() : null;
 
       return {
         items,

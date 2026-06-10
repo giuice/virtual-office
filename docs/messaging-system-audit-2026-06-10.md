@@ -24,7 +24,7 @@
 - [x] **B-04** — shared `src/lib/messaging/message-cache.ts` helper (`appendMessageToPages` / `replaceMessageInPages`) used by both realtime and optimistic paths: append to page 0, cross-page dedupe, temp→saved swap drops dupes. Multi-page unit tests in `__tests__/messaging/message-cache.test.ts`. → commit `fix(messaging): realtime inserts land in page 0...`
 - [x] **B-02** — deleted `/api/messages/typing` + `useTypingIndicator` + `messagingApi.sendTypingIndicator`. `useConversationPresence` is the single channel owner (send reuses the subscribed channel — leak fixed), exposes debounced `notifyTyping`/`stopTyping`, typing users carry display names. Production drawer (`message-feed.tsx`) now renders `TypingIndicator` and broadcasts composer input. Enhanced* (debug-only) made prop-driven. **Verify with two browsers when convenient.**
 - [x] **B-08** — deleted (no consumers): `getGroupedConversations`/`getUnreadSummary` client methods, `grouped=`/`summary=` route branches, `findByUserGrouped`/`getUnreadSummary` repo methods, `GroupedConversations`/`UnreadSummary` types, their tests. `pinned=` path kept (shape was correct). Also cleared L-02 commented instrumentation in `conversations/get`.
-- [ ] **M-02** — per-user archive filtering
+- [x] **M-02** — `findByUser` now filters by the per-user preference (pref > global fallback) in JS post-map, serializes the *effective* per-user `isArchived`, and advances the cursor by rows consumed. Client optimistic updates keep flag + preference in sync via `applyArchiveState`. Also fixed L-01 (dead lodash import, wrong file-header path).
 - [ ] **M-03** — composite cursor + drop probe query
 ### Phase 2 — pending (not started)
 ### Phase 3 — pending (not started)

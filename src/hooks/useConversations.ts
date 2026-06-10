@@ -1,4 +1,4 @@
-// src/contexts/messaging/useConversations.ts
+// src/hooks/useConversations.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -6,7 +6,6 @@ import { Conversation, ConversationType } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
 import { debugLogger } from '@/utils/debug-logger';
-import set from 'lodash/set';
 
 const getTimestamp = (): number => {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -14,6 +13,16 @@ const getTimestamp = (): number => {
   }
   return Date.now();
 };
+
+// Archive is a per-user preference (audit M-02); keep the effective flag and
+// the preference object in sync on optimistic updates.
+const applyArchiveState = (conversation: Conversation, isArchived: boolean): Conversation => ({
+  ...conversation,
+  isArchived,
+  preferences: conversation.preferences
+    ? { ...conversation.preferences, isArchived }
+    : conversation.preferences,
+});
 
 const createTraceId = (prefix: string): string => {
   try {
@@ -323,12 +332,13 @@ export function useConversations() {
       });
     }
 
-    // Optimistic update first
+    // Optimistic update first (archive is per-user — audit M-02: keep the
+    // effective flag and the preference in sync)
     let reverted = false;
-    setConversations(prev => 
-      prev.map(conversation => 
-        conversation.id === conversationId 
-          ? { ...conversation, isArchived: true } 
+    setConversations(prev =>
+      prev.map(conversation =>
+        conversation.id === conversationId
+          ? applyArchiveState(conversation, true)
           : conversation
       )
     );
@@ -346,10 +356,10 @@ export function useConversations() {
     } catch (error) {
       // Revert on error
       reverted = true;
-      setConversations(prev => 
-        prev.map(conversation => 
-          conversation.id === conversationId 
-            ? { ...conversation, isArchived: false } 
+      setConversations(prev =>
+        prev.map(conversation =>
+          conversation.id === conversationId
+            ? applyArchiveState(conversation, false)
             : conversation
         )
       );
@@ -380,10 +390,10 @@ export function useConversations() {
     }
     // Optimistic update first
     let failed = false;
-    setConversations(prev => 
-      prev.map(conversation => 
-        conversation.id === conversationId 
-          ? { ...conversation, isArchived: false } 
+    setConversations(prev =>
+      prev.map(conversation =>
+        conversation.id === conversationId
+          ? applyArchiveState(conversation, false)
           : conversation
       )
     );
@@ -396,10 +406,10 @@ export function useConversations() {
     } catch (error) {
       // Revert on error
       failed = true;
-      setConversations(prev => 
-        prev.map(conversation => 
-          conversation.id === conversationId 
-            ? { ...conversation, isArchived: true } 
+      setConversations(prev =>
+        prev.map(conversation =>
+          conversation.id === conversationId
+            ? applyArchiveState(conversation, true)
             : conversation
         )
       );
