@@ -2,49 +2,40 @@ import { ICompanyRepository, IUserRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { Company } from '@/types/database';
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-
-  // Get Supabase client using the server helper
-  const supabase = await createSupabaseServerClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    // Check if the user is authenticated
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
 
-  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
-  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
-
-  try {
-    const { name, creatorSupabaseUid, settings } = await request.json();
-
-    // Validate required fields
-    if (!name || !creatorSupabaseUid) {
+    if (authContext.dbUser.companyId) {
       return NextResponse.json(
-        { error: 'Missing required fields: name and creatorFirebaseUid are required.' },
-        { status: 400 }
+        { success: false, error: 'You already belong to a company. Leave your current company before creating a new one.' },
+        { status: 409 }
       );
     }
 
-    // 1. Get the user 
-    const creatorUser = await userRepository.findBySupabaseUid(creatorSupabaseUid);
+    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(authContext.supabase);
+    const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
+    const { name, settings } = await request.json();
 
-    if (!creatorUser) {
+    // Validate required fields
+    if (!name) {
       return NextResponse.json(
-        { success: false, error: 'Creator user not found in Supabase.' },
-        { status: 404 }
+        { error: 'Missing required field: name is required.' },
+        { status: 400 }
       );
     }
 
     // 2. Prepare company data with the correct Supabase User UUID as admin
     const companyData: Omit<Company, 'id' | 'createdAt'> = {
       name: name,
-      adminIds: [creatorUser.id], // Use the Supabase User UUID
+      adminIds: [authContext.dbUser.id],
       settings: settings || {}, // Use provided settings or default to empty object
     };
 
@@ -60,12 +51,12 @@ export async function POST(request: Request) {
 
     // 3. Update the creator's user record with the new company ID
     try {
-      const updatedUser = await userRepository.update(creatorUser.id, { companyId: newCompany.id });
+      const updatedUser = await userRepository.update(authContext.dbUser.id, { companyId: newCompany.id, role: 'admin' });
       if (!updatedUser) {
-        console.warn(`Company ${newCompany.id} created, but failed to update user ${creatorUser.id} with companyId.`);
+        console.warn(`Company ${newCompany.id} created, but failed to update user ${authContext.dbUser.id} with companyId.`);
       }
     } catch (userUpdateError) {
-      console.error(`Error updating user ${creatorUser.id} after company creation:`, userUpdateError);
+      console.error(`Error updating user ${authContext.dbUser.id} after company creation:`, userUpdateError);
       // Log and continue, returning the created company.
     }
 

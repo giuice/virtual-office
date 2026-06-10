@@ -1,50 +1,37 @@
 import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-
-// TODO: Implement proper authentication
-const getUserIdFromRequest = (): string | null => {
-  // Replace with actual authentication logic
-  return 'placeholder-auth-user-id-app-router';
-};
-
-// TODO: Implement proper authorization check
-const canDeleteSpace = async (userId: string, spaceId: string, repository: ISpaceRepository): Promise<boolean> => {
-  // Example: Check if user is admin or creator of the space
-  // const space = await repository.findById(spaceId);
-  // return space?.createdBy === userId || userHasAdminRole(userId);
-  return true; // Placeholder
-};
+import { requireAuthUser } from '@/lib/auth/session';
 
 export async function DELETE(request: Request) {
-  // Authentication check
-  const authenticatedUserId = getUserIdFromRequest();
-  if (!authenticatedUserId) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const spaceId = searchParams.get('id');
-
-  if (!spaceId) {
-    return NextResponse.json(
-      { message: 'Space ID is required' },
-      { status: 400 }
-    );
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
-
   try {
-    // Authorization check
-    const authorized = await canDeleteSpace(authenticatedUserId, spaceId, spaceRepository);
-    if (!authorized) {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const spaceId = searchParams.get('id') || searchParams.get('spaceId');
+
+    if (!spaceId) {
       return NextResponse.json(
-        { message: 'Forbidden: User cannot delete this space' },
-        { status: 403 }
+        { message: 'Space ID is required' },
+        { status: 400 }
       );
+    }
+
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
+
+    const existingSpace = await spaceRepository.findById(spaceId);
+    if (!existingSpace) {
+      return NextResponse.json(
+        { message: `Space with ID ${spaceId} not found or delete failed` },
+        { status: 404 }
+      );
+    }
+
+    if (existingSpace.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot delete spaces outside your company' }, { status: 403 });
     }
 
     const success = await spaceRepository.deleteById(spaceId);
@@ -60,10 +47,10 @@ export async function DELETE(request: Request) {
       { message: 'Space deleted successfully' },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting space:', error);
     return NextResponse.json(
-      { message: error.message || 'Failed to delete space' },
+      { message: error instanceof Error ? error.message : 'Failed to delete space' },
       { status: 500 }
     );
   }

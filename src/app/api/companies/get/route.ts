@@ -1,12 +1,17 @@
 import { ICompanyRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -14,8 +19,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
-  const supabase = await createSupabaseServerClient();
-  const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
+    if (id !== authContext.dbUser.companyId) {
+      return NextResponse.json({ error: 'Cannot access companies outside your account' }, { status: 403 });
+    }
+
+    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(authContext.supabase);
     const company = await companyRepository.findById(id);
     
     if (!company) {

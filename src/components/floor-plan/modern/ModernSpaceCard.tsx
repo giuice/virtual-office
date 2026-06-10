@@ -215,7 +215,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     if (e) {
       const target = e.target as HTMLElement;
       // Prevent clicks on interactive elements within the card from triggering navigation
-      if (target.closest('[data-avatar-interactive="true"]') || target.closest('a, button:not([data-space-action])')) {
+      if (target.closest('[data-avatar-interactive]') || target.closest('a, button:not([data-space-action])')) {
         e.stopPropagation();
         return;
       }

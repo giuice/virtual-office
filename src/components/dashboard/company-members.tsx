@@ -3,14 +3,12 @@
 import { useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar } from '@/components/ui/avatar';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InviteUserDialog } from './invite-user-dialog';
-import { getUserInitials } from '@/lib/avatar-utils';
 import { UserRole, User } from '@/types/database';
 import { useNotification } from '@/hooks/useNotification';
 import { Mail, ExternalLink } from 'lucide-react';
@@ -18,18 +16,6 @@ import Link from 'next/link';
 
 // Role Management Dialog Component
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'online':
-      return 'bg-green-500';
-    case 'away':
-      return 'bg-yellow-500';
-    case 'busy':
-      return 'bg-red-500';
-    default:
-      return 'bg-gray-400';
-  }
-};
 const getRoleBadge = (role: string) => {
   switch (role) {
     case 'admin':

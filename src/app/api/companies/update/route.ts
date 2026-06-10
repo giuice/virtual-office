@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server';
 import { ICompanyRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
 import type { Company } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-
-    // Authenticate the caller (server-side: use getUser, not getSession)
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
 
     const url = new URL(request.url);
@@ -22,9 +19,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
     }
 
+    if (id !== authContext.dbUser.companyId || authContext.dbUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Only company admins can update this company' }, { status: 403 });
+    }
+
     const companyData: Partial<Omit<Company, 'id' | 'createdAt' | 'updatedAt'>> = await request.json();
 
-    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabase);
+    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(authContext.supabase);
     const updatedCompany = await companyRepository.update(id, companyData);
 
     if (!updatedCompany) {

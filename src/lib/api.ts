@@ -77,18 +77,18 @@ export async function getUserById(supabase_uid: string): Promise<User | null> {
 }
 
 /**
- * Update a user's status by Supabase UID
+ * Update a user's status by database user ID
  */
 /**
  * Update user status via the server-side API
   */
 export async function updateUserStatus(
-  userId: string,
+  userDbId: string,
   status: 'online' | 'offline' | 'away' | 'busy',
   statusMessage?: string
 ): Promise<void> {
   try {
-        const response = await fetch(`/api/users/update?id=${userId}`, {
+        const response = await fetch(`/api/users/update?id=${userDbId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -319,4 +319,3 @@ export async function getSpacesByCompany(companyId: string): Promise<Space[]> {
     throw error;
   }
 }
-

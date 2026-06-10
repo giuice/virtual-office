@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
+import { extractUserUploadsPath } from '@/lib/user-uploads-storage';
 import sharp from 'sharp'; // For image processing
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    // Get Supabase client using the server helper
-    const supabase = await createSupabaseServerClient(); // Use the async helper
-
-    // Use getUser() instead of getSession() for better security as per warning
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    // Check if the user is authenticated
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
 
-
-  const { userRepository } = await getSupabaseRepositories(supabase);
-    const userDbId = await userRepository.findBySupabaseUid(user.id).then(user => user?.id) as string;
-    console.log('userDbId', userDbId);
+    const { userRepository } = await getSupabaseRepositories(authContext.supabase);
+    const userDbId = authContext.dbUser.id;
+    const oldAvatarUrl = authContext.dbUser.avatarUrl;
     // Parse the multipart form data
     const formData = await req.formData();
     const avatarFile = formData.get('avatar') as File;
@@ -117,12 +112,8 @@ export async function POST(req: NextRequest) {
         buffer = new Uint8Array(buffer);
       }
 
-      // Log the file size reduction
-      console.log(`Avatar image processed: Original size: ${(arrayBuffer.byteLength / 1024).toFixed(2)} KB, Processed size: ${(buffer.length / 1024).toFixed(2)} KB`);
     } catch (processingError) {
       console.error('Error processing image:', processingError);
-      // Continue with original buffer if processing fails
-      console.log('Using original image due to processing error');
       // We don't return an error here, we'll just use the original image
     }
 
@@ -133,7 +124,7 @@ export async function POST(req: NextRequest) {
     // Upload the file to Supabase Storage using service role client to bypass RLS
     // We can do this safely on the server since we've already authenticated the user
     const serviceRoleSupabase = await createSupabaseServerClient('service_role');
-    const { data: uploadData, error: uploadError } = await serviceRoleSupabase.storage
+    const { error: uploadError } = await serviceRoleSupabase.storage
       .from('user-uploads')
       .upload(filePath, buffer, {
         contentType: avatarFile.type,
@@ -153,17 +144,6 @@ export async function POST(req: NextRequest) {
       .from('user-uploads')
       .getPublicUrl(filePath);
 
-    console.log(`Avatar uploaded successfully: ${filePath}`);
-    console.log(`Public URL generated: ${publicUrl}`);
-
-    // Test if the URL is immediately accessible
-    try {
-      const testResponse = await fetch(publicUrl, { method: 'HEAD', cache: 'no-store' });
-      console.log(`Avatar URL test: ${testResponse.status} ${testResponse.statusText}`);
-    } catch (testError) {
-      console.warn('Avatar URL test failed:', testError);
-    }
-
     // Update the user using the repository with userDbId (the database UUID)
     const updatedUser = await userRepository.update(userDbId, {
       avatarUrl: publicUrl
@@ -174,6 +154,17 @@ export async function POST(req: NextRequest) {
         { error: 'Failed to update user profile' },
         { status: 500 }
       );
+    }
+
+    const oldAvatarPath = extractUserUploadsPath(oldAvatarUrl);
+    if (oldAvatarPath && oldAvatarPath !== filePath) {
+      const { error: removeOldAvatarError } = await serviceRoleSupabase.storage
+        .from('user-uploads')
+        .remove([oldAvatarPath]);
+
+      if (removeOldAvatarError) {
+        console.warn('Failed to remove old avatar object:', removeOldAvatarError.message);
+      }
     }
 
     return NextResponse.json({

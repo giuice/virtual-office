@@ -1,22 +1,29 @@
 import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Space } from '@/types/database';
+import { requireAuthUser } from '@/lib/auth/session';
 
 export async function GET(request: Request) {
-  // Get companyId from URL params
-  const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-
-  if (!companyId) {
-    return NextResponse.json({ message: 'Company ID is required' }, { status: 400 });
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
-
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    // Get companyId from URL params
+    const { searchParams } = new URL(request.url);
+    const companyId = searchParams.get('companyId');
+
+    if (!companyId) {
+      return NextResponse.json({ message: 'Company ID is required' }, { status: 400 });
+    }
+
+    if (companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot access spaces outside your company' }, { status: 403 });
+    }
+
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
     // Use the repository method to fetch spaces
     const spaces = await spaceRepository.findByCompany(companyId);
 
@@ -30,6 +37,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
     const spaceData = await request.json();
 
     // Basic validation
@@ -40,8 +52,11 @@ export async function POST(request: Request) {
       );
     }
 
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
+    if (spaceData.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot create spaces outside your company' }, { status: 403 });
+    }
+
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
 
     // Create new space
     const newSpace = await spaceRepository.create(spaceData);
@@ -58,6 +73,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
     const { id: spaceId, ...updateData } = await request.json();
 
     if (!spaceId) {
@@ -67,8 +87,18 @@ export async function PUT(request: Request) {
       );
     }
 
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
+    const existingSpace = await spaceRepository.findById(spaceId);
+    if (!existingSpace) {
+      return NextResponse.json(
+        { message: `Space with ID ${spaceId} not found` },
+        { status: 404 }
+      );
+    }
+
+    if (existingSpace.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot update spaces outside your company' }, { status: 403 });
+    }
 
     // Remove fields that shouldn't be updated directly
     delete updateData.createdAt;
@@ -96,20 +126,35 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const spaceId = searchParams.get('id');
-
-  if (!spaceId) {
-    return NextResponse.json(
-      { message: 'Space ID is required' },
-      { status: 400 }
-    );
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
-
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const spaceId = searchParams.get('id');
+
+    if (!spaceId) {
+      return NextResponse.json(
+        { message: 'Space ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
+    const existingSpace = await spaceRepository.findById(spaceId);
+    if (!existingSpace) {
+      return NextResponse.json(
+        { message: `Space with ID ${spaceId} not found or delete failed` },
+        { status: 404 }
+      );
+    }
+
+    if (existingSpace.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot delete spaces outside your company' }, { status: 403 });
+    }
+
     const success = await spaceRepository.deleteById(spaceId);
 
     if (!success) {

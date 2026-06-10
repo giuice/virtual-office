@@ -1,8 +1,8 @@
 // src/repositories/implementations/supabase/SupabaseMeetingNoteRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IMeetingNoteRepository } from '@/repositories/interfaces/IMeetingNoteRepository';
 import { MeetingNote } from '@/types/database'; // Removed ActionItem import here
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase for MeetingNote
 // Note: This does NOT include actionItems, as they are in a separate table.
@@ -32,9 +32,14 @@ function mapArrayToCamelCase(dataArray: any[]): MeetingNote[] {
 
 export class SupabaseMeetingNoteRepository implements IMeetingNoteRepository {
   private TABLE_NAME = 'meeting_notes'; // Ensure this matches your Supabase table name
+  private client: SupabaseClient;
+
+  constructor(client: SupabaseClient) {
+    this.client = client;
+  }
 
   async findById(id: string): Promise<MeetingNote | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .select('*') // Select only columns from meeting_notes table
       .eq('id', id)
@@ -55,7 +60,7 @@ export class SupabaseMeetingNoteRepository implements IMeetingNoteRepository {
     const to = from + limit - 1;
 
     // Query meeting notes for the room, ordered by meeting date descending
-    const { data, error, count } = await supabase
+    const { data, error, count } = await this.client
       .from(this.TABLE_NAME)
       .select('*', { count: 'exact' })
       .eq('room_id', roomId) // Assuming snake_case
@@ -96,7 +101,7 @@ export class SupabaseMeetingNoteRepository implements IMeetingNoteRepository {
         // createdAt/updatedAt handled by Supabase defaults/triggers
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -123,7 +128,7 @@ export class SupabaseMeetingNoteRepository implements IMeetingNoteRepository {
     if (editedBy !== undefined) dbUpdates.edited_by = editedBy;
     // updatedAt handled by Supabase trigger ideally
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -144,7 +149,7 @@ export class SupabaseMeetingNoteRepository implements IMeetingNoteRepository {
     // Note: Deleting a note should ideally cascade delete related action items
     // in the DB schema (ON DELETE CASCADE). If not, they need to be deleted manually
     // using the IMeetingNoteActionItemRepository before or after this call.
-    const { error, count } = await supabase
+    const { error, count } = await this.client
       .from(this.TABLE_NAME)
       .delete()
       .eq('id', id);

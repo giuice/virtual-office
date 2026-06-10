@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
 import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
+import { avatarCacheManager } from '@/lib/avatar-utils';
 
 export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
@@ -64,7 +65,8 @@ export function EnhancedUserMenu() {
         throw new Error(errorData.error || 'Failed to upload avatar');
       }
       
-      const data = await response.json();
+      await response.json();
+      avatarCacheManager.invalidateUser(String(currentUserProfile.id));
       
       // Show success message
       showSuccess({ description: 'Avatar updated successfully' });

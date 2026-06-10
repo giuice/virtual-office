@@ -1,33 +1,25 @@
 import { NextResponse } from 'next/server';
 import { Space } from '@/types/database'; 
-import { ISpaceRepository, IUserRepository } from '@/repositories/interfaces'; 
-import { SupabaseSpaceRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase'; 
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { ISpaceRepository } from '@/repositories/interfaces'; 
+import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase'; 
+import { requireAuthUser } from '@/lib/auth/session';
 
 export async function POST(request: Request) {
   try {
-    // Get Supabase client using the server helper
-    const supabase = await createSupabaseServerClient(); // Use the async helper
-    
-    // Use getUser() instead of getSession() for better security as per warning
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    // Check if the user is authenticated
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
 
     const spaceDataFromRequest: Partial<Space> = await request.json();
+    if (!spaceDataFromRequest.companyId || spaceDataFromRequest.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot create spaces outside your company' }, { status: 403 });
+    }
 
-    
-    const currentSupabaseUserId =  user.id;
-    console.log('Space data request:', spaceDataFromRequest);
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
-    const currentUserId = await userRepository.findBySupabaseUid(currentSupabaseUserId).then(user => user?.id) as string;
     const dataToCreate = {
       ...spaceDataFromRequest,
       //userIds, // Add the current user to the space
-      createdBy: currentUserId // Ensure createdBy is set
+      createdBy: authContext.dbUser.id // Ensure createdBy is set
     };
 
     delete dataToCreate.id;
@@ -36,7 +28,7 @@ export async function POST(request: Request) {
 
     const spaceToCreateRepoInput = dataToCreate as Omit<Space, 'id' | 'createdAt' | 'updatedAt'>; 
 
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
 
     const newSpace = await spaceRepository.create(spaceToCreateRepoInput);
 

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase/SupabaseSpaceRepository';
+import { requireAuthUser } from '@/lib/auth/session';
 // For now, return empty activity log (table may not exist yet)
 const activityLog: Array<{
   id: string;
@@ -34,6 +35,11 @@ export async function GET(request: NextRequest, {
   params
 }: RouteParams): Promise<NextResponse> {
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
     const {
       id: spaceId
     } = await params;
@@ -54,6 +60,14 @@ export async function GET(request: NextRequest, {
         error: 'Space not found'
       }, {
         status: 404
+      });
+    }
+
+    if (space.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({
+        error: 'Cannot access spaces outside your company'
+      }, {
+        status: 403
       });
     }
 

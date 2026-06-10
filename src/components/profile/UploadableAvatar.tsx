@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Camera, X, Loader2, AlertCircle, FileWarning, CheckCircle, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getUserInitials } from '@/lib/avatar-utils';
+import { avatarCacheManager, getStatusColorClass, getUserInitials } from '@/lib/avatar-utils';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -81,6 +81,7 @@ export function UploadableAvatar({
       }
     },
     onSuccess: response => {
+      avatarCacheManager.invalidateUser(String(user.id));
       // The component now handles file uploads internally
       // If onAvatarChange is provided, it's for external handling
       if (onUploadSuccess && response?.avatarUrl) {
@@ -139,6 +140,7 @@ export function UploadableAvatar({
         })
       });
       if (response.ok) {
+        avatarCacheManager.invalidateUser(String(user.id));
         reset();
         // Note: onAvatarChange expects a File, not a string for removal
         // For removal, we just reset the internal state
@@ -149,22 +151,6 @@ export function UploadableAvatar({
       console.error('Error removing avatar:', err);
     } finally {
       setShowRemoveDialog(false);
-    }
-  };
-
-  // Get status indicator color
-  const getStatusColor = () => {
-    switch (user.status) {
-      case 'online':
-        return 'bg-emerald-500';
-      case 'away':
-        return 'bg-amber-500';
-      case 'busy':
-        return 'bg-rose-500';
-      case 'offline':
-        return 'bg-gray-400';
-      default:
-        return '';
     }
   };
 
@@ -206,7 +192,7 @@ export function UploadableAvatar({
         </Avatar>
         
         {/* Status indicator */}
-        {user.status && <span className={cn('absolute bottom-0 right-0 size-3 rounded-full border-2 border-background', getStatusColor())} />}
+        {user.status && <span className={cn('absolute bottom-0 right-0 size-3 rounded-full border-2 border-background', getStatusColorClass(user.status))} />}
         
         {/* Upload controls (on hover) */}
         {hovered && !isActive && <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-full">

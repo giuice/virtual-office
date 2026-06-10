@@ -1,47 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { validateUserSession } from '@/lib/auth/session';
+import { requireAuthUser } from '@/lib/auth/session';
 import { IUserRepository } from '@/repositories/interfaces';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { extractUserUploadsPath } from '@/lib/user-uploads-storage';
 
 export async function POST(req: NextRequest) {
-  
   try {
-    // Get the authenticated user session
-    const { supabaseUid, userDbId, error: sessionError } = await validateUserSession();
-    if (sessionError || !supabaseUid || !userDbId) {
-      return NextResponse.json(
-        { error: sessionError || 'Authentication required' },
-        { status: 401 }
-      );
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
-      const supabase = await createSupabaseServerClient();
 
-    // Parse request body
-    const body = await req.json();
-    const { userId } = body;
+    const { dbUser, supabase } = authContext;
 
-    // Verify user has permission to update this profile
-    if (userId !== userDbId) {
+    // Callers may still send a userId, but it can only target the caller's own profile
+    const body = await req.json().catch(() => ({}));
+    if (body?.userId && body.userId !== dbUser.id) {
       return NextResponse.json(
         { error: 'You do not have permission to update this profile' },
         { status: 403 }
       );
     }
 
-  const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const oldAvatarPath = extractUserUploadsPath(dbUser.avatarUrl);
 
     // Update user profile to remove avatar URL
-    const updateOk = userRepository.update(userId, {
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const updateOk = await userRepository.update(dbUser.id, {
       avatarUrl: ''
     });
 
     if (!updateOk) {
-      console.error('Error updating user avatar:', userId);
+      console.error('Error updating user avatar:', dbUser.id);
       return NextResponse.json(
         { error: 'Error updating user avatar' },
         { status: 500 }
       );
+    }
+
+    if (oldAvatarPath) {
+      const serviceRoleSupabase = await createSupabaseServerClient('service_role');
+      const { error: removeAvatarError } = await serviceRoleSupabase.storage
+        .from('user-uploads')
+        .remove([oldAvatarPath]);
+
+      if (removeAvatarError) {
+        console.warn('Failed to remove avatar object:', removeAvatarError.message);
+      }
     }
 
     return NextResponse.json({

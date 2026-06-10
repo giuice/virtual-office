@@ -100,6 +100,7 @@ export function InteractiveUserAvatar({
           e.preventDefault();
           e.stopPropagation();
         }}
+        aria-label={ariaLabel || `${user.displayName}'s avatar actions`}
       >
         <EnhancedAvatarV2
           user={user}

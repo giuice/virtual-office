@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { 
@@ -193,7 +193,7 @@ function AvatarVisualState({
   return <AvatarFallback className="bg-transparent">{fallback}</AvatarFallback>;
 }
 
-export function EnhancedAvatarV2({
+function EnhancedAvatarV2Component({
   user,
   size = 'md',
   className,
@@ -438,6 +438,8 @@ export function EnhancedAvatarV2({
     </div>
   );
 }
+
+export const EnhancedAvatarV2 = memo(EnhancedAvatarV2Component);
 
 // Export with a more convenient name
 export { EnhancedAvatarV2 as EnhancedAvatar };

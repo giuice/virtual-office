@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { UserStatus } from '@/types/database';
 import { UploadableAvatar } from './UploadableAvatar';
+import { avatarCacheManager } from '@/lib/avatar-utils';
 
 // File upload handler - this is where you'd implement your avatar upload logic
 // This is just a sample implementation
@@ -92,6 +93,7 @@ export function EnhancedUserProfile() {
     try {
       // Upload avatar and get the URL
       const avatarUrl = await uploadUserAvatar(file, currentUserProfile.id);
+      avatarCacheManager.invalidateUser(String(currentUserProfile.id));
 
       // Update user profile with new avatar URL
       await updateUserProfile({

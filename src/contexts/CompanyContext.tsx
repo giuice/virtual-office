@@ -282,7 +282,7 @@ function useCompanyProviderValue(): CompanyContextType { const { user, isAuthRea
       // Call API to update user status/statusMessage using Supabase Auth UID
       // Assuming updateUserStatus expects Supabase Auth UID
       await updateUserStatus(
-        user.id, // Pass Supabase Auth UID
+        currentUserProfile.id,
         data.status || currentUserProfile.status, data.statusMessage
       );
 

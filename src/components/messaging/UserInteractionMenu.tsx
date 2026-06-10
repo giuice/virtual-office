@@ -1,7 +1,7 @@
 // src/components/messaging/UserInteractionMenu.tsx
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { MessageSquare, Phone, PhoneCall, MapPin, UserCheck, UserX, Info, Mail, Calendar, Zap } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

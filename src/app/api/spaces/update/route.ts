@@ -1,28 +1,13 @@
 import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-
-// TODO: Implement proper authentication
-const getUserIdFromRequest = (): string | null => {
-  // Replace with actual authentication logic
-  return 'placeholder-auth-user-id-app-router';
-};
-
-// TODO: Implement proper authorization check
-const canUpdateSpace = async (userId: string, spaceId: string, repository: ISpaceRepository): Promise<boolean> => {
-  // Example: Check if user is admin or creator of the space
-  // const space = await repository.findById(spaceId);
-  // return space?.createdBy === userId || userHasAdminRole(userId);
-  return true; // Placeholder
-};
+import { requireAuthUser } from '@/lib/auth/session';
 
 export async function PUT(request: Request) {
   try {
-    // Authentication check
-    const authenticatedUserId = getUserIdFromRequest();
-    if (!authenticatedUserId) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
     }
 
     const { id: spaceId, ...updateData } = await request.json();
@@ -41,16 +26,18 @@ export async function PUT(request: Request) {
       );
     }
 
-  const supabase = await createSupabaseServerClient();
-  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(supabase);
+  const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
 
-    // Authorization check
-    const authorized = await canUpdateSpace(authenticatedUserId, spaceId, spaceRepository);
-    if (!authorized) {
+    const existingSpace = await spaceRepository.findById(spaceId);
+    if (!existingSpace) {
       return NextResponse.json(
-        { message: 'Forbidden: User cannot update this space' },
-        { status: 403 }
+        { message: `Space with ID ${spaceId} not found` },
+        { status: 404 }
       );
+    }
+
+    if (existingSpace.companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ message: 'Cannot update spaces outside your company' }, { status: 403 });
     }
 
     // Remove fields that shouldn't be updated directly
@@ -70,11 +57,11 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json(updatedSpace);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating space:', error);
     if (error instanceof SyntaxError) {
       return NextResponse.json({ message: 'Invalid JSON payload' }, { status: 400 });
     }
-    return NextResponse.json({ message: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
   }
 }

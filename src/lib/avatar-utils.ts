@@ -1,5 +1,5 @@
 // src/lib/avatar-utils.ts
-import { User } from '@/types/database';
+import { User, type UserStatus } from '@/types/database';
 import { UIUser } from '@/types/ui';
 import { debugLogger } from '@/utils/debug-logger';
 
@@ -106,6 +106,21 @@ export interface AvatarUser {
   avatar?: string;
   photoURL?: string;
   status?: string;
+}
+
+export function getStatusColorClass(status: UserStatus | string | undefined): string {
+  switch (status) {
+    case 'online':
+      return 'bg-emerald-500';
+    case 'away':
+      return 'bg-amber-500';
+    case 'busy':
+      return 'bg-rose-500';
+    case 'offline':
+      return 'bg-gray-400';
+    default:
+      return '';
+  }
 }
 
 // Avatar loading error types for better debugging
