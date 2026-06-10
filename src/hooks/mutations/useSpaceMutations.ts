@@ -6,7 +6,7 @@ type SpaceUpdateData = Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'r
 
 // API functions
 const createSpace = async (data: SpaceCreateData): Promise<Space> => {
-  const response = await fetch('/api/spaces/create', {
+  const response = await fetch('/api/spaces', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -21,7 +21,7 @@ const createSpace = async (data: SpaceCreateData): Promise<Space> => {
 };
 
 const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateData }): Promise<Space> => {
-  const response = await fetch('/api/spaces/update', {
+  const response = await fetch('/api/spaces', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, ...updates }),
@@ -44,7 +44,7 @@ const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateDa
 };
 
 const deleteSpace = async (spaceId: string): Promise<string> => {
-  const response = await fetch(`/api/spaces/delete?spaceId=${spaceId}`, {
+  const response = await fetch(`/api/spaces?id=${spaceId}`, {
     method: 'DELETE',
   });
 

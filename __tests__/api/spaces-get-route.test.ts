@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@/types/database';
-import { GET } from '@/app/api/spaces/get/route';
+import { GET } from '@/app/api/spaces/route';
 
 const COMPANY_ID = 'company-1';
 const OTHER_COMPANY_ID = 'company-2';
@@ -42,11 +42,11 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 function requestFor(companyId: string): Request {
   return {
-    url: `https://example.com/api/spaces/get?companyId=${companyId}`,
+    url: `https://example.com/api/spaces?companyId=${companyId}`,
   } as Request;
 }
 
-describe('/api/spaces/get', () => {
+describe('/api/spaces GET', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireAuthUser.mockResolvedValue({
