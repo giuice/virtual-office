@@ -4,16 +4,14 @@
 import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { Message, FileAttachment } from '@/types/messaging';
 import { cn } from '@/lib/utils';
-import { 
-  Send, 
-  Paperclip, 
-  X, 
-  File, 
-  Image,
-  Smile 
+import {
+  Send,
+  Paperclip,
+  X,
+  File,
+  Image
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 
@@ -29,6 +27,10 @@ interface EnhancedMessageComposerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** Broadcast-based typing callbacks (audit B-02) — owned by the parent's
+   * useConversationPresence so the conversation channel stays single. */
+  onTyping?: () => void;
+  onStopTyping?: () => void;
 }
 
 function EnhancedReplyPreview({
@@ -95,14 +97,15 @@ function AttachmentsPreview({
 }
 
 export function EnhancedMessageComposer({
-  conversationId,
   onSendMessage,
   onUploadAttachment,
   replyToMessage,
   onCancelReply,
   placeholder = "Type a message…",
   disabled = false,
-  className
+  className,
+  onTyping,
+  onStopTyping
 }: EnhancedMessageComposerProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -111,15 +114,6 @@ export function EnhancedMessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { companyUsers, currentUserProfile } = useCompany();
-
-  // Typing indicator hook
-  const {
-    handleInputChange,
-    handleInputFocus,
-    handleInputBlur,
-    handleMessageSent,
-    cleanup
-  } = useTypingIndicator(conversationId);
 
   // Auto-resize textarea
   const adjustTextareaHeight = useCallback(() => {
@@ -133,7 +127,11 @@ export function EnhancedMessageComposer({
   // Handle content change
   const handleContentChange = (value: string) => {
     setContent(value);
-    handleInputChange(value);
+    if (value.trim().length > 0) {
+      onTyping?.();
+    } else {
+      onStopTyping?.();
+    }
     adjustTextareaHeight();
   };
 
@@ -162,7 +160,7 @@ export function EnhancedMessageComposer({
       setContent('');
       setAttachments([]);
       onCancelReply?.();
-      handleMessageSent();
+      onStopTyping?.();
       
       // Reset textarea height
       if (textareaRef.current) {
@@ -237,8 +235,7 @@ export function EnhancedMessageComposer({
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyPress}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
+            onBlur={() => onStopTyping?.()}
             placeholder={placeholder}
             disabled={disabled}
             className="min-h-[40px] max-h-[120px] resize-none"

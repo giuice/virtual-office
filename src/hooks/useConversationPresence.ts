@@ -1,59 +1,95 @@
 // src/hooks/useConversationPresence.ts
 import { useReducerState } from '@/hooks/useReducerState';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { debugLogger } from '@/utils/debug-logger';
+
+export interface TypingUser {
+  userId: string;
+  displayName: string;
+}
+
+// How long a remote "typing" signal stays visible without a refresh.
+const REMOTE_TYPING_TTL_MS = 4000;
+// Inactivity window before the local user stops broadcasting "typing".
+const LOCAL_TYPING_IDLE_MS = 2000;
 
 /**
- * Hook for managing conversation presence and typing indicators
- * Implements Phase 3 of the realtime message integration plan
+ * Single owner of the `conversation:{id}` Realtime channel: presence tracking
+ * plus typing indicators over broadcast (audit B-02 — typing is ephemeral and
+ * never touches Postgres). Both send and receive run through the ONE
+ * subscribed channel; creating a fresh channel per send leaks channel objects
+ * and, with Phoenix topics, can kick the subscribed one off the socket.
  */
 export function useConversationPresence(conversationId: string | null) {
   const { user } = useAuth();
   const [presenceState, updatePresenceState] = useReducerState<Record<string, any>>({});
-  const [typingUsers, updateTypingUsers] = useReducerState<string[]>([]);
+  const [typingUsers, updateTypingUsers] = useReducerState<TypingUser[]>([]);
 
-  // Send typing indicator
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const isSubscribedRef = useRef(false);
+  const remoteTypingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const localTypingRef = useRef(false);
+  const localIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const sendTypingIndicator = useCallback((isTyping: boolean) => {
-    if (!conversationId || !user) return;
+    const channel = channelRef.current;
+    if (!channel || !isSubscribedRef.current || !user) return;
 
-    const channel = supabase.channel(`conversation:${conversationId}`);
-    const userDisplayName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || user.email?.split('@')[0] || 'User';
-    
-    if (isTyping) {
-      channel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { 
-          userId: user.id, 
-          userDisplayName,
-          isTyping: true 
-        }
-      });
-    } else {
-      channel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { 
-          userId: user.id, 
-          userDisplayName,
-          isTyping: false 
-        }
-      });
+    const userDisplayName =
+      (user.user_metadata as any)?.full_name ||
+      (user.user_metadata as any)?.name ||
+      user.email?.split('@')[0] ||
+      'User';
+
+    void channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: user.id, userDisplayName, isTyping },
+    });
+  }, [user]);
+
+  /** Stop broadcasting "typing" for the local user (blur, send, unmount). */
+  const stopTyping = useCallback(() => {
+    if (localIdleTimerRef.current) {
+      clearTimeout(localIdleTimerRef.current);
+      localIdleTimerRef.current = null;
     }
-  }, [conversationId, user]);
-
-  // Auto-clear typing indicator after delay
-  const handleTypingTimeout = useCallback(() => {
-    sendTypingIndicator(false);
+    if (localTypingRef.current) {
+      localTypingRef.current = false;
+      sendTypingIndicator(false);
+    }
   }, [sendTypingIndicator]);
+
+  /** Call on every input change; debounces the broadcast and auto-stops. */
+  const notifyTyping = useCallback(() => {
+    if (!localTypingRef.current) {
+      localTypingRef.current = true;
+      sendTypingIndicator(true);
+    }
+    if (localIdleTimerRef.current) {
+      clearTimeout(localIdleTimerRef.current);
+    }
+    localIdleTimerRef.current = setTimeout(stopTyping, LOCAL_TYPING_IDLE_MS);
+  }, [sendTypingIndicator, stopTyping]);
 
   useEffect(() => {
     if (!conversationId || !user) {
       return;
     }
 
-    console.log(`[useConversationPresence] Setting up presence for conversation: ${conversationId}`);
+    const remoteTimers = remoteTypingTimersRef.current;
+
+    const clearRemoteTyping = (userId: string) => {
+      const timer = remoteTimers.get(userId);
+      if (timer) {
+        clearTimeout(timer);
+        remoteTimers.delete(userId);
+      }
+      updateTypingUsers(prev => prev.filter(t => t.userId !== userId));
+    };
 
     const channel = supabase
       .channel(`conversation:${conversationId}`, {
@@ -63,57 +99,74 @@ export function useConversationPresence(conversationId: string | null) {
         }
       })
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        console.log('[useConversationPresence] Presence synced:', state);
-        updatePresenceState(state);
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('[useConversationPresence] User joined:', key, newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('[useConversationPresence] User left:', key, leftPresences);
+        updatePresenceState(channel.presenceState());
       })
       .on('broadcast', { event: 'typing' }, (payload) => {
-        console.log('[useConversationPresence] Typing event:', payload);
-        
-        const { userId, isTyping } = payload.payload;
-        
-        // Don't show typing indicator for current user
-        if (userId === user.id) return;
-        
-        updateTypingUsers(prev => {
-          if (isTyping) {
-            return prev.includes(userId) ? prev : [...prev, userId];
-          } else {
-            return prev.filter(id => id !== userId);
-          }
-        });
-        
-        // Auto-clear typing indicator after 3 seconds
-        if (isTyping) {
-          setTimeout(() => {
-            updateTypingUsers(prev => prev.filter(id => id !== userId));
-          }, 3000);
+        const { userId, userDisplayName, isTyping } = payload.payload ?? {};
+        if (!userId || userId === user.id) return;
+
+        if (!isTyping) {
+          clearRemoteTyping(userId);
+          return;
         }
+
+        updateTypingUsers(prev =>
+          prev.some(t => t.userId === userId)
+            ? prev
+            : [...prev, { userId, displayName: userDisplayName || 'Someone' }]
+        );
+
+        // Reset (not stack) the TTL timer so continuous typing stays visible.
+        const existing = remoteTimers.get(userId);
+        if (existing) clearTimeout(existing);
+        remoteTimers.set(
+          userId,
+          setTimeout(() => {
+            remoteTimers.delete(userId);
+            updateTypingUsers(prev => prev.filter(t => t.userId !== userId));
+          }, REMOTE_TYPING_TTL_MS)
+        );
       })
       .subscribe(async (status) => {
-        console.log(`[useConversationPresence] Subscription status: ${status}`);
-        
+        if (debugLogger.messaging.enabled()) {
+          debugLogger.messaging.trace('useConversationPresence', 'status', {
+            conversationId,
+            status,
+          });
+        }
+
         if (status === 'SUBSCRIBED') {
-          const userDisplayName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || user.email?.split('@')[0] || 'User';
-          // Track presence in this conversation
+          isSubscribedRef.current = true;
+          const userDisplayName =
+            (user.user_metadata as any)?.full_name ||
+            (user.user_metadata as any)?.name ||
+            user.email?.split('@')[0] ||
+            'User';
           await channel.track({
             userId: user.id,
             userDisplayName,
             joinedAt: new Date().toISOString()
           });
+        } else {
+          isSubscribedRef.current = false;
         }
       });
 
-    // Clean up subscription
+    channelRef.current = channel;
+
     return () => {
-      console.log(`[useConversationPresence] Cleaning up presence for conversation ${conversationId}`);
-      channel.unsubscribe();
+      remoteTimers.forEach((timer) => clearTimeout(timer));
+      remoteTimers.clear();
+      if (localIdleTimerRef.current) {
+        clearTimeout(localIdleTimerRef.current);
+        localIdleTimerRef.current = null;
+      }
+      localTypingRef.current = false;
+      isSubscribedRef.current = false;
+      channelRef.current = null;
+      updateTypingUsers([]);
+      void channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [conversationId, user, updatePresenceState, updateTypingUsers]);
 
@@ -135,7 +188,8 @@ export function useConversationPresence(conversationId: string | null) {
     presentUsers,
     typingUsers: activeTypingUsers,
     sendTypingIndicator,
-    handleTypingTimeout,
+    notifyTyping,
+    stopTyping,
     isPresenceActive: !!conversationId && !!user
   };
 }

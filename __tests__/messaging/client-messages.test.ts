@@ -192,61 +192,8 @@ describe('Messaging API Client - Messages', () => {
     });
   });
 
-  // Typing Indicator Tests
-  describe('Typing Indicators', () => {
-    test('sendTypingIndicator should send typing status', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.sendTypingIndicator('conversation-id', 'user-id', true);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/messages/typing',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify({
-            conversationId: 'conversation-id',
-            userId: 'user-id',
-            isTyping: true
-          }),
-        })
-      );
-    });
-
-    test('sendTypingIndicator should send stop typing status', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.sendTypingIndicator('conversation-id', 'user-id', false);
-
-      const fetchCall = (global.fetch as any).mock.calls[0];
-      const body = JSON.parse(fetchCall[1].body);
-
-      expect(body.isTyping).toBe(false);
-    });
-
-    test('sendTypingIndicator should not throw on errors (fail silently)', async () => {
-      const mockResponse = { error: 'Server error' };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(500, mockResponse)
-      );
-
-      // Should not throw - typing indicators fail silently
-      await expect(
-        messagingApi.sendTypingIndicator('conversation-id', 'user-id', true)
-      ).resolves.not.toThrow();
-    });
-  });
+  // Typing indicators are broadcast-only (useConversationPresence) — no API
+  // surface to test here (audit B-02).
 
   // Error Handling Tests
   describe('Error Handling', () => {

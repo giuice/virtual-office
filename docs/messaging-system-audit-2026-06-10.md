@@ -18,7 +18,14 @@
 - [x] **X-01 (verification)** — **CONFIRMED 2026-06-10 with runtime evidence**: anonymous REST request (anon key only, no session) reads `users` rows including `email`, `status`, `role`, `current_space_id` (HTTP 200 + data), reads `spaces`, and an anonymous `PATCH` on `users` returns **204 (write permitted)**. Dedicated task opened: `docs/rls-enablement-task.md`. Remediation itself is a separate track (touches presence — consult `/presence-safety` first).
 - [ ] **S-03** — attachments bucket (private + signed URLs, size/MIME limits) — not yet started
 
-### Phase 1 — pending (not started)
+### Phase 1 — Make existing features actually work
+- [x] **B-01** — mark-as-read fixed both ends: route rewritten on `requireConversationParticipant` (DB-UUID comparison), client now calls `markConversationAsRead` when the active conversation is visible (drawer open, not minimized, unread > 0). Route tests added (`__tests__/api/conversations-read-route.test.ts`). → commit `<see git log: fix(messaging): mark-as-read works end-to-end>`
+- [x] **B-03 (migration written)** — `migrations/20260610_message_reactions_replica_identity.sql` sets `REPLICA IDENTITY FULL` on `message_reactions`. **NOT yet applied to live DB** (Supabase MCP lacks `SUPABASE_ACCESS_TOKEN` in this env; no psql/DATABASE_URL). Apply + verify `relreplident = 'f'` + two-browser unreact test.
+- [x] **B-04** — shared `src/lib/messaging/message-cache.ts` helper (`appendMessageToPages` / `replaceMessageInPages`) used by both realtime and optimistic paths: append to page 0, cross-page dedupe, temp→saved swap drops dupes. Multi-page unit tests in `__tests__/messaging/message-cache.test.ts`. → commit `fix(messaging): realtime inserts land in page 0...`
+- [x] **B-02** — deleted `/api/messages/typing` + `useTypingIndicator` + `messagingApi.sendTypingIndicator`. `useConversationPresence` is the single channel owner (send reuses the subscribed channel — leak fixed), exposes debounced `notifyTyping`/`stopTyping`, typing users carry display names. Production drawer (`message-feed.tsx`) now renders `TypingIndicator` and broadcasts composer input. Enhanced* (debug-only) made prop-driven. **Verify with two browsers when convenient.**
+- [ ] **B-08** — grouped/summary shape mismatch (fix or delete)
+- [ ] **M-02** — per-user archive filtering
+- [ ] **M-03** — composite cursor + drop probe query
 ### Phase 2 — pending (not started)
 ### Phase 3 — pending (not started)
 

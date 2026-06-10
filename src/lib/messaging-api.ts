@@ -546,32 +546,6 @@ export const messagingApi = {
   },
 
   /**
-   * Send a typing indicator for a conversation
-   */
-  async sendTypingIndicator(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
-    try {
-      // This might be handled purely via sockets, but adding an API call placeholder
-      const response = await fetch('/api/messages/typing', { // Assuming this endpoint
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ conversationId, userId, isTyping }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send typing indicator');
-      }
-      // No specific data expected on success
-    } catch (error) {
-      console.error('Error sending typing indicator:', error);
-      // Don't necessarily throw for typing indicators, might fail silently
-      // throw error; 
-    }
-  },
-
-  /**
    * Archive or unarchive a conversation
    */
   async setConversationArchiveStatus(conversationId: string, userId: string, isArchived: boolean): Promise<void> {

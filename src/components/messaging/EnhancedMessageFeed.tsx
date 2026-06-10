@@ -110,7 +110,7 @@ export function EnhancedMessageFeed({
           ))}
 
           {/* Typing indicator */}
-          <TypingIndicator typingUsers={typingUsers} />
+          <TypingIndicator typingUsers={typingUsers.map((t) => t.displayName)} />
 
           {/* Scroll anchor */}
           <div ref={messagesEndRef} />

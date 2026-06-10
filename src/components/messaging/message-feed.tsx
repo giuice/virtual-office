@@ -13,6 +13,8 @@ import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessageItem } from './message-item';
 import { MessageComposer } from './message-composer';
+import { TypingIndicator } from './TypingIndicator';
+import { useConversationPresence } from '@/hooks/useConversationPresence';
 
 interface MessageFeedProps {
   conversationId?: string;
@@ -42,6 +44,11 @@ export function MessageFeed({
     getOrCreateRoomConversation,
     addReaction,
   } = useMessaging();
+
+  // Typing indicators ride the conversation presence channel (audit B-02)
+  const { typingUsers, notifyTyping, stopTyping } = useConversationPresence(
+    activeConversation?.id ?? null
+  );
 
   const [isLoading, setIsLoading] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
@@ -134,6 +141,7 @@ export function MessageFeed({
     if (!activeConversation) return;
 
     try {
+      stopTyping();
       await sendMessage(content, {
         replyToId: replyToMessage?.id,
       });
@@ -141,7 +149,7 @@ export function MessageFeed({
     } catch (error) {
       console.error('Error sending message:', error);
     }
-  }, [activeConversation, replyToMessage?.id, sendMessage]);
+  }, [activeConversation, replyToMessage?.id, sendMessage, stopTyping]);
 
   // Handle reply
   const handleReply = useCallback((message: Message) => {
@@ -283,13 +291,14 @@ export function MessageFeed({
         </ScrollArea>
       </CardContent>
 
-      <CardFooter className="p-4 pt-2">
+      <CardFooter className="flex-col items-stretch gap-1 p-4 pt-2">
+        <TypingIndicator typingUsers={typingUsers.map((t) => t.displayName)} />
         <MessageComposer
           onSendMessage={handleSendMessage}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
           initialValue={""}
-          onValueChange={() => { }}
+          onValueChange={(value) => (value.trim() ? notifyTyping() : stopTyping())}
         />
       </CardFooter>
     </Card>
