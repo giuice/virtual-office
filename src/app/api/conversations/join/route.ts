@@ -1,46 +1,76 @@
 // src/app/api/conversations/join/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { IConversationRepository, IUserRepository } from '@/repositories/interfaces';
-import { SupabaseConversationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { requireAuthUser } from '@/lib/auth/session';
+import { jsonError } from '@/lib/auth/authorize';
+import { ConversationType } from '@/types/messaging';
+import { IConversationRepository, ISpaceRepository } from '@/repositories/interfaces';
+import { SupabaseConversationRepository, SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
+import { ConversationResolverError, ConversationResolverService } from '@/lib/services/ConversationResolverService';
 
 export async function POST(request: NextRequest) {
   try {
-  const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAuthUser();
+    if ('errorResponse' in auth) {
+      return auth.errorResponse;
+    }
+    const { dbUser } = auth;
+
+    let body: { conversationId?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError(400, 'BAD_REQUEST', 'Invalid JSON payload');
     }
 
-    const { conversationId } = await request.json();
+    const conversationId = typeof body.conversationId === 'string' ? body.conversationId : null;
     if (!conversationId) {
-      return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });
+      return jsonError(400, 'BAD_REQUEST', 'conversationId is required');
     }
 
-  const userRepo: IUserRepository = new SupabaseUserRepository(supabase);
-  // Use service_role for conversation repo to bypass RLS when adding participant
-  const serviceClient = await createSupabaseServerClient('service_role');
-  const convoRepo: IConversationRepository = new SupabaseConversationRepository(serviceClient);
+    const serviceClient = await createSupabaseServerClient('service_role');
+    const convoRepo: IConversationRepository = new SupabaseConversationRepository(serviceClient);
 
-    const userProfile = await userRepo.findBySupabaseUid(user.id);
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
-
-    // Ensure conversation exists; helps return 404 vs generic failure
     const existing = await convoRepo.findById(conversationId);
     if (!existing) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      return jsonError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found');
     }
 
-    const conversation = await convoRepo.addParticipant(conversationId, userProfile.id);
+    // Idempotent: already a participant — nothing to join.
+    if (existing.participants.includes(dbUser.id)) {
+      return NextResponse.json({ conversation: existing }, { status: 200 });
+    }
+
+    // Only room conversations are joinable. Direct/group membership is fixed
+    // at creation (resolver/invite paths) — joining someone else's DM would
+    // grant full read/write of its history (audit S-01).
+    if (existing.type !== ConversationType.ROOM || !existing.roomId) {
+      return jsonError(403, 'JOIN_FORBIDDEN', 'Only room conversations can be joined');
+    }
+
+    const spaceRepo: ISpaceRepository = new SupabaseSpaceRepository(serviceClient);
+    const space = await spaceRepo.findById(existing.roomId);
+    if (!space) {
+      return jsonError(404, 'ROOM_NOT_FOUND', 'Room not found');
+    }
+
+    try {
+      ConversationResolverService.assertRoomAccess(dbUser, space);
+    } catch (accessError) {
+      if (accessError instanceof ConversationResolverError) {
+        return jsonError(accessError.status, 'ROOM_ACCESS_DENIED', accessError.message);
+      }
+      throw accessError;
+    }
+
+    const conversation = await convoRepo.addParticipant(conversationId, dbUser.id);
     if (!conversation) {
-      return NextResponse.json({ error: 'Failed to join conversation' }, { status: 500 });
+      return jsonError(500, 'INTERNAL_ERROR', 'Failed to join conversation');
     }
 
     return NextResponse.json({ conversation }, { status: 200 });
   } catch (error) {
     console.error('Error joining conversation:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return jsonError(500, 'INTERNAL_ERROR', 'Internal server error');
   }
 }
