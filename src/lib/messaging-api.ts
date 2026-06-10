@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
+import { Message, Conversation, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -246,37 +246,6 @@ export const messagingApi = {
       console.error('Error fetching messages:', error);
       throw error;
     }
-  },
-
-  /**
-   * Create a new conversation
-   */
-  async createConversation(conversation: Partial<Conversation> & { userId?: string }): Promise<Conversation> {
-    if (!conversation.type) {
-      throw new Error('Conversation type is required');
-    }
-
-    if (conversation.type === ConversationType.DIRECT) {
-      const participants = Array.isArray(conversation.participants) ? conversation.participants : [];
-      const requesterId = conversation.userId || participants[0];
-      const targetUserId = participants.find(id => id !== requesterId);
-
-      if (!requesterId || !targetUserId) {
-        throw new Error('Direct conversations require requester and target user ids');
-      }
-
-      return this.resolveConversation({ type: ConversationType.DIRECT, userId: targetUserId });
-    }
-
-    if (conversation.type === ConversationType.ROOM) {
-      if (!conversation.roomId) {
-        throw new Error('Room conversations require a roomId');
-      }
-
-      return this.resolveConversation({ type: ConversationType.ROOM, roomId: conversation.roomId });
-    }
-
-    throw new Error(`Unsupported conversation type: ${conversation.type}`);
   },
 
   async resolveConversation(
