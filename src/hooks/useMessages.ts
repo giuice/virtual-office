@@ -10,6 +10,11 @@ import {
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+import {
+  appendMessageToPages,
+  replaceMessageInPages,
+  type MessagesInfiniteData,
+} from '@/lib/messaging/message-cache';
 import { debugLogger } from '@/utils/debug-logger';
 import { toast } from 'sonner';
 
@@ -29,21 +34,6 @@ const createTraceId = (prefix: string): string => {
     // Ignore and fallback to timestamp-based identifier
   }
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-};
-
-const dedupeMessages = (messages: Message[]): Message[] => {
-  const seen = new Set<string>();
-  const result: Message[] = [];
-
-  for (const message of messages) {
-    if (seen.has(message.id)) {
-      continue;
-    }
-    seen.add(message.id);
-    result.push(message);
-  }
-
-  return result;
 };
 
 export function useMessages(activeConversationId: string | null) {
@@ -75,7 +65,6 @@ export function useMessages(activeConversationId: string | null) {
     data,
     isLoading,
     isFetching,
-    isRefetching,
     error,
     hasNextPage,
     fetchNextPage,
@@ -203,23 +192,10 @@ export function useMessages(activeConversationId: string | null) {
         isEdited: false,
       };
 
-      // Optimistically add to the last page in cache
-      queryClient.setQueryData(
+      // Optimistically add to page 0 (newest window) via the shared helper (B-04)
+      queryClient.setQueryData<MessagesInfiniteData | undefined>(
         ['messages', activeConversationId],
-        (oldData:
-          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-          | undefined) => {
-          if (!oldData || !oldData.pages) {
-            return { pages: [{ messages: [optimisticMessage], hasMore: false }], pageParams: [undefined] };
-          }
-          const updatedPages = [...oldData.pages];
-          // Add to the FIRST page (Page 0), which contains the newest messages
-          updatedPages[0] = {
-            ...updatedPages[0],
-            messages: [...updatedPages[0].messages, optimisticMessage],
-          };
-          return { ...oldData, pages: updatedPages };
-        }
+        (oldData) => appendMessageToPages(oldData, optimisticMessage)
       );
 
       if (instrumentationEnabled) {
@@ -256,21 +232,11 @@ export function useMessages(activeConversationId: string | null) {
           });
         }
 
-        // Replace optimistic with saved
-        queryClient.setQueryData(
+        // Replace optimistic with saved (drops the temp copy if realtime
+        // already delivered the saved id)
+        queryClient.setQueryData<MessagesInfiniteData | undefined>(
           ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
-            if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: dedupeMessages(
-                page.messages.map((m) => (m.id === optimisticMessage.id ? savedMessage : m))
-              ),
-            }));
-            return { ...oldData, pages: updatedPages };
-          }
+          (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
         );
         return savedMessage;
       } catch (err) {
@@ -284,11 +250,9 @@ export function useMessages(activeConversationId: string | null) {
           });
         }
         // Remove the optimistic message on failure so UI does not show a failed temp message
-        queryClient.setQueryData(
+        queryClient.setQueryData<MessagesInfiniteData | undefined>(
           ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
+          (oldData) => {
             if (!oldData || !oldData.pages) return oldData;
             const updatedPages = oldData.pages.map((page) => ({
               ...page,
@@ -359,22 +323,9 @@ export function useMessages(activeConversationId: string | null) {
           senderId: message.senderId,
         });
       }
-      queryClient.setQueryData(
+      queryClient.setQueryData<MessagesInfiniteData | undefined>(
         ['messages', activeConversationId],
-        (oldData:
-          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-          | undefined) => {
-          if (!oldData || !oldData.pages) {
-            return { pages: [{ messages: [message], hasMore: false }], pageParams: [undefined] };
-          }
-          const updatedPages = [...oldData.pages];
-          // Add to the FIRST page (Page 0), which contains the newest messages
-          updatedPages[0] = {
-            ...updatedPages[0],
-            messages: [...updatedPages[0].messages, message],
-          };
-          return { ...oldData, pages: updatedPages };
-        }
+        (oldData) => appendMessageToPages(oldData, message)
       );
     },
     [activeConversationId, queryClient]

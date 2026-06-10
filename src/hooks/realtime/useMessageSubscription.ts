@@ -7,8 +7,8 @@ import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
 import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+import { appendMessageToPages, type MessagesInfiniteData } from '@/lib/messaging/message-cache';
 import {
-  REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
   type RealtimeChannel,
   type RealtimePostgresChangesPayload,
@@ -20,15 +20,6 @@ interface UseMessageSubscriptionOptions {
   onInsert?: (message: Message) => void;
   ignoreSenderId?: string;
 }
-
-type MessagesInfiniteData = {
-  pages: Array<{
-    messages: Message[];
-    hasMoreOlder?: boolean;
-    nextCursorBefore?: string;
-  }>;
-  pageParams: unknown[];
-};
 
 const FAILURE_STATUSES = new Set(['TIMED_OUT', 'CHANNEL_ERROR', 'CLOSED']);
 const RETRY_BASE_DELAY_MS = 250;
@@ -48,75 +39,12 @@ const mapRowToMessage = (row: any): Message => ({
   isEdited: Boolean(row.is_edited),
 });
 
-const isOptimisticMatch = (existing: Message, incoming: Message) => {
-  if (!existing.id.startsWith('temp-')) {
-    return false;
-  }
-  if (existing.senderId !== incoming.senderId) {
-    return false;
-  }
-  if (existing.content !== incoming.content) {
-    return false;
-  }
-
-  const existingTime = existing.timestamp instanceof Date
-    ? existing.timestamp.getTime()
-    : new Date(existing.timestamp).getTime();
-  const incomingTime = incoming.timestamp instanceof Date
-    ? incoming.timestamp.getTime()
-    : new Date(incoming.timestamp).getTime();
-
-  return Number.isFinite(existingTime) && Number.isFinite(incomingTime) && Math.abs(existingTime - incomingTime) <= 1000;
-};
-
-const dedupeMessages = (messages: Message[]): Message[] => {
-  const seen = new Set<string>();
-  const result: Message[] = [];
-
-  for (const msg of messages) {
-    if (seen.has(msg.id)) {
-      continue;
-    }
-    seen.add(msg.id);
-    result.push(msg);
-  }
-
-  return result;
-};
-
+// Audit B-04: shared cache-merge with the optimistic send path — page 0 is
+// the newest window and dedupe runs across all pages.
 const appendMessageToCache = (queryClient: QueryClient, message: Message) => {
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', message.conversationId],
-    (oldData) => {
-      if (!oldData || !oldData.pages || oldData.pages.length === 0) {
-        return { pages: [{ messages: [message] }], pageParams: [undefined] };
-      }
-
-      const pages = [...oldData.pages];
-      const lastIndex = pages.length - 1;
-      const lastPage = pages[lastIndex];
-      const messages = [...lastPage.messages];
-
-      const optimisticIndex = messages.findIndex((existing) => isOptimisticMatch(existing, message));
-
-      if (optimisticIndex >= 0) {
-        messages[optimisticIndex] = message;
-      } else {
-        const exists = messages.some((existing) => existing.id === message.id);
-        if (exists) {
-          return oldData;
-        }
-
-        messages.push(message);
-      }
-
-      pages[lastIndex] = {
-        ...lastPage,
-        messages: dedupeMessages(messages),
-      };
-
-      return { ...oldData, pages };
-    }
+    (oldData) => appendMessageToPages(oldData, message)
   );
 };
 
