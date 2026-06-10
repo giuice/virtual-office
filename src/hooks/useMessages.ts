@@ -77,7 +77,8 @@ export function useMessages(activeConversationId: string | null) {
       if (!activeConversationId) {
         return { messages: [], hasMoreOlder: false, nextCursorBefore: undefined };
       }
-      // When pageParam is provided, it is the oldest visible timestamp (ISO)
+      // When pageParam is provided, it is an opaque keyset cursor produced by
+      // the server (composite "timestamp|id")
       const res = await messagingApi.getMessages(activeConversationId, {
         limit: 20,
         cursorBefore: pageParam,

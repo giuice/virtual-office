@@ -25,7 +25,9 @@
 - [x] **B-02** — deleted `/api/messages/typing` + `useTypingIndicator` + `messagingApi.sendTypingIndicator`. `useConversationPresence` is the single channel owner (send reuses the subscribed channel — leak fixed), exposes debounced `notifyTyping`/`stopTyping`, typing users carry display names. Production drawer (`message-feed.tsx`) now renders `TypingIndicator` and broadcasts composer input. Enhanced* (debug-only) made prop-driven. **Verify with two browsers when convenient.**
 - [x] **B-08** — deleted (no consumers): `getGroupedConversations`/`getUnreadSummary` client methods, `grouped=`/`summary=` route branches, `findByUserGrouped`/`getUnreadSummary` repo methods, `GroupedConversations`/`UnreadSummary` types, their tests. `pinned=` path kept (shape was correct). Also cleared L-02 commented instrumentation in `conversations/get`.
 - [x] **M-02** — `findByUser` now filters by the per-user preference (pref > global fallback) in JS post-map, serializes the *effective* per-user `isArchived`, and advances the cursor by rows consumed. Client optimistic updates keep flag + preference in sync via `applyArchiveState`. Also fixed L-01 (dead lodash import, wrong file-header path).
-- [ ] **M-03** — composite cursor + drop probe query
+- [x] **M-03** — composite `{raw_pg_timestamp}|{id}` keyset cursor (full µs precision, id tie-break, legacy ts-only cursors still parse); repo computes direction-aware `nextCursor`; route reuses repo `hasMore` — both probe queries removed; `nextCursorBefore` only returned when older messages exist (fixes always-true client hasNextPage).
+
+**Phase 1 complete.** Remaining verifications needing a second browser/user: B-02 typing, B-03 unreact sync (after migration applied), B-01 badge clearing e2e.
 ### Phase 2 — pending (not started)
 ### Phase 3 — pending (not started)
 

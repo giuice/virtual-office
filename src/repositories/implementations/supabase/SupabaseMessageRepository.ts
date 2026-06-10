@@ -6,6 +6,21 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 // --- Helper Functions ---
 
+// Composite keyset cursor "{raw_pg_timestamp}|{id}" (audit M-03). The raw
+// Postgres timestamp keeps microsecond precision; the id breaks ties between
+// equal timestamps. Legacy timestamp-only cursors parse with id = null.
+function buildCompositeCursor(row: { timestamp: string; id: string }): string {
+  return `${row.timestamp}|${row.id}`;
+}
+
+function parseCompositeCursor(cursor: string): { ts: string; id: string | null } {
+  const sep = cursor.indexOf('|');
+  if (sep === -1) {
+    return { ts: cursor, id: null };
+  }
+  return { ts: cursor.slice(0, sep), id: cursor.slice(sep + 1) };
+}
+
 // Map DB snake_case to Message type (camelCase)
 // Note: attachments and reactions are handled separately or fetched later
 type MessageRow = {
@@ -219,20 +234,35 @@ export class SupabaseMessageRepository implements IMessageRepository {
     let error: any | null = null;
 
     if (hasCursorBefore || hasCursorAfter) {
-      // Use keyset pagination - fetch limit + 1 to check for more results
+      // Use keyset pagination - fetch limit + 1 to check for more results.
+      // Audit M-03: composite (timestamp, id) cursor so equal timestamps
+      // cannot skip or duplicate rows across pages. Legacy timestamp-only
+      // cursors are still accepted.
       let query = this.supabaseClient
         .from(this.MSG_TABLE_NAME)
         .select('*')
         .eq('conversation_id', conversationId);
 
       if (hasCursorBefore) {
-        query = query.lt('timestamp', options!.cursorBefore!);
+        const { ts, id } = parseCompositeCursor(options!.cursorBefore!);
+        query = id
+          ? query.or(`timestamp.lt."${ts}",and(timestamp.eq."${ts}",id.lt."${id}")`)
+          : query.lt('timestamp', ts);
         // Get older messages relative to cursorBefore, newest-first to apply limit
-        query = query.order('timestamp', { ascending: false }).limit(limit + 1);
+        query = query
+          .order('timestamp', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(limit + 1);
       } else if (hasCursorAfter) {
-        query = query.gt('timestamp', options!.cursorAfter!);
+        const { ts, id } = parseCompositeCursor(options!.cursorAfter!);
+        query = id
+          ? query.or(`timestamp.gt."${ts}",and(timestamp.eq."${ts}",id.gt."${id}")`)
+          : query.gt('timestamp', ts);
         // Get newer messages relative to cursorAfter, oldest-first for append
-        query = query.order('timestamp', { ascending: true }).limit(limit + 1);
+        query = query
+          .order('timestamp', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(limit + 1);
       }
 
       const res = await query;
@@ -253,6 +283,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         .select('*')
         .eq('conversation_id', conversationId)
         .order('timestamp', { ascending: false })
+        .order('id', { ascending: false })
         .limit(limit + 1);
       data = res.data as any[] | null;
       error = res.error;
@@ -361,17 +392,20 @@ export class SupabaseMessageRepository implements IMessageRepository {
       message.stars = starsByMessageId[message.id] || [];
     });
 
-    // Determine nextCursor based on pagination type
+    // Determine nextCursor based on pagination direction. Built from the RAW
+    // row (full Postgres timestamp precision) — Date#toISOString truncates to
+    // milliseconds, which can skip sub-millisecond neighbors at the boundary.
     let nextCursor: string | number | null = null;
     if (hasMore) {
-      if (hasCursorBefore || hasCursorAfter) {
-        // For keyset pagination, use the timestamp of the last message
-        const lastMessage = messages[messages.length - 1];
-        nextCursor = lastMessage.timestamp.toISOString();
+      if (hasCursorAfter) {
+        // Paging toward newer messages: continue after the newest returned row
+        const newestRow = trimmedData[trimmedData.length - 1];
+        nextCursor = buildCompositeCursor(newestRow);
       } else {
-        // For offset pagination, use the next offset
-        const currentOffset = typeof options?.cursor === 'number' ? options.cursor : 0;
-        nextCursor = currentOffset + limit;
+        // Initial load or paging toward older messages: continue before the
+        // oldest returned row (trimmedData is oldest-first)
+        const oldestRow = trimmedData[0];
+        nextCursor = buildCompositeCursor(oldestRow);
       }
     }
 
