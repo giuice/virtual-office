@@ -752,41 +752,6 @@ export const messagingApi = {
   },
 
   /**
-   * Get conversations grouped by type (direct vs rooms)
-   * @param options Query options
-   * @returns Promise resolving to grouped conversations
-   */
-  async getGroupedConversations(options?: { includeArchived?: boolean }): Promise<{
-    direct: Conversation[];
-    rooms: Conversation[];
-  }> {
-    try {
-      const params = new URLSearchParams();
-      params.append('grouped', 'true');
-
-      if (options?.includeArchived !== undefined) {
-        params.append('includeArchived', options.includeArchived.toString());
-      }
-
-      const response = await fetch(`/api/conversations/get?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch grouped conversations');
-      }
-
-      const data = await response.json();
-      return {
-        direct: data.direct || [],
-        rooms: data.rooms || [],
-      };
-    } catch (error) {
-      console.error('Error fetching grouped conversations:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Get pinned conversations for the current user
    * @returns Promise resolving to pinned conversations
    */
@@ -806,38 +771,6 @@ export const messagingApi = {
       return data.conversations || [];
     } catch (error) {
       console.error('Error fetching pinned conversations:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get unread summary counts by conversation type
-   * @returns Promise resolving to unread counts
-   */
-  async getUnreadSummary(): Promise<{
-    totalUnread: number;
-    directUnread: number;
-    roomUnread: number;
-  }> {
-    try {
-      const params = new URLSearchParams();
-      params.append('summary', 'true');
-
-      const response = await fetch(`/api/conversations/get?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch unread summary');
-      }
-
-      const data = await response.json();
-      return {
-        totalUnread: data.totalUnread || 0,
-        directUnread: data.directUnread || 0,
-        roomUnread: data.roomUnread || 0,
-      };
-    } catch (error) {
-      console.error('Error fetching unread summary:', error);
       throw error;
     }
   }

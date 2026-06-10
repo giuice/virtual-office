@@ -126,15 +126,3 @@ export interface Conversation {
   preferences?: ConversationPreferences; // Optional: current user's preferences
 }
 
-// Grouped Conversations Result
-export interface GroupedConversations {
-  direct: Conversation[];
-  rooms: Conversation[];
-}
-
-// Unread Summary
-export interface UnreadSummary {
-  totalUnread: number;
-  directUnread: number;
-  roomUnread: number;
-}

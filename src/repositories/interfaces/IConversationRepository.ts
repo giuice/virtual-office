@@ -1,5 +1,5 @@
 // src/repositories/interfaces/IConversationRepository.ts
-import { Conversation, ConversationType, ConversationPreferences, GroupedConversations, UnreadSummary } from '@/types/messaging';
+import { Conversation, ConversationType, ConversationPreferences } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 export interface IConversationRepository {
@@ -127,28 +127,9 @@ export interface IConversationRepository {
   getUserPreference(conversationId: string, userId: string): Promise<ConversationPreferences | null>;
 
   /**
-   * Finds conversations for a user, grouped by type (direct vs rooms).
-   * Optionally includes archived conversations and respects per-user archive preferences.
-   * @param userId The unique ID of the user.
-   * @param options Optional parameters for filtering (includeArchived).
-   * @returns A promise that resolves to a GroupedConversations object with direct and room arrays.
-   */
-  findByUserGrouped(
-    userId: string,
-    options?: { includeArchived?: boolean }
-  ): Promise<GroupedConversations>;
-
-  /**
    * Finds conversations pinned by a specific user, ordered by pinned_order.
    * @param userId The unique ID of the user.
    * @returns A promise that resolves to an array of pinned Conversation objects in user-defined order.
    */
   findPinnedByUser(userId: string): Promise<Conversation[]>;
-
-  /**
-   * Gets aggregated unread counts for a user, broken down by conversation type.
-   * @param userId The unique ID of the user.
-   * @returns A promise that resolves to an UnreadSummary object with total, direct, and room unread counts.
-   */
-  getUnreadSummary(userId: string): Promise<UnreadSummary>;
 }
