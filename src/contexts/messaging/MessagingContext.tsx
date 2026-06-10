@@ -156,17 +156,6 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     }
   }, [conversationsManager.conversations, activeConversation, setActiveConversation]);
 
-  const getLastActivityMs = useCallback((conversation: (typeof conversationsManager.conversations)[number]) => {
-    const value = conversation?.lastActivity;
-    if (!value) return 0;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === 'string') {
-      const parsed = Date.parse(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  }, []);
-
   // Polling to refresh conversations list (but NOT auto-open them)
   // Conversations should only open when:
   // 1. User enters a specific space (floor-plan context)
@@ -224,6 +213,25 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
 
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
+
+  // Audit B-01: mark the active conversation read while it is actually visible.
+  // Unread is derived from the polled list (the activeConversation object is a
+  // stale snapshot), and gated on drawer visibility because the localStorage
+  // restore sets an active conversation without opening the drawer.
+  const activeConversationId = activeConversation?.id ?? null;
+  const currentUserId = currentUserProfile?.id ?? null;
+  const { markConversationAsRead } = conversationsManager;
+  const activeUnreadCount = useMemo(() => {
+    if (!activeConversationId || !currentUserId) return 0;
+    const listed = conversationsManager.conversations.find((c) => c.id === activeConversationId);
+    return listed?.unreadCount?.[currentUserId] ?? 0;
+  }, [activeConversationId, currentUserId, conversationsManager.conversations]);
+
+  useEffect(() => {
+    if (!isDrawerOpen || isMinimized) return;
+    if (!activeConversationId || activeUnreadCount <= 0) return;
+    void markConversationAsRead(activeConversationId);
+  }, [isDrawerOpen, isMinimized, activeConversationId, activeUnreadCount, markConversationAsRead]);
 
 
   // Robust: ensure opening a conversation for a received message with retries
