@@ -4,6 +4,7 @@
 import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
+  Conversation,
   Message,
   MessageType,
   FileAttachment,
@@ -24,17 +25,33 @@ const DRAWER_STORAGE_KEYS = {
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
 
-function useMessagingProviderValue(): MessagingContextType { // Get conversation management hooks
-  const conversationsManager = useConversations();
+function useMessagingProviderValue(): MessagingContextType {
+  // Conversation list lives in TanStack Query (key ['conversations', userId]);
+  // useConversationRealtime invalidations keep it fresh — no polling (audit B-06).
+  const {
+    conversations,
+    activeConversation,
+    lastActiveConversation,
+    setActiveConversation,
+    loadingConversations,
+    refreshingConversations,
+    hasLoadedConversations,
+    errorConversations,
+    refreshConversations,
+    getCachedConversations,
+    getOrCreateRoomConversation,
+    getOrCreateUserConversation,
+    archiveConversation,
+    unarchiveConversation,
+    pinConversation,
+    unpinConversation,
+    markConversationAsRead,
+    totalUnreadCount,
+    updateConversationWithMessage,
+    clearLastActiveConversation,
+  } = useConversations();
   const { currentUserProfile } = useCompany();
   const [isMessagingV2Enabled, setIsMessagingV2Enabled] = useState(() => messagingFeatureFlags.isV2Enabled());
-  const {
-    activeConversation,
-    setActiveConversation,
-    lastActiveConversation,
-    refreshConversations,
-    clearLastActiveConversation,
-  } = conversationsManager;
 
   // Drawer state with localStorage persistence
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
@@ -114,12 +131,6 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     };
   }, []);
 
-  useEffect(() => { if (currentUserProfile?.id) {
-      debugLogger.messaging.event('MessagingContext', 'refreshConversations:on-mount', { userId: currentUserProfile.id });
-      void refreshConversations();
-    }
-  }, [currentUserProfile?.id, refreshConversations]);
-
   useEffect(() => {
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.event('MessagingContext', 'flag:messaging_v2', {
@@ -133,12 +144,12 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     // Only restore if we have conversations loaded and no active conversation yet
     if (
       typeof window !== 'undefined' &&
-      conversationsManager.conversations.length > 0 &&
+      conversations.length > 0 &&
       !activeConversation
     ) {
       const storedConversationId = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
       if (storedConversationId) {
-        const conversation = conversationsManager.conversations.find(
+        const conversation = conversations.find(
           (c) => c.id === storedConversationId
         );
         if (conversation) {
@@ -154,78 +165,22 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
         }
       }
     }
-  }, [conversationsManager.conversations, activeConversation, setActiveConversation]);
-
-  // Polling to refresh conversations list (but NOT auto-open them)
-  // Conversations should only open when:
-  // 1. User enters a specific space (floor-plan context)
-  // 2. User clicks on a conversation in the list
-  // 3. User creates a new conversation from search
-  useEffect(() => {
-    if (!currentUserProfile?.id) return;
-    const defaultMs = 5000;
-    const fromEnv = Number(process.env.NEXT_PUBLIC_MESSAGING_POLL_MS || '0');
-    const pollMs = Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : defaultMs;
-
-    let stopped = false;
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const tick = async () => {
-      if (stopped) return;
-      try {
-        // Refresh conversations to get latest unread counts, but DON'T auto-open
-        await refreshConversations();
-
-        if (debugLogger.messaging.enabled()) {
-          const uid = currentUserProfile.id;
-          const unreadConvs = conversationsManager.conversations
-            .filter((c) => (c.unreadCount?.[uid] || 0) > 0);
-
-          if (unreadConvs.length > 0) {
-            debugLogger.messaging.event('MessagingContext.poll', 'unread-detected', {
-              count: unreadConvs.length,
-              conversations: unreadConvs.map(c => ({ id: c.id, unread: c.unreadCount?.[uid] })),
-            });
-          }
-        }
-
-        // NOTE: Removed auto-opening logic - conversations should only open via:
-        // - Space navigation (floor-plan)
-        // - User clicking in conversation list
-        // - User starting new conversation from search
-      } catch (e) {
-        debugLogger.messaging.warn('MessagingContext.poll', 'error', e);
-      } finally {
-        if (!stopped) {
-          pollTimer = setTimeout(tick, pollMs);
-        }
-      }
-    };
-
-    pollTimer = setTimeout(tick, pollMs);
-    return () => {
-      stopped = true;
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-      }
-    };
-  }, [currentUserProfile?.id, conversationsManager.conversations, refreshConversations]);
+  }, [conversations, activeConversation, setActiveConversation]);
 
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
 
   // Audit B-01: mark the active conversation read while it is actually visible.
-  // Unread is derived from the polled list (the activeConversation object is a
+  // Unread is derived from the query cache (the activeConversation object is a
   // stale snapshot), and gated on drawer visibility because the localStorage
   // restore sets an active conversation without opening the drawer.
   const activeConversationId = activeConversation?.id ?? null;
   const currentUserId = currentUserProfile?.id ?? null;
-  const { markConversationAsRead } = conversationsManager;
   const activeUnreadCount = useMemo(() => {
     if (!activeConversationId || !currentUserId) return 0;
-    const listed = conversationsManager.conversations.find((c) => c.id === activeConversationId);
+    const listed = conversations.find((c) => c.id === activeConversationId);
     return listed?.unreadCount?.[currentUserId] ?? 0;
-  }, [activeConversationId, currentUserId, conversationsManager.conversations]);
+  }, [activeConversationId, currentUserId, conversations]);
 
   useEffect(() => {
     if (!isDrawerOpen || isMinimized) return;
@@ -233,8 +188,8 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     void markConversationAsRead(activeConversationId);
   }, [isDrawerOpen, isMinimized, activeConversationId, activeUnreadCount, markConversationAsRead]);
 
-
-  // Robust: ensure opening a conversation for a received message with retries
+  // Ensure an incoming message opens its conversation. Auto-opening the drawer
+  // for received DMs is an explicit product requirement.
   const ensureOpenForMessage = useCallback(async (message: { conversationId: string; senderId: string }) => {
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'start', {
@@ -243,49 +198,50 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
       });
     }
 
+    const openConversation = (conversation: Conversation) => {
+      updateConversationWithMessage(conversation.id, message, message.senderId);
+      setActiveConversation(conversation);
+      setIsDrawerOpen(true);
+    };
+
     // 1) Skip if already viewing
     if (activeConversation?.id === message.conversationId) return;
 
-    // 2) Try local cache
-    let existing = conversationsManager.conversations.find((c) => c.id === message.conversationId);
+    // 2) Try the query cache
+    let existing = getCachedConversations().find((c) => c.id === message.conversationId);
     if (existing) {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:local', {
           conversationId: message.conversationId,
         });
       }
-      conversationsManager.updateConversationWithMessage(message.conversationId, message as any, message.senderId);
-      setActiveConversation(existing);
-      setIsDrawerOpen(true);
+      openConversation(existing);
       return;
     }
 
-    // 3) Hard refresh conversations
+    // 3) Hard refresh, then re-read the cache imperatively (audit B-07: the
+    // render-closure list never reflected the refresh)
     await refreshConversations();
-    existing = conversationsManager.conversations.find((c) => c.id === message.conversationId);
+    existing = getCachedConversations().find((c) => c.id === message.conversationId);
     if (existing) {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:after-refresh', {
           conversationId: message.conversationId,
         });
       }
-      conversationsManager.updateConversationWithMessage(message.conversationId, message as any, message.senderId);
-      setActiveConversation(existing);
-      setIsDrawerOpen(true);
+      openConversation(existing);
       return;
     }
 
     // 4) As a last resort, try resolving a DM with the sender (covers direct DMs)
     try {
-      const dm = await conversationsManager.getOrCreateUserConversation(message.senderId);
+      const dm = await getOrCreateUserConversation(message.senderId);
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'created:dm', {
           conversationId: dm.id,
         });
       }
-      conversationsManager.updateConversationWithMessage(dm.id, message as any, message.senderId);
-      setActiveConversation(dm);
-      setIsDrawerOpen(true);
+      openConversation(dm);
       return;
     } catch { }
 
@@ -299,8 +255,7 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
 
       await new Promise((r) => setTimeout(r, delay));
       await refreshConversations();
-      const conversationsById = new Map(conversationsManager.conversations.map((conversation) => [conversation.id, conversation]));
-      const found = conversationsById.get(message.conversationId);
+      const found = getCachedConversations().find((c) => c.id === message.conversationId);
       if (found) {
         if (debugLogger.messaging.enabled()) {
           debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:retry', {
@@ -308,9 +263,7 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
             delay,
           });
         }
-        conversationsManager.updateConversationWithMessage(found.id, message as any, message.senderId);
-        setActiveConversation(found);
-        setIsDrawerOpen(true);
+        openConversation(found);
         return true;
       }
       return retryFindConversation(attempt + 1);
@@ -323,13 +276,20 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
         conversationId: message.conversationId,
       });
     }
-  }, [activeConversation?.id, conversationsManager, refreshConversations, setActiveConversation]);
+  }, [
+    activeConversation?.id,
+    getCachedConversations,
+    refreshConversations,
+    getOrCreateUserConversation,
+    updateConversationWithMessage,
+    setActiveConversation,
+  ]);
 
   const conversationIds = useMemo(() => {
-    const ids = conversationsManager.conversations.flatMap((c) => c.id ? [c.id] : []);
+    const ids = conversations.flatMap((c) => c.id ? [c.id] : []);
     ids.sort();
     return ids;
-  }, [conversationsManager.conversations]);
+  }, [conversations]);
 
   const shouldSubscribeToAll = conversationIds.length > 0;
 
@@ -386,7 +346,20 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     }
   }, [realtimeStatus]);
 
-  // Wrapper function for sendMessage that also clears the draft
+  const {
+    messages,
+    loadingMessages,
+    errorMessages,
+    hasMoreMessages,
+    loadMoreMessages,
+    refreshMessages,
+    sendMessage: sendMessageToActiveConversation,
+    addReaction,
+    removeReaction,
+    uploadAttachment,
+  } = messagesManager;
+
+  // Wrapper function for sendMessage that guards on an active conversation
   const sendMessage = useCallback(async (content: string, options?: {
     replyToId?: string;
     attachments?: FileAttachment[];
@@ -394,9 +367,8 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
   }) => {
     if (!activeConversation) return;
 
-    // Send the message
-    return await messagesManager.sendMessage(content, options);
-  }, [activeConversation, messagesManager.sendMessage]);
+    return await sendMessageToActiveConversation(content, options);
+  }, [activeConversation, sendMessageToActiveConversation]);
 
   const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
@@ -408,8 +380,9 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     }
   }, [setActiveConversation, clearLastActiveConversation]);
 
-  // Create context value by combining all the hooks
-  const value: MessagingContextType = {
+  // Memoized context value (audit M-05): consumers only re-render when one of
+  // the listed pieces actually changes.
+  const value: MessagingContextType = useMemo(() => ({
     // Drawer state
     isDrawerOpen,
     isMinimized,
@@ -417,40 +390,76 @@ function useMessagingProviderValue(): MessagingContextType { // Get conversation
     openDrawer,
     toggleMinimize,
     setActiveView,
-    // Conversations (from conversationsManager)
-    conversations: conversationsManager.conversations,
-    activeConversation: conversationsManager.activeConversation,
-    lastActiveConversation: conversationsManager.lastActiveConversation,
-    loadingConversations: conversationsManager.loadingConversations,
-    refreshingConversations: conversationsManager.refreshingConversations,
-    hasLoadedConversations: conversationsManager.hasLoadedConversations,
-    errorConversations: conversationsManager.errorConversations,
-    setActiveConversation: conversationsManager.setActiveConversation,
-    getOrCreateRoomConversation: conversationsManager.getOrCreateRoomConversation,
-    getOrCreateUserConversation: conversationsManager.getOrCreateUserConversation,
-    archiveConversation: conversationsManager.archiveConversation,
-    unarchiveConversation: conversationsManager.unarchiveConversation,
-    pinConversation: conversationsManager.pinConversation,
-    unpinConversation: conversationsManager.unpinConversation,
-    markConversationAsRead: conversationsManager.markConversationAsRead,
-    totalUnreadCount: conversationsManager.totalUnreadCount,
-    refreshConversations: conversationsManager.refreshConversations,
+    // Conversations
+    conversations,
+    activeConversation,
+    lastActiveConversation,
+    loadingConversations,
+    refreshingConversations,
+    hasLoadedConversations,
+    errorConversations,
+    setActiveConversation,
+    getOrCreateRoomConversation,
+    getOrCreateUserConversation,
+    archiveConversation,
+    unarchiveConversation,
+    pinConversation,
+    unpinConversation,
+    markConversationAsRead,
+    totalUnreadCount,
+    refreshConversations,
     closeDrawer,
-    // Messages (from messagesManager)
-    messages: messagesManager.messages,
-    loadingMessages: messagesManager.loadingMessages,
-    errorMessages: messagesManager.errorMessages,
-    hasMoreMessages: messagesManager.hasMoreMessages,
-    loadMoreMessages: messagesManager.loadMoreMessages,
-    refreshMessages: messagesManager.refreshMessages,
+    // Messages
+    messages,
+    loadingMessages,
+    errorMessages,
+    hasMoreMessages,
+    loadMoreMessages,
+    refreshMessages,
     sendMessage,
-    addReaction: messagesManager.addReaction,
-    removeReaction: messagesManager.removeReaction,
-    uploadAttachment: messagesManager.uploadAttachment,
+    addReaction,
+    removeReaction,
+    uploadAttachment,
     // Realtime
     connectionStatus: realtimeStatus,
     isMessagingV2Enabled,
-  };
+  }), [
+    isDrawerOpen,
+    isMinimized,
+    activeView,
+    openDrawer,
+    toggleMinimize,
+    conversations,
+    activeConversation,
+    lastActiveConversation,
+    loadingConversations,
+    refreshingConversations,
+    hasLoadedConversations,
+    errorConversations,
+    setActiveConversation,
+    getOrCreateRoomConversation,
+    getOrCreateUserConversation,
+    archiveConversation,
+    unarchiveConversation,
+    pinConversation,
+    unpinConversation,
+    markConversationAsRead,
+    totalUnreadCount,
+    refreshConversations,
+    closeDrawer,
+    messages,
+    loadingMessages,
+    errorMessages,
+    hasMoreMessages,
+    loadMoreMessages,
+    refreshMessages,
+    sendMessage,
+    addReaction,
+    removeReaction,
+    uploadAttachment,
+    realtimeStatus,
+    isMessagingV2Enabled,
+  ]);
 
   return value;
 }

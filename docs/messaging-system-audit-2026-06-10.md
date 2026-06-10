@@ -27,8 +27,20 @@
 - [x] **M-02** — `findByUser` now filters by the per-user preference (pref > global fallback) in JS post-map, serializes the *effective* per-user `isArchived`, and advances the cursor by rows consumed. Client optimistic updates keep flag + preference in sync via `applyArchiveState`. Also fixed L-01 (dead lodash import, wrong file-header path).
 - [x] **M-03** — composite `{raw_pg_timestamp}|{id}` keyset cursor (full µs precision, id tie-break, legacy ts-only cursors still parse); repo computes direction-aware `nextCursor`; route reuses repo `hasMore` — both probe queries removed; `nextCursorBefore` only returned when older messages exist (fixes always-true client hasNextPage).
 
-**Phase 1 complete.** Remaining verifications needing a second browser/user: B-02 typing, B-03 unreact sync (after migration applied), B-01 badge clearing e2e.
-### Phase 2 — pending (not started)
+**Phase 1 complete.** Remaining verifications needing a second browser/user: B-02 typing, B-03 unreact sync (migration **applied to live DB 2026-06-10** by user), B-01 badge clearing e2e.
+
+**2026-06-10 — migrations applied + open questions answered (user):**
+- B-03 replica-identity migration and the RLS migration (`supabase/migrations/20260610183139_enable_core_table_rls.sql`, X-01 track) both applied to live DB by the user.
+- **Runtime evidence (two-user test):** user→admin message delivered live; admin→user reply did **NOT** arrive live but **appeared after refresh** → message persisted fine, realtime/poll delivery failed. Consistent with **B-06** (conversation realtime is a no-op; 5 s polling is the only sync), not an RLS regression. Phase 2.1 is the fix; re-test two-browser delivery after it lands.
+- **§8 Q1 answered: per-message read receipts (✓✓) ARE a product requirement.** Phase 2.2 keeps `message_read_receipts` as per-message source of truth; `conversation_members.last_read_at` still drives unread counts.
+- **§8 Q2 answered: `messaging_v2` flag is removable.** The planned "global channel/board" is the Announcement System (PRD Epic 6, `announcements` table) — unrelated to this realtime-topology flag. Remove in Phase 2.4.
+- **§8 Q3 answered: auto-open drawer on incoming DM is an explicit product requirement.** Keep `ensureOpenForMessage` auto-open; delete the misleading "auto-open was removed" comments in the polling code.
+
+### Phase 2 — in progress (started 2026-06-10)
+- [ ] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) — in progress
+- [ ] **2.2** — one read model: `conversation_members.last_read_at` for unread counts **+ keep `message_read_receipts` for ✓✓ UI** (per Q1 answer)
+- [ ] **2.3** — single authorization helper everywhere (S-05)
+- [ ] **2.4** — channel topology consolidation (M-06, M-07) + remove `messaging_v2` flag (per Q2 answer)
 ### Phase 3 — pending (not started)
 
 ---

@@ -1,18 +1,18 @@
 // src/hooks/useConversations.ts
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Conversation, ConversationType } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
 import { debugLogger } from '@/utils/debug-logger';
 
-const getTimestamp = (): number => {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-};
+// Query key shared with useConversationRealtime invalidations (audit B-06):
+// both sides MUST use ['conversations', <DB user id>].
+export const conversationsQueryKey = (userId: string | undefined) =>
+  ['conversations', userId] as const;
+
+const NO_CONVERSATIONS: Conversation[] = [];
 
 // Archive is a per-user preference (audit M-02); keep the effective flag and
 // the preference object in sync on optimistic updates.
@@ -36,35 +36,31 @@ const createTraceId = (prefix: string): string => {
 };
 
 export function useConversations() {
-  const { user } = useAuth();
-  const { company, currentUserProfile } = useCompany();
-  
-  // State for conversations
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { currentUserProfile } = useCompany();
+  const queryClient = useQueryClient();
+  const userId = currentUserProfile?.id;
+
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const lastActiveConversationRef = useRef<Conversation | null>(null);
-  const [loadingConversations, setLoadingConversations] = useState<boolean>(false);
-  const [refreshingConversations, setRefreshingConversations] = useState<boolean>(false);
-  const [hasLoadedConversations, setHasLoadedConversations] = useState<boolean>(false);
-  const [errorConversations, setErrorConversations] = useState<string | null>(null);
-  
-  // Subscribe to realtime updates using the Database User ID (canonical)
-  useConversationRealtime(currentUserProfile?.id);
+
+  // Subscribe to realtime updates using the Database User ID (canonical).
+  // Invalidations target the same query key as the query below.
+  useConversationRealtime(userId);
 
   useEffect(() => {
     if (!debugLogger.messaging.enabled()) {
       return;
     }
 
-    if (!currentUserProfile?.id) {
+    if (!userId) {
       debugLogger.messaging.trace('useConversations.realtime', 'skip:no-user');
       return;
     }
 
     debugLogger.messaging.trace('useConversations.realtime', 'subscribe', {
-      userId: currentUserProfile.id,
+      userId,
     });
-  }, [currentUserProfile?.id]);
+  }, [userId]);
 
   if (activeConversation?.type === ConversationType.DIRECT) {
     lastActiveConversationRef.current = activeConversation;
@@ -72,90 +68,82 @@ export function useConversations() {
   const lastActiveConversation = activeConversation?.type === ConversationType.DIRECT
     ? activeConversation
     : lastActiveConversationRef.current;
-  
-  // Function to refresh conversations
-  const refreshConversations = useCallback(async () => {
-    const instrumentationEnabled = debugLogger.messaging.enabled();
-    const traceId = instrumentationEnabled ? createTraceId('conv-refresh') : '';
-    const userId = currentUserProfile?.id;
 
+  const conversationsQuery = useQuery<Conversation[], Error>({
+    queryKey: conversationsQueryKey(userId),
+    queryFn: async () => {
+      // Query conversations by Database User ID
+      const result = await messagingApi.getConversations(userId!);
+      return result.conversations;
+    },
+    enabled: !!userId,
+    // Realtime invalidation (useConversationRealtime) is the primary freshness
+    // signal; staleTime only guards against redundant mount refetches.
+    staleTime: 30_000,
+  });
+
+  const conversations = conversationsQuery.data ?? NO_CONVERSATIONS;
+  const loadingConversations = conversationsQuery.isLoading;
+  const refreshingConversations = conversationsQuery.isFetching && !conversationsQuery.isLoading;
+  const hasLoadedConversations = conversationsQuery.isSuccess;
+  const errorConversations = conversationsQuery.isError ? 'Failed to load conversations' : null;
+
+  // Imperative cache reader — the fix for the stale-closure retries in
+  // ensureOpenForMessage (audit B-07): always reflects the latest fetch.
+  const getCachedConversations = useCallback((): Conversation[] => {
+    if (!userId) return NO_CONVERSATIONS;
+    return queryClient.getQueryData<Conversation[]>(conversationsQueryKey(userId)) ?? NO_CONVERSATIONS;
+  }, [queryClient, userId]);
+
+  const setConversationsData = useCallback(
+    (updater: (prev: Conversation[]) => Conversation[]) => {
+      if (!userId) return;
+      queryClient.setQueryData<Conversation[]>(
+        conversationsQueryKey(userId),
+        (prev) => updater(prev ?? NO_CONVERSATIONS)
+      );
+    },
+    [queryClient, userId]
+  );
+
+  const upsertConversation = useCallback(
+    (conversation: Conversation) => {
+      setConversationsData((prev) => {
+        const existingIndex = prev.findIndex((c) => c.id === conversation.id);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = conversation;
+          return updated;
+        }
+        return [conversation, ...prev];
+      });
+    },
+    [setConversationsData]
+  );
+
+  // Function to refresh conversations (invalidate + refetch via the query)
+  const refreshConversations = useCallback(async () => {
     if (!userId) {
-      if (instrumentationEnabled) {
-        debugLogger.messaging.trace('useConversations.refresh', 'skip:no-user', {
-          traceId,
-        });
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('useConversations.refresh', 'skip:no-user');
       }
       return;
     }
-
-    const start = instrumentationEnabled ? getTimestamp() : 0;
-    if (instrumentationEnabled) {
-      debugLogger.messaging.event('useConversations.refresh', 'start', {
-        traceId,
-        userId,
-      });
-    }
-
-    try {
-      if (!hasLoadedConversations) {
-        setLoadingConversations(true);
-      } else {
-        setRefreshingConversations(true);
-      }
-      setErrorConversations(null);
-
-      // Query conversations by Database User ID
-      const result = await messagingApi.getConversations(userId); // DB ID
-
-      if (instrumentationEnabled) {
-        const duration = start ? getTimestamp() - start : 0;
-        if (start) {
-          debugLogger.messaging.metric('useConversations.refresh', 'api', duration, {
-            traceId,
-            userId,
-          });
-        }
-        debugLogger.messaging.event('useConversations.refresh', 'success', {
-          traceId,
-          total: result.conversations.length,
-        });
-      }
-
-      setConversations(result.conversations);
-      if (!hasLoadedConversations) {
-        setHasLoadedConversations(true);
-      }
-    } catch (error) {
-      if (instrumentationEnabled) {
-        const duration = start ? getTimestamp() - start : 0;
-        debugLogger.messaging.error('useConversations.refresh', 'error', {
-          traceId,
-          userId,
-          duration,
-          error: error instanceof Error ? error.message : error,
-        });
-      }
-      console.error('Error loading conversations:', error);
-      setErrorConversations('Failed to load conversations');
-    } finally {
-      setLoadingConversations(false);
-      setRefreshingConversations(false);
-    }
-  }, [currentUserProfile?.id, hasLoadedConversations]);
+    await queryClient.invalidateQueries({ queryKey: conversationsQueryKey(userId) });
+  }, [queryClient, userId]);
 
   const clearLastActiveConversation = useCallback(() => {
     lastActiveConversationRef.current = null;
   }, []);
-  
+
   // Function to get or create a room conversation
   const getOrCreateRoomConversation = useCallback(async (roomId: string, roomName: string): Promise<Conversation> => {
-    if (!currentUserProfile?.id) {
+    if (!userId) {
       throw new Error('User not authenticated');
     }
-    
+
     const instrumentationEnabled = debugLogger.messaging.enabled();
     const traceId = instrumentationEnabled ? createTraceId('room-conv') : '';
-    const userId = currentUserProfile.id;
 
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.room', 'start', {
@@ -167,32 +155,21 @@ export function useConversations() {
     }
 
     try {
-      // Use a functional state update to get current conversations and check if one exists
-      let existingConversation: Conversation | null = null;
-      let existingConversationId: string | null = null;
-      
-      setConversations(prev => {
-        // Check if conversation already exists
-        existingConversation = prev.find(
-          c => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
-        ) || null;
-        existingConversationId = existingConversation?.id ?? null;
-        
-        // Return previous state without modification for now
-        return prev;
-      });
-      
+      const existingConversation = getCachedConversations().find(
+        (c) => c.type === ConversationType.ROOM && 'roomId' in c && c.roomId === roomId
+      );
+
       if (existingConversation) {
         if (instrumentationEnabled) {
           debugLogger.messaging.event('useConversations.room', 'hit:existing', {
             traceId,
             roomId,
-            conversationId: existingConversationId,
+            conversationId: existingConversation.id,
           });
         }
         return existingConversation;
       }
-      
+
       const resolvedConversation = await messagingApi.resolveConversation({
         type: ConversationType.ROOM,
         roomId,
@@ -206,15 +183,7 @@ export function useConversations() {
         });
       }
 
-      setConversations(prev => {
-        const existingIndex = prev.findIndex(c => c.id === resolvedConversation.id);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = resolvedConversation;
-          return updated;
-        }
-        return [resolvedConversation, ...prev];
-      });
+      upsertConversation(resolvedConversation);
 
       return resolvedConversation;
     } catch (error) {
@@ -228,21 +197,20 @@ export function useConversations() {
       console.error('Error creating room conversation:', error);
       throw error;
     }
-  }, [currentUserProfile?.id]); // Removed conversations dependency
-  
+  }, [userId, getCachedConversations, upsertConversation]);
+
   // Function to get or create a direct conversation with another user
   const getOrCreateUserConversation = useCallback(async (otherUserId: string): Promise<Conversation> => {
-    if (!currentUserProfile?.id) {
+    if (!userId) {
       throw new Error('User not authenticated');
     }
     // Compare Database User IDs to prevent self-DM
-    if (currentUserProfile.id === otherUserId) {
+    if (userId === otherUserId) {
       throw new Error('Cannot create conversation with yourself');
     }
     const instrumentationEnabled = debugLogger.messaging.enabled();
     const traceId = instrumentationEnabled ? createTraceId('direct-conv') : '';
-    const userId = currentUserProfile.id;
-    
+
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.direct', 'start', {
         traceId,
@@ -250,37 +218,26 @@ export function useConversations() {
         otherUserId,
       });
     }
-    
+
     try {
-      // Use functional state update to check for existing conversation
-      let existingConversation: Conversation | null = null;
-      let existingConversationId: string | null = null;
-      
-      setConversations(prev => {
-        // Check if conversation already exists
-        existingConversation = prev.find(
-          c => c.type === ConversationType.DIRECT && 
-               c.participants.includes(currentUserProfile.id) && 
-               c.participants.includes(otherUserId) &&
-               c.participants.length === 2
-        ) || null;
-        existingConversationId = existingConversation?.id ?? null;
-        
-        // Return previous state without modification
-        return prev;
-      });
-      
+      const existingConversation = getCachedConversations().find(
+        (c) => c.type === ConversationType.DIRECT &&
+             c.participants.includes(userId) &&
+             c.participants.includes(otherUserId) &&
+             c.participants.length === 2
+      );
+
       if (existingConversation) {
         if (instrumentationEnabled) {
           debugLogger.messaging.event('useConversations.direct', 'hit:existing', {
             traceId,
-            conversationId: existingConversationId,
+            conversationId: existingConversation.id,
             otherUserId,
           });
         }
         return existingConversation;
       }
-      
+
       const resolvedConversation = await messagingApi.resolveConversation({
         type: ConversationType.DIRECT,
         userId: otherUserId,
@@ -294,15 +251,7 @@ export function useConversations() {
         });
       }
 
-      setConversations(prev => {
-        const existingIndex = prev.findIndex(c => c.id === resolvedConversation.id);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = resolvedConversation;
-          return updated;
-        }
-        return [resolvedConversation, ...prev];
-      });
+      upsertConversation(resolvedConversation);
 
       return resolvedConversation;
     } catch (error) {
@@ -316,13 +265,12 @@ export function useConversations() {
       console.error('Error creating direct conversation:', error);
       throw error;
     }
-  }, [currentUserProfile?.id]); // Removed conversations dependency
-  
+  }, [userId, getCachedConversations, upsertConversation]);
+
   // Function to archive a conversation
   const archiveConversation = useCallback(async (conversationId: string) => {
     const instrumentationEnabled = debugLogger.messaging.enabled();
     const traceId = instrumentationEnabled ? createTraceId('archive-conv') : '';
-    const userId = currentUserProfile?.id;
 
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.archive', 'start', {
@@ -334,9 +282,8 @@ export function useConversations() {
 
     // Optimistic update first (archive is per-user — audit M-02: keep the
     // effective flag and the preference in sync)
-    let reverted = false;
-    setConversations(prev =>
-      prev.map(conversation =>
+    setConversationsData((prev) =>
+      prev.map((conversation) =>
         conversation.id === conversationId
           ? applyArchiveState(conversation, true)
           : conversation
@@ -355,9 +302,8 @@ export function useConversations() {
       }
     } catch (error) {
       // Revert on error
-      reverted = true;
-      setConversations(prev =>
-        prev.map(conversation =>
+      setConversationsData((prev) =>
+        prev.map((conversation) =>
           conversation.id === conversationId
             ? applyArchiveState(conversation, false)
             : conversation
@@ -371,15 +317,14 @@ export function useConversations() {
         });
       }
       console.error('Error archiving conversation:', error);
-      if (reverted) throw error;
+      throw error;
     }
-  }, [activeConversation, currentUserProfile]);
-  
+  }, [activeConversation, currentUserProfile, userId, setConversationsData]);
+
   // Function to unarchive a conversation
   const unarchiveConversation = useCallback(async (conversationId: string) => {
     const instrumentationEnabled = debugLogger.messaging.enabled();
     const traceId = instrumentationEnabled ? createTraceId('unarchive-conv') : '';
-    const userId = currentUserProfile?.id;
 
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.unarchive', 'start', {
@@ -389,9 +334,8 @@ export function useConversations() {
       });
     }
     // Optimistic update first
-    let failed = false;
-    setConversations(prev =>
-      prev.map(conversation =>
+    setConversationsData((prev) =>
+      prev.map((conversation) =>
         conversation.id === conversationId
           ? applyArchiveState(conversation, false)
           : conversation
@@ -405,9 +349,8 @@ export function useConversations() {
       }
     } catch (error) {
       // Revert on error
-      failed = true;
-      setConversations(prev =>
-        prev.map(conversation =>
+      setConversationsData((prev) =>
+        prev.map((conversation) =>
           conversation.id === conversationId
             ? applyArchiveState(conversation, true)
             : conversation
@@ -421,15 +364,15 @@ export function useConversations() {
         });
       }
       console.error('Error unarchiving conversation:', error);
-      if (failed) throw error;
+      throw error;
     }
-  }, [currentUserProfile]);
+  }, [currentUserProfile, userId, setConversationsData]);
 
   // Pin / Unpin conversations with optimistic updates
   const pinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('pin-conv') : '';
     // Optimistic update - handle cases where preferences may not exist yet
-    setConversations(prev => prev.map(c => {
+    setConversationsData((prev) => prev.map((c) => {
       if (c.id !== conversationId) {
         return c;
       }
@@ -437,7 +380,7 @@ export function useConversations() {
       const existingPrefs = c.preferences || {
         id: '',
         conversationId: c.id,
-        userId: currentUserProfile?.id || '',
+        userId: userId || '',
         isPinned: false,
         pinnedOrder: null,
         isStarred: false,
@@ -464,7 +407,7 @@ export function useConversations() {
       await refreshConversations();
     } catch (error) {
       // Revert
-      setConversations(prev => prev.map(c => {
+      setConversationsData((prev) => prev.map((c) => {
         if (c.id !== conversationId) {
           return c;
         }
@@ -484,12 +427,12 @@ export function useConversations() {
       }
       throw error;
     }
-  }, [currentUserProfile?.id, refreshConversations]);
+  }, [userId, refreshConversations, setConversationsData]);
 
   const unpinConversation = useCallback(async (conversationId: string) => {
     const traceId = debugLogger.messaging.enabled() ? createTraceId('unpin-conv') : '';
     // Optimistic update
-    setConversations(prev => prev.map(c => {
+    setConversationsData((prev) => prev.map((c) => {
       if (c.id !== conversationId) {
         return c;
       }
@@ -514,7 +457,7 @@ export function useConversations() {
       await refreshConversations();
     } catch (error) {
       // Revert
-      setConversations(prev => prev.map(c => {
+      setConversationsData((prev) => prev.map((c) => {
         if (c.id !== conversationId) {
           return c;
         }
@@ -534,11 +477,11 @@ export function useConversations() {
       }
       throw error;
     }
-  }, [refreshConversations]);
-  
+  }, [refreshConversations, setConversationsData]);
+
   // Function to mark a conversation as read
   const markConversationAsRead = useCallback(async (conversationId: string) => {
-    if (!currentUserProfile?.id) {
+    if (!userId) {
       if (debugLogger.messaging.enabled()) {
         debugLogger.messaging.trace('useConversations.markRead', 'skip:no-user', {
           conversationId,
@@ -549,7 +492,6 @@ export function useConversations() {
 
     const instrumentationEnabled = debugLogger.messaging.enabled();
     const traceId = instrumentationEnabled ? createTraceId('mark-read') : '';
-    const userId = currentUserProfile.id;
 
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.markRead', 'start', {
@@ -560,17 +502,15 @@ export function useConversations() {
     }
 
     try {
-      // Call the API to mark the conversation as read
-      await messagingApi.markConversationAsRead(conversationId, currentUserProfile.id);
-      // console.warn("markConversationAsRead API call not implemented yet."); // Remove warning
+      await messagingApi.markConversationAsRead(conversationId, userId);
 
-      // Update local state (Optimistic update remains)
-      setConversations(prev => 
-        prev.map(conversation => {
+      // Optimistic update: clear this user's unread entry
+      setConversationsData((prev) =>
+        prev.map((conversation) => {
           if (conversation.id === conversationId && conversation.unreadCount) {
             const updatedUnreadCount = { ...conversation.unreadCount };
-            delete updatedUnreadCount[currentUserProfile.id];
-            
+            delete updatedUnreadCount[userId];
+
             return {
               ...conversation,
               unreadCount: updatedUnreadCount,
@@ -596,17 +536,18 @@ export function useConversations() {
       }
       console.error('Error marking conversation as read:', error);
     }
-  }, [currentUserProfile?.id]);
-  
+  }, [userId, setConversationsData]);
+
   // Calculate total unread count
-  const totalUnreadCount = conversations.reduce((count, conversation) => {
-    if (currentUserProfile?.id && conversation.unreadCount && conversation.unreadCount[currentUserProfile.id]) {
-      return count + conversation.unreadCount[currentUserProfile.id];
-    }
-    return count;
-  }, 0);
-  
-  // Update conversation with new message
+  const totalUnreadCount = useMemo(() => {
+    if (!userId) return 0;
+    return conversations.reduce((count, conversation) => {
+      const unread = conversation.unreadCount?.[userId];
+      return unread ? count + unread : count;
+    }, 0);
+  }, [conversations, userId]);
+
+  // Update conversation with new message (immutable — audit M-04)
   const updateConversationWithMessage = useCallback((conversationId: string, lastMessage: any, senderId: string) => {
     const instrumentationEnabled = debugLogger.messaging.enabled();
     if (instrumentationEnabled) {
@@ -618,61 +559,43 @@ export function useConversations() {
       });
     }
 
-    let foundConversation = false;
-    let unreadIncremented = false;
-    let movedToTop = false;
+    setConversationsData((prev) => {
+      const conversationIndex = prev.findIndex((c) => c.id === conversationId);
 
-    setConversations(prev => {
-      const updatedConversations = [...prev];
-      const conversationIndex = updatedConversations.findIndex(
-        c => c.id === conversationId
-      );
-      
-      if (conversationIndex !== -1) {
-        const conversation = { ...updatedConversations[conversationIndex] };
-        // conversation.lastMessage = lastMessage; // Property doesn't exist on type
-        conversation.lastActivity = lastMessage.timestamp;
-        foundConversation = true;
-        
-        // Update unread count if not the active conversation
-        if (
-          (!activeConversation || activeConversation.id !== conversation.id) && 
-          senderId !== currentUserProfile?.id
-        ) {
-          if (!conversation.unreadCount) {
-            conversation.unreadCount = {};
-          }
-          if (currentUserProfile?.id) {
-            const key = currentUserProfile.id;
-            conversation.unreadCount[key] = (conversation.unreadCount[key] || 0) + 1;
-            unreadIncremented = true;
-          }
+      if (conversationIndex === -1) {
+        if (instrumentationEnabled) {
+          debugLogger.messaging.warn('useConversations.updateWithMessage', 'miss:not-found', {
+            conversationId,
+          });
         }
-        
-        // Move conversation to top of list
-        updatedConversations.splice(conversationIndex, 1);
-        updatedConversations.unshift(conversation);
-        movedToTop = conversationIndex > 0;
+        return prev;
       }
-      else if (instrumentationEnabled) {
-        debugLogger.messaging.warn('useConversations.updateWithMessage', 'miss:not-found', {
-          conversationId,
-        });
-      }
-      
-      return updatedConversations;
-    });
 
-    if (instrumentationEnabled) {
-      debugLogger.messaging.event('useConversations.updateWithMessage', 'applied', {
-        conversationId,
-        foundConversation,
-        unreadIncremented,
-        movedToTop,
-      });
-    }
-  }, [activeConversation, currentUserProfile?.id]);
-  
+      const conversation: Conversation = {
+        ...prev[conversationIndex],
+        lastActivity: lastMessage.timestamp,
+      };
+
+      // Update unread count if not the active conversation
+      if (
+        (!activeConversation || activeConversation.id !== conversation.id) &&
+        userId &&
+        senderId !== userId
+      ) {
+        conversation.unreadCount = {
+          ...(conversation.unreadCount ?? {}),
+          [userId]: (conversation.unreadCount?.[userId] || 0) + 1,
+        };
+      }
+
+      // Move conversation to top of list
+      const updated = [...prev];
+      updated.splice(conversationIndex, 1);
+      updated.unshift(conversation);
+      return updated;
+    });
+  }, [activeConversation, userId, setConversationsData]);
+
   return {
     conversations,
     activeConversation,
@@ -683,6 +606,7 @@ export function useConversations() {
     hasLoadedConversations,
     errorConversations,
     refreshConversations,
+    getCachedConversations,
     getOrCreateRoomConversation,
     getOrCreateUserConversation,
     archiveConversation,
