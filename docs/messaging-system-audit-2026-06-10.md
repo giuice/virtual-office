@@ -37,7 +37,7 @@
 - **§8 Q3 answered: auto-open drawer on incoming DM is an explicit product requirement.** Keep `ensureOpenForMessage` auto-open; delete the misleading "auto-open was removed" comments in the polling code.
 
 ### Phase 2 — in progress (started 2026-06-10)
-- [ ] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) — in progress
+- [x] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) → commit `fix(messaging): conversations live in TanStack Query; delete 5s polling`. List backed by `useQuery(['conversations', userId])` (realtime invalidation now effective), polling deleted, `ensureOpenForMessage` reads the cache imperatively, context value memoized, `getCachedConversations` exposed. **Re-test two-browser live delivery (the admin→user miss) after this.**
 - [ ] **2.2** — one read model: `conversation_members.last_read_at` for unread counts **+ keep `message_read_receipts` for ✓✓ UI** (per Q1 answer)
 - [ ] **2.3** — single authorization helper everywhere (S-05)
 - [ ] **2.4** — channel topology consolidation (M-06, M-07) + remove `messaging_v2` flag (per Q2 answer)
