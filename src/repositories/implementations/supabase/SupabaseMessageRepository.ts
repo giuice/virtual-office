@@ -385,11 +385,29 @@ export class SupabaseMessageRepository implements IMessageRepository {
       return acc;
     }, {} as Record<string, MessageStar[]>);
 
+    // Audit B-05/Phase 2.2: messages.status is frozen at 'sent' in the DB;
+    // the read indicator derives from message_read_receipts. Rule: read if
+    // ANY non-sender receipt exists (receipts are only ever written for
+    // non-senders by mark_conversation_read). Group all-participants-read
+    // semantics deferred.
+    const { data: receiptsData, error: receiptsError } = await this.supabaseClient
+      .from(this.READ_RECEIPT_TABLE_NAME)
+      .select('message_id')
+      .in('message_id', messageIds);
+
+    if (receiptsError) {
+      console.error(`Error fetching read receipts for conversation ${conversationId}:`, receiptsError);
+    }
+    const readMessageIds = new Set((receiptsData || []).map((row: { message_id: string }) => row.message_id));
+
     messages.forEach(message => {
       message.attachments = attachmentsByMessageId[message.id] || [];
       message.reactions = reactionsByMessageId[message.id] || [];
       message.pins = pinsByMessageId[message.id] || [];
       message.stars = starsByMessageId[message.id] || [];
+      if (readMessageIds.has(message.id) && message.status !== MessageStatus.FAILED) {
+        message.status = MessageStatus.READ;
+      }
     });
 
     // Determine nextCursor based on pagination direction. Built from the RAW
@@ -588,27 +606,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   // --- Read Receipt Methods ---
-
-  async addReadReceipt(messageId: string, userId: string, readAt?: Date): Promise<ReadReceipt> {
-    const dbData = {
-      message_id: messageId,
-      user_id: userId,
-      read_at: readAt ? readAt.toISOString() : new Date().toISOString()
-    };
-
-    const { data, error } = await this.supabaseClient
-      .from(this.READ_RECEIPT_TABLE_NAME)
-      .upsert(dbData, { onConflict: 'message_id, user_id' })
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error('Error adding read receipt:', error);
-      throw error || new Error('Failed to add read receipt or retrieve created data.');
-    }
-
-    return mapReadReceiptToCamelCase(data);
-  }
+  // Receipts are written exclusively by the mark_conversation_read RPC
+  // (atomic with the conversation_members.last_read_at update).
 
   async getReadReceipts(messageId: string): Promise<ReadReceipt[]> {
     const { data, error } = await this.supabaseClient
@@ -753,7 +752,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return (count ?? 0) > 0;
   }
 
-  async getPinnedMessages(conversationId: string, userId: string): Promise<Message[]> {
+  async getPinnedMessages(conversationId: string, _userId: string): Promise<Message[]> {
     // First, get the pinned message IDs for this conversation (shared pins)
     const { data: pinsData, error: pinsError } = await this.supabaseClient
       .from(this.MESSAGE_PIN_TABLE_NAME)

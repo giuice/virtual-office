@@ -76,16 +76,15 @@ export async function POST(request: NextRequest) {
 
     const createdMessage = await messageRepository.create(messageData);
 
-    // Update conversation last activity and increment unread counts for other
-    // participants (legacy read model — replaced by conversation_members.last_read_at).
+    // Update conversation last activity. Besides ordering the list, this
+    // UPDATE on conversations is what fires useConversationRealtime's cache
+    // invalidation so recipients' unread badges refresh. Unread counts are
+    // derived from conversation_members.last_read_at (Phase 2.2) — nothing
+    // to increment here.
     try {
       await conversationRepository.updateLastActivityTimestamp(conversation.id);
-      const recipients = conversation.participants.filter((pid) => pid !== dbUser.id);
-      if (recipients.length > 0) {
-        await conversationRepository.incrementUnreadCount(conversation.id, recipients);
-      }
     } catch (updateError) {
-      console.warn('Failed to update conversation activity/unread counts:', updateError);
+      console.warn('Failed to update conversation activity:', updateError);
       // Don't fail the request if conversation update fails
     }
 

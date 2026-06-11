@@ -504,20 +504,13 @@ export function useConversations() {
     try {
       await messagingApi.markConversationAsRead(conversationId, userId);
 
-      // Optimistic update: clear this user's unread entry
+      // Optimistic update: clear the viewer's unread count
       setConversationsData((prev) =>
-        prev.map((conversation) => {
-          if (conversation.id === conversationId && conversation.unreadCount) {
-            const updatedUnreadCount = { ...conversation.unreadCount };
-            delete updatedUnreadCount[userId];
-
-            return {
-              ...conversation,
-              unreadCount: updatedUnreadCount,
-            };
-          }
-          return conversation;
-        })
+        prev.map((conversation) =>
+          conversation.id === conversationId && conversation.unreadCount > 0
+            ? { ...conversation, unreadCount: 0 }
+            : conversation
+        )
       );
 
       if (instrumentationEnabled) {
@@ -538,13 +531,14 @@ export function useConversations() {
     }
   }, [userId, setConversationsData]);
 
-  // Calculate total unread count
+  // Calculate total unread count (unreadCount is the viewer's own count,
+  // server-computed — Phase 2.2)
   const totalUnreadCount = useMemo(() => {
     if (!userId) return 0;
-    return conversations.reduce((count, conversation) => {
-      const unread = conversation.unreadCount?.[userId];
-      return unread ? count + unread : count;
-    }, 0);
+    return conversations.reduce(
+      (count, conversation) => count + (conversation.unreadCount || 0),
+      0
+    );
   }, [conversations, userId]);
 
   // Update conversation with new message (immutable — audit M-04)
@@ -582,10 +576,7 @@ export function useConversations() {
         userId &&
         senderId !== userId
       ) {
-        conversation.unreadCount = {
-          ...(conversation.unreadCount ?? {}),
-          [userId]: (conversation.unreadCount?.[userId] || 0) + 1,
-        };
+        conversation.unreadCount = (conversation.unreadCount || 0) + 1;
       }
 
       // Move conversation to top of list

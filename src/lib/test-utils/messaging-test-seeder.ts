@@ -204,7 +204,7 @@ export class MessagingTestSeeder {
     if (conversationIds.length > 0) {
       try {
         await this.supabase
-          .from('conversation_preferences')
+          .from('conversation_members')
           .delete()
           .in('conversation_id', conversationIds);
       } catch (error) {

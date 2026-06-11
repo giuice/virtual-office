@@ -38,7 +38,13 @@
 
 ### Phase 2 — in progress (started 2026-06-10)
 - [x] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) → commit `fix(messaging): conversations live in TanStack Query; delete 5s polling`. List backed by `useQuery(['conversations', userId])` (realtime invalidation now effective), polling deleted, `ensureOpenForMessage` reads the cache imperatively, context value memoized, `getCachedConversations` exposed. **Re-test two-browser live delivery (the admin→user miss) after this.**
-- [ ] **2.2** — one read model: `conversation_members.last_read_at` for unread counts **+ keep `message_read_receipts` for ✓✓ UI** (per Q1 answer)
+- [x] **2.2** — one read model (B-01 remainder, B-05, M-01 partial). **Migration `supabase/migrations/20260610210000_conversation_members_read_model.sql` NOT yet applied — user applies manually.** What changed:
+  - `conversation_preferences` **renamed** to `conversation_members` + `last_read_at`/`joined_at`; backfilled one row per (conversation, participant), `last_read_at = now()` (badges reset to 0 once at rollout, accepted). DB trigger `sync_conversation_members` keeps member rows in sync on conversation INSERT **and** `participants` UPDATE (replaces the INSERT-only preferences trigger).
+  - Unread counts server-computed via `get_unread_counts(uuid[])` RPC (viewer from `auth.uid()`, one aggregate per page — no N+1). `Conversation.unreadCount` is now a **number** (viewer-only) — also fixes the privacy leak (everyone saw everyone's counts) and the MessagingTrigger sum-all-users badge bug.
+  - `/api/conversations/read` → `mark_conversation_read(conv, user)` RPC (service-role only): sets `last_read_at` AND bulk-inserts `message_read_receipts` atomically. Receipts now carry `conversation_id` (denormalized, for realtime filters).
+  - ✓✓ derives from `message_read_receipts` ("any non-sender receipt = read", per user decision; group all-read deferred). `messages.status` frozen at `sent` in DB; `findByConversation` overlays READ. Live flip: `useMessageSubscription` subscribes to receipts INSERTs per conversation.
+  - **Deleted**: `/api/messages/status` route (zero callers), `messagingApi.updateMessageStatus`, repo `markAsRead`/`incrementUnreadCount`/`addReadReceipt`. `unread_count` JSONB no longer written anywhere (column drop = Phase 3).
+  - Post-apply verification pending: two-browser badge/✓✓ test, `migrations/database-structure.md` refresh.
 - [ ] **2.3** — single authorization helper everywhere (S-05)
 - [ ] **2.4** — channel topology consolidation (M-06, M-07) + remove `messaging_v2` flag (per Q2 answer)
 ### Phase 3 — pending (not started)

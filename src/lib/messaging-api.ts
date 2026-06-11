@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
+import { Message, Conversation, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -70,7 +70,9 @@ function normalizeConversation(raw: any): Conversation {
           : new Date(),
     name: raw?.name ?? undefined,
     isArchived: Boolean(raw?.isArchived ?? raw?.is_archived),
-    unreadCount: raw?.unreadCount ?? raw?.unread_count ?? {},
+    // Phase 2.2: server sends the viewer's count as a number (derived from
+    // conversation_members.last_read_at); legacy map payloads coerce to 0.
+    unreadCount: typeof raw?.unreadCount === 'number' ? raw.unreadCount : 0,
     roomId: raw?.roomId ?? raw?.room_id ?? undefined,
     visibility: raw?.visibility,
     preferences: raw?.preferences ? {
@@ -519,30 +521,6 @@ export const messagingApi = {
    */
   async removeReaction(messageId: string, emoji: string): Promise<void> {
     await this.toggleReaction(messageId, emoji);
-  },
-
-  /**
-   * Update the status of a message (e.g., delivered, read)
-   */
-  async updateMessageStatus(messageId: string, status: MessageStatus, userId: string): Promise<void> {
-    try {
-      const response = await fetch('/api/messages/status', { // Assuming this endpoint
-        method: 'PATCH', // Assuming PATCH for status update
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, status, userId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update message status');
-      }
-      // No specific data expected on success
-    } catch (error) {
-      console.error('Error updating message status:', error);
-      throw error;
-    }
   },
 
   /**

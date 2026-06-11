@@ -43,12 +43,11 @@ declare global {
 interface MockMessageRepository {
   findById: jest.Mock;
   addAttachment: jest.Mock;
-  updateStatus: jest.Mock;
 }
 
 interface MockConversationRepository {
   setArchiveStatus: jest.Mock;
-  markAsRead: jest.Mock;
+  markConversationRead: jest.Mock;
 }
 
 // Export types for use in tests

@@ -18,8 +18,8 @@ export interface IMessageRepository {
   removeReaction(messageId: string, userId: string, emoji: string): Promise<boolean>;
   findReactions(messageId: string): Promise<MessageReaction[]>;
 
-  // Read receipt methods
-  addReadReceipt(messageId: string, userId: string, readAt?: Date): Promise<ReadReceipt>;
+  // Read receipt methods. Receipts are written exclusively by the
+  // mark_conversation_read RPC (see IConversationRepository.markConversationRead).
   getReadReceipts(messageId: string): Promise<ReadReceipt[]>;
   getUnreadMessages(conversationId: string, userId: string, since?: Date): Promise<Message[]>;
 

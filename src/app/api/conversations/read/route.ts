@@ -29,7 +29,9 @@ export async function PATCH(request: NextRequest) {
     const conversationRepository: IConversationRepository = new SupabaseConversationRepository(
       ctx.serviceClient
     );
-    const success = await conversationRepository.markAsRead(conversationId, ctx.dbUser.id);
+    // Phase 2.2: atomic RPC — sets conversation_members.last_read_at and
+    // writes per-message read receipts in one transaction.
+    const success = await conversationRepository.markConversationRead(conversationId, ctx.dbUser.id);
 
     if (!success) {
       return jsonError(500, 'INTERNAL_ERROR', 'Failed to mark conversation as read');

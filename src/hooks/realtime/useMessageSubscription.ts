@@ -351,6 +351,25 @@ export function useMessageSubscription(
           handleConversationChange(conversationId)
         )
       );
+
+      // Phase 2.2: read-receipt INSERTs (written in bulk by the
+      // mark_conversation_read RPC) flip the sender's read indicator.
+      // Refetch derives status from message_read_receipts server-side;
+      // TanStack coalesces the burst of invalidations into one refetch.
+      teardownFns.push(
+        subscribeWithRetry(
+          `read_receipts:${conversationId}`,
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'message_read_receipts',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+          }
+        )
+      );
     });
 
     // Subscribe to reaction changes globally to handle reactions across all visible messages

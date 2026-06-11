@@ -38,20 +38,6 @@ test('Get attachments for a message', async ({ request }: { request: APIRequestC
   expect(data.attachments).toBeDefined();
 });
 
-// Update message status
-test('Update message status', async ({ request }: { request: APIRequestContext }) => {
-  const response = await request.patch('/api/messages/status', {
-    data: {
-      messageId: 'message-123',
-      status: 'read',
-    }
-  });
-  
-  expect(response.ok()).toBeTruthy();
-  const data = await response.json();
-  expect(data.success).toBe(true);
-});
-
 // Return 401 when user is not authenticated
 test('Return 401 when user is not authenticated', async ({ request }: { request: APIRequestContext }) => {
   // This test relies on the server correctly identifying unauthenticated requests

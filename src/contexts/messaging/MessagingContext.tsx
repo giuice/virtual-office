@@ -179,7 +179,7 @@ function useMessagingProviderValue(): MessagingContextType {
   const activeUnreadCount = useMemo(() => {
     if (!activeConversationId || !currentUserId) return 0;
     const listed = conversations.find((c) => c.id === activeConversationId);
-    return listed?.unreadCount?.[currentUserId] ?? 0;
+    return listed?.unreadCount ?? 0;
   }, [activeConversationId, currentUserId, conversations]);
 
   useEffect(() => {

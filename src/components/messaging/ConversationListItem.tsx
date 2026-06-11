@@ -60,7 +60,7 @@ export function ConversationListItem({
   onArchive,
   onUnarchive,
 }: ConversationListItemProps) {
-  const unreadCount = viewerId ? conversation.unreadCount?.[viewerId] || 0 : 0;
+  const unreadCount = conversation.unreadCount || 0;
   const isPinned = conversation.preferences?.isPinned ?? false;
   const isStarred = conversation.preferences?.isStarred ?? false;
 

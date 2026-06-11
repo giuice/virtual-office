@@ -1,6 +1,7 @@
 // __tests__/api/conversations-read-route.test.ts
 // Audit B-01 regression suite: the participant check must use DB UUIDs
-// (dbUser.id), and markAsRead must receive the DB id — never the Supabase UID.
+// (dbUser.id), and markConversationRead must receive the DB id — never the
+// Supabase UID.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { PATCH } from '@/app/api/conversations/read/route';
@@ -11,7 +12,7 @@ const OTHER_USER_ID = '22222222-2222-4222-8222-222222222222';
 const CONVERSATION_ID = '66666666-6666-4666-8666-666666666666';
 
 const mockRequireConversationParticipant = vi.fn();
-const mockMarkAsRead = vi.fn();
+const mockMarkConversationRead = vi.fn();
 
 vi.mock('@/lib/auth/authorize', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/auth/authorize')>();
@@ -25,7 +26,7 @@ vi.mock('@/lib/auth/authorize', async (importOriginal) => {
 vi.mock('@/repositories/implementations/supabase', () => ({
   SupabaseConversationRepository: function MockConversationRepository() {
     return {
-      markAsRead: (id: string, userId: string) => mockMarkAsRead(id, userId),
+      markConversationRead: (id: string, userId: string) => mockMarkConversationRead(id, userId),
     };
   },
 }));
@@ -56,14 +57,14 @@ describe('/api/conversations/read', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireConversationParticipant.mockResolvedValue(participantContext());
-    mockMarkAsRead.mockResolvedValue(true);
+    mockMarkConversationRead.mockResolvedValue(true);
   });
 
   it('rejects a missing conversationId with 400', async () => {
     const response = await PATCH(createRequest({}));
 
     expect(response.status).toBe(400);
-    expect(mockMarkAsRead).not.toHaveBeenCalled();
+    expect(mockMarkConversationRead).not.toHaveBeenCalled();
   });
 
   it('propagates authorization failures from the gate (non-participant → 403)', async () => {
@@ -74,7 +75,7 @@ describe('/api/conversations/read', () => {
     const response = await PATCH(createRequest({ conversationId: CONVERSATION_ID }));
 
     expect(response.status).toBe(403);
-    expect(mockMarkAsRead).not.toHaveBeenCalled();
+    expect(mockMarkConversationRead).not.toHaveBeenCalled();
   });
 
   it('marks the conversation read using the DB user id, ignoring client-sent userId', async () => {
@@ -85,11 +86,11 @@ describe('/api/conversations/read', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(mockMarkAsRead).toHaveBeenCalledWith(CONVERSATION_ID, APP_USER_ID);
+    expect(mockMarkConversationRead).toHaveBeenCalledWith(CONVERSATION_ID, APP_USER_ID);
   });
 
   it('returns 500 when the repository reports failure', async () => {
-    mockMarkAsRead.mockResolvedValueOnce(false);
+    mockMarkConversationRead.mockResolvedValueOnce(false);
 
     const response = await PATCH(createRequest({ conversationId: CONVERSATION_ID }));
 

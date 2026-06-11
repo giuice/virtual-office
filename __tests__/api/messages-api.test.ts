@@ -2,7 +2,6 @@
 import { NextRequest } from 'next/server';
 import { POST as uploadHandler } from '@/app/api/messages/upload/route';
 import { GET as getAttachmentsHandler } from '@/app/api/messages/attachments/route';
-import { PATCH as updateStatusHandler } from '@/app/api/messages/status/route';
 import { validateUserSession } from '@/lib/auth/session';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
@@ -198,39 +197,6 @@ describe('Messages API Routes', () => {
       
       expect(response.status).toBe(400);
       expect(data).toHaveProperty('error', 'Message ID is required');
-    });
-  });
-  
-  describe('Message Status Route', () => {
-    test('should update message status', async () => {
-      const mockRequest = createMockRequest('PATCH', {
-        messageId: 'message-123',
-        status: 'read',
-      });
-      
-      const response = await updateStatusHandler(mockRequest as NextRequest);
-      const data = await response.json();
-      
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('success', true);
-    });
-    
-    test('should return 401 when user is not authenticated', async () => {
-      // Mock failed session validation
-      (validateUserSession as any).mockResolvedValueOnce({
-        error: 'Unauthorized',
-      });
-      
-      const mockRequest = createMockRequest('PATCH', {
-        messageId: 'message-123',
-        status: 'read',
-      });
-      
-      const response = await updateStatusHandler(mockRequest as NextRequest);
-      const data = await response.json();
-      
-      expect(response.status).toBe(401);
-      expect(data).toHaveProperty('error', 'Unauthorized');
     });
   });
 });

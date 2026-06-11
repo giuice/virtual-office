@@ -1,6 +1,5 @@
 // __tests__/messaging/client-messages.test.ts
 import { messagingApi } from '@/lib/messaging-api';
-import { MessageStatus } from '@/types/messaging';
 import { expect, describe, test, beforeEach, vi } from 'vitest';
 
 // Mock fetch for all tests
@@ -135,60 +134,6 @@ describe('Messaging API Client - Messages', () => {
       await expect(
         messagingApi.getMessageAttachments('invalid-id')
       ).rejects.toThrow(errorMessage);
-    });
-  });
-
-  // Message Status Tests
-  describe('Message Status', () => {
-    test('updateMessageStatus should update status and return successfully', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.READ, 'user-id');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/messages/status',
-        expect.objectContaining({
-          method: 'PATCH',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify({
-            messageId: 'message-id',
-            status: MessageStatus.READ,
-            userId: 'user-id'
-          }),
-        })
-      );
-    });
-
-    test('updateMessageStatus should handle errors', async () => {
-      const errorMessage = 'Not authorized to update this message';
-      const mockResponse = { error: errorMessage };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(403, mockResponse)
-      );
-
-      await expect(
-        messagingApi.updateMessageStatus('message-id', MessageStatus.READ, 'user-id')
-      ).rejects.toThrow(errorMessage);
-    });
-
-    test('updateMessageStatus should handle different status types', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementation(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.DELIVERED, 'user-id');
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.SENT, 'user-id');
-
-      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
 

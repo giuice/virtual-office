@@ -15,7 +15,6 @@ const mockRequireConversationParticipant = vi.fn();
 const mockReplyLookup = vi.fn();
 const mockMessageCreate = vi.fn();
 const mockUpdateLastActivity = vi.fn();
-const mockIncrementUnread = vi.fn();
 
 vi.mock('@/lib/auth/authorize', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/auth/authorize')>();
@@ -35,7 +34,6 @@ vi.mock('@/repositories/implementations/supabase', () => ({
   SupabaseConversationRepository: function MockConversationRepository() {
     return {
       updateLastActivityTimestamp: (id: string) => mockUpdateLastActivity(id),
-      incrementUnreadCount: (id: string, userIds: string[]) => mockIncrementUnread(id, userIds),
     };
   },
 }));
@@ -92,7 +90,6 @@ describe('/api/messages/create', () => {
       ...data,
     }));
     mockUpdateLastActivity.mockResolvedValue(undefined);
-    mockIncrementUnread.mockResolvedValue(true);
   });
 
   it('propagates authorization failures from the gate', async () => {
@@ -155,7 +152,10 @@ describe('/api/messages/create', () => {
     expect(mockMessageCreate).not.toHaveBeenCalled();
   });
 
-  it('accepts a valid same-conversation reply and increments unread for recipients', async () => {
+  it('accepts a valid same-conversation reply and bumps last activity', async () => {
+    // Phase 2.2: unread counts derive from conversation_members.last_read_at;
+    // creating a message only touches last_activity (which drives realtime
+    // list invalidation for recipients).
     const response = await POST(
       createRequest({ conversationId: CONVERSATION_ID, content: 'hi', replyToId: REPLY_TARGET_ID })
     );
@@ -165,6 +165,5 @@ describe('/api/messages/create', () => {
       expect.objectContaining({ replyToId: REPLY_TARGET_ID })
     );
     expect(mockUpdateLastActivity).toHaveBeenCalledWith(CONVERSATION_ID);
-    expect(mockIncrementUnread).toHaveBeenCalledWith(CONVERSATION_ID, [OTHER_USER_ID]);
   });
 });

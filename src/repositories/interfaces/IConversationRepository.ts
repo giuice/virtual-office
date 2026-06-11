@@ -54,12 +54,15 @@ export interface IConversationRepository {
   setArchiveStatus(id: string, isArchived: boolean): Promise<Conversation | null>;
 
   /**
-   * Marks a conversation as read for a specific user by setting their unread count to 0.
+   * Marks a conversation as read for a specific user: sets their
+   * conversation_members.last_read_at cursor and writes per-message read
+   * receipts atomically (mark_conversation_read RPC). Requires a
+   * service-role client; callers must authorize the user first.
    * @param id The unique ID of the conversation.
-   * @param userId The unique ID of the user for whom the conversation should be marked as read.
+   * @param userId The DB user ID (users.id) marking the conversation read.
    * @returns A promise that resolves to true if the operation was successful, false otherwise.
    */
-  markAsRead(id: string, userId: string): Promise<boolean>;
+  markConversationRead(id: string, userId: string): Promise<boolean>;
 
    /**
    * Updates the timestamp of the last message in the conversation.
@@ -72,15 +75,6 @@ export interface IConversationRepository {
    * @returns A promise that resolves to the updated Conversation object or null if not found.
    */
    updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null>;
-
-  /**
-   * Increments the unread count for specified participants in a conversation.
-   * Should typically be called when a new message is added.
-   * @param id The unique ID of the conversation.
-   * @param userIdsToIncrement An array of user IDs whose unread count should be incremented.
-   * @returns A promise that resolves to true if the operation was successful, false otherwise.
-   */
-  incrementUnreadCount(id: string, userIdsToIncrement: string[]): Promise<boolean>;
 
   // Add other methods as needed, e.g., findByParticipants, addParticipant, removeParticipant
 
