@@ -89,8 +89,8 @@ export async function POST(request: Request) {
 			platformAdminId: user.id
 		});
 
-		// AC 2.3.1: Create company record
-		const companyRepository = new SupabaseCompanyRepository(supabase);
+		const supabaseAdmin = await createSupabaseServerClient('service_role');
+		const companyRepository = new SupabaseCompanyRepository(supabaseAdmin);
 
 		const companyData: Omit<Company, 'id' | 'createdAt'> = {
 			name: companyName.trim(),
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 		const token = crypto.randomBytes(32).toString('hex');
 		const expiresAtMs = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
 
-		const invitationRepository = new SupabaseInvitationRepository(supabase);
+		const invitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
 
 		const invitationData: Omit<Invitation, 'id' | 'createdAt' | 'status'> = {
 			email: normalizedAdminEmail,
@@ -145,9 +145,6 @@ export async function POST(request: Request) {
 		// AC 2.3.3: Send invitation email via Supabase Auth
 		const baseUrl = resolveAppBaseUrl(request);
 		const redirectTo = `${baseUrl}/join?token=${token}`;
-
-		// Use service role client for admin email operations
-		const supabaseAdmin = await createSupabaseServerClient('service_role');
 
 		const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
 			normalizedAdminEmail,

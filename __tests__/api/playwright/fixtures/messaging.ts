@@ -88,9 +88,10 @@ async function cleanupMessagingData(request: APIRequestContext, data: MessagingT
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  // The login page is localized (pt-BR today); match either language.
+  await page.getByLabel(/^email$/i).fill(email);
+  await page.getByLabel(/^(password|senha)$/i).fill(password);
+  await page.getByRole('button', { name: /^(sign in|entrar)$/i }).click();
   await page.waitForURL(/dashboard|floor-plan/, { timeout: 30_000 });
 }
 

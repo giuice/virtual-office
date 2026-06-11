@@ -13,7 +13,6 @@ export interface ConversationAccess {
   id: string;
   type: string;
   roomId: string | null;
-  participants: string[];
 }
 
 export interface ParticipantContext {
@@ -47,12 +46,14 @@ export function jsonError(status: number, code: string, message: string): NextRe
 
 async function loadConversationAccess(
   serviceClient: SupabaseClient,
-  conversationId: string
-): Promise<ConversationAccess | AuthzFailure> {
+  conversationId: string,
+  dbUserId: string
+): Promise<{ conversation: ConversationAccess; isMember: boolean } | AuthzFailure> {
   const { data: row, error } = await serviceClient
     .from('conversations')
-    .select('id, type, room_id, participants')
+    .select('id, type, room_id, conversation_members(user_id)')
     .eq('id', conversationId)
+    .eq('conversation_members.user_id', dbUserId)
     .maybeSingle();
 
   if (error) {
@@ -63,18 +64,24 @@ async function loadConversationAccess(
     return { errorResponse: jsonError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found') };
   }
 
+  const conversationMembers = Array.isArray((row as { conversation_members?: unknown }).conversation_members)
+    ? ((row as { conversation_members: { user_id: string }[] }).conversation_members ?? [])
+    : [];
+
   return {
-    id: row.id,
-    type: row.type,
-    roomId: row.room_id ?? null,
-    participants: Array.isArray(row.participants) ? row.participants : [],
+    conversation: {
+      id: row.id,
+      type: row.type,
+      roomId: row.room_id ?? null,
+    },
+    isMember: conversationMembers.length > 0,
   };
 }
 
 /**
  * Resolves the session and asserts the requester participates in the
- * conversation. Membership source of truth lives in this module only, so the
- * planned conversation_members migration changes one lookup, not every route.
+ * conversation. Membership authority is now conversation_members (synced from
+ * participants[] by DB trigger; participants[] will be removed in Phase 3).
  */
 export async function requireConversationParticipant(
   conversationId: string
@@ -89,16 +96,18 @@ export async function requireConversationParticipant(
   }
 
   const serviceClient = await createSupabaseServerClient('service_role');
-  const conversation = await loadConversationAccess(serviceClient, conversationId);
-  if (isAuthzFailure(conversation)) {
-    return conversation;
+  const access = await loadConversationAccess(serviceClient, conversationId, auth.dbUser.id);
+  if (isAuthzFailure(access)) {
+    return access;
   }
 
-  if (!conversation.participants.includes(auth.dbUser.id)) {
+  if (!access.isMember) {
     return {
       errorResponse: jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation'),
     };
   }
+
+  const { conversation } = access;
 
   return {
     supabase: auth.supabase,
@@ -139,12 +148,12 @@ export async function requireMessageParticipant(
     return { errorResponse: jsonError(404, 'MESSAGE_NOT_FOUND', 'Message not found') };
   }
 
-  const conversation = await loadConversationAccess(serviceClient, messageRow.conversation_id);
-  if (isAuthzFailure(conversation)) {
-    return conversation;
+  const access = await loadConversationAccess(serviceClient, messageRow.conversation_id, auth.dbUser.id);
+  if (isAuthzFailure(access)) {
+    return access;
   }
 
-  if (!conversation.participants.includes(auth.dbUser.id)) {
+  if (!access.isMember) {
     return {
       errorResponse: jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation'),
     };
@@ -154,7 +163,7 @@ export async function requireMessageParticipant(
     supabase: auth.supabase,
     serviceClient,
     dbUser: auth.dbUser,
-    conversation,
+    conversation: access.conversation,
     message: {
       id: messageRow.id,
       conversationId: messageRow.conversation_id,

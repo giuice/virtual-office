@@ -1,8 +1,8 @@
 // src/app/api/conversations/preferences/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { SupabaseConversationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { IConversationRepository } from '@/repositories/interfaces';
+import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
 
 /**
  * GET /api/conversations/preferences?conversationId={id}
@@ -10,13 +10,6 @@ import { IConversationRepository } from '@/repositories/interfaces';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const searchParams = new URL(request.url).searchParams;
     const conversationId = searchParams.get('conversationId');
 
@@ -24,19 +17,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required parameter: conversationId' }, { status: 400 });
     }
 
-    // Get user database record
-    const serviceSupabase = await createSupabaseServerClient('service_role');
-    const userRepository = new SupabaseUserRepository(serviceSupabase);
-    const userProfile = await userRepository.findBySupabaseUid(authData.user.id);
-
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
 
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(ctx.serviceClient);
 
     // Get user's preferences for this conversation
-    const preferences = await conversationRepository.getUserPreference(conversationId, userProfile.id);
+    const preferences = await conversationRepository.getUserPreference(conversationId, ctx.dbUser.id);
 
     if (!preferences) {
       // Return default preferences if none exist
@@ -71,13 +60,6 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { conversationId, isPinned, pinnedOrder, isStarred, notificationsEnabled } = body;
 
@@ -99,28 +81,12 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Get user database record
-    const serviceSupabase = await createSupabaseServerClient('service_role');
-    const userRepository = new SupabaseUserRepository(serviceSupabase);
-    const userProfile = await userRepository.findBySupabaseUid(authData.user.id);
-
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
 
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
-
-    // Check if the conversation exists and if the user is a participant
-    const conversation = await conversationRepository.findById(conversationId);
-
-    if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
-    }
-
-    // Verify user is a participant in the conversation
-    if (!conversation.participants.includes(userProfile.id)) {
-      return NextResponse.json({ error: 'Not authorized to modify preferences for this conversation' }, { status: 403 });
-    }
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(ctx.serviceClient);
 
     // Build preferences update object
     const preferencesUpdate: any = {};
@@ -136,14 +102,14 @@ export async function PATCH(request: NextRequest) {
     if (notificationsEnabled !== undefined) preferencesUpdate.notificationsEnabled = notificationsEnabled;
 
     console.log(
-      `API: Updating preferences for conversation ${conversationId} for user ${userProfile.id}:`,
+      `API: Updating preferences for conversation ${conversationId} for user ${ctx.dbUser.id}:`,
       preferencesUpdate
     );
 
     // Update preferences
     const updatedPreferences = await conversationRepository.setUserPreference(
       conversationId,
-      userProfile.id,
+      ctx.dbUser.id,
       preferencesUpdate
     );
 

@@ -30,12 +30,14 @@ vi.mock('@/lib/supabase/server-client', () => ({
     }
     return {
       from: (table: string) => ({
-        select: () => ({
-          eq: () => ({
+        select: () => {
+          const query = () => ({
+            eq: () => query(),
             maybeSingle: () =>
               table === 'conversations' ? mockConversationMaybeSingle() : mockMessageMaybeSingle(),
-          }),
-        }),
+          });
+          return query();
+        },
       }),
     };
   }),
@@ -48,7 +50,12 @@ describe('requireConversationParticipant', () => {
     vi.clearAllMocks();
     mockRequireAuthUser.mockResolvedValue({ supabase: { tag: 'user-scoped-client' }, dbUser, authUser: { id: 'auth-uid' } });
     mockConversationMaybeSingle.mockResolvedValue({
-      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, participants: [APP_USER_ID, OTHER_USER_ID] },
+      data: {
+        id: CONVERSATION_ID,
+        type: 'direct',
+        room_id: null,
+        conversation_members: [{ user_id: APP_USER_ID }, { user_id: OTHER_USER_ID }],
+      },
       error: null,
     });
   });
@@ -90,7 +97,7 @@ describe('requireConversationParticipant', () => {
 
   it('returns 403 failure when the requester is not a participant', async () => {
     mockConversationMaybeSingle.mockResolvedValueOnce({
-      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, participants: [OTHER_USER_ID] },
+      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, conversation_members: [] },
       error: null,
     });
 
@@ -113,7 +120,6 @@ describe('requireConversationParticipant', () => {
         id: CONVERSATION_ID,
         type: 'direct',
         roomId: null,
-        participants: [APP_USER_ID, OTHER_USER_ID],
       });
       expect(result.supabase).toEqual({ tag: 'user-scoped-client' });
       expect(result.serviceClient).toBeDefined();
@@ -130,7 +136,12 @@ describe('requireMessageParticipant', () => {
       error: null,
     });
     mockConversationMaybeSingle.mockResolvedValue({
-      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, participants: [APP_USER_ID, OTHER_USER_ID] },
+      data: {
+        id: CONVERSATION_ID,
+        type: 'direct',
+        room_id: null,
+        conversation_members: [{ user_id: APP_USER_ID }, { user_id: OTHER_USER_ID }],
+      },
       error: null,
     });
   });
@@ -149,7 +160,7 @@ describe('requireMessageParticipant', () => {
 
   it('returns 403 failure when the requester is not in the message conversation', async () => {
     mockConversationMaybeSingle.mockResolvedValueOnce({
-      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, participants: [OTHER_USER_ID] },
+      data: { id: CONVERSATION_ID, type: 'direct', room_id: null, conversation_members: [] },
       error: null,
     });
 

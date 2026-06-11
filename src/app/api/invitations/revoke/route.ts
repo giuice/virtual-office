@@ -10,8 +10,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client';
  * Only company admins can revoke
  */
 export async function POST(request: Request) {
-  const supabaseClient = await createSupabaseServerClient();
-  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseClient);
+  const [supabaseClient, supabaseAdmin] = await Promise.all([
+    createSupabaseServerClient(),
+    createSupabaseServerClient('service_role'),
+  ]);
+  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
 
   try {
     const body = await request.json();
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     // Get the invitation to verify ownership (include email for Auth user lookup)
-    const { data: invitation, error: invitationError } = await supabaseClient
+    const { data: invitation, error: invitationError } = await supabaseAdmin
       .from('invitations')
       .select('id, token, company_id, status, email')
       .eq('id', invitationId)
@@ -93,7 +96,6 @@ export async function POST(request: Request) {
     // the /join page should check invitation status before allowing signup
     let authUserDeleted = false;
     try {
-      const supabaseAdmin = await createSupabaseServerClient('service_role');
       const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
       const unconfirmedAuthUser = usersData?.users?.find(
         (u: { email?: string; email_confirmed_at?: string | null }) => 

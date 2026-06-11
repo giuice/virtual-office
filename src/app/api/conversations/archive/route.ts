@@ -1,19 +1,11 @@
 // src/app/api/conversations/archive/route.ts
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { SupabaseConversationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { IConversationRepository } from '@/repositories/interfaces';
+import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
 
 export async function PATCH(request: Request) {
   try {
-    // Get authenticated user
-    const supabase = await createSupabaseServerClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { conversationId, isArchived } = await request.json();
 
     // Basic validation
@@ -24,35 +16,18 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Get user database record
-    const serviceSupabase = await createSupabaseServerClient('service_role');
-    const userRepository = new SupabaseUserRepository(serviceSupabase);
-    const userProfile = await userRepository.findBySupabaseUid(authData.user.id);
-
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
 
-    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(supabase);
-
-    // Check if the conversation exists and if the user is a participant
-    const conversation = await conversationRepository.findById(conversationId);
-
-    if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
-    }
-
-    // Verify user is a participant in the conversation
-    if (!conversation.participants.includes(userProfile.id)) {
-      return NextResponse.json({ error: 'Not authorized to modify this conversation' }, { status: 403 });
-    }
-
+    const conversationRepository: IConversationRepository = new SupabaseConversationRepository(ctx.serviceClient);
     console.log(
-      `API: Setting per-user archive status for conversation ${conversationId} to ${isArchived} for user ${userProfile.id}`
+      `API: Setting per-user archive status for conversation ${conversationId} to ${isArchived} for user ${ctx.dbUser.id}`
     );
 
     // NEW: Use per-user preference instead of global archive status
-    const preferences = await conversationRepository.setUserPreference(conversationId, userProfile.id, {
+    const preferences = await conversationRepository.setUserPreference(conversationId, ctx.dbUser.id, {
       isArchived,
     });
 

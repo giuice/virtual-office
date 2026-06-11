@@ -60,7 +60,6 @@ function participantContext() {
       id: CONVERSATION_ID,
       type: 'direct',
       roomId: null,
-      participants: [APP_USER_ID, OTHER_USER_ID],
     },
   };
 }

@@ -3,25 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 // Removed deprecated auth-helpers client in favor of SSR client
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
-import { validateUserSession } from '@/lib/auth/session';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
 
 /**
  * Handle file upload for message attachments
  */
 export async function POST(request: NextRequest) {
   try {
-    // Validate user session
-  const { userDbId, error: sessionError } = await validateUserSession();
-
-    if (sessionError || !userDbId) {
-      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
-    }
-
-    // Create Supabase client with context
-  const supabase = await createSupabaseServerClient();
-  const { messageRepository } = await getSupabaseRepositories(supabase);
-    
     const formData = await request.formData();
     
     // Get file and metadata from form data
@@ -36,23 +24,14 @@ export async function POST(request: NextRequest) {
     if (!conversationId) {
       return NextResponse.json({ error: 'No conversation ID provided' }, { status: 400 });
     }
-    
-    // Check if user has access to the conversation
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select('participants')
-      .eq('id', conversationId)
-      .single();
-      
-    if (convError || !conversation) {
-      console.error('Error fetching conversation:', convError);
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
-    
-    // Verify user is a participant in the conversation (DB IDs)
-    if (!conversation.participants.includes(userDbId)) {
-      return NextResponse.json({ error: 'Not authorized to upload to this conversation' }, { status: 403 });
-    }
+
+    const supabase = ctx.supabase;
+    const { messageRepository } = await getSupabaseRepositories(supabase);
     
     // Prepare file metadata
     const fileExtension = file.name.split('.').pop();

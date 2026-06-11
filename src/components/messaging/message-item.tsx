@@ -325,7 +325,11 @@ export function MessageItem({
 
         <div className="flex items-center mt-1 text-xs text-muted-foreground gap-2">
           <span>{formatMessageTime(message.timestamp)}</span>
-          {isCurrentUser && message.status && <span>{getMessageStatusIcon(message.status)}</span>}
+          {isCurrentUser && message.status && (
+            <span data-testid={`message-status-${message.id}`}>
+              {getMessageStatusIcon(message.status)}
+            </span>
+          )}
           {isPinned && <Pin className="size-3 text-muted-foreground rotate-45" />}
           {isStarred && <Star className="size-3 text-yellow-400 fill-yellow-400" />}
         </div>

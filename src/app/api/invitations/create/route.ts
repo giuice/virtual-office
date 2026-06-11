@@ -4,32 +4,14 @@ import { SupabaseInvitationRepository } from '@/repositories/implementations/sup
 import { Invitation, UserRole } from '@/types/database';
 import crypto from 'crypto';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-
-function resolveAppBaseUrl(request: Request): string {
-  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (configuredAppUrl) {
-    try {
-      return new URL(configuredAppUrl).origin;
-    } catch (error) {
-      console.warn('[API /invitations/create] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
-    }
-  }
-
-  try {
-    return new URL(request.url).origin;
-  } catch {
-    return 'http://localhost:3000';
-  }
-}
+import { resolveAppBaseUrl } from './resolve-app-base-url';
 
 export async function POST(request: Request) {
-  // Use service_role client for admin operations (sending invite emails)
-  // Use regular client for DB operations with RLS
   const [supabaseAdmin, supabaseClient] = await Promise.all([
     createSupabaseServerClient('service_role'),
     createSupabaseServerClient(),
   ]);
-  const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabaseClient);
+  const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
   
   try {
     // Parse the request body
@@ -115,7 +97,7 @@ export async function POST(request: Request) {
     const baseUrl = resolveAppBaseUrl(request);
 
     // Keep invitation status consistent before limit checks and listing.
-    const { error: expireError } = await supabaseClient
+    const { error: expireError } = await supabaseAdmin
       .from('invitations')
       .update({ status: 'expired' })
       .eq('company_id', companyId)
@@ -132,7 +114,7 @@ export async function POST(request: Request) {
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId);
 
-    const { count: pendingCount } = await supabaseClient
+    const { count: pendingCount } = await supabaseAdmin
       .from('invitations')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)
@@ -158,7 +140,7 @@ export async function POST(request: Request) {
 
     // If there's already a pending invite for this email+company, reuse it
     // This avoids spamming emails (and hitting Supabase rate limits) on repeated clicks.
-    const { data: existingInvite, error: existingInviteError } = await supabaseClient
+    const { data: existingInvite, error: existingInviteError } = await supabaseAdmin
       .from('invitations')
       .select('token, expires_at')
       .eq('company_id', companyId)
@@ -225,7 +207,7 @@ export async function POST(request: Request) {
 
       // If a concurrent request created the same pending invite, reuse it.
       if (dbErrorCode === '23505') {
-        const { data: concurrentInvite, error: concurrentInviteError } = await supabaseClient
+        const { data: concurrentInvite, error: concurrentInviteError } = await supabaseAdmin
           .from('invitations')
           .select('token, expires_at')
           .eq('company_id', companyId)

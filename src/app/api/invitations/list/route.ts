@@ -21,8 +21,11 @@ function resolveAppBaseUrl(request: Request): string {
 }
 
 export async function GET(request: Request) {
-  const supabaseClient = await createSupabaseServerClient();
-  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseClient);
+  const [supabaseClient, supabaseAdmin] = await Promise.all([
+    createSupabaseServerClient(),
+    createSupabaseServerClient('service_role'),
+  ]);
+  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
 
   try {
     const url = new URL(request.url);
@@ -92,7 +95,7 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId);
 
-    const { count: pendingCountDb } = await supabaseClient
+    const { count: pendingCountDb } = await supabaseAdmin
       .from('invitations')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)

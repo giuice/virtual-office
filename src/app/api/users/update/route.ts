@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { requireAuthUser } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import type { User, UserRole, UserStatus } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +73,11 @@ export async function PATCH(
       userData = { role: body.role };
     }
 
-    const updatedUser = await userRepository.update(id, userData);
+    const updateRepository = id === authContext.dbUser.id
+      ? userRepository
+      : new SupabaseUserRepository(await createSupabaseServerClient('service_role'));
+
+    const updatedUser = await updateRepository.update(id, userData);
 
     if (!updatedUser) {
       return NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 });

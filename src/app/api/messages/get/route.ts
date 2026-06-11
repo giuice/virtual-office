@@ -4,19 +4,10 @@ import { Message } from '@/types/messaging';
 import { IMessageRepository } from '@/repositories/interfaces';
 import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
 import { PaginationOptions, PaginatedResult } from '@/types/common'; // Assuming path
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate the user
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
-    }
-    
-    const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
@@ -40,6 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
+    }
+
+    const messageRepository: IMessageRepository = new SupabaseMessageRepository(ctx.supabase);
     const paginationOptions: PaginationOptions = {
       limit,
       cursorBefore: cursorBefore || undefined,

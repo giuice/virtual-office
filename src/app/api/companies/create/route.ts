@@ -3,6 +3,7 @@ import { SupabaseCompanyRepository, SupabaseUserRepository } from '@/repositorie
 import { Company } from '@/types/database';
 import { NextResponse } from 'next/server';
 import { requireAuthUser } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +21,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(authContext.supabase);
-    const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
+    const supabaseAdmin = await createSupabaseServerClient('service_role');
+    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabaseAdmin);
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
     const { name, settings } = await request.json();
 
     // Validate required fields

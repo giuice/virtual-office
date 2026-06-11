@@ -1,7 +1,7 @@
 // src/app/api/messages/attachment/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { validateUserSession } from '@/lib/auth/session';
+import { isAuthzFailure, requireMessageParticipant } from '@/lib/auth/authorize';
 
 /**
  * DELETE handler for removing a file attachment
@@ -13,50 +13,33 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    // Validate user session
-    const { userDbId, error: sessionError } = await validateUserSession();
-    
-    if (sessionError || !userDbId) {
-      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
-    }
-    
     const attachmentId = id;
     if (!attachmentId) {
       return NextResponse.json({ error: 'Attachment ID is required' }, { status: 400 });
     }
-    
-    // Create Supabase client with server-side context
-    const supabase = await createSupabaseServerClient();
+
+    const serviceClient = await createSupabaseServerClient('service_role');
     
     // Get the attachment to find its path in storage
-    const { data: attachment, error: fetchError } = await supabase
+    const { data: attachment, error: fetchError } = await serviceClient
       .from('message_attachments')
       .select('*')
       .eq('id', attachmentId)
       .single();
     
-    if (fetchError) {
+    if (fetchError || !attachment) {
       console.error('Error fetching attachment:', fetchError);
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
     }
-    
-    // Get message to check if user has permission to delete this attachment
-    const { data: message, error: messageError } = await supabase
-      .from('messages')
-      .select('sender_id, conversation_id')
-      .eq('id', attachment.message_id)
-      .single();
-    
-    if (messageError) {
-      console.error('Error fetching message:', messageError);
-      return NextResponse.json({ error: 'Associated message not found' }, { status: 404 });
+
+    const ctx = await requireMessageParticipant(attachment.message_id);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
     
-    // Check if user has permission (is sender or admin)
-    // Using Database UUID (userDbId) for comparison with database sender_id
-    if (message.sender_id !== userDbId) {
-      // For group chats, check if user is admin - add implementation if needed
-      // For now, only message sender can delete attachments
+    const supabase = ctx.supabase;
+
+    if (ctx.message.senderId !== ctx.dbUser.id) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
     

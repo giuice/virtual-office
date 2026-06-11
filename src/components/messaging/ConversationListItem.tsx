@@ -143,7 +143,11 @@ export function ConversationListItem({
         <span className="flex items-center gap-1 flex-shrink-0">
           <span className="text-xs text-muted-foreground">{lastActivityTime}</span>
           {unreadCount > 0 && (
-            <Badge variant="default" className="h-5 min-w-[1.25rem] px-1.5 text-xs font-semibold">
+            <Badge
+              variant="default"
+              className="h-5 min-w-[1.25rem] px-1.5 text-xs font-semibold"
+              data-testid={`conversation-unread-badge-${conversation.id}`}
+            >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
           )}

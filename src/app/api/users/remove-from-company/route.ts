@@ -2,6 +2,7 @@ import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase/SupabaseUserRepository';
 import { NextResponse } from 'next/server';
 import { requireAuthUser } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 // Instantiate repositories per-request inside handler
 
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
     }
 
     const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
+    const adminUserRepository: IUserRepository = new SupabaseUserRepository(
+      await createSupabaseServerClient('service_role')
+    );
     const { userId, companyId } = await request.json();
 
     if (!userId || !companyId) {
@@ -42,14 +46,14 @@ export async function POST(request: Request) {
     }
 
     // 1. Update the user to remove company association using repository
-    await userRepository.updateCompanyAssociation(userId, null);
+    await adminUserRepository.updateCompanyAssociation(userId, null);
 
     // 2. Remove user from any occupied spaces using the new presence system
     // With the new schema, users track their own location via currentSpaceId
     // So we just need to clear the user's current space
     if (user?.currentSpaceId) {
       // Clear the user's current space location
-      await userRepository.update(userId, { currentSpaceId: null });
+      await adminUserRepository.update(userId, { currentSpaceId: null });
       console.log(`Removed user ${userId} from space ${user.currentSpaceId}`);
     }
 

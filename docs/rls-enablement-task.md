@@ -1,8 +1,8 @@
 # TASK: Enable RLS on core tables (X-01) — PLATFORM CRITICAL
 
 **Opened:** 2026-06-10 (from messaging audit §6, X-01)
-**Status:** Pending — verified, not remediated
-**Priority:** P0 — exploitable today with the public anon key shipped in the JS bundle
+**Status:** Applied and anonymously verified
+**Priority:** P0 — remediated on 2026-06-10; keep regression probes for future RLS changes
 
 ## Runtime evidence (2026-06-10)
 
@@ -14,6 +14,58 @@ Anonymous REST calls (anon key only, **no user session**):
 | `GET /rest/v1/spaces?select=id` | **200 + data** |
 | `PATCH /rest/v1/users?id=eq.<uuid>` | **204 — anonymous WRITE permitted** |
 | `GET` on `companies`, `invitations`, `announcements` | 200 + `[]` (tables may be empty — assume readable until proven otherwise) |
+
+Follow-up anonymous probes run on 2026-06-10 after preparing the migration still returned HTTP 200 for
+`users`, `spaces`, `companies`, `invitations`, and `announcements`. The production database remained exposed
+until the migration was applied.
+
+## Post-application verification (2026-06-10)
+
+Anonymous REST calls with the public anon key, no user session:
+
+| Test | Result |
+|------|--------|
+| `GET /rest/v1/users?select=email,status,role,current_space_id&limit=1` | `401`, `42501 permission denied for table users` |
+| `GET /rest/v1/spaces?select=id&limit=1` | `401`, `42501 permission denied for table spaces` |
+| `GET /rest/v1/companies?select=id&limit=1` | `401`, `42501 permission denied for table companies` |
+| `GET /rest/v1/invitations?select=id,token&limit=1` | `401`, `42501 permission denied for table invitations` |
+| `GET /rest/v1/announcements?select=id&limit=1` | `401`, `42501 permission denied for table announcements` |
+| `GET` on `meeting_notes`, `meeting_note_action_items`, `space_members`, `space_presence_log`, `space_reservations` | `401`, `42501 permission denied` |
+| `PATCH /rest/v1/users?id=eq.00000000-0000-0000-0000-000000000000` | `401`, `42501 permission denied for table users` |
+
+## Prepared remediation (2026-06-10)
+
+- Added migration: `supabase/migrations/20260610183139_enable_core_table_rls.sql`.
+- The migration enables RLS on all affected tables, revokes `anon` grants, removes old policies on the target tables, recreates same-company policies via private `SECURITY DEFINER` helpers to avoid `users` policy recursion, and leaves `invitations` service-role only.
+- Adjusted invitation APIs so token reads/writes use `service_role` after API-level auth/admin checks:
+  - `src/app/api/invitations/create/route.ts`
+  - `src/app/api/invitations/list/route.ts`
+  - `src/app/api/invitations/revoke/route.ts`
+  - `src/app/api/invitations/resend/route.ts`
+  - `src/app/api/platform-admin/create-company/route.ts`
+- Adjusted sensitive user/company mutations to use `service_role` after route guards:
+  - `src/app/api/companies/create/route.ts`
+  - `src/app/api/users/update/route.ts`
+  - `src/app/api/users/remove-from-company/route.ts`
+  - `src/app/api/users/sync-profile/route.ts`
+
+## Verification run (2026-06-10)
+
+- `npm run type-check` passed.
+- `npx vitest run __tests__/api/invitations-create-limit.test.ts __tests__/api/invitations-list-revoke.test.ts __tests__/api/invitations-accept.test.ts __tests__/api/invitations-validate.test.ts __tests__/api/users-location-route.test.ts` passed: 49 tests.
+- `npm run build` passed.
+- `npm run lint` exited 0 with existing warnings.
+- `supabase db lint --local` could not run because local Postgres was not started on `127.0.0.1:54322`.
+- `supabase db query --linked` and `supabase link --project-ref vhabpcoyypobgasacsko` could not run from this workspace: CLI project is not linked and the configured access token returned `Unauthorized`.
+
+## Remaining verification once Supabase CLI auth is fixed
+
+```bash
+supabase link --project-ref vhabpcoyypobgasacsko
+supabase db advisors --linked --type security --level warn
+```
+
+Advisors still need to be run from an authenticated Supabase CLI/MCP session.
 
 ## Affected tables (per `migrations/database-structure.md`, `rls_enabled: false`)
 

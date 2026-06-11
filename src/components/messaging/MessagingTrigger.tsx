@@ -45,6 +45,7 @@ export function MessagingTrigger({ className }: MessagingTriggerProps) {
         <Badge
           variant="destructive"
           className="absolute -top-1 -right-1 h-6 min-w-[1.5rem] rounded-full px-1 text-xs"
+          data-testid="messaging-drawer-trigger-badge"
         >
           {totalUnread > 99 ? '99+' : totalUnread}
         </Badge>
