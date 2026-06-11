@@ -7,6 +7,13 @@ Digital workspace: floor plans, rooms, presence, messaging, company mgmt. Next.j
 
 ## Core Principles
 
+### Delegation to Codex — CRITICAL (when model is Fable or Opus)
+You are the **orchestrator & architect**: plan, design, decide, review. Do NOT burn premium tokens on execution.
+- **Delegate execution to Codex** (near-unlimited via OpenAI promo, model `GPT-5.3-Codex-Spark` — extremely fast): mechanical/multi-file edits, doc updates, test writing, boilerplate, repetitive refactors.
+- **How**: `codex:codex-rescue` subagent (plugin), or parallel `tmux` sessions running the `codex` CLI — one per independent task.
+- **Codex prompts must be precise**: exact files, expected changes, acceptance checks. Codex executes; it doesn't decide architecture.
+- **Keep in main thread**: architecture decisions, root-cause debugging, security-sensitive changes, and final review of every Codex result before commit.
+
 ### Planning & Execution
 - **Plan mode** for non-trivial tasks (3+ steps, arch decisions). Plan before code.
 - Failed approach? **STOP, re-plan.** No pushing dead ends.
