@@ -33,10 +33,16 @@ const mapRowToMessage = (row: any): Message => ({
   type: row.type,
   status: row.status,
   replyToId: row.reply_to_id ?? undefined,
-  attachments: row.attachments ?? [],
-  reactions: row.reactions ?? [],
+  // Audit M-08: the messages row carries no attachments/reactions (separate
+  // tables) — start empty; attachment-bearing types trigger a refetch below.
+  attachments: [],
+  reactions: [],
   isEdited: Boolean(row.is_edited),
 });
+
+// Message types whose payload lives in message_attachments — the realtime
+// row can't carry it, so the conversation must refetch to enrich (M-08).
+const ATTACHMENT_MESSAGE_TYPES = new Set(['image', 'file']);
 
 // Audit B-04: shared cache-merge with the optimistic send path — page 0 is
 // the newest window and dedupe runs across all pages.
@@ -210,6 +216,12 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       if (eventType === 'INSERT' && payload.new) {
         const message = mapRowToMessage(payload.new);
         appendMessageToCache(queryClient, message);
+
+        // M-08: image/file messages arrive without their attachments —
+        // refetch the conversation so receivers see them without a reload.
+        if (ATTACHMENT_MESSAGE_TYPES.has(message.type as string)) {
+          queryClient.invalidateQueries({ queryKey: ['messages', message.conversationId] });
+        }
 
         const ignoreSenderId = ignoreSenderIdRef.current;
         if (ignoreSenderId && message.senderId === ignoreSenderId) {

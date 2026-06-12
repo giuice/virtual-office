@@ -2,9 +2,7 @@
 import {
   Message,
   Conversation,
-  ConversationType,
   MessageType,
-  MessageStatus,
   FileAttachment,
 } from '@/types/messaging';
 

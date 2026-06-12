@@ -405,19 +405,6 @@ export const messagingApi = {
     participants: string[]
   ): Promise<Conversation> {
     try {
-      // First try to find an existing room conversation
-      const userId = participants[0]; // Use the first participant as the userId for querying
-      const { conversations } = await this.getConversations(userId, {
-        type: ConversationType.ROOM
-      });
-      
-      const existingConversation = conversations.find(c => c.roomId === roomId);
-      
-      if (existingConversation) {
-        return existingConversation;
-      }
-      
-      // Create a new room conversation if one doesn't exist
       return await this.resolveConversation({
         type: ConversationType.ROOM,
         roomId,
@@ -507,20 +494,6 @@ export const messagingApi = {
       console.error('Error toggling reaction:', error);
       throw error;
     }
-  },
-
-  /**
-   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
-   */
-  async addReaction(messageId: string, emoji: string): Promise<void> {
-    await this.toggleReaction(messageId, emoji);
-  },
-
-  /**
-   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
-   */
-  async removeReaction(messageId: string, emoji: string): Promise<void> {
-    await this.toggleReaction(messageId, emoji);
   },
 
   /**

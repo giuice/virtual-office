@@ -54,13 +54,18 @@ function mapMessageToCamelCase(data: MessageRow): Message {
 // Map DB snake_case to FileAttachment type (camelCase)
 function mapAttachmentToCamelCase(data: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }): FileAttachment {
   if (!data) return data;
+  // Audit S-03: the bucket is private and `url` stores the storage path —
+  // expose the authz'd API route, which redirects to a signed URL. Legacy
+  // rows holding a full URL pass through (migration rewrites them to paths).
+  const isStoragePath = (value: string): boolean => !value.startsWith('http') && !value.startsWith('/');
+  const thumbnail = data.thumbnail_url || undefined;
   return {
     id: data.id,
     name: data.name,
     type: data.type,
     size: data.size,
-    url: data.url,
-    thumbnailUrl: data.thumbnail_url || undefined
+    url: isStoragePath(data.url) ? `/api/messages/attachment/${data.id}` : data.url,
+    thumbnailUrl: thumbnail && isStoragePath(thumbnail) ? `/api/messages/attachment/${data.id}` : thumbnail
   };
 }
 
@@ -128,6 +133,11 @@ function mapReadReceiptArrayToCamelCase(dataArray: { id: string; message_id: str
   return dataArray.map(item => mapReadReceiptToCamelCase(item));
 }
 
+type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+type MessagePinRow = { id: string; message_id: string; conversation_id: string; pinned_by: string; pinned_at: string };
+type MessageStarRow = { id: string; message_id: string; conversation_id: string; user_id: string; starred_at: string };
+
 
 export class SupabaseMessageRepository implements IMessageRepository {
   private MSG_TABLE_NAME = 'messages'; // Ensure this matches your Supabase table name
@@ -140,6 +150,45 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
   constructor(supabaseClient: SupabaseClient) {
     this.supabaseClient = supabaseClient;
+  }
+
+  private async enrichMessages(messages: Message[]): Promise<Message[]> {
+    if (messages.length === 0) {
+      return messages;
+    }
+
+    const messageIds = messages.map(m => m.id);
+
+    const { data: attachmentsData } = await this.supabaseClient
+      .from(this.ATTACHMENT_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapAttachmentToCamelCase(row));
+      return acc;
+    }, {} as Record<string, FileAttachment[]>);
+
+    const { data: reactionsData } = await this.supabaseClient
+      .from(this.REACTION_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
+      const msgId = row.message_id as string;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapReactionToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessageReaction[]>);
+
+    messages.forEach(message => {
+      message.attachments = attachmentsByMessageId[message.id] || [];
+      message.reactions = reactionsByMessageId[message.id] || [];
+    });
+
+    return messages;
   }
 
   async findById(id: string): Promise<Message | null> {
@@ -161,11 +210,29 @@ export class SupabaseMessageRepository implements IMessageRepository {
     // Map the core message data
     const message = mapMessageToCamelCase(data);
 
-    // Fetch related attachments
-    const { data: attachmentsData, error: attachmentsError } = await this.supabaseClient
-      .from(this.ATTACHMENT_TABLE_NAME)
-      .select('*')
-      .eq('message_id', message.id);
+    const [
+      { data: attachmentsData, error: attachmentsError },
+      { data: reactionsData, error: reactionsError },
+      { data: pinsData, error: pinsError },
+      { data: starsData, error: starsError }
+    ] = await Promise.all([
+      this.supabaseClient
+        .from(this.ATTACHMENT_TABLE_NAME)
+        .select('*')
+        .eq('message_id', message.id),
+      this.supabaseClient
+        .from(this.REACTION_TABLE_NAME)
+        .select('*')
+        .eq('message_id', message.id),
+      this.supabaseClient
+        .from(this.MESSAGE_PIN_TABLE_NAME)
+        .select('*')
+        .eq('message_id', message.id),
+      this.supabaseClient
+        .from(this.MESSAGE_STAR_TABLE_NAME)
+        .select('*')
+        .eq('message_id', message.id)
+    ]);
 
     if (attachmentsError) {
       console.error(`Error fetching attachments for message ID ${message.id}:`, attachmentsError);
@@ -176,12 +243,6 @@ export class SupabaseMessageRepository implements IMessageRepository {
       message.attachments = mapAttachmentArrayToCamelCase(attachmentsData || []);
     }
 
-    // Fetch related reactions
-    const { data: reactionsData, error: reactionsError } = await this.supabaseClient
-      .from(this.REACTION_TABLE_NAME)
-      .select('*')
-      .eq('message_id', message.id);
-
     if (reactionsError) {
       console.error(`Error fetching reactions for message ID ${message.id}:`, reactionsError);
       // Return message with empty reactions array on error
@@ -190,35 +251,21 @@ export class SupabaseMessageRepository implements IMessageRepository {
       message.reactions = mapReactionArrayToCamelCase(reactionsData || []);
     }
 
-    // Fetch related pins
-    const { data: pinsData, error: pinsError } = await this.supabaseClient
-      .from(this.MESSAGE_PIN_TABLE_NAME)
-      .select('*')
-      .eq('message_id', message.id);
-
     if (pinsError) {
       console.error(`Error fetching pins for message ID ${message.id}:`, pinsError);
       message.pins = [];
     } else {
       // Map pins
-      message.pins = (pinsData || []).map((p: any) => mapMessagePinToCamelCase(p));
+      message.pins = (pinsData as MessagePinRow[] | null || []).map((p: MessagePinRow) => mapMessagePinToCamelCase(p));
     }
-
-    // Fetch related stars
-    const { data: starsData, error: starsError } = await this.supabaseClient
-      .from(this.MESSAGE_STAR_TABLE_NAME)
-      .select('*')
-      .eq('message_id', message.id);
 
     if (starsError) {
       console.error(`Error fetching stars for message ID ${message.id}:`, starsError);
       message.stars = [];
     } else {
       // Map stars
-      message.stars = (starsData || []).map((s: any) => mapMessageStarToCamelCase(s));
+      message.stars = (starsData as MessageStarRow[] | null || []).map((s: MessageStarRow) => mapMessageStarToCamelCase(s));
     }
-
-
 
     return message;
   }
@@ -315,43 +362,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     // Map core message data
     const messages = mapMessageArrayToCamelCase(trimmedData);
     const messageIds = messages.map(m => m.id);
-
-    // Fetch all attachments for these messages in bulk
-    const { data: attachmentsData, error: attachmentsError } = await this.supabaseClient
-      .from(this.ATTACHMENT_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    if (attachmentsError) {
-      console.error(`Error fetching attachments for conversation ${conversationId}:`, attachmentsError);
-      // Continue without attachments if error occurs
-    }
-    // Group attachments by message_id using raw rows, then map
-    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
-    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapAttachmentToCamelCase(row));
-      return acc;
-    }, {} as Record<string, FileAttachment[]>);
-
-    // Fetch all reactions for these messages in bulk
-    const { data: reactionsData, error: reactionsError } = await this.supabaseClient
-      .from(this.REACTION_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    if (reactionsError) {
-      console.error(`Error fetching reactions for conversation ${conversationId}:`, reactionsError);
-      // Continue without reactions if error occurs
-    }
-    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
-    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapReactionToCamelCase(row));
-      return acc;
-    }, {} as Record<string, MessageReaction[]>);
+    const enrichedMessages = await this.enrichMessages(messages);
 
     // Fetch all pins for these messages in bulk
     const { data: pinsData, error: pinsError } = await this.supabaseClient
@@ -362,7 +373,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     if (pinsError) {
       console.error(`Error fetching pins for conversation ${conversationId}:`, pinsError);
     }
-    const pinsByMessageId = (pinsData || []).reduce((acc: Record<string, MessagePin[]>, row: any) => {
+    const pinsByMessageId = (pinsData as MessagePinRow[] | null || []).reduce((acc: Record<string, MessagePin[]>, row: MessagePinRow) => {
       const msgId = row.message_id;
       if (!acc[msgId]) acc[msgId] = [];
       acc[msgId].push(mapMessagePinToCamelCase(row));
@@ -378,7 +389,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     if (starsError) {
       console.error(`Error fetching stars for conversation ${conversationId}:`, starsError);
     }
-    const starsByMessageId = (starsData || []).reduce((acc: Record<string, MessageStar[]>, row: any) => {
+    const starsByMessageId = (starsData as MessageStarRow[] | null || []).reduce((acc: Record<string, MessageStar[]>, row: MessageStarRow) => {
       const msgId = row.message_id;
       if (!acc[msgId]) acc[msgId] = [];
       acc[msgId].push(mapMessageStarToCamelCase(row));
@@ -400,9 +411,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }
     const readMessageIds = new Set((receiptsData || []).map((row: { message_id: string }) => row.message_id));
 
-    messages.forEach(message => {
-      message.attachments = attachmentsByMessageId[message.id] || [];
-      message.reactions = reactionsByMessageId[message.id] || [];
+    enrichedMessages.forEach(message => {
       message.pins = pinsByMessageId[message.id] || [];
       message.stars = starsByMessageId[message.id] || [];
       if (readMessageIds.has(message.id) && message.status !== MessageStatus.FAILED) {
@@ -428,7 +437,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
     }
 
     return {
-      items: messages,
+      items: enrichedMessages,
       hasMore,
       nextCursor
     };
@@ -493,14 +502,11 @@ export class SupabaseMessageRepository implements IMessageRepository {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    // Map DB response back to Message type
-    // Note: attachments/reactions won't be populated here, similar to findById pre-fetch
+    // Audit M-08: enrich the returned message — returning emptied
+    // attachments/reactions corrupts any cache the caller writes it into.
     const updatedMessage = data ? mapMessageToCamelCase(data) : null;
     if (updatedMessage) {
-      // Fetch related data if needed, or rely on caller to re-fetch if necessary
-      // For simplicity, returning core message data only after update.
-      updatedMessage.attachments = []; // Reset placeholders
-      updatedMessage.reactions = [];
+      await this.enrichMessages([updatedMessage]);
     }
     return updatedMessage;
   }
@@ -624,95 +630,6 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return mapReadReceiptArrayToCamelCase(data || []);
   }
 
-  async getUnreadMessages(conversationId: string, userId: string, since?: Date): Promise<Message[]> {
-    // Get all messages in the conversation
-    let query = this.supabaseClient
-      .from(this.MSG_TABLE_NAME)
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('timestamp', { ascending: true });
-
-    if (since) {
-      query = query.gt('timestamp', since.toISOString());
-    }
-
-    const { data: messagesData, error: messagesError } = await query;
-
-    if (messagesError) {
-      console.error('Error fetching messages for unread check:', messagesError);
-      throw messagesError;
-    }
-
-    if (!messagesData || messagesData.length === 0) {
-      return [];
-    }
-
-    // Get message IDs
-    const messageIds = messagesData.map((m: any) => m.id);
-
-    // Get read receipts for this user
-    const { data: receiptsData, error: receiptsError } = await this.supabaseClient
-      .from(this.READ_RECEIPT_TABLE_NAME)
-      .select('message_id')
-      .in('message_id', messageIds)
-      .eq('user_id', userId);
-
-    if (receiptsError) {
-      console.error('Error fetching read receipts for unread check:', receiptsError);
-      throw receiptsError;
-    }
-
-    // Create a set of read message IDs
-    const readMessageIds = new Set((receiptsData || []).map((r: any) => r.message_id));
-
-    // Filter to only unread messages
-    const unreadMessagesData = messagesData.filter((m: any) => !readMessageIds.has(m.id));
-
-    // Map to Message objects
-    const messages = mapMessageArrayToCamelCase(unreadMessagesData);
-
-    // Fetch attachments and reactions for unread messages (similar to findByConversation)
-    if (messages.length > 0) {
-      const unreadMessageIds = messages.map(m => m.id);
-
-      // Fetch attachments
-      const { data: attachmentsData } = await this.supabaseClient
-        .from(this.ATTACHMENT_TABLE_NAME)
-        .select('*')
-        .in('message_id', unreadMessageIds);
-
-      type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
-      const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
-        const msgId = row.message_id as string;
-        if (!acc[msgId]) acc[msgId] = [];
-        acc[msgId].push(mapAttachmentToCamelCase(row));
-        return acc;
-      }, {} as Record<string, FileAttachment[]>);
-
-      // Fetch reactions
-      const { data: reactionsData } = await this.supabaseClient
-        .from(this.REACTION_TABLE_NAME)
-        .select('*')
-        .in('message_id', unreadMessageIds);
-
-      type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
-      const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
-        const msgId = row.message_id as string;
-        if (!acc[msgId]) acc[msgId] = [];
-        acc[msgId].push(mapReactionToCamelCase(row));
-        return acc;
-      }, {} as Record<string, MessageReaction[]>);
-
-      // Populate messages with attachments and reactions
-      messages.forEach(message => {
-        message.attachments = attachmentsByMessageId[message.id] || [];
-        message.reactions = reactionsByMessageId[message.id] || [];
-      });
-    }
-
-    return messages;
-  }
-
   // --- Message Pin Methods ---
 
   async pinMessage(messageId: string, conversationId: string, userId: string): Promise<MessagePin> {
@@ -790,41 +707,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Map to Message objects
     const messages = mapMessageArrayToCamelCase(messagesData);
-    const messageIds = messages.map(m => m.id);
-
-    // Fetch attachments and reactions (similar to findByConversation)
-    const { data: attachmentsData } = await this.supabaseClient
-      .from(this.ATTACHMENT_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
-    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapAttachmentToCamelCase(row));
-      return acc;
-    }, {} as Record<string, FileAttachment[]>);
-
-    const { data: reactionsData } = await this.supabaseClient
-      .from(this.REACTION_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
-    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapReactionToCamelCase(row));
-      return acc;
-    }, {} as Record<string, MessageReaction[]>);
-
-    messages.forEach(message => {
-      message.attachments = attachmentsByMessageId[message.id] || [];
-      message.reactions = reactionsByMessageId[message.id] || [];
-    });
-
-    return messages;
+    return this.enrichMessages(messages);
   }
 
   // --- Message Star Methods ---
@@ -911,40 +794,6 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Map to Message objects
     const messages = mapMessageArrayToCamelCase(messagesData);
-    const messageIds = messages.map(m => m.id);
-
-    // Fetch attachments and reactions
-    const { data: attachmentsData } = await this.supabaseClient
-      .from(this.ATTACHMENT_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
-    const attachmentsByMessageId = (attachmentsData as AttachmentRow[] | null || []).reduce((acc: Record<string, FileAttachment[]>, row: AttachmentRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapAttachmentToCamelCase(row));
-      return acc;
-    }, {} as Record<string, FileAttachment[]>);
-
-    const { data: reactionsData } = await this.supabaseClient
-      .from(this.REACTION_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
-    const reactionsByMessageId = (reactionsData as ReactionRow[] | null || []).reduce((acc: Record<string, MessageReaction[]>, row: ReactionRow) => {
-      const msgId = row.message_id as string;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapReactionToCamelCase(row));
-      return acc;
-    }, {} as Record<string, MessageReaction[]>);
-
-    messages.forEach(message => {
-      message.attachments = attachmentsByMessageId[message.id] || [];
-      message.reactions = reactionsByMessageId[message.id] || [];
-    });
-
-    return messages;
+    return this.enrichMessages(messages);
   }
 }

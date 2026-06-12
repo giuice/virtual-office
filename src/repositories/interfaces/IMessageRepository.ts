@@ -21,7 +21,6 @@ export interface IMessageRepository {
   // Read receipt methods. Receipts are written exclusively by the
   // mark_conversation_read RPC (see IConversationRepository.markConversationRead).
   getReadReceipts(messageId: string): Promise<ReadReceipt[]>;
-  getUnreadMessages(conversationId: string, userId: string, since?: Date): Promise<Message[]>;
 
   // Message pin methods (user-specific, per-conversation)
   pinMessage(messageId: string, conversationId: string, userId: string): Promise<MessagePin>;
