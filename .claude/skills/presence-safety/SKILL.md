@@ -292,6 +292,13 @@ When investigating a presence/space bug:
 5. **Check localStorage** — `lastSpaceId`, `vo-disconnect-timestamp`, `vo-first-login-done` (a missing first-login key triggers first-time placement).
 6. **NEVER guess the root cause** — Prove it with runtime evidence before editing code.
 
+### Realtime `postgres_changes` infrastructure gotchas (verified 2026-06-12)
+
+- **A table only emits `postgres_changes` events if it is in the `supabase_realtime` publication.** A channel on a non-published table still reports `SUBSCRIBED` and `"Subscribed to PostgreSQL" status:ok` — the subscription is a **silent no-op** (zero events, no error). This was the root cause of the messaging realtime miss (fixed by migration `20260612130141`, which added the messaging tables).
+- **`users` and `spaces` ARE in the publication** (probe-verified: UPDATE events delivered to a service_role subscriber). The presence `postgres_changes` listener and `useSpaceRealtime` have working infrastructure — do NOT add these tables to a publication migration again.
+- **Post-SUBSCRIBED blind window:** the `SUBSCRIBED` ack arrives before the realtime poller activates the subscription server-side. Events fired within the first ~1–2 s after the ack can be dropped with no replay. Don't treat `SUBSCRIBED` as "delivery guaranteed from this instant"; after (re)subscribing, reconcile with a refetch if missing an event would matter.
+- **How to probe delivery end-to-end** (no SQL access needed): node script with `@supabase/supabase-js` — subscribe with the service_role key (bypasses RLS), wait for `SUBSCRIBED`, wait a few seconds, mutate the row via service_role (a same-value UPDATE still emits an event), allow a 10–20 s window. Service_role subscriber receiving events but a user-JWT subscriber not = RLS SELECT policy problem; neither receiving = publication problem.
+
 ---
 
 ## File Quick Reference
