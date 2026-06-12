@@ -9,9 +9,17 @@ Digital workspace: floor plans, rooms, presence, messaging, company mgmt. Next.j
 - **Codex prompts must be precise**: exact files, expected changes, acceptance checks. Codex executes; it doesn't decide architecture.
 - **Keep in main thread**: architecture decisions, root-cause debugging, security-sensitive changes, and final review of every Codex result before commit.
 
+## Core Principles
+
+### Delegation to Codex — CRITICAL (when model is Fable or Opus)
+You are the **orchestrator & architect**: plan, design, decide, review. Do NOT burn premium tokens on execution.
+- **Delegate execution to Codex** :
+	- (model `GPT-5.3-Codex-Spark` — extremely fast): mechanical/multi-file edits, doc updates, test writing, boilerplate, repetitive refactors.
+	- Gpt-5.5 xhigh  — level fable reason: adversarial reviews on complex tasks
+
 ### Token Economy — CRITICAL
 - Always save tokens intelligently: `rtk` on every shell command, targeted reads (grep/offset/limit before full-file reads), never re-read unchanged files, no redundant verification runs.
-- Delegate bulk exploration/reading to subagents or Codex when raw output would flood main context.
+- Delegate bulk exploration/reading to codex subagents when raw output would flood main context.
 - Concise replies — substance over narration.
 
 ### Planning & Execution
