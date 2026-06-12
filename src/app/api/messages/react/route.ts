@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { IMessageRepository } from '@/repositories/interfaces';
 import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
 import { isAuthzFailure, requireMessageParticipant } from '@/lib/auth/authorize';
+import { enforceRateLimit } from '@/lib/auth/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,11 @@ export async function POST(request: NextRequest) {
     const ctx = await requireMessageParticipant(messageId);
     if (isAuthzFailure(ctx)) {
       return ctx.errorResponse;
+    }
+
+    const rateLimited = await enforceRateLimit(ctx.serviceClient, ctx.dbUser.id, 'message:react');
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const messageRepository: IMessageRepository = new SupabaseMessageRepository(ctx.supabase);

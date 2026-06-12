@@ -4,6 +4,7 @@ import { Message, MessageStatus, MessageType } from '@/types/messaging';
 import { IMessageRepository, IConversationRepository } from '@/repositories/interfaces';
 import { SupabaseMessageRepository, SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { isAuthzFailure, jsonError, requireConversationParticipant } from '@/lib/auth/authorize';
+import { enforceRateLimit } from '@/lib/auth/rate-limit';
 
 // Audit S-04: cap message payload size server-side.
 const MAX_CONTENT_LENGTH = 8192;
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
       return ctx.errorResponse;
     }
     const { serviceClient, dbUser, conversation } = ctx;
+
+    const rateLimited = await enforceRateLimit(serviceClient, dbUser.id, 'message:create');
+    if (rateLimited) {
+      return rateLimited;
+    }
 
     const messageRepository: IMessageRepository = new SupabaseMessageRepository(serviceClient);
     const conversationRepository: IConversationRepository = new SupabaseConversationRepository(serviceClient);
