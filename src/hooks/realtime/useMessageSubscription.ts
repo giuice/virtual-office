@@ -1,18 +1,16 @@
 // src/hooks/realtime/useMessageSubscription.ts
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
-import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
+import { debugLogger } from '@/utils/debug-logger';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import { appendMessageToPages, type MessagesInfiniteData } from '@/lib/messaging/message-cache';
 import {
-  REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
   type RealtimeChannel,
   type RealtimePostgresChangesPayload,
-  type RealtimePostgresChangesFilter,
 } from '@supabase/supabase-js';
 
 interface UseMessageSubscriptionOptions {
@@ -21,6 +19,7 @@ interface UseMessageSubscriptionOptions {
   ignoreSenderId?: string;
 }
 
+const CHANNEL_NAME = 'messaging-db-changes';
 const FAILURE_STATUSES = new Set(['TIMED_OUT', 'CHANNEL_ERROR', 'CLOSED']);
 const RETRY_BASE_DELAY_MS = 250;
 const RETRY_MAX_DELAY_MS = 5000;
@@ -121,30 +120,44 @@ const handleReactionUpdate = (
   });
 };
 
-const removeMessageFromCache = (queryClient: QueryClient, conversationId: string, row: any) => {
-  queryClient.setQueryData<MessagesInfiniteData | undefined>(
-    ['messages', conversationId],
-    (oldData) => {
-      if (!oldData || !oldData.pages) {
-        return oldData;
+// DELETE payloads only carry the primary key under RLS, so the conversation
+// is unknown — drop the message from every cached conversation.
+const removeMessageFromAllCaches = (queryClient: QueryClient, messageId: string) => {
+  const allMessagesQueries = queryClient.getQueriesData<MessagesInfiniteData>({
+    queryKey: ['messages'],
+  });
+
+  allMessagesQueries.forEach(([queryKey, oldData]) => {
+    if (!oldData?.pages) return;
+
+    let changed = false;
+    const pages = oldData.pages.map((page) => {
+      const filtered = page.messages.filter((existing) => existing.id !== messageId);
+      if (filtered.length !== page.messages.length) {
+        changed = true;
+        return { ...page, messages: filtered };
       }
+      return page;
+    });
 
-      const pages = oldData.pages.map((page) => ({
-        ...page,
-        messages: page.messages.filter((existing) => existing.id !== row.id),
-      }));
-
-      return { ...oldData, pages };
+    if (changed) {
+      queryClient.setQueryData(queryKey, { ...oldData, pages });
     }
-  );
+  });
 };
 
-export function useMessageSubscription(
-  conversationIds: string | string[] | null,
-  options?: UseMessageSubscriptionOptions
-) {
+/**
+ * One realtime channel for the whole messaging domain (audit M-06).
+ *
+ * Three postgres_changes bindings — messages, message_read_receipts,
+ * message_reactions — share a single channel with NO client-side filters:
+ * RLS SELECT policies (private.is_conversation_member) scope rows per
+ * subscriber on the server, so the hook needs no conversation id list and
+ * never re-subscribes when conversations change. The reported status is the
+ * real status of the one channel carrying every messaging event.
+ */
+export function useMessageSubscription(options?: UseMessageSubscriptionOptions) {
   const isActive = options?.isActive ?? true;
-  const ignoreSenderId = options?.ignoreSenderId;
   const queryClient = useQueryClient();
   const statusRef = useRef<string | null>(null);
   const statusListenersRef = useRef<Set<() => void> | null>(null);
@@ -154,6 +167,7 @@ export function useMessageSubscription(
   const statusListeners = statusListenersRef.current;
 
   const onInsertRef = useRef(options?.onInsert);
+  const ignoreSenderIdRef = useRef(options?.ignoreSenderId);
 
   const publishStatus = useCallback((nextStatus: string | null) => {
     statusRef.current = nextStatus;
@@ -174,238 +188,177 @@ export function useMessageSubscription(
     onInsertRef.current = options?.onInsert;
   }, [options?.onInsert]);
 
-  const stableIds = useMemo(() => {
-    if (!conversationIds) return [] as string[];
-    const raw = Array.isArray(conversationIds) ? conversationIds : [conversationIds];
-    const filtered = raw.filter(Boolean) as string[];
-    const unique = Array.from(new Set(filtered));
-    unique.sort();
-    return unique;
-  }, [conversationIds]);
-
-  const subscriptionKey = useMemo(() => stableIds.join('|'), [stableIds]);
+  useEffect(() => {
+    ignoreSenderIdRef.current = options?.ignoreSenderId;
+  }, [options?.ignoreSenderId]);
 
   useEffect(() => {
     if (!isActive) {
       return;
     }
 
-    const ids = stableIds;
-    const featureFlagEnabled = messagingFeatureFlags.isV2Enabled();
     let isMounted = true;
-    const teardownFns: Array<() => void> = [];
+    let channel: RealtimeChannel | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
 
-    const subscribeWithRetry = <E extends `${REALTIME_POSTGRES_CHANGES_LISTEN_EVENT}`>(
-      channelName: string,
-      filter: RealtimePostgresChangesFilter<E>,
-      handler: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void
-    ) => {
-      let channel: RealtimeChannel | null = null;
-      let retryTimer: ReturnType<typeof setTimeout> | null = null;
-      let attempt = 0;
-
-      const cleanup = () => {
-        if (retryTimer) {
-          clearTimeout(retryTimer);
-          retryTimer = null;
-        }
-        if (channel) {
-          if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
-          channel: channelName,
-        });
-          }
-          void channel.unsubscribe();
-          supabase.removeChannel(channel);
-          channel = null;
-        }
-      };
-
-      const subscribeChannel = () => {
-        if (!isMounted) return;
-
-        cleanup();
-        attempt += 1;
-        channel = supabase.channel(channelName);
-
-        if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.trace('useMessageSubscription', 'subscribe:attempt', {
-            channel: channelName,
-            attempt,
-          });
-        }
-
-        channel.on('postgres_changes', filter as any, handler as any);
-
-        channel.subscribe((channelStatus) => {
-          if (!isMounted) return;
-
-          publishStatus(channelStatus);
-
-          if (debugLogger.messaging.enabled()) {
-            debugLogger.messaging.trace('useMessageSubscription', 'status', {
-              channel: channelName,
-              status: channelStatus,
-            });
-          }
-
-          if (channelStatus === 'SUBSCRIBED') {
-            attempt = 0;
-            return;
-          }
-
-          if (FAILURE_STATUSES.has(channelStatus)) {
-            const delay = Math.min(
-              RETRY_MAX_DELAY_MS,
-              RETRY_BASE_DELAY_MS * Math.pow(2, Math.max(attempt - 1, 0))
-            );
-
-            if (debugLogger.messaging.enabled()) {
-              debugLogger.messaging.warn('useMessageSubscription', 'retry', {
-                channel: channelName,
-                status: channelStatus,
-                delay,
-                attempt,
-              });
-            }
-
-            retryTimer = setTimeout(subscribeChannel, delay);
-          }
-        });
-      };
-
-      subscribeChannel();
-
-      return () => {
-        cleanup();
-      };
-    };
-
-    const handleGlobalInsert = (
-      payload: RealtimePostgresChangesPayload<Record<string, unknown>>
-    ) => {
-      if (!payload.new) return;
-      const message = mapRowToMessage(payload.new);
-
-      appendMessageToCache(queryClient, message);
-
-      if (ignoreSenderId && message.senderId === ignoreSenderId) {
-        return;
-      }
-
-      const callback = onInsertRef.current;
-      if (callback) {
-        callback(message);
-      }
-    };
-
-    const handleConversationChange =
-      (conversationId: string) =>
-      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-        const eventType = payload.eventType;
-
-        if (eventType === 'INSERT' && payload.new) {
-          const message = mapRowToMessage(payload.new);
-          appendMessageToCache(queryClient, message);
-
-          const callback = onInsertRef.current;
-          if (!ignoreSenderId || message.senderId !== ignoreSenderId) {
-            if (callback) {
-              callback(message);
-            }
-          }
-          return;
-        }
-
-        if (eventType === 'UPDATE' && payload.new) {
-          updateMessageInCache(queryClient, conversationId, payload.new);
-          return;
-        }
-
-        if (eventType === 'DELETE' && payload.old) {
-          removeMessageFromCache(queryClient, conversationId, payload.old);
-        }
-      };
-
-    const shouldSubscribeGlobally = featureFlagEnabled || ids.length === 0;
-    if (shouldSubscribeGlobally) {
-      teardownFns.push(
-        subscribeWithRetry(
-          'messages:all',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          handleGlobalInsert
-        )
-      );
-    }
-
-    ids.forEach((conversationId) => {
-      teardownFns.push(
-        subscribeWithRetry(
-          `messages:${conversationId}`,
-          {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          handleConversationChange(conversationId)
-        )
-      );
-
-      // Phase 2.2: read-receipt INSERTs (written in bulk by the
-      // mark_conversation_read RPC) flip the sender's read indicator.
-      // Refetch derives status from message_read_receipts server-side;
-      // TanStack coalesces the burst of invalidations into one refetch.
-      teardownFns.push(
-        subscribeWithRetry(
-          `read_receipts:${conversationId}`,
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'message_read_receipts',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-          }
-        )
-      );
-    });
-
-    // Subscribe to reaction changes globally to handle reactions across all visible messages
-    const handleReactionChange = (
+    const handleMessageChange = (
       payload: RealtimePostgresChangesPayload<Record<string, unknown>>
     ) => {
       const eventType = payload.eventType;
-      
+
       if (eventType === 'INSERT' && payload.new) {
+        const message = mapRowToMessage(payload.new);
+        appendMessageToCache(queryClient, message);
+
+        const ignoreSenderId = ignoreSenderIdRef.current;
+        if (ignoreSenderId && message.senderId === ignoreSenderId) {
+          return;
+        }
+
+        const callback = onInsertRef.current;
+        if (callback) {
+          callback(message);
+        }
+        return;
+      }
+
+      if (eventType === 'UPDATE' && payload.new) {
+        updateMessageInCache(queryClient, payload.new.conversation_id as string, payload.new);
+        return;
+      }
+
+      if (eventType === 'DELETE' && payload.old) {
+        removeMessageFromAllCaches(queryClient, payload.old.id as string);
+      }
+    };
+
+    // Phase 2.2: read-receipt INSERTs (written in bulk by the
+    // mark_conversation_read RPC) flip the sender's read indicator.
+    // Refetch derives status from message_read_receipts server-side;
+    // TanStack coalesces the burst of invalidations into one refetch.
+    const handleReceiptInsert = (
+      payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    ) => {
+      const conversationId = (payload.new as Record<string, unknown> | null)?.conversation_id;
+      if (typeof conversationId === 'string') {
+        queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+      }
+    };
+
+    const handleReactionChange = (
+      payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    ) => {
+      if (payload.eventType === 'INSERT' && payload.new) {
         const messageId = payload.new.message_id as string;
         const userId = payload.new.user_id as string;
         const emoji = payload.new.emoji as string;
         const timestampValue = payload.new.created_at ?? payload.new.timestamp;
         const timestamp = timestampValue ? new Date(timestampValue as string) : new Date();
         handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT', timestamp);
-      } else if (eventType === 'DELETE' && payload.old) {
-        const messageId = payload.old.message_id as string;
-        const userId = payload.old.user_id as string;
-        const emoji = payload.old.emoji as string;
-        handleReactionUpdate(queryClient, messageId, userId, emoji, 'DELETE', new Date());
+        return;
+      }
+
+      if (payload.eventType === 'DELETE') {
+        // Under RLS the DELETE payload only carries the reaction row's PK, so
+        // the affected message is unknown — invalidate and let the active
+        // conversation refetch (this is what syncs reaction removal live).
+        queryClient.invalidateQueries({ queryKey: ['messages'] });
       }
     };
 
-    teardownFns.push(
-      subscribeWithRetry(
-        'message_reactions:all',
-        { event: '*', schema: 'public', table: 'message_reactions' },
-        handleReactionChange
-      )
-    );
+    const cleanup = () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      if (channel) {
+        if (debugLogger.messaging.enabled()) {
+          debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
+            channel: CHANNEL_NAME,
+          });
+        }
+        void channel.unsubscribe();
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+
+    const subscribeChannel = () => {
+      if (!isMounted) return;
+
+      cleanup();
+      attempt += 1;
+
+      if (debugLogger.messaging.enabled()) {
+        debugLogger.messaging.trace('useMessageSubscription', 'subscribe:attempt', {
+          channel: CHANNEL_NAME,
+          attempt,
+        });
+      }
+
+      channel = supabase
+        .channel(CHANNEL_NAME)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages' },
+          handleMessageChange
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
+          handleReceiptInsert
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'message_reactions' },
+          handleReactionChange
+        );
+
+      channel.subscribe((channelStatus) => {
+        if (!isMounted) return;
+
+        publishStatus(channelStatus);
+
+        if (debugLogger.messaging.enabled()) {
+          debugLogger.messaging.trace('useMessageSubscription', 'status', {
+            channel: CHANNEL_NAME,
+            status: channelStatus,
+          });
+        }
+
+        if (channelStatus === 'SUBSCRIBED') {
+          attempt = 0;
+          return;
+        }
+
+        if (FAILURE_STATUSES.has(channelStatus)) {
+          const delay = Math.min(
+            RETRY_MAX_DELAY_MS,
+            RETRY_BASE_DELAY_MS * Math.pow(2, Math.max(attempt - 1, 0))
+          );
+
+          if (debugLogger.messaging.enabled()) {
+            debugLogger.messaging.warn('useMessageSubscription', 'retry', {
+              channel: CHANNEL_NAME,
+              status: channelStatus,
+              delay,
+              attempt,
+            });
+          }
+
+          retryTimer = setTimeout(subscribeChannel, delay);
+        }
+      });
+    };
+
+    subscribeChannel();
 
     return () => {
       isMounted = false;
-      teardownFns.forEach((teardown) => teardown());
+      cleanup();
     };
-  }, [subscriptionKey, ignoreSenderId, isActive, queryClient, publishStatus, stableIds]);
+  }, [isActive, queryClient, publishStatus]);
 
   return { status: isActive ? status : null };
 }

@@ -14,7 +14,6 @@ const isTruthyFlag = (value: string | null | undefined): boolean => {
 };
 
 const MESSAGING_DEBUG_STORAGE_KEY = 'vo:debug:messaging';
-const MESSAGING_FLAG_STORAGE_KEY = 'vo:flag:messaging_v2';
 
 const isMessagingDebugEnabled = (): boolean => {
   // 1) Highest priority: explicit env flag (works in any NODE_ENV)
@@ -34,27 +33,6 @@ const isMessagingDebugEnabled = (): boolean => {
 
   // 3) Fallback: enable logs in development by default
   return isDevelopmentEnv;
-};
-
-const isMessagingV2Enabled = (): boolean => {
-  // Explicit env toggle takes priority (server or build time)
-  if (isTruthyFlag((process as any)?.env?.NEXT_PUBLIC_MESSAGING_V2 ?? process.env?.NEXT_PUBLIC_MESSAGING_V2)) {
-    return true;
-  }
-
-  // Allow QA overrides via localStorage in the browser
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = window.localStorage?.getItem(MESSAGING_FLAG_STORAGE_KEY);
-      if (isTruthyFlag(stored)) {
-        return true;
-      }
-    } catch {
-      // Ignore storage access issues (Safari private mode, etc.)
-    }
-  }
-
-  return false;
 };
 
 const logMessaging = (
@@ -237,10 +215,8 @@ export const debugLogger = {
 
   messaging: {
     enabled: () => isMessagingDebugEnabled(),
-    featureEnabled: () => isMessagingV2Enabled(),
     storageKeys: {
       debug: MESSAGING_DEBUG_STORAGE_KEY,
-      flag: MESSAGING_FLAG_STORAGE_KEY,
     },
 
     info: (scope: string, message: string, payload?: unknown) => {
@@ -267,10 +243,4 @@ export const debugLogger = {
       logMessagingMetric(scope, metric, value, payload);
     }
   }
-};
-
-export const messagingFeatureFlags = {
-  isV2Enabled: (): boolean => isMessagingV2Enabled(),
-  debugStorageKey: MESSAGING_DEBUG_STORAGE_KEY,
-  flagStorageKey: MESSAGING_FLAG_STORAGE_KEY,
 };

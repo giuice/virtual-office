@@ -1,5 +1,5 @@
 // src/hooks/useMessages.ts
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
@@ -40,26 +40,9 @@ export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
 
-  // Realtime is handled by a dedicated hook: useMessageSubscription
-
-  // Clear cache when conversation changes to prevent stale data
-  React.useLayoutEffect(() => {
-    if (activeConversationId) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useMessages.cache', 'conversation-change', {
-          conversationId: activeConversationId,
-        });
-      }
-      // Optional: Remove queries for all other conversations to save memory
-      queryClient.removeQueries({
-        queryKey: ['messages'],
-        predicate: (query) => {
-          const [, conversationId] = query.queryKey;
-          return conversationId !== activeConversationId;
-        }
-      });
-    }
-  }, [activeConversationId, queryClient]);
+  // Realtime is handled by a dedicated hook: useMessageSubscription.
+  // Audit M-07: caches for other conversations are intentionally kept —
+  // switching back reuses them; TanStack's gcTime evicts idle ones.
 
   const {
     data,

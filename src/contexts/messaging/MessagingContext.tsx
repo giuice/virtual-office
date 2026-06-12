@@ -13,7 +13,7 @@ import { MessagingContextType, DrawerView } from './types';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
-import { debugLogger, messagingFeatureFlags } from '@/utils/debug-logger';
+import { debugLogger } from '@/utils/debug-logger';
 
 // LocalStorage keys for drawer state persistence
 const DRAWER_STORAGE_KEYS = {
@@ -51,7 +51,6 @@ function useMessagingProviderValue(): MessagingContextType {
     clearLastActiveConversation,
   } = useConversations();
   const { currentUserProfile } = useCompany();
-  const [isMessagingV2Enabled, setIsMessagingV2Enabled] = useState(() => messagingFeatureFlags.isV2Enabled());
 
   // Drawer state with localStorage persistence
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
@@ -114,30 +113,6 @@ function useMessagingProviderValue(): MessagingContextType {
       });
     }
   }, [isMinimized]);
-
-  useEffect(() => {
-    const handler = () => {
-      setIsMessagingV2Enabled(messagingFeatureFlags.isV2Enabled());
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', handler);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('storage', handler);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (debugLogger.messaging.enabled()) {
-      debugLogger.messaging.event('MessagingContext', 'flag:messaging_v2', {
-        enabled: isMessagingV2Enabled,
-      });
-    }
-  }, [isMessagingV2Enabled]);
 
   // Restore active conversation from localStorage on mount
   useEffect(() => {
@@ -285,14 +260,6 @@ function useMessagingProviderValue(): MessagingContextType {
     setActiveConversation,
   ]);
 
-  const conversationIds = useMemo(() => {
-    const ids = conversations.flatMap((c) => c.id ? [c.id] : []);
-    ids.sort();
-    return ids;
-  }, [conversations]);
-
-  const shouldSubscribeToAll = conversationIds.length > 0;
-
   const handleConversationInsert = useCallback((message: Message) => {
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.event('MessagingContext', 'onInsert:conversation', {
@@ -303,23 +270,14 @@ function useMessagingProviderValue(): MessagingContextType {
     void ensureOpenForMessage({ conversationId: message.conversationId, senderId: message.senderId });
   }, [ensureOpenForMessage]);
 
-  const { status: focusedConversationStatus } = useMessageSubscription(
-    activeConversation?.id || null,
-    {
-      isActive: Boolean(activeConversation?.id) && !shouldSubscribeToAll,
-    }
-  );
-
-  const { status: allConversationStatus } = useMessageSubscription(
-    shouldSubscribeToAll ? conversationIds : null,
-    {
-      isActive: shouldSubscribeToAll,
-      ignoreSenderId: currentUserProfile?.id,
-      onInsert: handleConversationInsert,
-    }
-  );
-
-  const realtimeStatus = allConversationStatus ?? focusedConversationStatus ?? null;
+  // One channel for every messaging event (audit M-06): RLS scopes rows
+  // server-side, so no conversation id list is needed and this status is the
+  // real status of the channel delivering messages, receipts and reactions.
+  const { status: realtimeStatus } = useMessageSubscription({
+    isActive: Boolean(currentUserProfile?.id),
+    ignoreSenderId: currentUserProfile?.id,
+    onInsert: handleConversationInsert,
+  });
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -422,7 +380,6 @@ function useMessagingProviderValue(): MessagingContextType {
     uploadAttachment,
     // Realtime
     connectionStatus: realtimeStatus,
-    isMessagingV2Enabled,
   }), [
     isDrawerOpen,
     isMinimized,
@@ -458,7 +415,6 @@ function useMessagingProviderValue(): MessagingContextType {
     removeReaction,
     uploadAttachment,
     realtimeStatus,
-    isMessagingV2Enabled,
   ]);
 
   return value;

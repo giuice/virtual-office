@@ -59,7 +59,4 @@ export interface MessagingContextType {
 
   // Realtime connection
   connectionStatus?: string | null;
-
-  // Feature flags
-  isMessagingV2Enabled: boolean;
 }
