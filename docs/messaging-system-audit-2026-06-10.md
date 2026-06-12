@@ -36,7 +36,7 @@
 - **§8 Q2 answered: `messaging_v2` flag is removable.** The planned "global channel/board" is the Announcement System (PRD Epic 6, `announcements` table) — unrelated to this realtime-topology flag. Remove in Phase 2.4.
 - **§8 Q3 answered: auto-open drawer on incoming DM is an explicit product requirement.** Keep `ensureOpenForMessage` auto-open; delete the misleading "auto-open was removed" comments in the polling code.
 
-### Phase 2 — in progress (started 2026-06-10)
+### Phase 2 — COMPLETE (2026-06-12; user confirmed live messaging works end-to-end after 2.4)
 - [x] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) → commit `fix(messaging): conversations live in TanStack Query; delete 5s polling`. List backed by `useQuery(['conversations', userId])` (realtime invalidation now effective), polling deleted, `ensureOpenForMessage` reads the cache imperatively, context value memoized, `getCachedConversations` exposed. **Re-test two-browser live delivery (the admin→user miss) after this.**
 - [x] **2.2** — one read model (B-01 remainder, B-05, M-01 partial). **Migration `supabase/migrations/20260610210000_conversation_members_read_model.sql` APPLIED to live DB by user (2026-06-10; required a re-runnable revision — a legacy ad-hoc `mark_conversation_read(conv_id, ...)` existed in the live DB and was dropped/replaced).** `migrations/database-structure.md` refreshed (via Codex agent). What changed:
   - `conversation_preferences` **renamed** to `conversation_members` + `last_read_at`/`joined_at`; backfilled one row per (conversation, participant), `last_read_at = now()` (badges reset to 0 once at rollout, accepted). DB trigger `sync_conversation_members` keeps member rows in sync on conversation INSERT **and** `participants` UPDATE (replaces the INSERT-only preferences trigger).
@@ -56,7 +56,28 @@
   - **M-07:** `useMessages` no longer `removeQueries` other conversations on switch; TanStack gcTime evicts idle caches.
   - **Flag removed:** `isMessagingV2Enabled` out of MessagingContext/types; `messagingFeatureFlags`, `NEXT_PUBLIC_MESSAGING_V2`, `vo:flag:messaging_v2` machinery deleted from debug-logger.
   - Validation: tsc clean (2 pre-existing errors only), lint 0 errors, 26 messaging API tests pass.
-### Phase 3 — pending (not started)
+### Phase 3 — Hygiene (started 2026-06-12)
+
+Already closed opportunistically in earlier phases: **L-01** (with M-02), **L-02** (with B-08), **L-08** (2.3), **M-10** (2.2 — viewer-only numeric `unreadCount`). **L-11** downgraded to won't-fix: after M-02 the cursor advances by rows consumed (offset-based); worst case is one extra empty fetch. Note: 2.3's RLS migration `20260611120000` is confirmed applied — 2.4's receipts policy depends on `private.is_conversation_member()` from it and applied cleanly.
+
+- [x] **3.1 — repo cleanup (L-05, L-06, L-10)** — implemented 2026-06-12 (via Codex, reviewed). Single `enrichMessages()` private helper replaces the 4 copies (read-receipt overlay stayed in `findByConversation`); `findById` runs the 4 dependent lookups in one `Promise.all`; `getUnreadMessages` deleted from interface + impl (zero callers). Repo shrank by ~230 lines.
+- [x] **3.2 — dead code sweep (L-03, L-04)** — implemented 2026-06-12 (via Codex, reviewed). Deprecated `addReaction`/`removeReaction` wrappers + `__tests__/messaging-api.test.ts.deprecated` deleted; `messaging-api.getOrCreateRoomConversation` no longer fetches the whole conversation list (resolver is idempotent; 5 real callers in `SystemMessageService` keep the same signature).
+- [x] **3.3 — M-08** — implemented 2026-06-12. Repo `update()` now enriches the returned message (was resetting attachments/reactions to `[]`); `mapRowToMessage` no longer pretends the row carries attachments; realtime INSERT of `image`/`file` messages invalidates the conversation so receivers get attachments without a reload. (The UPDATE cache path already merge-preserved per-field since 2.4.)
+- [x] **3.4 — M-09 rate limiting** — implemented 2026-06-12. **Migration `20260612190000_messaging_rate_limits.sql` (NOT yet applied):** fixed-window counters in `private.rate_limit_counters` + `public.check_rate_limit()` SECURITY DEFINER, **service_role-only execute** (an authenticated caller could otherwise burn another user's quota). `enforceRateLimit` helper (`src/lib/auth/rate-limit.ts`) wired into create (30/min), react (60/min), upload (10/min); **fails open** (logged) until the migration is applied.
+- [x] **3.5 — DB hygiene migration** — written 2026-06-12, **NOT yet applied**: `20260612180000_messaging_hygiene_drop_unread_count.sql` drops `conversations.unread_count` (zero code references to the column; only the RPC output field shares the name) and removes pin/star tables from the publication (guarded for both pre- and post-rename names).
+- [x] **3.6 — L-07** — implemented 2026-06-12. Was mostly resolved by attrition: zero `validateUserSession` callers remained; converted the last 2 manual `getUser()+findBySupabaseUid` routes (`conversations/get`, `conversations/resolve`) to the standard `requireAuthUser()`; false "Firebase UID" comment removed from the attachment route.
+- [x] **(Phase 0 leftover) S-03** — implemented 2026-06-12. **Migration `20260612200000_attachments_bucket_private.sql` (NOT yet applied):** `attachments` bucket → private + 10 MB `file_size_limit` + MIME allowlist; legacy `message_attachments.url` public URLs rewritten to storage paths. Route changes: upload validates size (413) and MIME (415) server-side, `upsert: false`, storage ops via service client post-authz, fake-thumbnail duplication deleted; new **GET `/api/messages/attachment/[id]`** checks membership then 302-redirects to a 1 h signed URL; repo serializes path-stored attachments as that API URL; DELETE handles both path- and legacy-URL rows. Note: the production composer (`message-composer.tsx`) has no attachment UI — the route was live attack surface with no feature on top.
+
+**Phase 3 validation (2026-06-12):** tsc clean (2 known pre-existing errors: sharp types, ZodError in users/location); lint 0 errors; API+messaging suites 27 files / 162 tests pass. Pre-existing UI test failures (avatar/floor-plan/knock, 7 files) are the auth-refactor handoff follow-up, untouched by this phase.
+**Migrations applied by user 2026-06-12; runtime smoke probe (node, REST + realtime) results:**
+- ✅ `unread_count` column gone (42703), table functional.
+- ✅ `check_rate_limit`: window exact (`[true,true,true,false]` at limit 3), anon execution denied (42501).
+- ✅ legacy attachment URLs: zero `http%` rows (table is empty — feature never used in prod).
+- ✅ realtime regression check: messages INSERT events delivered (probe A@5.0s, B@15.5s). First probe's miss was the post-SUBSCRIBED blind window, not a regression.
+- ❌→✅ **the `attachments` bucket did not exist in the live project** — the migration's UPDATE was a silent no-op (and the upload route would always have failed at runtime). `20260612200000` rewritten as INSERT … ON CONFLICT, re-applied by user, verified: `public=false`, `file_size_limit=10485760`, 10 MIME types.
+- ⚠️ Out of scope, noted for the platform track: `user-uploads` bucket (avatars) is public, 1 MB, no MIME restrictions.
+
+**Phase 3 + S-03 COMPLETE (2026-06-12): all migrations applied, smoke probe all-green, committed.** Remaining separate tracks: X-01 platform RLS, auth-refactor UI tests, login-page alerts (hydration + presence 401), `user-uploads` bucket hardening.
 
 ---
 

@@ -80,7 +80,21 @@ const mockAuthorizedCtx = {
       remove: vi.fn().mockResolvedValue({}),
     }),
   },
-  serviceClient: {},
+  // S-03: storage writes/signing go through the service client; M-09: rate
+  // limit RPC also runs on it.
+  serviceClient: {
+    rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    storage: {
+      from: vi.fn().mockReturnValue({
+        upload: vi.fn().mockResolvedValue({ error: null }),
+        createSignedUrl: vi.fn().mockResolvedValue({
+          data: { signedUrl: 'https://example.com/signed/test.jpg' },
+          error: null,
+        }),
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    },
+  },
   dbUser: { id: APP_USER_ID, companyId: 'company-1', role: 'member' },
   conversation: {
     id: CONVERSATION_ID,
