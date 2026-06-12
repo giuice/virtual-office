@@ -7,6 +7,16 @@ import sharp from 'sharp'; // For image processing
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_INPUT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+type OutputFormat = 'jpeg' | 'jpg' | 'png' | 'webp';
+
+const OUTPUT_CONTENT_TYPES: Record<OutputFormat, string> = {
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
 export async function POST(req: NextRequest) {
   try {
     const authContext = await requireAuthUser();
@@ -29,12 +39,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file type
-    if (!avatarFile.type.startsWith('image/')) {
+    if (
+      !ALLOWED_INPUT_MIMES.includes(
+        avatarFile.type as (typeof ALLOWED_INPUT_MIMES)[number]
+      )
+    ) {
       return NextResponse.json(
         { error: 'File must be an image' },
         { status: 400 }
       );
-    }    // We'll accept files up to 5MB initially, then process them down to 1MB
+    }
+    // We'll accept files up to 5MB initially, then process them down to 1MB
     const initialMaxSize = 5 * 1024 * 1024; // 5MB
     if (avatarFile.size > initialMaxSize) {
       return NextResponse.json(
@@ -46,12 +61,15 @@ export async function POST(req: NextRequest) {
     // Convert the file to an array buffer
     const arrayBuffer = await avatarFile.arrayBuffer();
     let buffer = new Uint8Array(arrayBuffer);
+    let outputFormat: OutputFormat = 'jpeg';
 
     try {
       // Process the image to ensure it's under 1MB
       // 1. Determine image format based on file type
       const inputFormat = avatarFile.type.replace('image/', '');
-      const outputFormat = ['jpeg', 'jpg', 'png', 'webp'].includes(inputFormat) ? inputFormat : 'jpeg';
+      outputFormat = ['jpeg', 'jpg', 'png', 'webp'].includes(inputFormat)
+        ? inputFormat as OutputFormat
+        : 'jpeg';
 
       // 2. Process image with sharp
       let processedImage = sharp(buffer);
@@ -114,11 +132,14 @@ export async function POST(req: NextRequest) {
 
     } catch (processingError) {
       console.error('Error processing image:', processingError);
-      // We don't return an error here, we'll just use the original image
+      return NextResponse.json(
+        { error: 'Invalid image file' },
+        { status: 400 }
+      );
     }
 
     // Create a unique file name
-    const fileName = `avatar-${userDbId}-${Date.now()}.${avatarFile.name.split('.').pop()}`;
+    const fileName = `avatar-${userDbId}-${Date.now()}.${outputFormat}`;
     const filePath = `avatars/${fileName}`;
 
     // Upload the file to Supabase Storage using service role client to bypass RLS
@@ -127,7 +148,7 @@ export async function POST(req: NextRequest) {
     const { error: uploadError } = await serviceRoleSupabase.storage
       .from('user-uploads')
       .upload(filePath, buffer, {
-        contentType: avatarFile.type,
+        contentType: OUTPUT_CONTENT_TYPES[outputFormat],
         upsert: true,
       });
 

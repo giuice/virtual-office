@@ -133,6 +133,42 @@ describe('/api/users/avatar', () => {
     expect(mocks.storageUpload).not.toHaveBeenCalled();
   });
 
+  it('rejects avatar uploads with non-allowlisted image MIME types', async () => {
+    const response = await uploadAvatar(uploadRequest(new File(['avatar'], 'avatar.svg', { type: 'image/svg+xml' })));
+
+    expect(response.status).toBe(400);
+    expect(mocks.sharp).not.toHaveBeenCalled();
+    expect(mocks.storageUpload).not.toHaveBeenCalled();
+  });
+
+  it('rejects avatar uploads when image processing fails', async () => {
+    const processingError = new Error('invalid image');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.sharpPipeline.metadata.mockRejectedValue(processingError);
+
+    const response = await uploadAvatar(uploadRequest(new File(['avatar'], 'avatar.png', { type: 'image/png' })));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid image file' });
+    expect(mocks.storageUpload).not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
+  it('uploads processed avatars with content type and extension from the output format', async () => {
+    const response = await uploadAvatar(uploadRequest(new File(['avatar'], 'avatar.jpg', { type: 'image/webp' })));
+
+    expect(response.status).toBe(200);
+    expect(mocks.storageUpload).toHaveBeenCalledOnce();
+
+    const [path, , options] = mocks.storageUpload.mock.calls[0];
+    expect(path).toMatch(/^avatars\/avatar-app-user-1-\d+\.webp$/);
+    expect(options).toMatchObject({
+      contentType: 'image/webp',
+      upsert: true,
+    });
+  });
+
   it('removes the previous user-uploads object after a successful avatar upload', async () => {
     const response = await uploadAvatar(uploadRequest(new File(['avatar'], 'avatar.png', { type: 'image/png' })));
 
