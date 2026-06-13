@@ -340,7 +340,7 @@ async function handleLocationUpdate(request: Request) {
     if (!validationResult.success) {
       return NextResponse.json({ 
         error: 'Invalid input', 
-        details: validationResult.error.errors 
+        details: validationResult.error.issues
       }, { status: 400 });
     }
 
