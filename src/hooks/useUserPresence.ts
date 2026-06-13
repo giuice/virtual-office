@@ -131,6 +131,7 @@ export function useUserPresence(currentUserId?: string) {
 
       return filtered;
     },
+    enabled: !!currentUserId,
   });
 
   const currentUser = useMemo(() => {
