@@ -96,32 +96,28 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="sm" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-8');
-      expect(avatar.className).toContain('w-8');
+      expect(avatar.className).toContain('size-8');
     });
 
     it('applies medium size classes (default)', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="md" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-12');
-      expect(avatar.className).toContain('w-12');
+      expect(avatar.className).toContain('size-12');
     });
 
     it('applies large size classes', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="lg" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-16');
-      expect(avatar.className).toContain('w-16');
+      expect(avatar.className).toContain('size-16');
     });
 
     it('applies extra large size classes', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="xl" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-24');
-      expect(avatar.className).toContain('w-24');
+      expect(avatar.className).toContain('size-24');
     });
   });
 
@@ -215,8 +211,7 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
       
       const avatar = screen.getByTestId('avatar');
       expect(avatar.className).toContain('custom-class');
-      expect(avatar.className).toContain('h-12');
-      expect(avatar.className).toContain('w-12');
+      expect(avatar.className).toContain('size-12');
       expect(avatar.className).toContain('border');
     });
   });

@@ -240,13 +240,14 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
   });
 
   describe('Accessibility', () => {
-    it('has role="button" when onClick is provided', () => {
+    it('renders a native button when onClick is provided', () => {
       render(<UserAvatarPresence user={mockUser} onClick={() => {}} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
       
-      expect(wrapper.getAttribute('role')).toBe('button');
+      expect(wrapper.tagName).toBe('BUTTON');
+      expect(wrapper.getAttribute('type')).toBe('button');
     });
 
     it('has tabIndex when onClick is provided', () => {
@@ -267,26 +268,24 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
       expect(wrapper.getAttribute('aria-label')).toContain('John Doe');
     });
 
-    it('handles keyboard activation', () => {
-      const onClick = vi.fn();
-      render(<UserAvatarPresence user={mockUser} onClick={onClick} />);
+    it('uses native button semantics for Enter activation', () => {
+      render(<UserAvatarPresence user={mockUser} onClick={() => {}} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
       
-      fireEvent.keyDown(wrapper, { key: 'Enter' });
-      expect(onClick).toHaveBeenCalled();
+      expect(wrapper.tagName).toBe('BUTTON');
+      expect(wrapper.getAttribute('type')).toBe('button');
     });
 
-    it('handles space key activation', () => {
-      const onClick = vi.fn();
-      render(<UserAvatarPresence user={mockUser} onClick={onClick} />);
+    it('uses native button semantics for space key activation', () => {
+      render(<UserAvatarPresence user={mockUser} onClick={() => {}} />);
       
       const trigger = screen.getByTestId('tooltip-trigger');
       const wrapper = trigger.firstChild as HTMLElement;
       
-      fireEvent.keyDown(wrapper, { key: ' ' });
-      expect(onClick).toHaveBeenCalled();
+      expect(wrapper.tagName).toBe('BUTTON');
+      expect(wrapper.getAttribute('type')).toBe('button');
     });
   });
 

@@ -103,11 +103,11 @@ describe('AttentionBeacon - Story 3.4 Tests', () => {
       expect(beacon.getAttribute('aria-live')).toBe('polite');
     });
 
-    it('has role="status" attribute', () => {
+    it('renders as an output element for status changes', () => {
       render(<AttentionBeacon active={true} severity="normal" />);
       
       const beacon = screen.getByTestId('attention-beacon');
-      expect(beacon.getAttribute('role')).toBe('status');
+      expect(beacon.tagName).toBe('OUTPUT');
     });
 
     it('has aria-label with reason', () => {
