@@ -54,7 +54,6 @@ export function useVoiceActivity({
 }: UseVoiceActivityOptions): VoiceActivityState {
 	const [isSpeaking, setIsSpeaking] = useState(false);
 	const [volume, setVolume] = useState(-Infinity);
-	const [isAnalyzing, setIsAnalyzing] = useState(false);
 
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const analyserRef = useRef<AnalyserNode | null>(null);
@@ -72,7 +71,6 @@ export function useVoiceActivity({
 
 	useEffect(() => {
 		if (!stream || !enabled) {
-			setIsAnalyzing(false);
 			return;
 		}
 
@@ -98,8 +96,6 @@ export function useVoiceActivity({
 		const source = audioContext.createMediaStreamSource(stream);
 		source.connect(analyser);
 		sourceRef.current = source;
-
-		setIsAnalyzing(true);
 
 		// Frequency data buffer
 		const frequencyData = new Uint8Array(analyser.frequencyBinCount);
@@ -153,24 +149,24 @@ export function useVoiceActivity({
 				analyserRef.current = null;
 			}
 
-			setIsAnalyzing(false);
 		};
 	}, [stream, enabled, threshold, sampleInterval, onSpeakingChange]);
 
-	// Cleanup audio context on unmount
-	useEffect(() => {
-		return () => {
-			if (audioContextRef.current) {
-				audioContextRef.current.close().catch(console.error);
-				audioContextRef.current = null;
-			}
-		};
-	}, []);
+		// Cleanup audio context on unmount
+		useEffect(() => {
+			const closeAudioContext = () => {
+				if (audioContextRef.current) {
+					audioContextRef.current.close().catch(console.error);
+					audioContextRef.current = null;
+				}
+			};
+			return closeAudioContext;
+		}, []);
 
 	return {
 		isSpeaking,
 		volume,
-		isAnalyzing,
+		isAnalyzing: Boolean(stream && enabled),
 		resume,
 	};
 }

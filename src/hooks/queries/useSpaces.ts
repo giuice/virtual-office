@@ -43,7 +43,7 @@ export function useSpaces(companyId: string | undefined, enabled?: boolean) {
  * @param enabled Optional flag to enable/disable the query. Defaults to true if spaceId is provided.
  * @returns The react-query query object.
  */
-export function useSpace(spaceId: string | undefined, enabled?: boolean) {
+function useSpace(spaceId: string | undefined, enabled?: boolean) {
   return useQuery<Space | null, Error>({
     queryKey: ['space', spaceId],
     queryFn: async () => {

@@ -3,7 +3,7 @@ import { IConversationRepository } from '@/repositories/interfaces/IConversation
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging';
-import { User } from '@/types/database';
+import { Space, User } from '@/types/database';
 
 export class ConversationResolverError extends Error {
   status: number;
@@ -129,31 +129,18 @@ export class ConversationResolverService {
     requesterId,
     roomId,
   }: RoomConversationResolutionParams): Promise<Conversation> {
-    const requester = await this.requireUser(requesterId, 'requester');
-    const space = await this.spaceRepository.findById(roomId);
+    const [requester, space] = await Promise.all([
+      this.requireUser(requesterId, 'requester'),
+      this.spaceRepository.findById(roomId),
+    ]);
 
     if (!space) {
       throw new ConversationResolverError('Room not found', 404);
     }
 
-    if (space.companyId && requester.companyId && space.companyId !== requester.companyId) {
-      throw new ConversationResolverError('Room conversation not accessible for this user', 403);
-    }
+    ConversationResolverService.assertRoomAccess(requester, space);
 
     const { accessControl } = space;
-    if (accessControl) {
-      const allowedUsers = accessControl.allowedUsers ?? [];
-      const allowedRoles = accessControl.allowedRoles ?? [];
-      if (allowedUsers.length > 0 && !allowedUsers.includes(requesterId)) {
-        throw new ConversationResolverError('Room conversation restricted to specific users', 403);
-      }
-      if (allowedRoles.length > 0 && requester.role && !allowedRoles.includes(requester.role)) {
-        throw new ConversationResolverError('Room conversation restricted to specific roles', 403);
-      }
-      if (!accessControl.isPublic && allowedUsers.length === 0 && allowedRoles.length === 0 && !requester.companyId) {
-        throw new ConversationResolverError('Room is private and user has no company assigned', 403);
-      }
-    }
 
     this.log('resolveRoom.start', { requesterId, roomId });
 
@@ -219,12 +206,37 @@ export class ConversationResolverService {
     return normalized;
   }
 
+  /**
+   * Shared room access rules — used by room conversation resolution and by
+   * /api/conversations/join. Throws ConversationResolverError(403) on denial.
+   */
+  static assertRoomAccess(requester: User, space: Space): void {
+    if (space.companyId && requester.companyId && space.companyId !== requester.companyId) {
+      throw new ConversationResolverError('Room conversation not accessible for this user', 403);
+    }
+
+    const { accessControl } = space;
+    if (accessControl) {
+      const allowedUsers = accessControl.allowedUsers ?? [];
+      const allowedRoles = accessControl.allowedRoles ?? [];
+      if (allowedUsers.length > 0 && !allowedUsers.includes(requester.id)) {
+        throw new ConversationResolverError('Room conversation restricted to specific users', 403);
+      }
+      if (allowedRoles.length > 0 && requester.role && !allowedRoles.includes(requester.role)) {
+        throw new ConversationResolverError('Room conversation restricted to specific roles', 403);
+      }
+      if (!accessControl.isPublic && allowedUsers.length === 0 && allowedRoles.length === 0 && !requester.companyId) {
+        throw new ConversationResolverError('Room is private and user has no company assigned', 403);
+      }
+    }
+  }
+
   static computeParticipantsFingerprint(participants: string[]): string {
     if (participants.length === 0) {
       throw new ConversationResolverError('Participants are required to compute fingerprint', 400);
     }
 
-    const sorted = [...participants].sort();
+    const sorted = participants.toSorted();
     const fingerprintSource = sorted.join(':');
     return createHash('md5').update(fingerprintSource).digest('hex');
   }

@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "sharp": [
+        "./node_modules/sharp/lib/index.d.ts"
       ]
     }
   },

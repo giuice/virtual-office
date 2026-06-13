@@ -1,32 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { IMessageRepository, IUserRepository } from '@/repositories/interfaces';
-import { SupabaseMessageRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { IMessageRepository } from '@/repositories/interfaces';
+import { SupabaseMessageRepository } from '@/repositories/implementations/supabase';
+import { isAuthzFailure, requireMessageParticipant } from '@/lib/auth/authorize';
+import { enforceRateLimit } from '@/lib/auth/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate the user
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
-    }
-
-    // Get the database user record
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
-    const userRecord = await userRepository.findBySupabaseUid(user.id);
-    if (!userRecord) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
-
-    const messageRepository: IMessageRepository = new SupabaseMessageRepository(supabase);
     const { messageId, emoji } = await request.json();
 
     // Input Validation
     if (!messageId || typeof messageId !== 'string' || !emoji || typeof emoji !== 'string') {
       return NextResponse.json({ error: 'Missing or invalid messageId or emoji' }, { status: 400 });
     }
+
+    const ctx = await requireMessageParticipant(messageId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
+    }
+
+    const rateLimited = await enforceRateLimit(ctx.serviceClient, ctx.dbUser.id, 'message:react');
+    if (rateLimited) {
+      return rateLimited;
+    }
+
+    const messageRepository: IMessageRepository = new SupabaseMessageRepository(ctx.supabase);
 
     // Fetch the message to check current reaction state
     const message = await messageRepository.findById(messageId);
@@ -38,18 +35,18 @@ export async function POST(request: NextRequest) {
     // Determine if user is adding or removing reaction
     // message.reactions is an array of MessageReaction objects
     const userHasReacted = message.reactions.some(
-      (reaction) => reaction.userId === userRecord.id && reaction.emoji === emoji
+      (reaction) => reaction.userId === ctx.dbUser.id && reaction.emoji === emoji
     );
     let action: 'added' | 'removed';
 
     try {
       if (userHasReacted) {
         // User is removing their reaction
-        await messageRepository.removeReaction(messageId, userRecord.id, emoji);
+        await messageRepository.removeReaction(messageId, ctx.dbUser.id, emoji);
         action = 'removed';
       } else {
         // User is adding a new reaction
-        await messageRepository.addReaction(messageId, { userId: userRecord.id, emoji });
+        await messageRepository.addReaction(messageId, { userId: ctx.dbUser.id, emoji });
         action = 'added';
       }
     } catch (repoError) {

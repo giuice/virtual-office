@@ -160,7 +160,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
           className="flex items-center gap-2 shadow-lg"
           onClick={toggleMinimize}
         >
-          <MessageSquare className="h-4 w-4" />
+          <MessageSquare className="size-4" />
           <span>{drawerTitle}</span>
         </Button>
       </div>
@@ -184,13 +184,13 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="size-6"
                 onClick={handleBackToList}
               >
-                <ArrowLeft className="h-3 w-3" />
+                <ArrowLeft className="size-3" />
               </Button>
             )}
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="size-4" />
             <CardTitle className="text-sm font-medium">{drawerTitle}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
@@ -199,11 +199,11 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="size-6"
                 onClick={handleNewMessage}
                 title="New message"
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="size-3" />
               </Button>
             )}
             {/* Show list button when NOT in list view - allows user to always navigate to list */}
@@ -211,31 +211,31 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="size-6"
                 onClick={handleBackToList}
                 title="View all conversations"
               >
-                <List className="h-3 w-3" />
+                <List className="size-3" />
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="size-6"
               onClick={toggleMinimize}
               title="Minimize"
             >
-              <Minimize2 className="h-3 w-3" />
+              <Minimize2 className="size-3" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="size-6"
               onClick={handleClose}
               title="Close"
               data-testid="messaging-drawer-close"
             >
-              <X className="h-3 w-3" />
+              <X className="size-3" />
             </Button>
           </div>
         </CardHeader>
@@ -266,7 +266,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
             <>
               {isCreatingConversation ? (
                 <div className="p-4 text-center text-muted-foreground">
-                  Creating conversation...
+                  Creating conversation…
                 </div>
               ) : (
                 <ConversationSearch

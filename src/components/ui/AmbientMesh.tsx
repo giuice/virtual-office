@@ -1,7 +1,7 @@
 // src/components/ui/AmbientMesh.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useVOTheme } from '@/hooks/useVOTheme';
 
 /**
@@ -14,12 +14,11 @@ import { useVOTheme } from '@/hooks/useVOTheme';
  */
 export function AmbientMesh() {
   const { theme } = useVOTheme();
-  const [mounted, setMounted] = useState(false);
-
-  // Only render after client-side hydration to prevent SSR mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
 
   // Return null during SSR and initial hydration
   if (!mounted) {
@@ -39,5 +38,3 @@ export function AmbientMesh() {
     />
   );
 }
-
-export default AmbientMesh;

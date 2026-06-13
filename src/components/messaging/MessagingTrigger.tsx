@@ -20,11 +20,9 @@ interface MessagingTriggerProps {
 export function MessagingTrigger({ className }: MessagingTriggerProps) {
   const { isDrawerOpen, openDrawer, conversations } = useMessaging();
 
-  // Calculate total unread messages
-  const totalUnread = conversations.reduce((sum, conv) => {
-    const unreadCount = Object.values(conv.unreadCount || {}).reduce((a, b) => a + b, 0);
-    return sum + unreadCount;
-  }, 0);
+  // Calculate total unread messages (unreadCount is the viewer's own
+  // server-computed count — Phase 2.2)
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
 
   // Don't show trigger if drawer is already open
   if (isDrawerOpen) {
@@ -36,17 +34,18 @@ export function MessagingTrigger({ className }: MessagingTriggerProps) {
       data-testid="messaging-drawer-trigger"
       onClick={openDrawer}
       className={cn(
-        'fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg',
+        'fixed bottom-6 right-6 z-40 size-14 rounded-full shadow-lg',
         className
       )}
       size="icon"
       aria-label="Open messages"
     >
-      <MessageSquare className="h-6 w-6" />
+      <MessageSquare className="size-6" />
       {totalUnread > 0 && (
         <Badge
           variant="destructive"
           className="absolute -top-1 -right-1 h-6 min-w-[1.5rem] rounded-full px-1 text-xs"
+          data-testid="messaging-drawer-trigger-badge"
         >
           {totalUnread > 99 ? '99+' : totalUnread}
         </Badge>

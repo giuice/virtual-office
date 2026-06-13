@@ -2,6 +2,7 @@
 // Story 3.10: Beacon Queue Component - Displays aggregated beacon list
 'use client';
 
+import { useReducerState } from '@/hooks/useReducerState';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,13 +36,14 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
   maxVisible = 4,
   className,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [previousCount, setPreviousCount] = useState(beacons.length);
-  const [announcement, setAnnouncement] = useState('');
+  const [isExpanded, updateIsExpanded] = useReducerState(false);
+  const previousCountRef = useRef(beacons.length);
+  const [announcement, updateAnnouncement] = useReducerState('');
   const announcementTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track new beacons for announcements (AC6)
   useEffect(() => {
+    const previousCount = previousCountRef.current;
     if (beacons.length > previousCount) {
       // Find the newest beacon (likely the first one that wasn't there before)
       const newBeacon = beacons.find(b => 
@@ -50,25 +52,25 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
       
       if (newBeacon) {
         const severityText = newBeacon.severity === 'critical' ? 'Critical' : 'Normal';
-        setAnnouncement(`New beacon on ${newBeacon.spaceName}, ${severityText} severity. ${newBeacon.reason}`);
+        updateAnnouncement(`New beacon on ${newBeacon.spaceName}, ${severityText} severity. ${newBeacon.reason}`);
         
         // Clear announcement after 5 seconds
         if (announcementTimeoutRef.current) {
           clearTimeout(announcementTimeoutRef.current);
         }
         announcementTimeoutRef.current = setTimeout(() => {
-          setAnnouncement('');
+          updateAnnouncement('');
         }, 5000);
       }
     }
-    setPreviousCount(beacons.length);
+    previousCountRef.current = beacons.length;
 
     return () => {
       if (announcementTimeoutRef.current) {
         clearTimeout(announcementTimeoutRef.current);
       }
     };
-  }, [beacons, previousCount]);
+  }, [beacons, updateAnnouncement]);
 
   const handleBeaconClick = useCallback((e: React.MouseEvent | React.KeyboardEvent, spaceId: string) => {
     e.preventDefault();
@@ -83,8 +85,8 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
   }, [handleBeaconClick]);
 
   const toggleExpand = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
+    updateIsExpanded(prev => !prev);
+  }, [updateIsExpanded]);
 
   // Don't render if no beacons
   if (beacons.length === 0) {
@@ -95,28 +97,26 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
   const hasMore = beacons.length > maxVisible;
 
   return (
-    <div 
+    <section
       className={cn(
         'flex flex-col gap-1',
         className
       )}
-      role="region"
       aria-label="Active beacons"
     >
       {/* Aria-live region for beacon announcements (AC6) */}
-      <div
-        role="status"
+      <output
         aria-live="polite"
         aria-atomic="true"
         className="sr-only"
       >
         {announcement}
-      </div>
+      </output>
 
       {/* Beacon header with count */}
       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
         <span className="font-medium flex items-center gap-1.5">
-          <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          <AlertCircle className="size-3.5" aria-hidden="true" />
           Beacons ({beacons.length})
         </span>
         {hasMore && (
@@ -133,11 +133,11 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
           >
             {isExpanded ? (
               <>
-                Show less <ChevronUp className="h-3 w-3" />
+                Show less <ChevronUp className="size-3" />
               </>
             ) : (
               <>
-                +{beacons.length - maxVisible} more <ChevronDown className="h-3 w-3" />
+                +{beacons.length - maxVisible} more <ChevronDown className="size-3" />
               </>
             )}
           </button>
@@ -174,12 +174,12 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
             {/* Severity icon */}
             {beacon.severity === 'critical' ? (
               <AlertTriangle 
-                className="h-3.5 w-3.5 flex-shrink-0 text-red-500" 
+                className="size-3.5 flex-shrink-0 text-red-500" 
                 aria-hidden="true"
               />
             ) : (
               <div 
-                className="h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse"
+                className="size-2.5 rounded-full flex-shrink-0 animate-pulse"
                 style={{ backgroundColor: 'var(--vo-beacon-color)' }}
                 aria-hidden="true"
               />
@@ -205,7 +205,7 @@ export const BeaconQueue: React.FC<BeaconQueueProps> = ({
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

@@ -1,20 +1,19 @@
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { User } from '@/types/database';
 import { NextResponse } from 'next/server';
-
-// Instantiate the repository
-let userRepository: IUserRepository | null = null;
+import { requireAuthUser } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  if (!userRepository) {
-    const supabase = await createSupabaseServerClient();
-    userRepository = new SupabaseUserRepository(supabase);
-  }
   try {
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
@@ -33,6 +32,13 @@ export async function GET(request: Request) {
         success: false, 
         message: 'User not found' 
       }, { status: 404 });
+    }
+
+    const canAccessUser = user.id === authContext.dbUser.id ||
+      (authContext.dbUser.companyId !== null && user.companyId === authContext.dbUser.companyId);
+
+    if (!canAccessUser) {
+      return NextResponse.json({ success: false, error: 'Cannot access users outside your company' }, { status: 403 });
     }
     
     // Return success with the user data

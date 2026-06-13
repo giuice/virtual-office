@@ -1,14 +1,18 @@
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
 
@@ -17,6 +21,10 @@ export async function GET(request: Request) {
         { error: 'Missing required companyId parameter' },
         { status: 400 }
       );
+    }
+
+    if (companyId !== authContext.dbUser.companyId) {
+      return NextResponse.json({ success: false, error: 'Cannot access users outside your company' }, { status: 403 });
     }
 
     // Get users using the repository

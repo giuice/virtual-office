@@ -91,16 +91,17 @@ export function useKnock(): UseKnockReturn {
 	const [targetSpaceId, setTargetSpaceId] = useState<string | null>(null);
 	const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
 
-	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+		const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+		const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-	// Cleanup timeouts on unmount
-	useEffect(() => {
-		return () => {
-			if (timeoutRef.current) clearTimeout(timeoutRef.current);
-			if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-		};
-	}, []);
+		// Cleanup timeouts on unmount
+		useEffect(() => {
+			const clearKnockTimers = () => {
+				if (timeoutRef.current) clearTimeout(timeoutRef.current);
+				if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+			};
+			return clearKnockTimers;
+		}, []);
 
 	/**
 	 * Check if a knock is allowed for a specific space.

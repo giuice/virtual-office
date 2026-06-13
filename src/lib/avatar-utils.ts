@@ -1,5 +1,5 @@
 // src/lib/avatar-utils.ts
-import { User } from '@/types/database';
+import { User, type UserStatus } from '@/types/database';
 import { UIUser } from '@/types/ui';
 import { debugLogger } from '@/utils/debug-logger';
 
@@ -106,6 +106,21 @@ export interface AvatarUser {
   avatar?: string;
   photoURL?: string;
   status?: string;
+}
+
+export function getStatusColorClass(status: UserStatus | string | undefined): string {
+  switch (status) {
+    case 'online':
+      return 'bg-emerald-500';
+    case 'away':
+      return 'bg-amber-500';
+    case 'busy':
+      return 'bg-rose-500';
+    case 'offline':
+      return 'bg-gray-400';
+    default:
+      return '';
+  }
 }
 
 // Avatar loading error types for better debugging
@@ -504,9 +519,10 @@ export async function getAvatarUrlWithRetry(
   
   // For external URLs, attempt to validate with retry logic
   let lastError: Error | null = null;
+  let lastErrorMessage: string | undefined;
   const currentRetryCount = avatarCache.getRetryCount(userId);
   
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  const validateWithRetry = async (attempt: number): Promise<string | null> => {
     try {
       // Attempt to validate the URL by creating an Image object
       await validateImageUrl(avatarUrl);
@@ -521,6 +537,7 @@ export async function getAvatarUrlWithRetry(
       
     } catch (error) {
       lastError = error as Error;
+      lastErrorMessage = lastError.message;
       
       //const retryCount = avatarCache.incrementRetryCount(userId);
       
@@ -539,8 +556,15 @@ export async function getAvatarUrlWithRetry(
       // If this isn't the last attempt, wait before retrying
       if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return validateWithRetry(attempt + 1);
       }
     }
+    return null;
+  };
+
+  const validatedAvatarUrl = await validateWithRetry(0);
+  if (validatedAvatarUrl) {
+    return validatedAvatarUrl;
   }
   
   // All retry attempts failed - log error and return fallback
@@ -552,7 +576,7 @@ export async function getAvatarUrlWithRetry(
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
     additionalInfo: {
       maxRetries,
-      finalError: lastError?.message,
+      finalError: lastErrorMessage,
       totalRetryCount: avatarCache.getRetryCount(userId)
     }
   };

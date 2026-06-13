@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, renderHook, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
@@ -216,31 +216,41 @@ describe('useGroupedSpaces Hook', () => {
 
 describe('useNeighborhoodFilters Hook', () => {
   beforeEach(() => {
-    localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it('should start with showAll = true when no filters set', () => {
-    // Testing the initial state logic
-    const activeFilters = new Set<string>();
-    const isShowingAll = activeFilters.size === 0;
+    const { result } = renderHook(() => useNeighborhoodFilters(mockNeighborhoods));
     
-    expect(isShowingAll).toBe(true);
+    expect(result.current.isShowingAll).toBe(true);
+    expect(result.current.activeCount).toBe(0);
   });
 
   it('should add filter when toggling a neighborhood', () => {
-    const activeFilters = new Set<string>();
-    activeFilters.add('n1');
+    const { result } = renderHook(() => useNeighborhoodFilters(mockNeighborhoods));
     
-    expect(activeFilters.has('n1')).toBe(true);
-    expect(activeFilters.size).toBe(1);
+    act(() => {
+      result.current.toggleFilter('n1');
+    });
+
+    expect(result.current.activeFilters.has('n1')).toBe(true);
+    expect(result.current.activeCount).toBe(1);
+    expect(result.current.isShowingAll).toBe(false);
   });
 
   it('should remove filter when toggling same neighborhood', () => {
-    const activeFilters = new Set<string>(['n1', 'n2']);
-    activeFilters.delete('n1');
+    const { result } = renderHook(() => useNeighborhoodFilters(mockNeighborhoods));
+
+    act(() => {
+      result.current.showOnly('n1');
+    });
+    act(() => {
+      result.current.toggleFilter('n1');
+    });
     
-    expect(activeFilters.has('n1')).toBe(false);
-    expect(activeFilters.size).toBe(1);
+    expect(result.current.activeFilters.has('n1')).toBe(false);
+    expect(result.current.activeCount).toBe(0);
+    expect(result.current.isShowingAll).toBe(true);
   });
 });
 

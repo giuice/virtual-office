@@ -35,7 +35,7 @@ const sortByTimestampAsc = (a: MessageReaction, b: MessageReaction) => {
   return ensureDate(a.timestamp).getTime() - ensureDate(b.timestamp).getTime();
 };
 
-export const toggleReactionOnMessage = ({
+const toggleReactionOnMessage = ({
   message,
   messageId,
   emoji,

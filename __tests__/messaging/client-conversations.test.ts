@@ -124,62 +124,8 @@ describe('Messaging API Client - Conversations', () => {
     });
   });
 
-  // Grouped Conversations Tests
-  describe('Grouped Conversations', () => {
-    test('getGroupedConversations should return conversations grouped by type', async () => {
-      const mockGrouped = {
-        direct: [
-          { id: 'conv-1', type: 'direct', participants: ['user-1', 'user-2'] },
-          { id: 'conv-2', type: 'direct', participants: ['user-1', 'user-3'] },
-        ],
-        rooms: [
-          { id: 'conv-3', type: 'room', roomId: 'room-1', participants: ['user-1', 'user-2', 'user-3'] },
-        ],
-      };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockGrouped)
-      );
-
-      const result = await messagingApi.getGroupedConversations();
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/conversations/get?grouped=true'
-      );
-
-      expect(result).toEqual(mockGrouped);
-    });
-
-    test('getGroupedConversations should support includeArchived option', async () => {
-      const mockGrouped = {
-        direct: [],
-        rooms: [],
-      };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockGrouped)
-      );
-
-      await messagingApi.getGroupedConversations({ includeArchived: true });
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/conversations/get?grouped=true&includeArchived=true'
-      );
-    });
-
-    test('getGroupedConversations should handle errors', async () => {
-      const errorMessage = 'Failed to fetch grouped conversations';
-      const mockResponse = { error: errorMessage };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(500, mockResponse)
-      );
-
-      await expect(
-        messagingApi.getGroupedConversations()
-      ).rejects.toThrow(errorMessage);
-    });
-  });
+  // getGroupedConversations / getUnreadSummary were deleted (audit B-08):
+  // their response shapes never matched the route and nothing consumed them.
 
   // Pinned Conversations Tests
   describe('Pinned Conversations', () => {
@@ -214,43 +160,6 @@ describe('Messaging API Client - Conversations', () => {
       const result = await messagingApi.getPinnedConversations();
 
       expect(result).toEqual([]);
-    });
-  });
-
-  // Unread Summary Tests
-  describe('Unread Summary', () => {
-    test('getUnreadSummary should return unread counts by type', async () => {
-      const mockSummary = {
-        totalUnread: 15,
-        directUnread: 8,
-        roomUnread: 7,
-      };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockSummary)
-      );
-
-      const result = await messagingApi.getUnreadSummary();
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/conversations/get?summary=true'
-      );
-
-      expect(result).toEqual(mockSummary);
-    });
-
-    test('getUnreadSummary should default to zero counts on empty response', async () => {
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, {})
-      );
-
-      const result = await messagingApi.getUnreadSummary();
-
-      expect(result).toEqual({
-        totalUnread: 0,
-        directUnread: 0,
-        roomUnread: 0,
-      });
     });
   });
 

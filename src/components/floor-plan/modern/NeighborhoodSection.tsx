@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Space, Neighborhood } from '@/types/database';
-import { FloorPlanPerspective } from './ModernFloorPlan';
+import type { FloorPlanPerspective } from './ModernFloorPlan';
 import { cn } from '@/lib/utils';
 
 interface NeighborhoodSectionProps {

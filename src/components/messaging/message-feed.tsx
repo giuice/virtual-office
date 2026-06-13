@@ -13,6 +13,8 @@ import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessageItem } from './message-item';
 import { MessageComposer } from './message-composer';
+import { TypingIndicator } from './TypingIndicator';
+import { useConversationPresence } from '@/hooks/useConversationPresence';
 
 interface MessageFeedProps {
   conversationId?: string;
@@ -42,6 +44,11 @@ export function MessageFeed({
     getOrCreateRoomConversation,
     addReaction,
   } = useMessaging();
+
+  // Typing indicators ride the conversation presence channel (audit B-02)
+  const { typingUsers, notifyTyping, stopTyping } = useConversationPresence(
+    activeConversation?.id ?? null
+  );
 
   const [isLoading, setIsLoading] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
@@ -111,41 +118,30 @@ export function MessageFeed({
     }
   }, [messages]);
 
-  useEffect(() => {
-    // Collapse any thread entries that no longer have replies
-    setExpandedThreads((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      Object.keys(next).forEach((key) => {
-        if (!repliesByParent.has(key) || (repliesByParent.get(key)?.length ?? 0) === 0) {
-          delete next[key];
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
+  const effectiveExpandedThreads = useMemo(() => {
+    const next: Record<string, boolean> = {};
+    Object.entries(expandedThreads).forEach(([messageId, expanded]) => {
+      if (expanded && repliesByParent.has(messageId) && (repliesByParent.get(messageId)?.length ?? 0) > 0) {
+        next[messageId] = true;
+      }
     });
-  }, [repliesByParent]);
 
-  useEffect(() => {
     if (!replyToMessage) {
-      return;
+      return next;
     }
     const parentId = replyToMessage.replyToId && messageMap.has(replyToMessage.replyToId)
       ? replyToMessage.replyToId
       : replyToMessage.id;
-    setExpandedThreads((prev) => {
-      if (prev[parentId]) {
-        return prev;
-      }
-      return { ...prev, [parentId]: true };
-    });
-  }, [replyToMessage, messageMap]);
+    next[parentId] = true;
+    return next;
+  }, [expandedThreads, messageMap, repliesByParent, replyToMessage]);
 
   // Handle sending a message
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     if (!activeConversation) return;
 
     try {
+      stopTyping();
       await sendMessage(content, {
         replyToId: replyToMessage?.id,
       });
@@ -153,17 +149,17 @@ export function MessageFeed({
     } catch (error) {
       console.error('Error sending message:', error);
     }
-  };
+  }, [activeConversation, replyToMessage?.id, sendMessage, stopTyping]);
 
   // Handle reply
-  const handleReply = (message: Message) => {
+  const handleReply = useCallback((message: Message) => {
     setReplyToMessage(message);
-  };
+  }, []);
 
   // Handle reaction
-  const handleReaction = (messageId: string, emoji: string) => {
+  const handleReaction = useCallback((messageId: string, emoji: string) => {
     addReaction(messageId, emoji);
-  };
+  }, [addReaction]);
 
   const toggleThread = useCallback((messageId: string) => {
     setExpandedThreads((prev) => ({
@@ -175,7 +171,7 @@ export function MessageFeed({
   const renderMessageTree = useCallback((message: Message, depth = 0): React.ReactNode => {
     const replies = repliesByParent.get(message.id) ?? [];
     const replyCount = replies.length;
-    const isExpanded = expandedThreads[message.id] ?? false;
+    const isExpanded = effectiveExpandedThreads[message.id] ?? false;
     const parentMessage = depth > 0 && message.replyToId ? messageMap.get(message.replyToId) ?? null : null;
 
     return (
@@ -200,7 +196,7 @@ export function MessageFeed({
         )}
       </div>
     );
-  }, [expandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap]);
+  }, [effectiveExpandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap]);
 
   // Render loading state
   if (isLoading || loadingMessages) {
@@ -231,7 +227,7 @@ export function MessageFeed({
       <Card className={cn("w-full", className)}>
         <CardContent className="p-6">
           <div className="text-center text-red-500">
-            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+            <AlertCircle className="size-8 mx-auto mb-2" />
             <p>Failed to load messages. Please try again.</p>
             <Button
               variant="outline"
@@ -260,7 +256,7 @@ export function MessageFeed({
   }
 
   return (
-    <Card className={cn("w-full h-full min-h-0 flex flex-col", className)} data-testid="messages-feed">
+    <Card className={cn("size-full min-h-0 flex flex-col", className)} data-testid="messages-feed">
       {/* Legacy test hook for older specs */}
       <div data-testid="message-feed" className="sr-only" />
       <CardHeader className="pb-2">
@@ -295,13 +291,14 @@ export function MessageFeed({
         </ScrollArea>
       </CardContent>
 
-      <CardFooter className="p-4 pt-2">
+      <CardFooter className="flex-col items-stretch gap-1 p-4 pt-2">
+        <TypingIndicator typingUsers={typingUsers.map((t) => t.displayName)} />
         <MessageComposer
           onSendMessage={handleSendMessage}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
           initialValue={""}
-          onValueChange={() => { }}
+          onValueChange={(value) => (value.trim() ? notifyTyping() : stopTyping())}
         />
       </CardFooter>
     </Card>

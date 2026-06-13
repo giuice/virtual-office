@@ -44,15 +44,15 @@ export function TypingIndicator({ typingUsers, className }: TypingIndicatorProps
       "flex items-center px-4 py-2 text-sm text-muted-foreground italic",
       className
     )}>
-      <div className="flex space-x-1 mr-2">
+      <div className="flex gap-x-1 mr-2">
         {/* Animated typing dots */}
-        <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-pulse"></div>
+        <div className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"></div>
         <div 
-          className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-pulse"
+          className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"
           style={{ animationDelay: '0.2s' }}
         ></div>
         <div 
-          className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-pulse"
+          className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"
           style={{ animationDelay: '0.4s' }}
         ></div>
       </div>

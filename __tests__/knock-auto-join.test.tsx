@@ -99,7 +99,7 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
     space,
     onEnterSpace,
     onKnock,
-    canDirectEnter,
+    state,
     pendingKnockRequest,
     onKnockApprove,
     onKnockDeny,
@@ -107,13 +107,13 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
     space: Space;
     onEnterSpace: (spaceId: string) => void;
     onKnock?: (spaceId: string) => void;
-    canDirectEnter?: boolean;
+    state?: { directEnter?: boolean };
     pendingKnockRequest?: KnockRequestPayload | null;
     onKnockApprove?: (payload: KnockRequestPayload) => void;
     onKnockDeny?: (payload: KnockRequestPayload) => void;
   }) => (
     <div data-testid={`space-${space.id}`}>
-      <div data-testid={`space-state-${space.id}`}>{`direct:${Boolean(canDirectEnter)} knock:${Boolean(onKnock)}`}</div>
+      <div data-testid={`space-state-${space.id}`}>{`direct:${Boolean(state?.directEnter)} knock:${Boolean(onKnock)}`}</div>
       <button type="button" onClick={() => onEnterSpace(space.id)}>Enter {space.name}</button>
       <button type="button" onClick={() => onKnock?.(space.id)}>Knock {space.name}</button>
       {pendingKnockRequest && (

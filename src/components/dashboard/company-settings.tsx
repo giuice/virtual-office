@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useReducerState } from '@/hooks/useReducerState';
+import { useMemo } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useNotification } from '@/hooks/useNotification';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Building2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CompanySpacesSettingsTab } from './CompanySpacesSettingsTab';
 
 const NO_SPACE_VALUE = '__none__';
 
@@ -23,28 +23,19 @@ export function CompanySettings() {
   // Check if the current user is an admin
   const isAdmin = company?.adminIds.includes(currentUserProfile?.id || '') || false;
 
-  // Company Name
-  const [companyName, setCompanyName] = useState(company?.name || '');
-  
-  // Company Settings
-  const [allowGuestAccess, setAllowGuestAccess] = useState(
-    company?.settings?.allowGuestAccess || false
-  );
-  const [maxRooms, setMaxRooms] = useState(
-    company?.settings?.maxRooms?.toString() || '10'
-  );
-  const [theme, setTheme] = useState(company?.settings?.theme || 'light');
-  const [defaultSpaceId, setDefaultSpaceId] = useState(company?.settings?.defaultSpaceId || '');
-  const [homeSpaces, setHomeSpaces] = useState<Record<string, string>>(company?.settings?.homeSpaces || {});
+  const [companyNameDraft, setCompanyNameDraft] = useReducerState<string | null>(null);
+  const [allowGuestAccessDraft, setAllowGuestAccessDraft] = useReducerState<boolean | null>(null);
+  const [maxRoomsDraft, setMaxRoomsDraft] = useReducerState<string | null>(null);
+  const [themeDraft, setThemeDraft] = useReducerState<string | null>(null);
+  const [defaultSpaceIdDraft, setDefaultSpaceIdDraft] = useReducerState<string | null>(null);
+  const [homeSpacesDraft, setHomeSpacesDraft] = useReducerState<Record<string, string> | null>(null);
 
-  useEffect(() => {
-    setCompanyName(company?.name || '');
-    setAllowGuestAccess(company?.settings?.allowGuestAccess || false);
-    setMaxRooms(company?.settings?.maxRooms?.toString() || '10');
-    setTheme(company?.settings?.theme || 'light');
-    setDefaultSpaceId(company?.settings?.defaultSpaceId || '');
-    setHomeSpaces(company?.settings?.homeSpaces || {});
-  }, [company]);
+  const companyName = companyNameDraft ?? company?.name ?? '';
+  const allowGuestAccess = allowGuestAccessDraft ?? company?.settings?.allowGuestAccess ?? false;
+  const maxRooms = maxRoomsDraft ?? company?.settings?.maxRooms?.toString() ?? '10';
+  const theme = themeDraft ?? company?.settings?.theme ?? 'light';
+  const defaultSpaceId = defaultSpaceIdDraft ?? company?.settings?.defaultSpaceId ?? '';
+  const homeSpaces = homeSpacesDraft ?? company?.settings?.homeSpaces ?? {};
 
   const activeSpaces = useMemo(
     () => spaces.filter((space) => space.status === 'active' || space.status === 'available' || space.status === 'in_use'),
@@ -125,6 +116,13 @@ export function CompanySettings() {
     }
   };
 
+  const handleHomeSpaceChange = (userId: string, spaceId: string) => {
+    setHomeSpacesDraft((prev) => ({
+      ...(prev ?? homeSpaces),
+      [userId]: spaceId,
+    }));
+  };
+
   if (!isAdmin) {
     return (
       <Card>
@@ -152,7 +150,7 @@ export function CompanySettings() {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
             <TabsTrigger value="spaces" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
+              <Building2 className="size-4" />
               Spaces
             </TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
@@ -160,15 +158,15 @@ export function CompanySettings() {
           
           {/* General Settings Tab */}
           <TabsContent value="general">
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="gap-y-4">
+              <div className="gap-y-2">
                 <label htmlFor="companyName" className="text-sm font-medium">
                   Company Name
                 </label>
                 <Input
                   id="companyName"
                   value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
+                  onChange={(e) => setCompanyNameDraft(e.target.value)}
                   placeholder="Enter company name"
                   disabled={isLoading}
                 />
@@ -187,7 +185,7 @@ export function CompanySettings() {
           
           {/* Features Tab */}
           <TabsContent value="features">
-            <div className="space-y-4">
+            <div className="gap-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-medium">Guest Access</h3>
@@ -197,14 +195,14 @@ export function CompanySettings() {
                 </div>
                 <Switch
                   checked={allowGuestAccess}
-                  onCheckedChange={setAllowGuestAccess}
+                  onCheckedChange={setAllowGuestAccessDraft}
                   disabled={isLoading}
                 />
               </div>
               
               <Separator />
               
-              <div className="space-y-2">
+              <div className="gap-y-2">
                 <label htmlFor="maxRooms" className="text-sm font-medium">
                   Maximum Number of Rooms
                 </label>
@@ -214,7 +212,7 @@ export function CompanySettings() {
                   min="1"
                   max="50"
                   value={maxRooms}
-                  onChange={(e) => setMaxRooms(e.target.value)}
+                  onChange={(e) => setMaxRoomsDraft(e.target.value)}
                   disabled={isLoading}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -233,142 +231,54 @@ export function CompanySettings() {
             </div>
           </TabsContent>
 
-          <TabsContent value="spaces" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Company Default Space</CardTitle>
-                <CardDescription className="text-sm font-normal">
-                  Where new team members land on their first login
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Select
-                  value={defaultSpaceId || NO_SPACE_VALUE}
-                  onValueChange={(value) => setDefaultSpaceId(value === NO_SPACE_VALUE ? '' : value)}
-                  disabled={isLoading || activeSpaces.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a space..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_SPACE_VALUE}>No default space</SelectItem>
-                    {Object.entries(spacesByType).map(([type, typeSpaces]) => (
-                      <SelectGroup key={type}>
-                        <SelectLabel className="capitalize">{type.replace(/_/g, ' ')}</SelectLabel>
-                        {typeSpaces.map((space) => (
-                          <SelectItem key={space.id} value={space.id}>
-                            {space.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {currentDefaultSpaceName ? (
-                  <p className="text-xs font-normal text-muted-foreground">
-                    Currently: {currentDefaultSpaceName}
-                  </p>
-                ) : (
-                  <p className="text-xs font-normal italic text-muted-foreground">
-                    No default space selected. New members will join the first available workspace.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Home Space Assignments</CardTitle>
-                <CardDescription className="text-sm font-normal">
-                  Assign each team member their home room (like a desk)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {companyUsers.length === 0 ? (
-                  <p className="text-sm font-normal italic text-muted-foreground">No team members found</p>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {companyUsers.map((user, index) => (
-                      <div
-                        key={user.id}
-                        className={cn(
-                          'flex items-center gap-3 py-3',
-                          index < companyUsers.length - 1 && 'border-b border-border'
-                        )}
-                      >
-                        <EnhancedAvatarV2 user={user} size="sm" />
-                        <span className="min-w-0 flex-1 truncate text-sm font-normal text-foreground">
-                          {user.displayName}
-                        </span>
-                        <Select
-                          value={homeSpaces[user.id] || NO_SPACE_VALUE}
-                          onValueChange={(value) => {
-                            setHomeSpaces((prev) => ({
-                              ...prev,
-                              [user.id]: value === NO_SPACE_VALUE ? '' : value,
-                            }));
-                          }}
-                          disabled={isLoading || activeSpaces.length === 0}
-                        >
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Not assigned" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NO_SPACE_VALUE}>Not assigned</SelectItem>
-                            {activeSpaces.map((space) => (
-                              <SelectItem key={space.id} value={space.id}>
-                                {space.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button onClick={handleSaveSpaces} disabled={isLoading}>
-                Save Changes
-              </Button>
-            </div>
+          <TabsContent value="spaces" className="gap-y-6">
+            <CompanySpacesSettingsTab
+              activeSpaces={activeSpaces}
+              spacesByType={spacesByType}
+              companyUsers={companyUsers}
+              defaultSpaceId={defaultSpaceId}
+              currentDefaultSpaceName={currentDefaultSpaceName}
+              homeSpaces={homeSpaces}
+              loading={isLoading}
+              onDefaultSpaceChange={setDefaultSpaceIdDraft}
+              onHomeSpaceChange={handleHomeSpaceChange}
+              onSave={handleSaveSpaces}
+            />
           </TabsContent>
           
           {/* Appearance Tab */}
           <TabsContent value="appearance">
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="gap-y-4">
+              <div className="gap-y-2">
                 <label htmlFor="theme" className="text-sm font-medium">
                   Default Theme
                 </label>
-                <div className="flex space-x-4">
-                  <div 
-                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
+                <div className="flex gap-x-4">
+                  <button
+                    type="button"
+                    className={`flex w-[48%] flex-col items-center p-4 border rounded-md cursor-pointer ${
                       theme === 'light' ? 'border-primary bg-primary/5' : 'border-border'
                     }`}
-                    onClick={() => setTheme('light')}
-                    style={{ width: '48%' }}
+                    onClick={() => setThemeDraft('light')}
                   >
                     <div className="h-24 w-full bg-white border border-gray-200 rounded-md mb-2 shadow-sm">
                       <div className="h-4 w-full bg-primary/10 rounded-t-md"></div>
                     </div>
                     <p className="text-sm text-center font-medium">Light</p>
-                  </div>
+                  </button>
                   
-                  <div 
-                    className={`flex flex-col items-center p-4 border rounded-md cursor-pointer ${
+                  <button
+                    type="button"
+                    className={`flex w-[48%] flex-col items-center p-4 border rounded-md cursor-pointer ${
                       theme === 'dark' ? 'border-primary bg-primary/5' : 'border-border'
                     }`}
-                    onClick={() => setTheme('dark')}
-                    style={{ width: '48%' }}
+                    onClick={() => setThemeDraft('dark')}
                   >
                     <div className="h-24 w-full bg-gray-900 border border-gray-700 rounded-md mb-2 shadow-sm">
                       <div className="h-4 w-full bg-primary/30 rounded-t-md"></div>
                     </div>
                     <p className="text-sm text-center font-medium">Dark</p>
-                  </div>
+                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Set the default theme for all users. Users can override this in their personal settings.

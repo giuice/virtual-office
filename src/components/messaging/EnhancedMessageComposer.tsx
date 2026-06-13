@@ -4,16 +4,14 @@
 import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { Message, FileAttachment } from '@/types/messaging';
 import { cn } from '@/lib/utils';
-import { 
-  Send, 
-  Paperclip, 
-  X, 
-  File, 
-  Image,
-  Smile 
+import {
+  Send,
+  Paperclip,
+  X,
+  File,
+  Image
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 
@@ -29,17 +27,85 @@ interface EnhancedMessageComposerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** Broadcast-based typing callbacks (audit B-02) — owned by the parent's
+   * useConversationPresence so the conversation channel stays single. */
+  onTyping?: () => void;
+  onStopTyping?: () => void;
+}
+
+function EnhancedReplyPreview({
+  replyToMessage,
+  currentUserProfile,
+  companyUsers,
+  onCancelReply,
+}: {
+  replyToMessage?: Message;
+  currentUserProfile: { id: string; displayName?: string } | null | undefined;
+  companyUsers: Array<{ id: string; displayName?: string }>;
+  onCancelReply?: () => void;
+}) {
+  if (!replyToMessage) return null;
+
+  const replySender = replyToMessage.senderId
+    ? (replyToMessage.senderId === currentUserProfile?.id
+        ? currentUserProfile
+        : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
+    : null;
+
+  return (
+    <div className="flex items-start gap-2 p-3 bg-muted/50 border-l-2 border-primary">
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-muted-foreground mb-1">
+          Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
+        </div>
+        <div className="text-sm truncate">{replyToMessage.content}</div>
+      </div>
+      <Button variant="ghost" size="icon" className="size-6 shrink-0" onClick={onCancelReply}>
+        <X className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+function AttachmentsPreview({
+  attachments,
+  onRemoveAttachment,
+}: {
+  attachments: FileAttachment[];
+  onRemoveAttachment: (attachmentId: string) => void;
+}) {
+  if (attachments.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 p-3 border-t">
+      {attachments.map((attachment) => (
+        <div key={attachment.id} className="flex items-center gap-2 bg-secondary rounded-md p-2 text-sm">
+          {attachment.type.startsWith('image/') ? <Image className="size-4" /> : <File className="size-4" />}
+          <span className="truncate max-w-32">{attachment.name}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-4 shrink-0"
+            onClick={() => onRemoveAttachment(attachment.id)}
+          >
+            <X className="size-3" />
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function EnhancedMessageComposer({
-  conversationId,
   onSendMessage,
   onUploadAttachment,
   replyToMessage,
   onCancelReply,
-  placeholder = "Type a message...",
+  placeholder = "Type a message…",
   disabled = false,
-  className
+  className,
+  onTyping,
+  onStopTyping
 }: EnhancedMessageComposerProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -48,15 +114,6 @@ export function EnhancedMessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { companyUsers, currentUserProfile } = useCompany();
-
-  // Typing indicator hook
-  const {
-    handleInputChange,
-    handleInputFocus,
-    handleInputBlur,
-    handleMessageSent,
-    cleanup
-  } = useTypingIndicator(conversationId);
 
   // Auto-resize textarea
   const adjustTextareaHeight = useCallback(() => {
@@ -70,7 +127,11 @@ export function EnhancedMessageComposer({
   // Handle content change
   const handleContentChange = (value: string) => {
     setContent(value);
-    handleInputChange(value);
+    if (value.trim().length > 0) {
+      onTyping?.();
+    } else {
+      onStopTyping?.();
+    }
     adjustTextareaHeight();
   };
 
@@ -99,7 +160,7 @@ export function EnhancedMessageComposer({
       setContent('');
       setAttachments([]);
       onCancelReply?.();
-      handleMessageSent();
+      onStopTyping?.();
       
       // Reset textarea height
       if (textareaRef.current) {
@@ -135,75 +196,15 @@ export function EnhancedMessageComposer({
     setAttachments(prev => prev.filter(a => a.id !== attachmentId));
   };
 
-  // Render reply preview
-  const renderReplyPreview = () => {
-    if (!replyToMessage) return null;
-
-    const replySender = replyToMessage?.senderId
-      ? (replyToMessage.senderId === currentUserProfile?.id
-          ? currentUserProfile
-          : companyUsers.find(user => user.id === replyToMessage.senderId) || null)
-      : null;
-
-    return (
-      <div className="flex items-start gap-2 p-3 bg-muted/50 border-l-2 border-primary">
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-muted-foreground mb-1">
-            Replying to {replySender?.displayName || (replyToMessage.senderId ? `User ${replyToMessage.senderId.slice(0, 4)}` : 'System')}
-          </div>
-          <div className="text-sm truncate">
-            {replyToMessage.content}
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0"
-          onClick={onCancelReply}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    );
-  };
-
-  // Render attachments preview
-  const renderAttachmentsPreview = () => {
-    if (attachments.length === 0) return null;
-
-    return (
-      <div className="flex flex-wrap gap-2 p-3 border-t">
-        {attachments.map((attachment) => (
-          <div 
-            key={attachment.id}
-            className="flex items-center gap-2 bg-secondary rounded-md p-2 text-sm"
-          >
-            {attachment.type.startsWith('image/') ? (
-              <Image className="h-4 w-4" />
-            ) : (
-              <File className="h-4 w-4" />
-            )}
-            <span className="truncate max-w-32">
-              {attachment.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 shrink-0"
-              onClick={() => removeAttachment(attachment.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className={cn("border-t bg-background", className)}>
-      {renderReplyPreview()}
-      {renderAttachmentsPreview()}
+      <EnhancedReplyPreview
+        replyToMessage={replyToMessage}
+        currentUserProfile={currentUserProfile}
+        companyUsers={companyUsers}
+        onCancelReply={onCancelReply}
+      />
+      <AttachmentsPreview attachments={attachments} onRemoveAttachment={removeAttachment} />
       
       <div className="flex items-end gap-2 p-4">
         {/* File upload */}
@@ -212,15 +213,17 @@ export function EnhancedMessageComposer({
             variant="ghost"
             size="icon"
             disabled={disabled || uploading}
+            aria-label="Attach files"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="size-4" />
           </Button>
           <input
             ref={fileInputRef}
             type="file"
             multiple
             className="hidden"
+            aria-label="Attach files"
             onChange={(e) => handleFileUpload(e.target.files)}
           />
         </div>
@@ -232,8 +235,7 @@ export function EnhancedMessageComposer({
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyPress}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
+            onBlur={() => onStopTyping?.()}
             placeholder={placeholder}
             disabled={disabled}
             className="min-h-[40px] max-h-[120px] resize-none"
@@ -247,14 +249,14 @@ export function EnhancedMessageComposer({
           disabled={(!content.trim() && attachments.length === 0) || sending || disabled}
           size="icon"
         >
-          <Send className="h-4 w-4" />
+          <Send className="size-4" />
         </Button>
       </div>
       
       {uploading && (
         <div className="px-4 pb-2">
           <div className="text-xs text-muted-foreground">
-            Uploading files...
+            Uploading files…
           </div>
         </div>
       )}

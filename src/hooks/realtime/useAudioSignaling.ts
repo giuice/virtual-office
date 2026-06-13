@@ -170,7 +170,7 @@ export function useAudioSignaling({
 			channelRef.current = null;
 			isConnectedRef.current = false;
 		};
-	}, [spaceId, currentUserId, webrtcManager, enabled, handleHandshake, handleOffer, handleAnswer, handleIceCandidate, updatePresenceState]); // Removed isMuted dependency to avoid re-subscription
+		}, [spaceId, currentUserId, webrtcManager, enabled, handleHandshake, handleOffer, handleAnswer, handleIceCandidate, updatePresenceState, isMuted]);
 
 	return {
 		isConnected: isConnectedRef.current,

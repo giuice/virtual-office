@@ -46,14 +46,15 @@ export async function POST(request: Request) {
     // Get Supabase client using the server helper
     const supabase = await createSupabaseServerClient(); // Use the async helper
 
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
-
     // First verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabaseAdmin = await createSupabaseServerClient('service_role');
+    const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
 
     const userData = await request.json();
 
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Missing required fields: supabaseUid and email are required' },
         { status: 400 }
+      );
+    }
+
+    if (userData.supabaseUid !== user.id || userData.email !== user.email) {
+      return NextResponse.json(
+        { error: 'Profile data does not match authenticated user' },
+        { status: 403 }
       );
     }
 
@@ -126,8 +134,8 @@ export async function POST(request: Request) {
       email: userData.email,
       displayName: userData.displayName || userData.email.split('@')[0],
       status: userData.status || 'online',
-      companyId: userData.companyId,
-      role: userData.role || 'member',
+      companyId: null,
+      role: 'member',
       preferences: {},
       avatarUrl: userData.googleAvatarUrl || undefined, // Store Google avatar URL if provided
       currentSpaceId: null

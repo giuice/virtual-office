@@ -5,7 +5,7 @@ import { spaceColors } from '../types';
 /**
  * Helper function to get room color based on type
  */
-export const getRoomColor = (type: SpaceType = 'workspace') => {
+const getRoomColor = (type: SpaceType = 'workspace') => {
   return spaceColors[type] || spaceColors.default;
 };
 

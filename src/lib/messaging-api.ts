@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, MessageType, MessageStatus, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
+import { Message, Conversation, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -70,7 +70,9 @@ function normalizeConversation(raw: any): Conversation {
           : new Date(),
     name: raw?.name ?? undefined,
     isArchived: Boolean(raw?.isArchived ?? raw?.is_archived),
-    unreadCount: raw?.unreadCount ?? raw?.unread_count ?? {},
+    // Phase 2.2: server sends the viewer's count as a number (derived from
+    // conversation_members.last_read_at); legacy map payloads coerce to 0.
+    unreadCount: typeof raw?.unreadCount === 'number' ? raw.unreadCount : 0,
     roomId: raw?.roomId ?? raw?.room_id ?? undefined,
     visibility: raw?.visibility,
     preferences: raw?.preferences ? {
@@ -248,37 +250,6 @@ export const messagingApi = {
     }
   },
 
-  /**
-   * Create a new conversation
-   */
-  async createConversation(conversation: Partial<Conversation> & { userId?: string }): Promise<Conversation> {
-    if (!conversation.type) {
-      throw new Error('Conversation type is required');
-    }
-
-    if (conversation.type === ConversationType.DIRECT) {
-      const participants = Array.isArray(conversation.participants) ? conversation.participants : [];
-      const requesterId = conversation.userId || participants[0];
-      const targetUserId = participants.find(id => id !== requesterId);
-
-      if (!requesterId || !targetUserId) {
-        throw new Error('Direct conversations require requester and target user ids');
-      }
-
-      return this.resolveConversation({ type: ConversationType.DIRECT, userId: targetUserId });
-    }
-
-    if (conversation.type === ConversationType.ROOM) {
-      if (!conversation.roomId) {
-        throw new Error('Room conversations require a roomId');
-      }
-
-      return this.resolveConversation({ type: ConversationType.ROOM, roomId: conversation.roomId });
-    }
-
-    throw new Error(`Unsupported conversation type: ${conversation.type}`);
-  },
-
   async resolveConversation(
     params:
       | { type: ConversationType.DIRECT; userId: string }
@@ -434,19 +405,6 @@ export const messagingApi = {
     participants: string[]
   ): Promise<Conversation> {
     try {
-      // First try to find an existing room conversation
-      const userId = participants[0]; // Use the first participant as the userId for querying
-      const { conversations } = await this.getConversations(userId, {
-        type: ConversationType.ROOM
-      });
-      
-      const existingConversation = conversations.find(c => c.roomId === roomId);
-      
-      if (existingConversation) {
-        return existingConversation;
-      }
-      
-      // Create a new room conversation if one doesn't exist
       return await this.resolveConversation({
         type: ConversationType.ROOM,
         roomId,
@@ -535,70 +493,6 @@ export const messagingApi = {
       });
       console.error('Error toggling reaction:', error);
       throw error;
-    }
-  },
-
-  /**
-   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
-   */
-  async addReaction(messageId: string, emoji: string): Promise<void> {
-    await this.toggleReaction(messageId, emoji);
-  },
-
-  /**
-   * @deprecated Use toggleReaction instead - the API handles add/remove automatically
-   */
-  async removeReaction(messageId: string, emoji: string): Promise<void> {
-    await this.toggleReaction(messageId, emoji);
-  },
-
-  /**
-   * Update the status of a message (e.g., delivered, read)
-   */
-  async updateMessageStatus(messageId: string, status: MessageStatus, userId: string): Promise<void> {
-    try {
-      const response = await fetch('/api/messages/status', { // Assuming this endpoint
-        method: 'PATCH', // Assuming PATCH for status update
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, status, userId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update message status');
-      }
-      // No specific data expected on success
-    } catch (error) {
-      console.error('Error updating message status:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Send a typing indicator for a conversation
-   */
-  async sendTypingIndicator(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
-    try {
-      // This might be handled purely via sockets, but adding an API call placeholder
-      const response = await fetch('/api/messages/typing', { // Assuming this endpoint
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ conversationId, userId, isTyping }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send typing indicator');
-      }
-      // No specific data expected on success
-    } catch (error) {
-      console.error('Error sending typing indicator:', error);
-      // Don't necessarily throw for typing indicators, might fail silently
-      // throw error; 
     }
   },
 
@@ -809,41 +703,6 @@ export const messagingApi = {
   },
 
   /**
-   * Get conversations grouped by type (direct vs rooms)
-   * @param options Query options
-   * @returns Promise resolving to grouped conversations
-   */
-  async getGroupedConversations(options?: { includeArchived?: boolean }): Promise<{
-    direct: Conversation[];
-    rooms: Conversation[];
-  }> {
-    try {
-      const params = new URLSearchParams();
-      params.append('grouped', 'true');
-
-      if (options?.includeArchived !== undefined) {
-        params.append('includeArchived', options.includeArchived.toString());
-      }
-
-      const response = await fetch(`/api/conversations/get?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch grouped conversations');
-      }
-
-      const data = await response.json();
-      return {
-        direct: data.direct || [],
-        rooms: data.rooms || [],
-      };
-    } catch (error) {
-      console.error('Error fetching grouped conversations:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Get pinned conversations for the current user
    * @returns Promise resolving to pinned conversations
    */
@@ -863,38 +722,6 @@ export const messagingApi = {
       return data.conversations || [];
     } catch (error) {
       console.error('Error fetching pinned conversations:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get unread summary counts by conversation type
-   * @returns Promise resolving to unread counts
-   */
-  async getUnreadSummary(): Promise<{
-    totalUnread: number;
-    directUnread: number;
-    roomUnread: number;
-  }> {
-    try {
-      const params = new URLSearchParams();
-      params.append('summary', 'true');
-
-      const response = await fetch(`/api/conversations/get?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch unread summary');
-      }
-
-      const data = await response.json();
-      return {
-        totalUnread: data.totalUnread || 0,
-        directUnread: data.directUnread || 0,
-        roomUnread: data.roomUnread || 0,
-      };
-    } catch (error) {
-      console.error('Error fetching unread summary:', error);
       throw error;
     }
   }

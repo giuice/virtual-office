@@ -120,21 +120,9 @@ export interface Conversation {
   lastActivity: Date;
   name?: string; // For group and room conversations
   isArchived: boolean; // DEPRECATED: Use preferences.isArchived for per-user control
-  unreadCount: Record<string, number>; // Map of user IDs to unread counts
+  unreadCount: number; // Viewer's unread count, server-computed from conversation_members.last_read_at
   roomId?: string; // Only for room conversations
   visibility?: ConversationVisibility; // For room conversations
   preferences?: ConversationPreferences; // Optional: current user's preferences
 }
 
-// Grouped Conversations Result
-export interface GroupedConversations {
-  direct: Conversation[];
-  rooms: Conversation[];
-}
-
-// Unread Summary
-export interface UnreadSummary {
-  totalUnread: number;
-  directUnread: number;
-  roomUnread: number;
-}

@@ -96,32 +96,28 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="sm" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-8');
-      expect(avatar.className).toContain('w-8');
+      expect(avatar.className).toContain('size-8');
     });
 
     it('applies medium size classes (default)', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="md" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-12');
-      expect(avatar.className).toContain('w-12');
+      expect(avatar.className).toContain('size-12');
     });
 
     it('applies large size classes', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="lg" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-16');
-      expect(avatar.className).toContain('w-16');
+      expect(avatar.className).toContain('size-16');
     });
 
     it('applies extra large size classes', () => {
       render(<EnhancedAvatarV2 user={mockUser} size="xl" />);
       
       const avatar = screen.getByTestId('avatar');
-      expect(avatar.className).toContain('h-24');
-      expect(avatar.className).toContain('w-24');
+      expect(avatar.className).toContain('size-24');
     });
   });
 
@@ -129,7 +125,7 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
     it('shows loading state for external URLs', () => {
       (avatarUtils.getAvatarUrl as any).mockReturnValue('https://example.com/avatar.jpg');
       
-      render(<EnhancedAvatarV2 user={mockUser} showLoadingState={true} />);
+      render(<EnhancedAvatarV2 user={mockUser} display={{ loadingState: true }} />);
       
       // Should show loader initially for external URLs
       const loader = screen.getByTestId('loader');
@@ -139,7 +135,7 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
     it('does not show loading state for data URIs', () => {
       (avatarUtils.getAvatarUrl as any).mockReturnValue('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=');
       
-      render(<EnhancedAvatarV2 user={mockUser} showLoadingState={true} />);
+      render(<EnhancedAvatarV2 user={mockUser} display={{ loadingState: true }} />);
       
       // Should not show loader for data URIs
       const loader = screen.queryByTestId('loader');
@@ -215,8 +211,7 @@ describe('EnhancedAvatarV2 - Basic Tests', () => {
       
       const avatar = screen.getByTestId('avatar');
       expect(avatar.className).toContain('custom-class');
-      expect(avatar.className).toContain('h-12');
-      expect(avatar.className).toContain('w-12');
+      expect(avatar.className).toContain('size-12');
       expect(avatar.className).toContain('border');
     });
   });

@@ -37,7 +37,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const updateSearchValue = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
   }, [onChange]);
 
@@ -65,7 +65,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
       {/* Search icon */}
       <Search 
         data-testid="search-icon"
-        className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none"
+        className="absolute left-3 size-4 text-muted-foreground pointer-events-none"
         aria-hidden="true"
       />
       
@@ -74,7 +74,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
         ref={inputRef}
         type="text"
         value={value}
-        onChange={handleChange}
+        onChange={updateSearchValue}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         aria-label="Search spaces"
@@ -108,7 +108,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
           aria-label="Clear search"
           className={cn(
             'absolute right-2',
-            'h-5 w-5 rounded-full',
+            'size-5 rounded-full',
             'flex items-center justify-center',
             'text-muted-foreground hover:text-foreground',
             'hover:bg-[var(--vo-hover-bg)]',
@@ -116,7 +116,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
             'focus:outline-none focus:ring-2 focus:ring-[var(--vo-accent)]',
           )}
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="size-3.5" />
         </button>
       )}
     </div>

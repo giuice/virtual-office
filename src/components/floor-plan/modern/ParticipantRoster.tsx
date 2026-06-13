@@ -9,6 +9,8 @@ import ModernUserAvatar from './ModernUserAvatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Mic, MicOff, Monitor, Eye } from 'lucide-react';
 
+const EMPTY_USER_IDS: string[] = [];
+
 /**
  * Story 3.11 - AC2: Full Participant Roster Display
  * - Displays ALL participants (not limited to 4 like card view)
@@ -48,7 +50,7 @@ function getUserStatus(
  * Status icon component
  */
 const StatusIcon: React.FC<{ status: ReturnType<typeof getUserStatus> }> = ({ status }) => {
-  const iconClasses = 'w-3 h-3';
+  const iconClasses = 'size-3';
   
   switch (status) {
     case 'speaking':
@@ -79,9 +81,9 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({
   users,
   onUserClick,
   maxHeight = 200,
-  speakingUserIds = [],
+  speakingUserIds = EMPTY_USER_IDS,
   presentingUserId,
-  mutedUserIds = [],
+  mutedUserIds = EMPTY_USER_IDS,
   className,
 }) => {
   // Empty state
@@ -101,25 +103,28 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({
       {users.map((user) => {
         const status = getUserStatus(user.id, speakingUserIds, presentingUserId, mutedUserIds);
         
+        const handleClick = () => onUserClick?.(user.id);
+        const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleClick();
+          }
+        };
+
         return (
           <div
             key={user.id}
+            role="button"
+            tabIndex={0}
             className={cn(
-              'flex items-center gap-2 p-1.5 rounded-lg',
+              'flex w-full items-center gap-2 p-1.5 rounded-lg text-left',
               'hover:bg-[var(--vo-hover-bg)] transition-colors cursor-pointer',
               status === 'muted' && 'opacity-60'
             )}
-            onClick={() => onUserClick?.(user.id)}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
             data-avatar-interactive="true"
-            role="button"
-            tabIndex={0}
             aria-label={`${user.displayName}, ${getStatusLabel(status)}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onUserClick?.(user.id);
-              }
-            }}
           >
             {/* Avatar with status indicator */}
             <div className={cn(

@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useReducerState } from '@/hooks/useReducerState';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { debounce } from 'lodash';
+import debounce from 'lodash/debounce';
 import { supabase } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { UserPresenceData } from '@/types/database';
@@ -24,21 +25,38 @@ interface PresenceLeavePayload {
   leftPresences?: PresencePayload[];
 }
 
+function sendUnloadPresenceUpdate(currentUserId: string) {
+  const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/api/users/location', payload);
+    return;
+  }
+
+  void fetch('/api/users/location', {
+    method: 'POST',
+    body: payload,
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    keepalive: true,
+  }).catch((error) => {
+    console.error('[Presence] Failed to send unload cleanup request:', error);
+  });
+}
+
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
   if (process.env.NODE_ENV === 'development') {
     // console.log(`[useUserPresence] Initialize with userId: ${currentUserId || 'undefined'}`);
   }
   const queryClient = useQueryClient();
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [updateInProgress, setUpdateInProgress] = useState(false);
-  const [isPresenceReady, setIsPresenceReady] = useState(false);
+  const [connectionStatus, updateConnectionStatus] = useReducerState<ConnectionStatus>('idle');
+  const [isInitialized, updateIsInitialized] = useReducerState(false);
+  const [updateInProgress, updateUpdateInProgress] = useReducerState(false);
+  const [isPresenceReady, updateIsPresenceReady] = useReducerState(false);
   const initializationGuard = useRef(false);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const lastPresencePayloadRef = useRef<string | null>(null);
   const lastUpdateRef = useRef<string | null>(null);
-  const [presenceState, setPresenceState] = useState<Record<string, PresencePayload[]>>({});
+  const [presenceState, updatePresenceState] = useReducerState<Record<string, PresencePayload[]>>({});
   const { user: authUser } = useAuth();
   // Prefer user_metadata.avatar_url (Google) then direct photoURL
   const currentUserPhotoUrl = (authUser as any)?.user_metadata?.avatar_url || (authUser as any)?.photoURL || '';
@@ -60,11 +78,11 @@ export function useUserPresence(currentUserId?: string) {
       // Process and validate user data with avatar information
       const now = Date.now();
 
-      const mapped: UserPresenceData[] = (json.users || []).map((user: any) => {
+      const mapped: UserPresenceData[] = (json.users || []).flatMap((user: any) => {
         // Validate required fields
         if (!user.id) {
           console.error('[Presence] User missing ID - skipping');
-          return null; // Will be filtered out below
+          return [];
         }
 
         // Ensure avatar and other fields are properly formatted
@@ -96,8 +114,8 @@ export function useUserPresence(currentUserId?: string) {
           }
         }
         
-        return processedUser;
-      }).filter(Boolean) as UserPresenceData[];
+        return [processedUser];
+      });
 
       // Filter out logged-out or stale users, but always keep current user if present
       const filtered = mapped.filter((u) => {
@@ -113,6 +131,7 @@ export function useUserPresence(currentUserId?: string) {
 
       return filtered;
     },
+    enabled: !!currentUserId,
   });
 
   const currentUser = useMemo(() => {
@@ -159,8 +178,8 @@ export function useUserPresence(currentUserId?: string) {
         : [];
     });
 
-    setPresenceState(clone);
-  }, []);
+    updatePresenceState(clone);
+  }, [updatePresenceState]);
 
   const computePresenceSignature = useCallback((payload: PresencePayload | null) => {
     if (!payload) return null;
@@ -255,7 +274,7 @@ export function useUserPresence(currentUserId?: string) {
     // Log the attempted change
     console.log(`[Presence] Requesting location change: ${currentUser?.currentSpaceId || 'null'} -> ${spaceId || 'null'}`);
     
-    setUpdateInProgress(true);
+    updateUpdateInProgress(true);
     
     try {
       // Update immediately (apply debounce internally)
@@ -273,9 +292,9 @@ export function useUserPresence(currentUserId?: string) {
         });
       }
     } finally {
-      setUpdateInProgress(false);
+      updateUpdateInProgress(false);
     }
-  }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient]);
+  }, [currentUserId, currentUser, updateInProgress, debouncedUpdateLocation, queryClient, updateUpdateInProgress]);
 
   const usersInSpaces = useMemo(() => {
     const map = new Map<string | null, UserPresenceData[]>();
@@ -318,21 +337,7 @@ export function useUserPresence(currentUserId?: string) {
 
     const handleBeforeUnload = () => {
       localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
-
-      const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/users/location', payload);
-        return;
-      }
-
-      void fetch('/api/users/location', {
-        method: 'POST',
-        body: payload,
-        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        keepalive: true,
-      }).catch((error) => {
-        console.error('[Presence] Failed to send unload cleanup request:', error);
-      });
+      sendUnloadPresenceUpdate(currentUserId);
     };
 
     const handleVisibilityChange = () => {
@@ -352,15 +357,14 @@ export function useUserPresence(currentUserId?: string) {
 
   useEffect(() => {
     if (!currentUserId) {
-      return;
+      return () => {};
     }
 
     if (initializationGuard.current) {
-      return;
+      return () => {};
     }
 
     initializationGuard.current = true;
-    setConnectionStatus('subscribing');
 
     const mapDbRowToPresence = (row: any): UserPresenceData => ({
       id: row.id,
@@ -386,11 +390,9 @@ export function useUserPresence(currentUserId?: string) {
       snapshotPresenceState(channel);
       // Only mark ready once the current user is tracked in presence state,
       // so we don't prematurely derive everyone as offline from an empty snapshot
-      if (!isPresenceReady) {
-        const state = channel.presenceState();
-        if (currentUserId && state[currentUserId]) {
-          setIsPresenceReady(true);
-        }
+      const state = channel.presenceState();
+      if (currentUserId && state[currentUserId]) {
+        updateIsPresenceReady(true);
       }
     };
 
@@ -469,7 +471,7 @@ export function useUserPresence(currentUserId?: string) {
     channel.subscribe(async (status, err) => {
       if (err) {
         console.error('[Presence] Supabase subscription error:', err);
-        setConnectionStatus('error');
+        updateConnectionStatus('error');
         initializationGuard.current = false;
         return;
       }
@@ -480,8 +482,8 @@ export function useUserPresence(currentUserId?: string) {
 
       switch (status) {
         case 'SUBSCRIBED': {
-          setConnectionStatus('subscribed');
-          setIsInitialized(true);
+          updateConnectionStatus('subscribed');
+          updateIsInitialized(true);
           handlePresenceSnapshot();
 
           const payload = buildPresencePayload();
@@ -498,17 +500,17 @@ export function useUserPresence(currentUserId?: string) {
           break;
         }
         case 'TIMED_OUT':
-          setConnectionStatus('timed_out');
+          updateConnectionStatus('timed_out');
           console.warn('[Presence] Subscription timed out. Supabase client may attempt reconnection.');
           initializationGuard.current = false;
           break;
         case 'CHANNEL_ERROR':
-          setConnectionStatus('error');
+          updateConnectionStatus('error');
           console.error('[Presence] Channel error occurred.');
           initializationGuard.current = false;
           break;
         case 'CLOSED':
-          setConnectionStatus('closed');
+          updateConnectionStatus('closed');
           initializationGuard.current = false;
           break;
         default:
@@ -525,18 +527,21 @@ export function useUserPresence(currentUserId?: string) {
         console.log('[Presence] Unsubscribing from Supabase presence channel.');
       }
 
-      setPresenceState({});
+      updatePresenceState({});
       presenceChannelRef.current = null;
       initializationGuard.current = false;
-      setIsInitialized(false);
-      setIsPresenceReady(false);
+      updateIsInitialized(false);
+      updateIsPresenceReady(false);
       lastPresencePayloadRef.current = null;
 
+      channel.unsubscribe().catch((error) => {
+        console.error('[Presence] Error unsubscribing from Supabase channel:', error);
+      });
       supabase.removeChannel(channel).catch((error) => {
         console.error('[Presence] Error removing Supabase channel:', error);
       });
     };
-  }, [currentUserId, queryClient, snapshotPresenceState, buildPresencePayload, computePresenceSignature]);
+  }, [currentUserId, queryClient, snapshotPresenceState, buildPresencePayload, computePresenceSignature, updateIsPresenceReady, updateConnectionStatus, updateIsInitialized, updatePresenceState]);
 
   return {
     users: presenceAwareUsers,

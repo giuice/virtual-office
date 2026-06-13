@@ -34,6 +34,6 @@ export const createClientMock = vi.fn().mockReturnValue({
   })
 });
 
-export const mockSupabase = {
+const mockSupabase = {
   createClient: createClientMock
 };

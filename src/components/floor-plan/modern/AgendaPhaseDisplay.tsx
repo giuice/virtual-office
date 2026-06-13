@@ -37,19 +37,18 @@ export const AgendaPhaseDisplay: React.FC<AgendaPhaseDisplayProps> = ({
   const progressPercent = Math.min((currentPhase / totalPhases) * 100, 100);
 
   return (
-    <div
+    <output
       className={cn(
         'flex flex-col gap-1.5 p-2 rounded-lg',
         'bg-[var(--vo-log-bg)]',
         className
       )}
-      role="status"
       aria-label={`Meeting phase: ${phaseName}, ${currentPhase} of ${totalPhases}`}
     >
       {/* Header with icon and phase tracker pill */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <ListChecks className="w-3 h-3 text-muted-foreground" />
+          <ListChecks className="size-3 text-muted-foreground" />
           <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
             Agenda
           </span>
@@ -81,19 +80,14 @@ export const AgendaPhaseDisplay: React.FC<AgendaPhaseDisplayProps> = ({
 
       {/* Progress bar */}
       <div className="h-1 w-full bg-[var(--vo-border-subtle)] rounded-full overflow-hidden">
-        <div
-          className="h-full transition-all duration-500 rounded-full"
-          style={{
-            width: `${progressPercent}%`,
-            backgroundColor: 'var(--vo-accent)',
-          }}
-          role="progressbar"
-          aria-valuenow={currentPhase}
-          aria-valuemin={1}
-          aria-valuemax={totalPhases}
+        <progress
+          className="h-full w-full transition-all duration-500 rounded-full [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-[var(--vo-accent)] [&::-moz-progress-bar]:bg-[var(--vo-accent)]"
+          value={currentPhase}
+          max={totalPhases}
+          aria-label="Agenda phase progress"
         />
       </div>
-    </div>
+    </output>
   );
 };
 

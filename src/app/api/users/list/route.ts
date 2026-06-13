@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { requireAuthUser } from '@/lib/auth/session';
 import { User } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // Create server client and repository instance
-    const supabase = await createSupabaseServerClient();
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const userRepository: IUserRepository = new SupabaseUserRepository(authContext.supabase);
     
-    const users: User[] = await userRepository.findAll();
+    const users: User[] = authContext.dbUser.companyId
+      ? await userRepository.findByCompany(authContext.dbUser.companyId)
+      : [authContext.dbUser];
 
     return NextResponse.json({
       success: true,

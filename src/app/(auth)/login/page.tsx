@@ -1,8 +1,9 @@
 // src/app/(auth)/login/page.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+
+import { useReducerState } from '@/hooks/useReducerState';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ type FormStatus = 'idle' | 'credential' | 'google';
 function AuthLoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <Loader2 className="size-8 animate-spin text-muted-foreground" />
       <p className="text-sm text-muted-foreground" aria-live="assertive">
         {message}
       </p>
@@ -27,17 +28,15 @@ function AuthLoadingScreen({ message }: { message: string }) {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
-  const [resendStatus, setResendStatus] = useState<'idle' | 'sent' | 'error'>('idle');
-  const errorRef = useRef<HTMLDivElement>(null);
+  const [email, setEmail] = useReducerState('');
+  const [password, setPassword] = useReducerState('');
+  const [isLoading, setIsLoading] = useReducerState(false);
+  const [formStatus, setFormStatus] = useReducerState<FormStatus>('idle');
+  const [statusMessage, setStatusMessage] = useReducerState<string | null>(null);
+  const [formError, setFormError] = useReducerState<string | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useReducerState<string | null>(null);
+  const [resendStatus, setResendStatus] = useReducerState<'idle' | 'sent' | 'error'>('idle');
 
-  const router = useRouter();
   const {
     signIn,
     signInWithGoogle,
@@ -51,29 +50,12 @@ export default function LoginPage() {
   const isBusy = isLoading || actionLoading;
   const isDisabled = isBusy || !isAuthReady;
 
-  useEffect(() => {
-    if (formError) {
-      errorRef.current?.focus();
-    }
-  }, [formError]);
-
-  useEffect(() => {
-    if (!isAuthReady) {
-      return;
-    }
-
-    if (!user || companyLoading) return;
-
-    const redirectPath = company ? '/floor-plan' : '/onboarding';
-    const redirectTimer = setTimeout(() => {
-      router.push(redirectPath);
-    }, 400);
-
-    return () => clearTimeout(redirectTimer);
-  }, [company, companyLoading, isAuthReady, router, user]);
-
   if (!isAuthReady || authLoading) {
     return <AuthLoadingScreen message="Restaurando sessão..." />;
+  }
+
+  if (user && !companyLoading) {
+    redirect(company ? '/floor-plan' : '/onboarding');
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -175,7 +157,6 @@ export default function LoginPage() {
               <div
                 role="alert"
                 tabIndex={-1}
-                ref={errorRef}
                 className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
               >
                 {formError}
@@ -213,7 +194,7 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isDisabled}>
               {isBusy && formStatus === 'credential' ? (
                 <span className="inline-flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   {statusMessage ?? 'Entrando...'}
                 </span>
               ) : (
@@ -239,12 +220,12 @@ export default function LoginPage() {
             >
               {isBusy && formStatus === 'google' ? (
                 <span className="inline-flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   {statusMessage ?? 'Entrando com Google...'}
                 </span>
               ) : (
                 <span className="inline-flex items-center justify-center gap-2">
-                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                  <svg className="mr-2 size-4" viewBox="0 0 24 24">
                     <path
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                       fill="#4285F4"

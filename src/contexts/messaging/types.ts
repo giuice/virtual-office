@@ -2,9 +2,7 @@
 import {
   Message,
   Conversation,
-  ConversationType,
   MessageType,
-  MessageStatus,
   FileAttachment,
 } from '@/types/messaging';
 
@@ -59,7 +57,4 @@ export interface MessagingContextType {
 
   // Realtime connection
   connectionStatus?: string | null;
-
-  // Feature flags
-  isMessagingV2Enabled: boolean;
 }

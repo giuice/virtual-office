@@ -10,7 +10,7 @@ export { default as AvatarGroup } from './AvatarGroup';
 export { default as AttentionBeacon } from './AttentionBeacon';
 export type { AttentionBeaconProps, BeaconSeverity } from './AttentionBeacon';
 export { SpaceStatusBadge, SpaceTypeIndicator, CapacityIndicator } from './StatusIndicators';
-export { floorPlanTokens, floorPlanHelpers } from './designTokens';
+export { floorPlanTokens } from './designTokens';
 export { default as SpaceContextMenu } from './SpaceContextMenu';
 
 // Neighborhood components (Story 3.9)

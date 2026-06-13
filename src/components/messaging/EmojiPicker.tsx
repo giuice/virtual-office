@@ -146,14 +146,14 @@ export function EmojiPicker({
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-7 w-7", className)}
+            className={cn("size-7", className)}
             data-testid="message-reaction-trigger"
             data-avatar-interactive
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             ref={triggerRef}
           >
-            <Smile className="h-4 w-4" />
+            <Smile className="size-4" />
           </Button>
         )}
       </PopoverTrigger>

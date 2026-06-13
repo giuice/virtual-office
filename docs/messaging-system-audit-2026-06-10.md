@@ -1,0 +1,282 @@
+# Messaging System Audit — Handoff & Fix Plan
+
+**Date:** 2026-06-10
+**Scope:** Full messaging subsystem — API routes (`src/app/api/messages/*`, `src/app/api/conversations/*`), repositories (`SupabaseMessageRepository`, `SupabaseConversationRepository`), client API (`src/lib/messaging-api.ts`), hooks (`useMessages`, `useConversations`, `useTypingIndicator`, `useConversationPresence`), realtime (`useMessageSubscription`, `useConversationRealtime`), context (`MessagingContext`), and the messaging migrations/RLS.
+**Method:** Static code analysis + schema cross-check against `migrations/database-structure.md` (live `list_tables` dump) + existing test run.
+**Test baseline:** `vitest run` on the 4 messaging test files → **42 pass, 0 fail**. The bugs below live in paths the tests do not cover.
+
+> Per project protocol: findings marked **[code-confirmed]** are provable from source/schema alone. Findings marked **[needs runtime evidence]** should be reproduced (network tab / DB state / logs) before the fix lands.
+
+---
+
+## Implementation Progress (update as fixes land)
+
+### Phase 0 — Stop the bleeding
+- [x] **S-01** — authorization on `/api/conversations/join` → commit `b17a696` (+ shared helper `src/lib/auth/authorize.ts`)
+- [x] **S-02 / B-09** — legacy `/api/conversations/create` deleted (removes the debug-leak 500 path) → commit `eb70105`
+- [x] **S-04** — `messages/create` hardened: `status='sent'` forced server-side, `replyToId` validated same-conversation, 8 KB content cap, authz via `requireConversationParticipant`; route tests added (`__tests__/api/messages-create-route.test.ts`, 6 pass) → commit `3772c70`
+- [x] **X-01 (verification)** — **CONFIRMED 2026-06-10 with runtime evidence**: anonymous REST request (anon key only, no session) reads `users` rows including `email`, `status`, `role`, `current_space_id` (HTTP 200 + data), reads `spaces`, and an anonymous `PATCH` on `users` returns **204 (write permitted)**. Dedicated task opened: `docs/rls-enablement-task.md`. Remediation itself is a separate track (touches presence — consult `/presence-safety` first).
+- [ ] **S-03** — attachments bucket (private + signed URLs, size/MIME limits) — not yet started
+
+### Phase 1 — Make existing features actually work
+- [x] **B-01** — mark-as-read fixed both ends: route rewritten on `requireConversationParticipant` (DB-UUID comparison), client now calls `markConversationAsRead` when the active conversation is visible (drawer open, not minimized, unread > 0). Route tests added (`__tests__/api/conversations-read-route.test.ts`). → commit `<see git log: fix(messaging): mark-as-read works end-to-end>`
+- [x] **B-03 (migration written)** — `migrations/20260610_message_reactions_replica_identity.sql` sets `REPLICA IDENTITY FULL` on `message_reactions`. **NOT yet applied to live DB** (Supabase MCP lacks `SUPABASE_ACCESS_TOKEN` in this env; no psql/DATABASE_URL). Apply + verify `relreplident = 'f'` + two-browser unreact test.
+- [x] **B-04** — shared `src/lib/messaging/message-cache.ts` helper (`appendMessageToPages` / `replaceMessageInPages`) used by both realtime and optimistic paths: append to page 0, cross-page dedupe, temp→saved swap drops dupes. Multi-page unit tests in `__tests__/messaging/message-cache.test.ts`. → commit `fix(messaging): realtime inserts land in page 0...`
+- [x] **B-02** — deleted `/api/messages/typing` + `useTypingIndicator` + `messagingApi.sendTypingIndicator`. `useConversationPresence` is the single channel owner (send reuses the subscribed channel — leak fixed), exposes debounced `notifyTyping`/`stopTyping`, typing users carry display names. Production drawer (`message-feed.tsx`) now renders `TypingIndicator` and broadcasts composer input. Enhanced* (debug-only) made prop-driven. **Verify with two browsers when convenient.**
+- [x] **B-08** — deleted (no consumers): `getGroupedConversations`/`getUnreadSummary` client methods, `grouped=`/`summary=` route branches, `findByUserGrouped`/`getUnreadSummary` repo methods, `GroupedConversations`/`UnreadSummary` types, their tests. `pinned=` path kept (shape was correct). Also cleared L-02 commented instrumentation in `conversations/get`.
+- [x] **M-02** — `findByUser` now filters by the per-user preference (pref > global fallback) in JS post-map, serializes the *effective* per-user `isArchived`, and advances the cursor by rows consumed. Client optimistic updates keep flag + preference in sync via `applyArchiveState`. Also fixed L-01 (dead lodash import, wrong file-header path).
+- [x] **M-03** — composite `{raw_pg_timestamp}|{id}` keyset cursor (full µs precision, id tie-break, legacy ts-only cursors still parse); repo computes direction-aware `nextCursor`; route reuses repo `hasMore` — both probe queries removed; `nextCursorBefore` only returned when older messages exist (fixes always-true client hasNextPage).
+
+**Phase 1 complete.** Remaining verifications needing a second browser/user: B-02 typing, B-03 unreact sync (migration **applied to live DB 2026-06-10** by user), B-01 badge clearing e2e.
+
+**2026-06-10 — migrations applied + open questions answered (user):**
+- B-03 replica-identity migration and the RLS migration (`supabase/migrations/20260610183139_enable_core_table_rls.sql`, X-01 track) both applied to live DB by the user.
+- **Runtime evidence (two-user test):** user→admin message delivered live; admin→user reply did **NOT** arrive live but **appeared after refresh** → message persisted fine, realtime/poll delivery failed. Consistent with **B-06** (conversation realtime is a no-op; 5 s polling is the only sync), not an RLS regression. Phase 2.1 is the fix; re-test two-browser delivery after it lands.
+- **§8 Q1 answered: per-message read receipts (✓✓) ARE a product requirement.** Phase 2.2 keeps `message_read_receipts` as per-message source of truth; `conversation_members.last_read_at` still drives unread counts.
+- **§8 Q2 answered: `messaging_v2` flag is removable.** The planned "global channel/board" is the Announcement System (PRD Epic 6, `announcements` table) — unrelated to this realtime-topology flag. Remove in Phase 2.4.
+- **§8 Q3 answered: auto-open drawer on incoming DM is an explicit product requirement.** Keep `ensureOpenForMessage` auto-open; delete the misleading "auto-open was removed" comments in the polling code.
+
+### Phase 2 — COMPLETE (2026-06-12; user confirmed live messaging works end-to-end after 2.4)
+- [x] **2.1** — conversations into TanStack Query (B-06, B-07, M-04, M-05) → commit `fix(messaging): conversations live in TanStack Query; delete 5s polling`. List backed by `useQuery(['conversations', userId])` (realtime invalidation now effective), polling deleted, `ensureOpenForMessage` reads the cache imperatively, context value memoized, `getCachedConversations` exposed. **Re-test two-browser live delivery (the admin→user miss) after this.**
+- [x] **2.2** — one read model (B-01 remainder, B-05, M-01 partial). **Migration `supabase/migrations/20260610210000_conversation_members_read_model.sql` APPLIED to live DB by user (2026-06-10; required a re-runnable revision — a legacy ad-hoc `mark_conversation_read(conv_id, ...)` existed in the live DB and was dropped/replaced).** `migrations/database-structure.md` refreshed (via Codex agent). What changed:
+  - `conversation_preferences` **renamed** to `conversation_members` + `last_read_at`/`joined_at`; backfilled one row per (conversation, participant), `last_read_at = now()` (badges reset to 0 once at rollout, accepted). DB trigger `sync_conversation_members` keeps member rows in sync on conversation INSERT **and** `participants` UPDATE (replaces the INSERT-only preferences trigger).
+  - Unread counts server-computed via `get_unread_counts(uuid[])` RPC (viewer from `auth.uid()`, one aggregate per page — no N+1). `Conversation.unreadCount` is now a **number** (viewer-only) — also fixes the privacy leak (everyone saw everyone's counts) and the MessagingTrigger sum-all-users badge bug.
+  - `/api/conversations/read` → `mark_conversation_read(conv, user)` RPC (service-role only): sets `last_read_at` AND bulk-inserts `message_read_receipts` atomically. Receipts now carry `conversation_id` (denormalized, for realtime filters).
+  - ✓✓ derives from `message_read_receipts` ("any non-sender receipt = read", per user decision; group all-read deferred). `messages.status` frozen at `sent` in DB; `findByConversation` overlays READ. Live flip: `useMessageSubscription` subscribes to receipts INSERTs per conversation.
+  - **Deleted**: `/api/messages/status` route (zero callers), `messagingApi.updateMessageStatus`, repo `markAsRead`/`incrementUnreadCount`/`addReadReceipt`. `unread_count` JSONB no longer written anywhere (column drop = Phase 3).
+  - **Pending: two-browser badge/✓✓ verification** (A sends 3 → B badge 3; B opens drawer → badge clears + receipts; A's ✓✓ flips live; 5-message burst converges exact). Also re-verify 2.1 live delivery (admin→user) in the same session.
+- [x] **2.3** — single authorization helper everywhere (S-05) — implemented 2026-06-11, **confirmed by user**. `loadConversationAccess` now checks membership via `conversation_members` in one query (embedded filter keeps 404-vs-403); `participants` removed from `ConversationAccess`. Helper adopted in: `messages/get` + `react` (had NO check — RLS-only), `upload`, `attachments`, `attachment/[id]` (+ sender-only rule kept), `pin`, `star`, `conversations/archive`, `preferences` GET+PATCH (closes L-08). `join` untouched by design (non-member room join; gate = `assertRoomAccess`). Tests: authorize-helper rewritten for new shape, +`messages-get-route`/`messages-react-route` 403 tests; 109 pass. **RLS migration written, NOT yet applied:** `supabase/migrations/20260611120000_messaging_rls_conversation_members.sql` — policies move from `ANY(participants)` to `private.is_conversation_member()`; conversations INSERT policy stays on NEW.participants (membership trigger is AFTER INSERT); `update_own_messages` gains WITH CHECK (X-02 partial).
+- [x] **2.4** — channel topology consolidation (M-06, M-07) + remove `messaging_v2` flag (per Q2 answer). **Done 2026-06-12 — migration APPLIED by user, two-browser manual test PASSED (live delivery both ways confirmed by user).**
+  - **REALTIME-MISS ROOT CAUSE FOUND (runtime evidence, node probe 2026-06-12):** messaging tables are **not in the `supabase_realtime` publication** — even a service_role subscriber gets ZERO postgres_changes events while the channel reports SUBSCRIBED. Every realtime subscription in messaging has been a silent no-op; polling (removed in 2.1) was the only thing that ever synced. The earlier `publishStatus` funnel hypothesis was secondary (real, but not the cause).
+  - **Second gap found:** `message_read_receipts` has RLS enabled but no member-visible SELECT policy (probe: member cannot read the other member's receipts) — receipts realtime could never deliver to the sender, so ✓✓ could not flip live.
+  - **Migration `supabase/migrations/20260612130141_messaging_realtime_publication_and_receipts_policy.sql` — APPLIED to live DB by user (2026-06-12):** adds messages/message_read_receipts/message_reactions/conversations to the publication (guarded, re-runnable) + `read_receipts_in_own_conversations` SELECT policy via `private.is_conversation_member()`.
+  - **M-06:** `useMessageSubscription` rewritten — ONE channel (`messaging-db-changes`) with 3 postgres_changes bindings (messages `*`, receipts INSERT, reactions `*`), NO client filters; RLS scopes rows server-side. No conversation-id list, no re-subscribe on list change, status now reflects the single real channel (kills the premature `data-messaging-realtime-ready`). Retry/backoff kept. Signature: `useMessageSubscription(options?)`.
+  - MessagingContext: focused/all double-hook deleted → single call gated on `currentUserProfile?.id`; `conversationIds`/`shouldSubscribeToAll` removed.
+  - Reaction DELETE under RLS only carries the PK → handler now invalidates `['messages']` (active conv refetches) — incidentally fixes the broken reaction-removal sync. Message DELETE: removed by id across all cached conversations.
+  - **M-07:** `useMessages` no longer `removeQueries` other conversations on switch; TanStack gcTime evicts idle caches.
+  - **Flag removed:** `isMessagingV2Enabled` out of MessagingContext/types; `messagingFeatureFlags`, `NEXT_PUBLIC_MESSAGING_V2`, `vo:flag:messaging_v2` machinery deleted from debug-logger.
+  - Validation: tsc clean (2 pre-existing errors only), lint 0 errors, 26 messaging API tests pass.
+### Phase 3 — Hygiene (started 2026-06-12)
+
+Already closed opportunistically in earlier phases: **L-01** (with M-02), **L-02** (with B-08), **L-08** (2.3), **M-10** (2.2 — viewer-only numeric `unreadCount`). **L-11** downgraded to won't-fix: after M-02 the cursor advances by rows consumed (offset-based); worst case is one extra empty fetch. Note: 2.3's RLS migration `20260611120000` is confirmed applied — 2.4's receipts policy depends on `private.is_conversation_member()` from it and applied cleanly.
+
+- [x] **3.1 — repo cleanup (L-05, L-06, L-10)** — implemented 2026-06-12 (via Codex, reviewed). Single `enrichMessages()` private helper replaces the 4 copies (read-receipt overlay stayed in `findByConversation`); `findById` runs the 4 dependent lookups in one `Promise.all`; `getUnreadMessages` deleted from interface + impl (zero callers). Repo shrank by ~230 lines.
+- [x] **3.2 — dead code sweep (L-03, L-04)** — implemented 2026-06-12 (via Codex, reviewed). Deprecated `addReaction`/`removeReaction` wrappers + `__tests__/messaging-api.test.ts.deprecated` deleted; `messaging-api.getOrCreateRoomConversation` no longer fetches the whole conversation list (resolver is idempotent; 5 real callers in `SystemMessageService` keep the same signature).
+- [x] **3.3 — M-08** — implemented 2026-06-12. Repo `update()` now enriches the returned message (was resetting attachments/reactions to `[]`); `mapRowToMessage` no longer pretends the row carries attachments; realtime INSERT of `image`/`file` messages invalidates the conversation so receivers get attachments without a reload. (The UPDATE cache path already merge-preserved per-field since 2.4.)
+- [x] **3.4 — M-09 rate limiting** — implemented 2026-06-12. **Migration `20260612190000_messaging_rate_limits.sql` (NOT yet applied):** fixed-window counters in `private.rate_limit_counters` + `public.check_rate_limit()` SECURITY DEFINER, **service_role-only execute** (an authenticated caller could otherwise burn another user's quota). `enforceRateLimit` helper (`src/lib/auth/rate-limit.ts`) wired into create (30/min), react (60/min), upload (10/min); **fails open** (logged) until the migration is applied.
+- [x] **3.5 — DB hygiene migration** — written 2026-06-12, **NOT yet applied**: `20260612180000_messaging_hygiene_drop_unread_count.sql` drops `conversations.unread_count` (zero code references to the column; only the RPC output field shares the name) and removes pin/star tables from the publication (guarded for both pre- and post-rename names).
+- [x] **3.6 — L-07** — implemented 2026-06-12. Was mostly resolved by attrition: zero `validateUserSession` callers remained; converted the last 2 manual `getUser()+findBySupabaseUid` routes (`conversations/get`, `conversations/resolve`) to the standard `requireAuthUser()`; false "Firebase UID" comment removed from the attachment route.
+- [x] **(Phase 0 leftover) S-03** — implemented 2026-06-12. **Migration `20260612200000_attachments_bucket_private.sql` (NOT yet applied):** `attachments` bucket → private + 10 MB `file_size_limit` + MIME allowlist; legacy `message_attachments.url` public URLs rewritten to storage paths. Route changes: upload validates size (413) and MIME (415) server-side, `upsert: false`, storage ops via service client post-authz, fake-thumbnail duplication deleted; new **GET `/api/messages/attachment/[id]`** checks membership then 302-redirects to a 1 h signed URL; repo serializes path-stored attachments as that API URL; DELETE handles both path- and legacy-URL rows. Note: the production composer (`message-composer.tsx`) has no attachment UI — the route was live attack surface with no feature on top.
+
+**Phase 3 validation (2026-06-12):** tsc clean (2 known pre-existing errors: sharp types, ZodError in users/location); lint 0 errors; API+messaging suites 27 files / 162 tests pass. Pre-existing UI test failures (avatar/floor-plan/knock, 7 files) are the auth-refactor handoff follow-up, untouched by this phase.
+**Migrations applied by user 2026-06-12; runtime smoke probe (node, REST + realtime) results:**
+- ✅ `unread_count` column gone (42703), table functional.
+- ✅ `check_rate_limit`: window exact (`[true,true,true,false]` at limit 3), anon execution denied (42501).
+- ✅ legacy attachment URLs: zero `http%` rows (table is empty — feature never used in prod).
+- ✅ realtime regression check: messages INSERT events delivered (probe A@5.0s, B@15.5s). First probe's miss was the post-SUBSCRIBED blind window, not a regression.
+- ❌→✅ **the `attachments` bucket did not exist in the live project** — the migration's UPDATE was a silent no-op (and the upload route would always have failed at runtime). `20260612200000` rewritten as INSERT … ON CONFLICT, re-applied by user, verified: `public=false`, `file_size_limit=10485760`, 10 MIME types.
+- ⚠️ Out of scope, noted for the platform track: `user-uploads` bucket (avatars) is public, 1 MB, no MIME restrictions.
+
+**Phase 3 + S-03 COMPLETE (2026-06-12): all migrations applied, smoke probe all-green, committed.** Remaining separate tracks: X-01 platform RLS, auth-refactor UI tests, login-page alerts (hydration + presence 401), `user-uploads` bucket hardening.
+
+---
+
+## Executive Summary
+
+The messaging system works for the happy path (send/receive text in an open conversation) but has **2 critical security holes**, **~8 features that are silently broken end-to-end** (unread counts, mark-as-read, typing indicators, reaction-removal sync, message status, grouped/summary endpoints), and a **split-brain architecture**: conversations live in `useState` + 5-second polling while a parallel realtime layer invalidates TanStack Query keys nobody uses. There are also three overlapping, mutually inconsistent read-tracking mechanisms. A separate, **platform-wide critical** RLS gap was found outside messaging (see §6).
+
+---
+
+## 1. CRITICAL — Security
+
+### S-01. `/api/conversations/join` has no authorization at all [code-confirmed]
+`src/app/api/conversations/join/route.ts:22-36` — any authenticated user can join **any** conversation by ID, including other people's private DMs, because the route uses the **service-role client** to call `addParticipant` with zero checks (no participant check, no conversation-type check, no company check). Joining a DM then passes every "is participant" check elsewhere, granting full read/write of the conversation history.
+**Fix:** require that the conversation is a `room` type AND the room is accessible to the requester (same company, room visibility), or that the user was invited. Never allow joining `direct` conversations. Add a test that a non-participant joining a DM gets 403.
+
+### S-02. Error responses leak internals [code-confirmed]
+`src/app/api/conversations/create/route.ts:154-169` returns `error.message`, full **stack trace**, the raw request body, and user IDs to the client on any 500. Several routes also `console.log` full conversation payloads.
+**Fix:** return a generic 500; log details server-side only.
+
+### S-03. Attachments bucket is public; no upload limits [code-confirmed]
+`src/app/api/messages/upload/route.ts:107-151` — files are stored in the public `attachments` bucket and exposed via `getPublicUrl`. Anyone with the URL reads private-conversation attachments without auth (URLs are UUID-based but shareable/loggable forever). There is **no file-size or content-type limit**, no rate limit, and "thumbnail" is just a second full-size copy of the file.
+**Fix:** private bucket + signed URLs (or storage RLS), enforce max size + allowed MIME types, drop the fake thumbnail or implement real resizing.
+
+### S-04. `messages/create` trusts client-supplied fields [code-confirmed]
+`src/app/api/messages/create/route.ts:56-66`:
+- `status` comes from the client (a sender can create a message pre-marked `read`/`delivered`).
+- `replyToId` is not validated — can point to a message in a *different* conversation (cross-conversation reference leak in UI).
+- No max content length (unbounded payloads).
+**Fix:** force `status = 'sent'` server-side; validate `replyToId` belongs to the same conversation; cap content length (e.g. 8–16 KB).
+
+### S-05. Inconsistent reliance on RLS vs explicit checks [code-confirmed]
+`/api/messages/get` does **no** participant check in the route — it is protected *only* because the repo happens to use the user-scoped client and the `read_messages_in_own_conversations` policy. Other routes (`messages/create`, `pin`, `conversations/join`) use the **service-role** client "to work around RLS mismatches" and re-implement checks by hand (or, in S-01, forget them). This mixed model is how S-01 happened.
+**Fix (spec):** one rule — every route resolves the requester profile, performs an explicit participant/company check via a shared helper (`assertParticipant(conversationId, userDbId)`), and only then may use service-role for the mutation. RLS remains defense-in-depth, not the primary gate.
+
+---
+
+## 2. HIGH — Features silently broken end-to-end
+
+### B-01. Mark-as-read is double-broken → unread counts never reset [code-confirmed]
+1. **Server:** `src/app/api/conversations/read/route.ts:44` checks `conversation.participants.includes(userId)` where `userId` is the **Supabase UID**, but participants store **DB UUIDs** (the resolver builds them from `users.id`). The check always fails → **permanent 403**. The comment on line 43 ("participants field likely contains Firebase UIDs") is wrong legacy lore — this is the #1 ID-mismatch bug class called out in CLAUDE.md.
+2. **Client:** `markConversationAsRead` is exposed by `MessagingContext` (`MessagingContext.tsx:427`) but **no component ever calls it** — opening a conversation never marks it read.
+**Consequence:** `unread_count` only ever increments. Badges grow forever.
+**Fix:** compare against `userDbId` (already available from `validateUserSession`); call `markConversationAsRead` when a conversation becomes active/visible; add a route test for the participant check using DB IDs.
+
+### B-02. Typing indicators are dead, and implemented twice [code-confirmed]
+- `/api/messages/typing/route.ts:44-54` upserts into **`typing_indicators` — a table that does not exist** in the live schema (absent from the `list_tables` dump; no migration creates it). The route swallows the error and returns `success: true`.
+- Nothing subscribes to `typing_indicators` anyway.
+- A second, parallel implementation exists in `useConversationPresence.ts` using Realtime broadcast on `conversation:{id}` — and `EnhancedMessageComposer.tsx:122` uses the **broken API-based hook** (`useTypingIndicator`), not the broadcast one. `useConversationPresence.sendTypingIndicator` also creates a brand-new channel object per call without subscribing (channel leak).
+**Fix (spec):** delete the API route, the `useTypingIndicator` hook, and the DB-based path entirely. Keep ONE implementation: Realtime **broadcast** on the existing conversation channel (per `/supabase-realtime` guidance — typing is ephemeral; it should never touch Postgres). Wire the composer to it.
+
+### B-03. Reaction *removal* never syncs to other clients [code-confirmed]
+`realtime_messaging_setup.sql:193-196` — `REPLICA IDENTITY FULL` is commented out, so `DELETE` events on `message_reactions` deliver `payload.old` containing **only the PK `id`**. `useMessageSubscription.ts:441-446` then reads `payload.old.message_id / user_id / emoji` → all `undefined` → `handleReactionUpdate` no-ops. Other clients keep showing a reaction that was removed until refetch. **[needs runtime evidence — confirm replica identity on live DB: `SELECT relreplident FROM pg_class WHERE relname='message_reactions';`]**
+**Fix:** `ALTER TABLE public.message_reactions REPLICA IDENTITY FULL;` (tiny table rows, WAL cost negligible) or migrate reaction sync to broadcast.
+
+### B-04. Realtime inserts land in the wrong page of the messages cache [code-confirmed]
+The infinite query stores **page 0 = newest** window (`useMessages.ts:101-108` reverses pages for display; optimistic sends append to page 0 at `useMessages.ts:217`). But the realtime handler `appendMessageToCache` (`useMessageSubscription.ts:95-111`) appends to the **last** page — the *oldest* one. With more than one page loaded, incoming messages render in the middle of history, and a sent message can appear **twice** (optimistic replaced in page 0 + realtime copy in the last page; `dedupeMessages` only dedupes within a single page).
+**Fix:** make `appendMessageToCache` target page 0 (same as optimistic path), dedupe across **all** pages, and reuse one shared cache-update helper for both paths.
+
+### B-05. `/api/messages/status` silently fails for receivers; three read-tracking systems [code-confirmed]
+- The DELIVERED/READ branch updates `messages.status` through the **user-scoped** client (`status/route.ts:17-18,71`), but RLS `update_own_messages` is **sender-only** → the update matches 0 rows; the route still returns `success: true`.
+- Design-level: a single `status` column per message can't represent per-recipient read state in group/room conversations.
+- The system currently has **three** overlapping read mechanisms: `conversations.unread_count` JSONB (broken, B-01), `messages.status` (broken, this item), and `message_read_receipts` (written on a path no UI triggers). None works.
+**Fix (spec):** pick ONE model — recommended: per-user `last_read_at` on a `conversation_members` table (see D-01), derive unread counts by query, drop `messages.status` mutation by receivers and the `unread_count` JSONB. This is the core re-design of Phase 2 below.
+
+### B-06. Conversation realtime is a no-op; 5-second polling is the real sync [code-confirmed]
+`useConversationRealtime.ts:25,36-37,48` invalidates TanStack keys `['conversations', userId]` / `['conversation', id]` — **no query uses those keys**; the conversation list lives in `useState` inside `useConversations`. So conversation realtime does nothing, and `MessagingContext.tsx:175-223` compensates by polling `refreshConversations()` every 5 s. The poll effect's deps include `conversationsManager.conversations`, so each poll (new array identity) tears down and recreates the timer, and re-runs the "restore active conversation" effect.
+**Fix:** move the conversation list into TanStack Query (key `['conversations', userId]`) so the existing invalidations work, then delete the polling loop. (Conversations *are* in the realtime publication per `20251009_messaging_features_phase3_realtime.sql`.)
+
+### B-07. Stale-closure retry logic in `ensureOpenForMessage` [code-confirmed]
+`MessagingContext.tsx:256-257,294` — after `await refreshConversations()`, the code re-reads `conversationsManager.conversations` from the **same render closure**, which never reflects the refresh. Steps 3 and 5 of the retry ladder can only succeed by accident (a concurrent re-render). Fixing B-06 (query cache) fixes this too, since the cache can be read imperatively via `queryClient.getQueryData`.
+
+### B-08. Client/server response-shape mismatches → endpoints that always return empty [code-confirmed]
+- `messagingApi.getGroupedConversations` (`messaging-api.ts:836-839`) reads `data.direct`/`data.rooms`, but the route returns `{ grouped: { direct, rooms } }` (`conversations/get/route.ts:120-126`) → always `[]`.
+- `messagingApi.getUnreadSummary` (`messaging-api.ts:890-895`) reads `data.totalUnread`, but the route returns `{ summary: {...} }` (`conversations/get/route.ts:74`) → always 0.
+Currently no production component calls these (dead-but-broken API surface). Decide: fix the shapes **or delete** both client methods and the route branches.
+
+### B-09. Legacy `/api/conversations/create` has broken DM dedup [code-confirmed]
+The route computes a **plaintext** fingerprint `sorted.join(':')` (`conversations/create/route.ts:81-82,116`), but the DB trigger (`20250427_conversation_uniqueness.sql:24`) overwrites it with an **MD5** hash. `findDirectByFingerprint(plaintext)` can never match → dedup always misses → insert hits the unique index → 500 (with the S-02 debug leak). The proper path (`/api/conversations/resolve` + `ConversationResolverService:230-231`) hashes correctly. No client code calls `/create` anymore.
+**Fix:** delete the route (mirrors the recent removal of legacy space routes).
+
+---
+
+## 3. MEDIUM — Race conditions, consistency, performance
+
+### M-01. `unread_count` and `participants` use read-modify-write on shared rows [code-confirmed]
+`SupabaseConversationRepository.markAsRead` (322-361), `incrementUnreadCount` (388-430), `addParticipant` (432-472) all do fetch → mutate in JS → write back. Two concurrent messages lose increments; two concurrent joins lose a participant. Made worse by `messages/create` doing the increment per message.
+**Fix:** atomic SQL (`jsonb_set` with arithmetic in a single UPDATE, `array_append ... WHERE NOT participants @> ...`) or RPC; or eliminated entirely by the D-01 redesign.
+
+### M-02. Archive semantics are split-brain [code-confirmed]
+The archive route writes a **per-user preference** (`conversations/archive/route.ts:55`), but `findByUser` filters on the **global** `is_archived` column (`SupabaseConversationRepository.ts:166-168`), and the client optimistically flips the global `isArchived` field (`useConversations.ts:328-334`). Result: archiving hides nothing in the standard list; grouped and standard queries disagree.
+**Fix:** filter by the per-user preference in `findByUser` (join already exists), and make the optimistic update target `preferences.isArchived`.
+
+### M-03. Keyset pagination breaks on equal timestamps; redundant probe queries [code-confirmed]
+- Cursor is `timestamp` only (`SupabaseMessageRepository.findByConversation:221-236`); messages with identical timestamps (bulk inserts, same-ms sends) can be skipped or duplicated across pages. Use a composite cursor `(timestamp, id)`.
+- `messages/get/route.ts:64-110` discards the repo's own `hasMore` (it already fetches `limit+1`) and issues an **extra probe query per request** to recompute `hasMoreOlder`. Return the repo's `hasMore` instead — one query saved on every message fetch.
+
+### M-04. State mutation inside `setConversations` updater [code-confirmed]
+`useConversations.updateConversationWithMessage:637` mutates `conversation.unreadCount[key]` where `unreadCount` is still **the same object referenced by previous state** (only the conversation wrapper was shallow-copied). Also `getOrCreateRoomConversation`/`getOrCreateUserConversation` (165-174, 250-262) call `setConversations` purely to *read* state inside the updater — an anti-pattern that breaks under StrictMode double-invoke. Both disappear with the B-06 query migration.
+
+### M-05. MessagingContext value is rebuilt every render; no memo [code-confirmed]
+`MessagingContext.tsx:404-447` — the context `value` is a fresh object each render, and the provider re-renders at least every 5 s (poll). Every consumer of `useMessaging()` re-renders constantly. Memoize the value (or split into state/actions contexts) after the polling is removed.
+
+### M-06. Per-conversation channel fan-out + global subscriptions [code-confirmed]
+`MessagingContext` subscribes to **one Realtime channel per conversation** (`useMessageSubscription.ts:413-426`) — N channels for N conversations — plus a global `messages:all` channel when the v2 flag is on, plus a global `message_reactions:all` channel. RLS filters rows server-side, but this is heavy on sockets and on the realtime quota.
+**Fix (spec):** one channel with `filter: conversation_id=in.(...)` or rely on a single RLS-scoped table subscription; reconcile the "focused vs all" double-hook setup in `MessagingContext.tsx:338-352`.
+
+### M-07. `useMessages` nukes all other conversation caches on every switch [code-confirmed]
+`useMessages.ts:56-72` `removeQueries` for every other conversation each time the active conversation changes — defeating TanStack caching (full refetch on every switch back) and racing with the realtime handler that re-seeds those very caches (`appendMessageToCache` creates `{pages:[...]}` skeletons for non-active conversations). Pick one policy: keep caches with a `gcTime`, or scope the realtime append to cached conversations only.
+
+### M-08. `mapRowToMessage` invents fields; UPDATE path resets them [code-confirmed]
+`useMessageSubscription.ts:37-49` maps `row.attachments ?? []` — the `messages` table has no such columns, so realtime-delivered messages always show **no attachments** until a refetch. Similarly `SupabaseMessageRepository.update:450-451` returns the message with attachments/reactions emptied — any caller writing that into cache corrupts it.
+
+### M-09. No rate limiting on any messaging mutation [code-confirmed]
+`messages/create`, `react`, `typing`, `upload` are all unthrottled. Combined with no content cap (S-04) this is a spam/DoS vector. Add basic per-user rate limits (middleware or Postgres-based counters).
+
+### M-10. `users.unread`-style privacy leak in conversation payloads [code-confirmed]
+Every participant receives the full `unread_count` map for **all** participants (serialized in `conversations/get`). Minor, but the D-01 redesign should keep per-user read state private to its owner.
+
+---
+
+## 4. LOW — Hygiene & dead code
+
+| ID | Finding | Location |
+|----|---------|----------|
+| L-01 | `import set from 'lodash/set'` unused; file header says `src/contexts/messaging/useConversations.ts` but file lives in `src/hooks/` | `useConversations.ts:1,9` |
+| L-02 | Huge blocks of commented-out instrumentation | `conversations/get/route.ts` (~60 lines) |
+| L-03 | `getOrCreateRoomConversation` in `messaging-api.ts:431-458` fetches the whole conversation list to find a room conv, then resolves anyway — the resolver alone is enough; also duplicated by the hook version | `messaging-api.ts`, `useConversations.ts:142` |
+| L-04 | Deprecated `addReaction`/`removeReaction` wrappers; deprecated test file `__tests__/messaging-api.test.ts.deprecated` | `messaging-api.ts:544-553` |
+| L-05 | 4 near-identical copies of the attachments/reactions enrichment block (~40 lines each) in `SupabaseMessageRepository` (`findByConversation`, `getUnreadMessages`, `getPinnedMessages`, `getStarredMessages`) — extract one `enrichMessages(messages)` helper | `SupabaseMessageRepository.ts:288-362,641-678,762-793,883-913` |
+| L-06 | `findById` runs 5 sequential queries (message, attachments, reactions, pins, stars) — parallelize or select with joins | `SupabaseMessageRepository.ts:130-209` |
+| L-07 | Three different auth patterns across routes (`validateUserSession` vs `getUser()+findBySupabaseUid` vs mixed service-role) + recurring false "Firebase UID" comments — standardize on one helper | all routes |
+| L-08 | `conversations/preferences` GET does no participant check (leaks only defaults; low) | `preferences/route.ts:11-65` |
+| L-09 | Phase-3 migration adds `message_pins`/`message_stars` to the realtime publication, but the live tables are `pinned_messages`/`starred_messages` (renamed in `20251120` refactor) — publication entries are stale; pin/star changes don't sync (no client subscribes today) | `20251009_messaging_features_phase3_realtime.sql:23,27` |
+| L-10 | `getUnreadMessages` loads **all** messages of a conversation unbounded | `SupabaseMessageRepository.ts:594-606` |
+| L-11 | `useConversations.findByUser` reports `hasMore: true` whenever `items.length === limit` even if the next page is empty | `SupabaseConversationRepository.ts:192-197` |
+
+---
+
+## 5. Root-cause design problems (what the fix plan is built around)
+
+1. **`participants` as a UUID array on `conversations`** forces: read-modify-write races (M-01), JSONB unread counters (B-01/M-01), no per-member metadata (read cursor, role, mute), `contains` queries, and the UID-vs-DB-ID confusion that produced B-01. → Replace with a **`conversation_members` join table** (`conversation_id, user_id, last_read_at, joined_at, archived_at, …`). `conversation_preferences` already proves the pattern and can be folded in or kept alongside.
+2. **Conversation list state lives outside TanStack Query** while realtime invalidates query keys → polling band-aid, stale closures, context-wide re-renders (B-06/B-07/M-04/M-05).
+3. **Three read-tracking mechanisms, zero working** (B-01, B-05). One model must win.
+4. **No single authorization helper** → each route reinvents (or forgets) the participant check (S-01, S-05, B-01).
+
+---
+
+## 6. Other findings outside messaging scope (do not ignore)
+
+### X-01. RLS is DISABLED on core tables — platform-critical [needs runtime verification]
+Per the live `list_tables` dump in `migrations/database-structure.md`, `rls_enabled: false` on: **`users`, `companies`, `spaces`, `announcements`, `invitations`, `meeting_notes`, `meeting_note_action_items`, `space_members`, `space_presence_log`, `space_reservations`**.
+With default Supabase grants, **anyone holding the publishable anon key (shipped in the JS bundle) can read — and likely write — these tables directly**, bypassing every API route: all user emails/status/locations, company settings, invitations (which contain tokens). This dwarfs everything else in this document.
+**Verify immediately** (e.g. anonymous `select` against `users` via the anon key, or `mcp_supabase_get_advisors` security lint), then enable RLS + policies table by table. The presence skill's rules (location updates via service-role routes) already assume server-side authority, so enabling RLS should be low-friction for those flows.
+
+### X-02. `messages.update` RLS policy has no `WITH CHECK`
+`update_own_messages` constrains *which rows* a sender can update but not *what values* — a sender can rewrite `conversation_id` of their own message into another conversation. Low exploitability, worth tightening when touching RLS.
+
+---
+
+## 7. Remediation Plan (phased, each phase shippable)
+
+### Phase 0 — Stop the bleeding (security, ~1 day)
+1. **S-01**: add authorization to `/api/conversations/join` (room-only + company check). *Test: non-participant join of DM → 403.*
+2. **S-02**: strip debug payloads from error responses (or just do B-09's route deletion, which removes the worst offender).
+3. **S-04**: force `status='sent'`, validate `replyToId`, cap content length in `messages/create`.
+4. **B-09**: delete `/api/conversations/create` (no callers).
+5. **X-01**: run the verification query; if confirmed, open a dedicated RLS-enablement task immediately (separate track — touches presence; consult `/presence-safety` before policies on `users`).
+
+### Phase 1 — Make existing features actually work (~2-3 days)
+1. **B-01**: fix the UID comparison in `conversations/read`; call `markConversationAsRead` when a conversation is opened/visible. *Test: route test with DB IDs; e2e unread badge clears.*
+2. **B-03**: `REPLICA IDENTITY FULL` migration for `message_reactions`. *Verify with two browsers.*
+3. **B-04**: realtime insert → page 0 + cross-page dedupe; share one cache-append helper with the optimistic path. *Test: load 2+ pages, receive realtime message, assert ordering and no duplicate.*
+4. **B-02**: delete DB/API typing path; wire composer to the broadcast implementation; fix the channel-leak in `useConversationPresence`. (Use `/supabase-realtime` skill when implementing.)
+5. **B-08**: delete `getGroupedConversations`/`getUnreadSummary` client methods + route branches, or fix shapes if a consumer is planned.
+6. **M-02**: per-user archive filtering in `findByUser` + client optimistic fix.
+7. **M-03**: composite `(timestamp, id)` cursor; drop the probe query.
+
+### Phase 2 — Architecture consolidation (the real fix, ~1 week)
+1. **Conversations into TanStack Query** (key `['conversations', userId]`): rewrite `useConversations` as `useQuery` + mutations; realtime invalidation (B-06) starts working; delete the 5 s polling, the stale-closure retries (B-07), the `setConversations`-as-reader hacks (M-04); memoize/split `MessagingContext` (M-05).
+2. **One read model**: introduce `conversation_members` (`conversation_id, user_id, last_read_at, archived_at, joined_at`), backfill from `participants` + `conversation_preferences`; unread = `count(messages where timestamp > last_read_at)` (server-computed); drop `unread_count` JSONB writes, drop receiver-side `messages.status` mutation (B-05), keep `message_read_receipts` only if per-message receipts are a product requirement.
+3. **One authorization helper**: `requireParticipant(conversationId)` used by every route; service-role only after the check (S-05).
+4. **Channel topology**: single subscription strategy instead of per-conversation channels + globals (M-06); reconcile with cache policy (M-07).
+5. Migration order: ship the table + dual-write → backfill → switch reads → remove old columns. Each step behind its own commit with tests.
+
+### Phase 3 — Hygiene (opportunistic)
+L-01…L-11, M-08, M-09 (rate limiting), M-10. Extract `enrichMessages()` (L-05) before any other repo work to shrink the 900-line repository.
+
+### Test gaps to close alongside
+- Route-level authz tests: join (S-01), read (B-01), status (B-05) — the current 42 tests cover the resolver and client wrappers, not these paths.
+- A realtime cache-merge unit test for `appendMessageToCache` with multi-page data (B-04).
+- An e2e "two users chat" Playwright flow (send → receive → react → unreact → mark read) — would have caught B-01/B-03/B-04 outright.
+
+---
+
+## 8. Open questions for the team
+
+1. Is per-message read-receipt UI (✓✓ style) a product requirement, or is conversation-level `last_read_at` enough? (Decides how much of B-05/Phase 2.2 survives.)
+2. Is the `messaging_v2` feature flag (`messagingFeatureFlags.isV2Enabled`) still meaningful? It currently toggles the global `messages:all` channel — candidate for removal in Phase 2.4.
+3. Should incoming DMs auto-open the drawer (`ensureOpenForMessage` does this today)? Comments in the polling code say auto-open was removed, but the realtime path still does it.
+4. `attachments` bucket: any compliance requirement (signed URLs vs public) before Phase 0.3 ships?
+
+**Status: Pending user confirmation** — this is an audit handoff; no production code was modified.

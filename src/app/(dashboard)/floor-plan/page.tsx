@@ -7,7 +7,7 @@ import { FloorPlan } from "@/components/floor-plan/floor-plan";
 export default function FloorPlanPage() {
   return (
     <DashboardShell>
-      <div className="h-full w-full flex justify-center">
+      <div className="size-full flex justify-center">
         <FloorPlan />
       </div>
     </DashboardShell>

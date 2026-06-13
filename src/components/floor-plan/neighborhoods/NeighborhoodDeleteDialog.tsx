@@ -51,7 +51,7 @@ export const NeighborhoodDeleteDialog: React.FC<NeighborhoodDeleteDialogProps> =
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <AlertTriangle className="size-5 text-destructive" />
             Delete Neighborhood
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
@@ -63,7 +63,7 @@ export const NeighborhoodDeleteDialog: React.FC<NeighborhoodDeleteDialogProps> =
               
               {spaceCount > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-md text-destructive-foreground">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />
+                  <AlertTriangle className="size-4 mt-0.5 flex-shrink-0 text-destructive" />
                   <div className="text-sm">
                     <p className="font-medium">
                       {spaceCount} space{spaceCount !== 1 ? 's' : ''} will become ungrouped
@@ -94,8 +94,8 @@ export const NeighborhoodDeleteDialog: React.FC<NeighborhoodDeleteDialogProps> =
           >
             {isDeleting ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Deleting...
+                <Loader2 className="size-4 mr-2 animate-spin" />
+                Deleting…
               </>
             ) : (
               'Delete Neighborhood'
@@ -106,5 +106,3 @@ export const NeighborhoodDeleteDialog: React.FC<NeighborhoodDeleteDialogProps> =
     </AlertDialog>
   );
 };
-
-export default NeighborhoodDeleteDialog;

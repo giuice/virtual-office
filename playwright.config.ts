@@ -34,7 +34,7 @@ export default defineConfig({
     },
     {
       name: 'messaging-drawer',
-      testMatch: ['**/epic-4A-*.spec.ts'],
+      testMatch: ['**/epic-4A-*.spec.ts', '**/messaging-read-model.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],

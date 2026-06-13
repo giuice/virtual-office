@@ -1,5 +1,4 @@
 // src/repositories/implementations/supabase/SupabaseInvitationRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IInvitationRepository } from '@/repositories/interfaces/IInvitationRepository';
 import { Invitation, UserRole } from '@/types/database'; // Import UserRole if needed
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -43,7 +42,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
   private TABLE_NAME = 'invitations'; // Ensure this matches your Supabase table name
   private client: SupabaseClient;
 
-  constructor(client: SupabaseClient = supabase) {
+  constructor(client: SupabaseClient) {
     this.client = client;
   }
 
@@ -121,7 +120,10 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       throw error;
     }
 
-    return (data || []).map((row) => mapToCamelCase(row)).filter(Boolean) as Invitation[];
+    return (data || []).flatMap((row) => {
+      const invitation = mapToCamelCase(row);
+      return invitation ? [invitation] : [];
+    }) as Invitation[];
   }
 
   // Optional: Implement deleteByToken if needed

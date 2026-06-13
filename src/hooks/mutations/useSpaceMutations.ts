@@ -1,22 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Space, SpaceType } from "@/types/database";
-import type { RoomTemplate } from "@/components/floor-plan/types";
+import type { Space } from "@/types/database";
 // Existing mutation types
 type SpaceCreateData = Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>;
 type SpaceUpdateData = Partial<Omit<Space, 'id' | 'createdAt' | 'updatedAt' | 'reservations'>>;
 
-
-
-// Create from template type
-type CreateFromTemplateData = {
-  template: RoomTemplate;
-  companyId: string;
-  position?: { x: number; y: number; width: number; height: number };
-};
-
 // API functions
 const createSpace = async (data: SpaceCreateData): Promise<Space> => {
-  const response = await fetch('/api/spaces/create', {
+  const response = await fetch('/api/spaces', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -31,14 +21,13 @@ const createSpace = async (data: SpaceCreateData): Promise<Space> => {
 };
 
 const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateData }): Promise<Space> => {
-  const response = await fetch('/api/spaces/update', {
+  const response = await fetch('/api/spaces', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, ...updates }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
     // Handle 404 specifically - space not found
     if (response.status === 404) {
       console.warn(`Space with ID ${id} not found for update.`);
@@ -46,6 +35,7 @@ const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateDa
       // For now, let's throw a more specific error to differentiate
       throw new Error(`Space with ID ${id} not found`); 
     }
+    const error = await response.json();
     // Throw for other non-ok statuses
     throw new Error(error.message || `Failed to update space (status: ${response.status})`);
   }
@@ -53,31 +43,8 @@ const updateSpace = async ({ id, updates }: { id: string; updates: SpaceUpdateDa
   return response.json();
 };
 
-const createFromTemplate = async ({ template, companyId, position }: CreateFromTemplateData): Promise<Space> => {
-  // Convert template to SpaceCreateData
-  const spaceData: SpaceCreateData = {
-    companyId,
-    name: template.name,
-    type: template.type as SpaceType,
-    status: 'available',
-    capacity: template.capacity,
-    features: template.features,
-    position: position || {
-      x: 100,
-      y: 100,
-      width: template.defaultWidth,
-      height: template.defaultHeight
-    },
-    description: template.description,
-    accessControl: { isPublic: template.isPublic },
-    isTemplate: false,
-  };
-
-  return createSpace(spaceData);
-};
-
 const deleteSpace = async (spaceId: string): Promise<string> => {
-  const response = await fetch(`/api/spaces/delete?spaceId=${spaceId}`, {
+  const response = await fetch(`/api/spaces?id=${spaceId}`, {
     method: 'DELETE',
   });
 
@@ -106,17 +73,6 @@ export function useUpdateSpace() {
   
   return useMutation({
     mutationFn: updateSpace,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['spaces'] });
-    },
-  });
-}
-
-export function useCreateSpaceFromTemplate() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: createFromTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spaces'] });
     },

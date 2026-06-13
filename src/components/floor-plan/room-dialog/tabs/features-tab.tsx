@@ -5,17 +5,20 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RoomFeatureCheckboxProps } from '../types';
 
-export function FeaturesTab({ features = [], onChange, availableFeatures }: RoomFeatureCheckboxProps) {
+const EMPTY_FEATURES: string[] = [];
+
+export function FeaturesTab({ features = EMPTY_FEATURES, onChange, availableFeatures }: RoomFeatureCheckboxProps) {
   return (
-    <div className="space-y-2">
+    <div className="gap-y-2">
       <Label>Room Features</Label>
       <ScrollArea className="h-[300px] border rounded-md p-4">
         <div className="grid grid-cols-2 gap-2">
           {availableFeatures.map(feature => (
-            <div key={feature.value} className="flex items-center space-x-2">
+            <div key={feature.value} className="flex items-center gap-x-2">
               <input
                 type="checkbox"
                 id={`feature-${feature.value}`}
+                aria-label={feature.label}
                 checked={features.includes(feature.value)}
                 onChange={(e) => {
                   const newFeatures = [...features];

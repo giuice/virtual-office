@@ -1,10 +1,10 @@
 import { SpaceType, SpaceStatus, Position } from '@/types/database';
 import { UIUser } from '@/types/ui';
-import { spaceColors, userStatusColors } from '@/types/ui';
+import { spaceColors } from '@/types/ui';
 
 // Re-export types needed by the floor plan components
 export type { SpaceType, SpaceStatus, Position, UIUser };
-export { spaceColors, userStatusColors };
+export { spaceColors };
 
 // Room template interface
 export interface RoomTemplate {

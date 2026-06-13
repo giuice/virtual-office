@@ -1,5 +1,5 @@
 // src/hooks/useMessages.ts
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
@@ -10,6 +10,11 @@ import {
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+import {
+  appendMessageToPages,
+  replaceMessageInPages,
+  type MessagesInfiniteData,
+} from '@/lib/messaging/message-cache';
 import { debugLogger } from '@/utils/debug-logger';
 import { toast } from 'sonner';
 
@@ -31,51 +36,18 @@ const createTraceId = (prefix: string): string => {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 
-const dedupeMessages = (messages: Message[]): Message[] => {
-  const seen = new Set<string>();
-  const result: Message[] = [];
-
-  for (const message of messages) {
-    if (seen.has(message.id)) {
-      continue;
-    }
-    seen.add(message.id);
-    result.push(message);
-  }
-
-  return result;
-};
-
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
 
-  // Realtime is handled by a dedicated hook: useMessageSubscription
-
-  // Clear cache when conversation changes to prevent stale data
-  React.useEffect(() => {
-    if (activeConversationId) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useMessages.cache', 'conversation-change', {
-          conversationId: activeConversationId,
-        });
-      }
-      // Optional: Remove queries for all other conversations to save memory
-      queryClient.removeQueries({
-        queryKey: ['messages'],
-        predicate: (query) => {
-          const [, conversationId] = query.queryKey;
-          return conversationId !== activeConversationId;
-        }
-      });
-    }
-  }, [activeConversationId, queryClient]);
+  // Realtime is handled by a dedicated hook: useMessageSubscription.
+  // Audit M-07: caches for other conversations are intentionally kept —
+  // switching back reuses them; TanStack's gcTime evicts idle ones.
 
   const {
     data,
     isLoading,
     isFetching,
-    isRefetching,
     error,
     hasNextPage,
     fetchNextPage,
@@ -88,7 +60,8 @@ export function useMessages(activeConversationId: string | null) {
       if (!activeConversationId) {
         return { messages: [], hasMoreOlder: false, nextCursorBefore: undefined };
       }
-      // When pageParam is provided, it is the oldest visible timestamp (ISO)
+      // When pageParam is provided, it is an opaque keyset cursor produced by
+      // the server (composite "timestamp|id")
       const res = await messagingApi.getMessages(activeConversationId, {
         limit: 20,
         cursorBefore: pageParam,
@@ -105,7 +78,7 @@ export function useMessages(activeConversationId: string | null) {
     // So we reverse the pages array before flattening
     const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
     return flattened;
-  }, [data, activeConversationId]);
+  }, [data]);
 
   const loadingMessages = isLoading || isFetching;
   const errorMessages = error ? (error as Error).message : null;
@@ -203,23 +176,10 @@ export function useMessages(activeConversationId: string | null) {
         isEdited: false,
       };
 
-      // Optimistically add to the last page in cache
-      queryClient.setQueryData(
+      // Optimistically add to page 0 (newest window) via the shared helper (B-04)
+      queryClient.setQueryData<MessagesInfiniteData | undefined>(
         ['messages', activeConversationId],
-        (oldData:
-          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-          | undefined) => {
-          if (!oldData || !oldData.pages) {
-            return { pages: [{ messages: [optimisticMessage], hasMore: false }], pageParams: [undefined] };
-          }
-          const updatedPages = [...oldData.pages];
-          // Add to the FIRST page (Page 0), which contains the newest messages
-          updatedPages[0] = {
-            ...updatedPages[0],
-            messages: [...updatedPages[0].messages, optimisticMessage],
-          };
-          return { ...oldData, pages: updatedPages };
-        }
+        (oldData) => appendMessageToPages(oldData, optimisticMessage)
       );
 
       if (instrumentationEnabled) {
@@ -256,21 +216,11 @@ export function useMessages(activeConversationId: string | null) {
           });
         }
 
-        // Replace optimistic with saved
-        queryClient.setQueryData(
+        // Replace optimistic with saved (drops the temp copy if realtime
+        // already delivered the saved id)
+        queryClient.setQueryData<MessagesInfiniteData | undefined>(
           ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
-            if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: dedupeMessages(
-                page.messages.map((m) => (m.id === optimisticMessage.id ? savedMessage : m))
-              ),
-            }));
-            return { ...oldData, pages: updatedPages };
-          }
+          (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
         );
         return savedMessage;
       } catch (err) {
@@ -284,11 +234,9 @@ export function useMessages(activeConversationId: string | null) {
           });
         }
         // Remove the optimistic message on failure so UI does not show a failed temp message
-        queryClient.setQueryData(
+        queryClient.setQueryData<MessagesInfiniteData | undefined>(
           ['messages', activeConversationId],
-          (oldData:
-            | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-            | undefined) => {
+          (oldData) => {
             if (!oldData || !oldData.pages) return oldData;
             const updatedPages = oldData.pages.map((page) => ({
               ...page,
@@ -359,22 +307,9 @@ export function useMessages(activeConversationId: string | null) {
           senderId: message.senderId,
         });
       }
-      queryClient.setQueryData(
+      queryClient.setQueryData<MessagesInfiniteData | undefined>(
         ['messages', activeConversationId],
-        (oldData:
-          | { pages: Array<{ messages: Message[]; hasMore: boolean; nextCursor?: string }>; pageParams: any[] }
-          | undefined) => {
-          if (!oldData || !oldData.pages) {
-            return { pages: [{ messages: [message], hasMore: false }], pageParams: [undefined] };
-          }
-          const updatedPages = [...oldData.pages];
-          // Add to the FIRST page (Page 0), which contains the newest messages
-          updatedPages[0] = {
-            ...updatedPages[0],
-            messages: [...updatedPages[0].messages, message],
-          };
-          return { ...oldData, pages: updatedPages };
-        }
+        (oldData) => appendMessageToPages(oldData, message)
       );
     },
     [activeConversationId, queryClient]

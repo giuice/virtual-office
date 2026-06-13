@@ -118,25 +118,28 @@ export class MessagingTestSeeder {
     const spaces = await this.createSpaces(company.id, primaryProfile.id, runId, roomCount);
 
     const participants = profiles.map((profile) => profile.id);
-    const directConversation = await this.createDirectConversation(
-      participants,
-      runId,
-    );
+    const [directConversation, roomConversations] = await Promise.all([
+      this.createDirectConversation(
+        participants,
+        runId,
+      ),
+      this.createRoomConversations({
+        participants,
+        runId,
+        spaces,
+        includePinnedRoom,
+      }),
+    ]);
 
-    const roomConversations = await this.createRoomConversations({
-      participants,
-      runId,
-      spaces,
-      includePinnedRoom,
-    });
-
-    await this.conversationRepository.setUserPreference(directConversation.id, profiles[0].id, {
-      isPinned: true,
-      pinnedOrder: 0,
-    });
-    await this.conversationRepository.setUserPreference(directConversation.id, profiles[1].id, {
-      isPinned: false,
-    });
+    await Promise.all([
+      this.conversationRepository.setUserPreference(directConversation.id, profiles[0].id, {
+        isPinned: true,
+        pinnedOrder: 0,
+      }),
+      this.conversationRepository.setUserPreference(directConversation.id, profiles[1].id, {
+        isPinned: false,
+      }),
+    ]);
 
     if (includePinnedRoom && roomConversations.length > 0) {
       await this.conversationRepository.setUserPreference(
@@ -201,7 +204,7 @@ export class MessagingTestSeeder {
     if (conversationIds.length > 0) {
       try {
         await this.supabase
-          .from('conversation_preferences')
+          .from('conversation_members')
           .delete()
           .in('conversation_id', conversationIds);
       } catch (error) {
@@ -302,10 +305,7 @@ export class MessagingTestSeeder {
   }
 
   private async createSpaces(companyId: string, createdBy: string, runId: string, roomCount: number) {
-    const spaces = [] as Awaited<ReturnType<typeof this.spaceRepository.create>>[];
-
-    for (let index = 0; index < roomCount; index += 1) {
-      const space = await this.spaceRepository.create({
+    return Promise.all(Array.from({ length: roomCount }, (_, index) => this.spaceRepository.create({
         companyId,
         name: `Test Space ${index + 1} ${runId}`,
         type: this.pickSpaceType(index),
@@ -325,11 +325,7 @@ export class MessagingTestSeeder {
         createdBy,
         isTemplate: false,
         templateName: undefined,
-      });
-      spaces.push(space);
-    }
-
-    return spaces;
+      })));
   }
 
   private pickSpaceType(index: number): SpaceType {
@@ -338,7 +334,7 @@ export class MessagingTestSeeder {
   }
 
   private async createDirectConversation(participants: string[], runId: string) {
-    const fingerprint = [...participants].sort().join(':');
+    const fingerprint = participants.toSorted().join(':');
     const now = new Date();
 
     const existing = await this.conversationRepository.findDirectByFingerprint(fingerprint);
@@ -370,17 +366,16 @@ export class MessagingTestSeeder {
     includePinnedRoom: boolean;
   }) {
     const { participants, runId, spaces, includePinnedRoom } = options;
-    const conversations = [] as Awaited<ReturnType<typeof this.conversationRepository.create>>[];
     const now = new Date();
 
-    for (let index = 0; index < spaces.length; index += 1) {
+    return Promise.all(spaces.map(async (space, index) => {
       const conversation = await this.conversationRepository.create({
         type: ConversationType.ROOM,
         participants,
         lastActivity: now,
         name: `Test Room Conversation ${index + 1} ${runId}`,
         isArchived: false,
-        roomId: spaces[index].id,
+        roomId: space.id,
         visibility: ConversationVisibility.PUBLIC,
       });
 
@@ -391,10 +386,8 @@ export class MessagingTestSeeder {
         });
       }
 
-      conversations.push(conversation);
-    }
-
-    return conversations;
+      return conversation;
+    }));
   }
 
   private async seedInitialMessages(options: {

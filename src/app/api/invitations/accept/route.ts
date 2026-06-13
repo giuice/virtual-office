@@ -5,11 +5,13 @@ import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export async function POST(req: NextRequest) {
   // Regular client for authentication check
-  const supabase = await createSupabaseServerClient();
   // Service role client for invitation operations (bypasses RLS)
   // Needed because the invited user may not yet belong to the company,
   // so RLS policies on invitations would block reads/writes.
-  const supabaseAdmin = await createSupabaseServerClient('service_role');
+  const [supabase, supabaseAdmin] = await Promise.all([
+    createSupabaseServerClient(),
+    createSupabaseServerClient('service_role'),
+  ]);
 
   // Get authenticated user from session (AC4 - use real supabaseUid from session)
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();

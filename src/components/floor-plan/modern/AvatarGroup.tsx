@@ -1,16 +1,12 @@
 // src/components/floor-plan/modern/AvatarGroup.tsx
 // Story 3.3: Avatar Constellation V2 - Smart stacking with negative margin overlap
 // Story 3.13: Real-time presence animations with enter/exit tracking
-import React, { useState, useEffect, useRef } from 'react';
+import { useReducerState } from '@/hooks/useReducerState';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { UserPresenceData } from '@/types/database';
 import ModernUserAvatar from './ModernUserAvatar';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { AvatarOverflowBadge } from './AvatarOverflowBadge';
 
 /**
  * Story 3.3: Avatar Constellation V2
@@ -37,6 +33,39 @@ interface AvatarGroupProps {
   mutedUserIds?: string[];
 }
 
+const EMPTY_USER_IDS: string[] = [];
+
+function useManagedTimeouts() {
+  const timeoutIdsRef = useRef<Set<ReturnType<typeof setTimeout>> | null>(null);
+  if (timeoutIdsRef.current === null) {
+    timeoutIdsRef.current = new Set();
+  }
+  const timeoutIds = timeoutIdsRef.current;
+
+  useEffect(() => {
+    return () => {
+      timeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
+      timeoutIds.clear();
+    };
+  }, [timeoutIds]);
+
+  return useCallback((callback: () => void, delay: number) => {
+    const timeoutId = setTimeout(() => {
+      timeoutIds.delete(timeoutId);
+      callback();
+    }, delay);
+    timeoutIds.add(timeoutId);
+
+    return {
+      id: timeoutId,
+      cancel: () => {
+        clearTimeout(timeoutId);
+        timeoutIds.delete(timeoutId);
+      },
+    };
+  }, [timeoutIds]);
+}
+
 const AvatarGroup: React.FC<AvatarGroupProps> = ({
   users,
   max = 4, // Story 3.3: Reduced from 5 to 4 per spec
@@ -45,18 +74,26 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   onUserClick,
   showEmpty = true,
   emptyText = 'No users',
-  speakingUserIds = [],
+  speakingUserIds = EMPTY_USER_IDS,
   presentingUserId,
-  mutedUserIds = [],
+  mutedUserIds = EMPTY_USER_IDS,
 }) => {
   // Story 3.13 AC1: Track entering users for enter animation (only truly new users)
-  const [enteringUserIds, setEnteringUserIds] = useState<Set<string>>(new Set());
+  const [enteringUserIds, updateEnteringUserIds] = useReducerState<Set<string>>(new Set());
   // Story 3.13 AC2: Track exiting users for leave animation
-  const [exitingUsers, setExitingUsers] = useState<UserPresenceData[]>([]);
+  const [exitingUsers, updateExitingUsers] = useReducerState<UserPresenceData[]>([]);
   // Phase 2 (FLOR-02): Track offline users that should fade before leaving the DOM
-  const exitingUsersRef = useRef<Map<string, UserPresenceData>>(new Map());
-  const offlineExitTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const [exitingUserIds, setExitingUserIds] = useState<Set<string>>(new Set());
+  const exitingUsersRef = useRef<Map<string, UserPresenceData> | null>(null);
+  if (exitingUsersRef.current === null) {
+    exitingUsersRef.current = new Map();
+  }
+  const exitingUsersMap = exitingUsersRef.current;
+  const offlineExitTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>> | null>(null);
+  if (offlineExitTimeoutsRef.current === null) {
+    offlineExitTimeoutsRef.current = new Map();
+  }
+  const offlineExitTimeouts = offlineExitTimeoutsRef.current;
+  const [exitingUserIds, updateExitingUserIds] = useReducerState<Set<string>>(new Set());
 
   const prevUsersRef = useRef<UserPresenceData[]>(users);
   const isInitialRender = useRef(true);
@@ -64,66 +101,85 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
   // This prevents mass-fade when presence system initializes and derives stale DB 'online' → 'offline'.
   const isSettledRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleTimeout = useManagedTimeouts();
+
+  useEffect(() => {
+    settleTimerRef.current = setTimeout(() => {
+      isSettledRef.current = true;
+    }, 5000);
+
+    return () => {
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+    };
+  }, [exitingUsersMap, offlineExitTimeouts]);
 
   // Story 3.13: Detect user additions/removals and trigger animations
   useEffect(() => {
+    const cleanupTimers: Array<() => void> = [];
     const currentUsers = users;
     const prevUsers = prevUsersRef.current;
     const currentIds = new Set(currentUsers.map(u => u.id));
     const prevIds = new Set(prevUsers.map(u => u.id));
+    const shouldSkipAnimation = isInitialRender.current;
 
     // Skip animation on initial render and during settling period
-    if (isInitialRender.current) {
+    if (shouldSkipAnimation) {
       isInitialRender.current = false;
       prevUsersRef.current = currentUsers;
-      // Start settling timer — don't trigger offline fades until presence stabilizes
-      if (!settleTimerRef.current) {
-        settleTimerRef.current = setTimeout(() => {
-          isSettledRef.current = true;
-        }, 5000);
-      }
-      return;
     }
 
     // Find users that were added
     const addedIds = Array.from(currentIds).filter(id => !prevIds.has(id));
 
     // Handle entering users (animate in)
-    if (addedIds.length > 0) {
-      setEnteringUserIds(prev => {
+    if (!shouldSkipAnimation && addedIds.length > 0) {
+      updateEnteringUserIds(prev => {
         const next = new Set(prev);
         addedIds.forEach(id => next.add(id));
         return next;
       });
       // Clear entering state after animation completes (300ms per AC1)
-      setTimeout(() => {
-        setEnteringUserIds(prev => {
+      const cancelEnteringTimer = scheduleTimeout(() => {
+        updateEnteringUserIds(prev => {
           const next = new Set(prev);
           addedIds.forEach(id => next.delete(id));
           return next;
         });
       }, 300);
+      cleanupTimers.push(() => {
+        cancelEnteringTimer.cancel();
+        updateEnteringUserIds(prev => {
+          const next = new Set(prev);
+          addedIds.forEach(id => next.delete(id));
+          return next;
+        });
+      });
     }
 
     // Cancel fade for users that came back online
+    if (!shouldSkipAnimation) {
     users.forEach((user) => {
       if (exitingUserIds.has(user.id) && user.status !== 'offline') {
-        const existingTimeout = offlineExitTimeoutsRef.current.get(user.id);
+        const existingTimeout = offlineExitTimeouts.get(user.id);
         if (existingTimeout) {
           clearTimeout(existingTimeout);
-          offlineExitTimeoutsRef.current.delete(user.id);
+          offlineExitTimeouts.delete(user.id);
         }
-        exitingUsersRef.current.delete(user.id);
-        setExitingUserIds((prev) => {
+        exitingUsersMap.delete(user.id);
+        updateExitingUserIds((prev) => {
           const next = new Set(prev);
           next.delete(user.id);
           return next;
         });
       }
     });
+    }
 
     // Only trigger offline fade after settling period to prevent mass-fade on presence init
-    if (isSettledRef.current) {
+    if (!shouldSkipAnimation && isSettledRef.current) {
     users.forEach((user) => {
       const prevUser = prevUsers.find((prev) => prev.id === user.id);
       if (!prevUser || prevUser.status === 'offline' || user.status !== 'offline') {
@@ -134,56 +190,76 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
         return;
       }
 
-      exitingUsersRef.current.set(user.id, { ...user });
-      setExitingUserIds((prev) => new Set(prev).add(user.id));
+      exitingUsersMap.set(user.id, { ...user });
+      updateExitingUserIds((prev) => new Set(prev).add(user.id));
 
-      const existingTimeout = offlineExitTimeoutsRef.current.get(user.id);
+      const existingTimeout = offlineExitTimeouts.get(user.id);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
       }
 
-      const timeoutId = setTimeout(() => {
-        offlineExitTimeoutsRef.current.delete(user.id);
-        exitingUsersRef.current.delete(user.id);
-        setExitingUserIds((prev) => {
+      const timeoutId = scheduleTimeout(() => {
+        offlineExitTimeouts.delete(user.id);
+        exitingUsersMap.delete(user.id);
+        updateExitingUserIds((prev) => {
           const next = new Set(prev);
           next.delete(user.id);
           return next;
         });
       }, 3000);
 
-      offlineExitTimeoutsRef.current.set(user.id, timeoutId);
+      offlineExitTimeouts.set(user.id, timeoutId.id);
+      cleanupTimers.push(() => {
+        timeoutId.cancel();
+        offlineExitTimeouts.delete(user.id);
+        exitingUsersMap.delete(user.id);
+        updateExitingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      });
     });
     } // end isSettledRef guard
 
     // Find users that were removed
-    const removedUsers = prevUsers.filter(
-      (user) => !currentIds.has(user.id) && !exitingUsersRef.current.has(user.id)
-    );
+    const removedUsers = shouldSkipAnimation
+      ? []
+      : prevUsers.filter(
+        (user) => !currentIds.has(user.id) && !exitingUsersMap.has(user.id)
+      );
 
     // Handle exiting users (animate out)
     if (removedUsers.length > 0) {
-      setExitingUsers(prev => [...prev, ...removedUsers]);
+      updateExitingUsers(prev => [...prev, ...removedUsers]);
       // Remove from exiting state after animation completes (200ms per AC2)
-      setTimeout(() => {
-        setExitingUsers(prev => prev.filter(u => !removedUsers.find(r => r.id === u.id)));
+      const cancelExitingTimer = scheduleTimeout(() => {
+        updateExitingUsers(prev => prev.filter(u => !removedUsers.find(r => r.id === u.id)));
       }, 200);
+      cleanupTimers.push(() => {
+        cancelExitingTimer.cancel();
+        updateExitingUsers(prev => prev.filter(u => !removedUsers.find(r => r.id === u.id)));
+      });
     }
 
     // Always update ref for next comparison
     prevUsersRef.current = currentUsers;
-  }, [users]);
+    return () => {
+      cleanupTimers.forEach((cleanupTimer) => cleanupTimer());
+    };
+  }, [exitingUserIds, exitingUsersMap, offlineExitTimeouts, scheduleTimeout, users, updateEnteringUserIds, updateExitingUserIds, updateExitingUsers]);
 
   useEffect(() => {
+    const settleTimer = settleTimerRef.current;
     return () => {
-      offlineExitTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
-      offlineExitTimeoutsRef.current.clear();
-      exitingUsersRef.current.clear();
-      if (settleTimerRef.current) {
-        clearTimeout(settleTimerRef.current);
+      offlineExitTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+      offlineExitTimeouts.clear();
+      exitingUsersMap.clear();
+      if (settleTimer) {
+        clearTimeout(settleTimer);
       }
     };
-  }, []);
+  }, [exitingUsersMap, offlineExitTimeouts]);
 
   // If no users are present (and no exiting users)
   if (users.length === 0 && exitingUsers.length === 0 && showEmpty) {
@@ -199,7 +275,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     return <div className={className} />;
   }
 
-  const offlineUsers = Array.from(exitingUsersRef.current.values()).filter((user) =>
+  const offlineUsers = Array.from(exitingUsersMap.values()).filter((user) =>
     exitingUserIds.has(user.id)
   );
 
@@ -272,34 +348,12 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
           </div>
         ))}
 
-        {/* Story 3.3: Overflow badge styled as avatar (AC5) */}
-        {remainingCount > 0 && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className="vo-avatar-overflow"
-                  style={{ zIndex: visibleUsers.length + 1 }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${remainingCount} more participants`}
-                >
-                  +{remainingCount}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-center">
-                  <p className="text-sm font-medium">
-                    {remainingCount} more {remainingCount === 1 ? 'participant' : 'participants'}
-                  </p>
-                  <div className="mt-1 text-xs text-muted-foreground max-w-[200px]">
-                    {users.slice(max).map(user => user.displayName).join(', ')}
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <AvatarOverflowBadge
+          remainingCount={remainingCount}
+          visibleCount={visibleUsers.length}
+          users={users}
+          max={max}
+        />
       </div>
     </div>
   );

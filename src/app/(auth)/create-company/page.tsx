@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { redirect } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,31 +9,23 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 
 export default function CreateCompanyPage() {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { createNewCompany, isLoading, error, currentUserProfile, loadCompanyData } = useCompany();
   const [companyName, setCompanyName] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Handle authentication redirect
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [authLoading, user, router]);
-  
-  // Handle company redirect
-  useEffect(() => {
-    if (!isLoading && !isCreating && currentUserProfile?.companyId) {
-      console.log('Redirecting to dashboard - user already has company:', currentUserProfile);
-      router.push('/dashboard');
-    }
-  }, [isLoading, currentUserProfile, router, isCreating]);
-
   // Early return if loading
   if (authLoading || isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">Loading…</div>;
+  }
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  if (!isCreating && currentUserProfile?.companyId) {
+    redirect('/dashboard');
   }
 
   // Don't render the form if user is not logged in or already has a company
@@ -107,7 +99,7 @@ export default function CreateCompanyPage() {
               className="w-full"
               disabled={isLoading || isCreating || !companyName.trim()}
             >
-              {isCreating ? 'Creating...' : isLoading ? 'Loading...' : 'Create Company'}
+              {isCreating ? 'Creating…' : isLoading ? 'Loading…' : 'Create Company'}
             </Button>
           </div>
         </form>

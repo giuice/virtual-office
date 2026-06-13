@@ -19,10 +19,10 @@ function resolveAppBaseUrl(request: Request): string {
 }
 
 export async function POST(request: Request) {
-  // Use service_role client for admin operations (sending invite emails)
-  const supabaseAdmin = await createSupabaseServerClient('service_role');
-  // Use regular client for DB operations with RLS
-  const supabaseClient = await createSupabaseServerClient();
+  const [supabaseAdmin, supabaseClient] = await Promise.all([
+    createSupabaseServerClient('service_role'),
+    createSupabaseServerClient(),
+  ]);
   
   try {
     const body = await request.json();
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     // Get the invitation
-    const { data: invitation, error: inviteError } = await supabaseClient
+    const { data: invitation, error: inviteError } = await supabaseAdmin
       .from('invitations')
       .select('*')
       .eq('id', invitationId)
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const now = Date.now();
     const expiresAtMs = invitation.expires_at ? new Date(invitation.expires_at).getTime() : 0;
     if (expiresAtMs !== 0 && expiresAtMs <= now) {
-      await supabaseClient
+      await supabaseAdmin
         .from('invitations')
         .update({ status: 'expired' })
         .eq('id', invitationId);

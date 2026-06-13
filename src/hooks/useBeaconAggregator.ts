@@ -176,5 +176,3 @@ export function useBeaconAggregator(
 
   return result;
 }
-
-export default useBeaconAggregator;

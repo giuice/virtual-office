@@ -33,12 +33,16 @@ export interface SpaceDetailPanelProps {
     speaker: string;
     timestamp: Date;
   };
-  isUserInSpace: boolean;
-  isPrivate?: boolean;
-  /** Story 3.12 - AC3: Whether space is at full capacity */
-  isFull?: boolean;
-  /** Whether direct join/enter is currently allowed */
-  canDirectEnter?: boolean;
+  state: {
+    userInSpace: boolean;
+    privateSpace?: boolean;
+    /** Story 3.12 - AC3: Whether space is at full capacity */
+    full?: boolean;
+    /** Whether direct join/enter is currently allowed */
+    canDirectEnter?: boolean;
+    /** Loading state while fetching details */
+    loading?: boolean;
+  };
   /** Story 3.16: Current knock status for this space */
   knockStatus?: KnockStatus;
   /** Story 3.16: Current cooldown remaining for this space */
@@ -56,8 +60,6 @@ export interface SpaceDetailPanelProps {
   /** Muted user IDs for dimmed display */
   mutedUserIds?: string[];
   className?: string;
-  /** Loading state while fetching details */
-  isLoading?: boolean;
 }
 
 /**
@@ -79,10 +81,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   agendaPhase,
   activityLog,
   transcript,
-  isUserInSpace,
-  isPrivate = false,
-  isFull = false,
-  canDirectEnter = true,
+  state,
   knockStatus = 'idle',
   knockCooldownRemaining = 0,
   onJoin,
@@ -95,10 +94,17 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   presentingUserId,
   mutedUserIds,
   className,
-  isLoading = false,
 }) => {
+  const {
+    userInSpace,
+    privateSpace = false,
+    full = false,
+    canDirectEnter = true,
+    loading = false,
+  } = state;
+
   return (
-    <div
+    <section
       className={cn(
         'space-detail-panel',
         // Base layout
@@ -121,15 +127,12 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
       }}
       // AC7: Click-stop protocol compliance
       data-avatar-interactive="true"
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-      role="region"
       aria-label={`Details for ${space.name}`}
     >
       {/* Loading state */}
-      {isLoading ? (
+      {loading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin h-6 w-6 border-2 border-current border-t-transparent rounded-full" />
+          <div className="animate-spin size-6 border-2 border-current border-t-transparent rounded-full" />
         </div>
       ) : (
         <>
@@ -139,7 +142,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
               {space.name}
             </h4>
             {onClose && (
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="text-muted-foreground hover:text-foreground transition-colors p-1"
                 aria-label="Close panel"
@@ -169,7 +172,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
                 capacity={space.capacity}
                 size="md"
               />
-              {isFull && (
+              {full && (
                 <span className="text-xs text-destructive font-medium">
                   At capacity
                 </span>
@@ -217,11 +220,13 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
 
           {/* AC6: Action Buttons */}
           <SpaceActionButtons
-            isUserInSpace={isUserInSpace}
-            isPrivate={isPrivate}
-            hasOccupants={usersInSpace.length > 0}
-            isFull={isFull}
-            canDirectEnter={canDirectEnter}
+            state={{
+              userInSpace,
+              privateSpace,
+              hasOccupants: usersInSpace.length > 0,
+              full,
+              canDirectEnter,
+            }}
             onJoin={onJoin}
             onLeave={onLeave}
             onKnock={onKnock}
@@ -230,7 +235,7 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
           />
         </>
       )}
-    </div>
+    </section>
   );
 };
 

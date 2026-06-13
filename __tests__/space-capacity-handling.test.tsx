@@ -69,8 +69,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('renders enabled Join button when not full', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={false}
+          state={{ userInSpace: false, full: false }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -83,8 +82,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('disables Join button when space is full (AC3)', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={true}
+          state={{ userInSpace: false, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -97,8 +95,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('shows tooltip explaining "Space is full" when disabled (AC3)', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={true}
+          state={{ userInSpace: false, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -111,8 +108,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('has aria-disabled when full for accessibility (AC3, AC8)', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={true}
+          state={{ userInSpace: false, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -125,8 +121,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('does not call onJoin when button is clicked while full (AC3)', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={true}
+          state={{ userInSpace: false, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -141,8 +136,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('shows "Full" text instead of "Join" when full', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={false}
-          isFull={true}
+          state={{ userInSpace: false, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />
@@ -155,8 +149,7 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     it('shows Leave button when user is in space (unaffected by isFull)', () => {
       render(
         <SpaceActionButtons
-          isUserInSpace={true}
-          isFull={true}
+          state={{ userInSpace: true, full: true }}
           onJoin={mockOnJoin}
           onLeave={mockOnLeave}
         />

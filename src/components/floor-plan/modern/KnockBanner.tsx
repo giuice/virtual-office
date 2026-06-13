@@ -51,12 +51,12 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
           }}
           size="md"
           fallbackName={requesterName}
-          className="w-10 h-10"
+          className="size-10"
           aria-label={`${requesterName} avatar`}
         />
         {!requesterAvatarUrl && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <DoorOpen className="w-4 h-4" />
+            <DoorOpen className="size-4" />
           </div>
         )}
       </div>
@@ -74,10 +74,10 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
         data-avatar-interactive="true"
         onPointerDown={handleApprove}
         onClick={handleApprove}
-        className="w-9 h-9 rounded-lg bg-[var(--vo-signal-success)]/20 hover:bg-[var(--vo-signal-success)]/30 text-[var(--vo-signal-success)] flex items-center justify-center"
+        className="size-9 rounded-lg bg-[var(--vo-signal-success)]/20 hover:bg-[var(--vo-signal-success)]/30 text-[var(--vo-signal-success)] flex items-center justify-center"
         aria-label={`Let ${requesterName} in`}
       >
-        <Check className="w-4 h-4" />
+        <Check className="size-4" />
       </button>
 
       <button
@@ -85,13 +85,11 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
         data-avatar-interactive="true"
         onPointerDown={handleDeny}
         onClick={handleDeny}
-        className="w-9 h-9 rounded-lg bg-[var(--vo-signal-critical)]/20 hover:bg-[var(--vo-signal-critical)]/30 text-[var(--vo-signal-critical)] flex items-center justify-center"
+        className="size-9 rounded-lg bg-[var(--vo-signal-critical)]/20 hover:bg-[var(--vo-signal-critical)]/30 text-[var(--vo-signal-critical)] flex items-center justify-center"
         aria-label={`Deny ${requesterName}`}
       >
-        <X className="w-4 h-4" />
+        <X className="size-4" />
       </button>
     </div>
   );
 };
-
-export default KnockBanner;

@@ -8,13 +8,15 @@ import { Calendar } from 'lucide-react';
 import { Reservation } from '@/types/database';
 import { RoomReservationsTabProps } from '../types';
 
-export function ReservationsTab({ reservations = [] }: RoomReservationsTabProps) {
+const EMPTY_RESERVATIONS: Reservation[] = [];
+
+export function ReservationsTab({ reservations = EMPTY_RESERVATIONS }: RoomReservationsTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Upcoming Reservations</h3>
         <Button variant="outline" size="sm" className="flex items-center gap-1">
-          <Calendar className="h-4 w-4" />
+          <Calendar className="size-4" />
           Make Reservation
         </Button>
       </div>
@@ -34,7 +36,7 @@ export function ReservationsTab({ reservations = [] }: RoomReservationsTabProps)
                 <div key={reservation.id} className="border rounded-md p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Calendar className="size-4 text-muted-foreground" />
                       <span className="font-medium">{formattedDate}</span>
                     </div>
                     <Badge variant="outline">
@@ -52,7 +54,7 @@ export function ReservationsTab({ reservations = [] }: RoomReservationsTabProps)
             })
           ) : (
             <div className="flex flex-col items-center justify-center h-full py-8 text-center text-muted-foreground">
-              <Calendar className="h-10 w-10 mb-2 opacity-20" />
+              <Calendar className="size-10 mb-2 opacity-20" />
               <p>No reservations for this room</p>
               <p className="text-sm">Schedule a meeting time</p>
             </div>

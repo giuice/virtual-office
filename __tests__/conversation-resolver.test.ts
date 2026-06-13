@@ -33,7 +33,7 @@ const baseConversation: Conversation = {
   participants: ['user-1', 'user-2'],
   lastActivity: new Date(),
   isArchived: false,
-  unreadCount: {},
+  unreadCount: 0,
 };
 
 type ResolverDeps = {
@@ -170,7 +170,7 @@ describe('ConversationResolverService', () => {
       participants: payload.participants,
       lastActivity: new Date(payload.lastActivity),
       isArchived: false,
-      unreadCount: {},
+      unreadCount: 0,
       roomId: payload.roomId,
       visibility: payload.visibility ?? ConversationVisibility.PUBLIC,
     }));
@@ -198,7 +198,7 @@ describe('ConversationResolverService', () => {
       participants: ['another-user'],
       lastActivity: new Date(),
       isArchived: false,
-      unreadCount: {},
+      unreadCount: 0,
       roomId: 'space-1',
       visibility: ConversationVisibility.PUBLIC,
     };

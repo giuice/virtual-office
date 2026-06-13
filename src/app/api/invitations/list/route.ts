@@ -21,8 +21,11 @@ function resolveAppBaseUrl(request: Request): string {
 }
 
 export async function GET(request: Request) {
-  const supabaseClient = await createSupabaseServerClient();
-  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseClient);
+  const [supabaseClient, supabaseAdmin] = await Promise.all([
+    createSupabaseServerClient(),
+    createSupabaseServerClient('service_role'),
+  ]);
+  const repo: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
 
   try {
     const url = new URL(request.url);
@@ -60,20 +63,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Apenas administradores podem listar convites' }, { status: 403 });
     }
 
-    const nowIso = new Date().toISOString();
-    const { error: expireError } = await supabaseClient
-      .from('invitations')
-      .update({ status: 'expired' })
-      .eq('company_id', companyId)
-      .eq('status', 'pending')
-      .lte('expires_at', nowIso);
-
-    if (expireError) {
-      console.warn('[API /invitations/list] Failed to expire stale invitations:', expireError);
-    }
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nowMs = now.getTime();
 
     // Fetch invitations
-    let invitations = await repo.findByCompanyId(companyId);
+    let invitations = (await repo.findByCompanyId(companyId)).map((invitation) => ({
+      ...invitation,
+      status: invitation.status === 'pending' && invitation.expiresAt <= nowMs
+        ? 'expired' as const
+        : invitation.status,
+    }));
 
     // Filter by status if provided (AC7)
     if (status) {
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId);
 
-    const { count: pendingCountDb } = await supabaseClient
+    const { count: pendingCountDb } = await supabaseAdmin
       .from('invitations')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)

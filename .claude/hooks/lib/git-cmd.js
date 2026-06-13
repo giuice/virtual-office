@@ -120,10 +120,10 @@ function isGitSubcommand(cmd, sub) {
     const t = tokens[i];
 
     // --flag=value form for argument-taking flags
-    const eqIdx = t.indexOf('=');
-    const flagName = eqIdx !== -1 ? t.slice(0, eqIdx) : t;
+    const hasInlineValue = /=/.test(t);
+    const flagName = hasInlineValue ? t.split('=', 1)[0] : t;
     if (ARGUMENT_TAKING_FLAGS.has(flagName)) {
-      if (eqIdx !== -1) {
+      if (hasInlineValue) {
         // consumed as one token: --git-dir=.git
         i++;
       } else {

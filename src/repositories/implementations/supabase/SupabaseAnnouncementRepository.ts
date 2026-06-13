@@ -1,8 +1,8 @@
 // src/repositories/implementations/supabase/SupabaseAnnouncementRepository.ts
-import { supabase } from '@/lib/supabase/client';
 import { IAnnouncementRepository } from '@/repositories/interfaces/IAnnouncementRepository';
 import { Announcement, TimeStampType } from '@/types/database'; // Import TimeStampType if needed
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Helper function to map DB snake_case to TS camelCase
 function mapToCamelCase(data: any): Announcement {
@@ -28,9 +28,14 @@ function mapArrayToCamelCase(dataArray: any[]): Announcement[] {
 
 export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
   private TABLE_NAME = 'announcements'; // Ensure this matches your Supabase table name
+  private client: SupabaseClient;
+
+  constructor(client: SupabaseClient) {
+    this.client = client;
+  }
 
   async findById(id: string): Promise<Announcement | null> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .select('*')
       .eq('id', id)
@@ -50,7 +55,7 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
     const to = from + limit - 1;
 
     // Query announcements for the company, ordered by timestamp descending
-    const { data, error, count } = await supabase
+    const { data, error, count } = await this.client
       .from(this.TABLE_NAME)
       .select('*', { count: 'exact' })
       .eq('company_id', companyId) // Assuming snake_case
@@ -86,7 +91,7 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
         // timestamp handled by Supabase default value
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .insert(dbData)
       .select()
@@ -107,7 +112,7 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
      const dbUpdates: Record<string, any> = { ...restUpdates };
      if (postedBy !== undefined) dbUpdates.posted_by = postedBy;
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(this.TABLE_NAME)
       .update(dbUpdates)
       .eq('id', id)
@@ -124,7 +129,7 @@ export class SupabaseAnnouncementRepository implements IAnnouncementRepository {
   }
 
   async deleteById(id: string): Promise<boolean> {
-    const { error, count } = await supabase
+    const { error, count } = await this.client
       .from(this.TABLE_NAME)
       .delete()
       .eq('id', id);

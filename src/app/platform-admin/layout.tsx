@@ -3,6 +3,7 @@
 // Platform Admin area with strict auth guard
 
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabasePlatformAdminRepository } from '@/repositories/implementations/supabase/SupabasePlatformAdminRepository';
 
@@ -51,12 +52,12 @@ export default async function PlatformAdminLayout({
 								</p>
 							</div>
 						</div>
-						<a
+						<Link
 							href="/dashboard"
 							className="text-sm text-[var(--vo-text-secondary)] hover:text-[var(--vo-text-primary)] transition-colors"
 						>
 							← Back to Dashboard
-						</a>
+						</Link>
 					</div>
 				</div>
 			</header>

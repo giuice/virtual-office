@@ -8,7 +8,7 @@ function parseLastActiveTime(lastActive?: string | null): number | null {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-export function isStalePresenceRecord(
+function isStalePresenceRecord(
   lastActive?: string | null,
   now: number = Date.now()
 ): boolean {

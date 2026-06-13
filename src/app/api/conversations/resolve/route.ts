@@ -4,17 +4,17 @@ import { ConversationType } from '@/types/messaging';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseConversationRepository, SupabaseSpaceRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { ConversationResolverError, ConversationResolverService } from '@/lib/services/ConversationResolverService';
+import { requireAuthUser } from '@/lib/auth/session';
 
 export async function POST(request: NextRequest) {
   let payload: unknown;
 
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAuthUser();
+    if ('errorResponse' in auth) {
+      return auth.errorResponse;
     }
+    const requesterProfile = auth.dbUser;
 
     try {
       payload = await request.json();
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const serviceClient = await createSupabaseServerClient('service_role');
 
-    const conversationRepository = new SupabaseConversationRepository(supabase);
+    const conversationRepository = new SupabaseConversationRepository(auth.supabase);
     const adminConversationRepository = new SupabaseConversationRepository(serviceClient);
     const userRepository = new SupabaseUserRepository(serviceClient);
     const spaceRepository = new SupabaseSpaceRepository(serviceClient);
@@ -46,11 +46,6 @@ export async function POST(request: NextRequest) {
       userRepository,
       spaceRepository,
     });
-
-    const requesterProfile = await userRepository.findBySupabaseUid(user.id);
-    if (!requesterProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
 
     if (type === ConversationType.DIRECT) {
       const targetUserId = typeof body.userId === 'string' ? body.userId : null;

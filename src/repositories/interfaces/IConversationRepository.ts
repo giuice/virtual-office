@@ -1,5 +1,5 @@
 // src/repositories/interfaces/IConversationRepository.ts
-import { Conversation, ConversationType, ConversationPreferences, GroupedConversations, UnreadSummary } from '@/types/messaging';
+import { Conversation, ConversationType, ConversationPreferences } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 export interface IConversationRepository {
@@ -54,12 +54,15 @@ export interface IConversationRepository {
   setArchiveStatus(id: string, isArchived: boolean): Promise<Conversation | null>;
 
   /**
-   * Marks a conversation as read for a specific user by setting their unread count to 0.
+   * Marks a conversation as read for a specific user: sets their
+   * conversation_members.last_read_at cursor and writes per-message read
+   * receipts atomically (mark_conversation_read RPC). Requires a
+   * service-role client; callers must authorize the user first.
    * @param id The unique ID of the conversation.
-   * @param userId The unique ID of the user for whom the conversation should be marked as read.
+   * @param userId The DB user ID (users.id) marking the conversation read.
    * @returns A promise that resolves to true if the operation was successful, false otherwise.
    */
-  markAsRead(id: string, userId: string): Promise<boolean>;
+  markConversationRead(id: string, userId: string): Promise<boolean>;
 
    /**
    * Updates the timestamp of the last message in the conversation.
@@ -72,15 +75,6 @@ export interface IConversationRepository {
    * @returns A promise that resolves to the updated Conversation object or null if not found.
    */
    updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null>;
-
-  /**
-   * Increments the unread count for specified participants in a conversation.
-   * Should typically be called when a new message is added.
-   * @param id The unique ID of the conversation.
-   * @param userIdsToIncrement An array of user IDs whose unread count should be incremented.
-   * @returns A promise that resolves to true if the operation was successful, false otherwise.
-   */
-  incrementUnreadCount(id: string, userIdsToIncrement: string[]): Promise<boolean>;
 
   // Add other methods as needed, e.g., findByParticipants, addParticipant, removeParticipant
 
@@ -127,28 +121,9 @@ export interface IConversationRepository {
   getUserPreference(conversationId: string, userId: string): Promise<ConversationPreferences | null>;
 
   /**
-   * Finds conversations for a user, grouped by type (direct vs rooms).
-   * Optionally includes archived conversations and respects per-user archive preferences.
-   * @param userId The unique ID of the user.
-   * @param options Optional parameters for filtering (includeArchived).
-   * @returns A promise that resolves to a GroupedConversations object with direct and room arrays.
-   */
-  findByUserGrouped(
-    userId: string,
-    options?: { includeArchived?: boolean }
-  ): Promise<GroupedConversations>;
-
-  /**
    * Finds conversations pinned by a specific user, ordered by pinned_order.
    * @param userId The unique ID of the user.
    * @returns A promise that resolves to an array of pinned Conversation objects in user-defined order.
    */
   findPinnedByUser(userId: string): Promise<Conversation[]>;
-
-  /**
-   * Gets aggregated unread counts for a user, broken down by conversation type.
-   * @param userId The unique ID of the user.
-   * @returns A promise that resolves to an UnreadSummary object with total, direct, and room unread counts.
-   */
-  getUnreadSummary(userId: string): Promise<UnreadSummary>;
 }

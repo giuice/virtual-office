@@ -61,13 +61,14 @@ const MANAGED_HOOKS = [
   'gsd-validate-commit.sh',
   'gsd-workflow-guard.js',
 ];
+const MANAGED_HOOKS_SET = new Set(MANAGED_HOOKS);
 
 let staleHooks = [];
 if (configDir) {
   const hooksDir = path.join(configDir, 'hooks');
   try {
     if (fs.existsSync(hooksDir)) {
-      const hookFiles = fs.readdirSync(hooksDir).filter(f => MANAGED_HOOKS.includes(f));
+      const hookFiles = fs.readdirSync(hooksDir).filter(f => MANAGED_HOOKS_SET.has(f));
       for (const hookFile of hookFiles) {
         try {
           const content = fs.readFileSync(path.join(hooksDir, hookFile), 'utf8');
@@ -75,7 +76,7 @@ if (configDir) {
           const versionMatch = content.match(/(?:\/\/|#) gsd-hook-version:\s*(.+)/);
           if (versionMatch) {
             const hookVersion = versionMatch[1].trim();
-            if (isNewer(installed, hookVersion) && !hookVersion.includes('{{')) {
+            if (isNewer(installed, hookVersion) && !/\{\{/.test(hookVersion)) {
               staleHooks.push({ file: hookFile, hookVersion, installedVersion: installed });
             }
           } else {

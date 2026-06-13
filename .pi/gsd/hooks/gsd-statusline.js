@@ -82,8 +82,9 @@ process.stdin.on('end', () => {
         if (session && fs.existsSync(todosDir)) {
             try {
                 const files = fs.readdirSync(todosDir)
-                    .filter(f => f.startsWith(session) && f.includes('-agent-') && f.endsWith('.json'))
-                    .map(f => ({ name: f, mtime: fs.statSync(path.join(todosDir, f)).mtime }))
+                    .flatMap(f => f.startsWith(session) && f.includes('-agent-') && f.endsWith('.json')
+                        ? [{ name: f, mtime: fs.statSync(path.join(todosDir, f)).mtime }]
+                        : [])
                     .sort((a, b) => b.mtime - a.mtime);
 
                 if (files.length > 0) {

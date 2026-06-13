@@ -57,7 +57,9 @@ describe('KnockToast', () => {
 
 			const avatar = screen.getByAltText("John Doe's avatar");
 			expect(avatar).toBeInTheDocument();
-			expect(avatar).toHaveAttribute('src', 'https://example.com/avatar.jpg');
+			const optimizedSrc = avatar.getAttribute('src');
+			expect(optimizedSrc).toContain('/_next/image');
+			expect(new URLSearchParams(optimizedSrc?.split('?')[1]).get('url')).toBe('https://example.com/avatar.jpg');
 		});
 
 		it('should display icon when no avatar URL is provided', () => {

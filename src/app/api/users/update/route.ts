@@ -1,17 +1,33 @@
 import { NextResponse } from 'next/server';
-import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { User } from '@/types/database';
+import { requireAuthUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import type { User, UserRole, UserStatus } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
+
+const USER_ROLES = ['admin', 'member'] as const satisfies readonly UserRole[];
+const USER_STATUSES = ['online', 'away', 'busy', 'offline'] as const satisfies readonly UserStatus[];
+
+function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && USER_ROLES.some(role => role === value);
+}
+
+function isUserStatus(value: unknown): value is UserStatus {
+  return typeof value === 'string' && USER_STATUSES.some(status => status === value);
+}
 
 export async function PATCH(
   request: Request,
 ) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const authContext = await requireAuthUser();
+    if ('errorResponse' in authContext) {
+      return authContext.errorResponse;
+    }
+
+    const userRepository = new SupabaseUserRepository(authContext.supabase);
+
     // Get ID from query parameters
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -22,18 +38,46 @@ export async function PATCH(
 
     // Get user data from request body
     // Ensure lastActive is excluded if present, as the repository handles it.
-    const { lastActive, ...userData }: Partial<User> = await request.json();
+    const body: Partial<User> = await request.json();
+    const targetUser = id === authContext.dbUser.id ? authContext.dbUser : await userRepository.findById(id);
 
-    
-    
-    let userId = id;
-    
-    
+    if (!targetUser) {
+      return NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 });
+    }
 
-    // Update the user using the repository with the correct UUID
-    // The repository's update method handles mapping camelCase to snake_case
-    // and automatically sets last_active.
-    const updatedUser = await userRepository.update(userId, userData);
+    let userData: Partial<User>;
+
+    if (id === authContext.dbUser.id) {
+      if (body.status !== undefined && !isUserStatus(body.status)) {
+        return NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 });
+      }
+
+      userData = {};
+      if (body.displayName !== undefined) userData.displayName = body.displayName;
+      if (body.statusMessage !== undefined) userData.statusMessage = body.statusMessage;
+      if (body.status !== undefined) userData.status = body.status;
+      if (body.preferences !== undefined) userData.preferences = body.preferences;
+    } else {
+      if (authContext.dbUser.role !== 'admin') {
+        return NextResponse.json({ success: false, error: 'Only admins can update other users' }, { status: 403 });
+      }
+
+      if (!authContext.dbUser.companyId || targetUser.companyId !== authContext.dbUser.companyId) {
+        return NextResponse.json({ success: false, error: 'Cannot update users outside your company' }, { status: 403 });
+      }
+
+      if (!isUserRole(body.role)) {
+        return NextResponse.json({ success: false, error: 'Cross-user updates may only change role' }, { status: 400 });
+      }
+
+      userData = { role: body.role };
+    }
+
+    const updateRepository = id === authContext.dbUser.id
+      ? userRepository
+      : new SupabaseUserRepository(await createSupabaseServerClient('service_role'));
+
+    const updatedUser = await updateRepository.update(id, userData);
 
     if (!updatedUser) {
       return NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 });

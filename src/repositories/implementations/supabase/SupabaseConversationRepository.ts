@@ -1,6 +1,6 @@
 // src/repositories/implementations/supabase/SupabaseConversationRepository.ts
 import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
-import { Conversation, ConversationType, ConversationVisibility, ConversationPreferences, GroupedConversations, UnreadSummary } from '@/types/messaging';
+import { Conversation, ConversationType, ConversationVisibility, ConversationPreferences } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -12,13 +12,12 @@ type ConversationRow = {
   last_activity: string | null;
   name: string | null;
   is_archived: boolean | null;
-  unread_count: Record<string, number> | null;
   room_id: string | null;
   visibility: string | null;
   participants_fingerprint: string | null;
 };
 function mapToCamelCase(data: ConversationRow): Conversation {
-  
+
   // Ensure we have the correct structure with necessary checks
   return {
     id: data.id,
@@ -27,16 +26,12 @@ function mapToCamelCase(data: ConversationRow): Conversation {
     lastActivity: data.last_activity ? new Date(data.last_activity) : new Date(),
     name: data.name || undefined,
     isArchived: Boolean(data.is_archived),
-    unreadCount: data.unread_count || {},
+    // Viewer's unread count is server-computed (get_unread_counts RPC) and
+    // only attached in findByUser; other read paths don't need it.
+    unreadCount: 0,
     roomId: data.room_id || undefined,
     visibility: (data.visibility as ConversationVisibility) || ConversationVisibility.PUBLIC,
   };
-}
-
-// Helper function to map an array
-function mapArrayToCamelCase(dataArray: ConversationRow[]): Conversation[] {
-  if (!dataArray) return [];
-  return dataArray.map(item => mapToCamelCase(item));
 }
 
 // ConversationPreferences row type
@@ -67,6 +62,22 @@ function mapPreferencesToCamelCase(data: ConversationPreferencesRow): Conversati
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
   };
+}
+
+function getPreferenceForUser(
+  preferences: ConversationPreferencesRow[] | ConversationPreferencesRow | null | undefined,
+  userId: string
+): ConversationPreferencesRow | null {
+  if (Array.isArray(preferences)) {
+    for (const preference of preferences) {
+      if (preference.user_id === userId) {
+        return preference;
+      }
+    }
+    return null;
+  }
+
+  return preferences?.user_id === userId ? preferences : null;
 }
 
 
@@ -122,12 +133,13 @@ export class SupabaseConversationRepository implements IConversationRepository {
       const from = offset;
       const to = from + limit - 1;
 
-      // Query conversations where the user is a participant, including preferences
+      // Query conversations where the user is a participant, including the
+      // user's member row (pin/star/archive prefs + read cursor)
       let query = this.supabaseClient
         .from(this.TABLE_NAME)
         .select(`
           *,
-          conversation_preferences!left(
+          conversation_members!left(
             id,
             conversation_id,
             user_id,
@@ -147,10 +159,6 @@ export class SupabaseConversationRepository implements IConversationRepository {
         query = query.eq('type', options.type);
       }
 
-      if (!options?.includeArchived) {
-        query = query.eq('is_archived', false);
-      }
-
       const { data, error, count } = await query.range(from, to);
 
       if (error) {
@@ -161,21 +169,53 @@ export class SupabaseConversationRepository implements IConversationRepository {
       // Map DB response array with preferences
       const items: Conversation[] = [];
       for (const row of (data || [])) {
+        const userPrefs = getPreferenceForUser(row.conversation_members, userId);
+
+        // Audit M-02: archiving is per-user — the archive route writes
+        // conversation_preferences.is_archived, so that is what hides a
+        // conversation here. The global column only acts as a fallback.
+        if (!options?.includeArchived) {
+          const isArchived = userPrefs?.is_archived ?? row.is_archived ?? false;
+          if (isArchived) continue;
+        }
+
         const conversation = mapToCamelCase(row as ConversationRow);
-        
-        // Find the user's preference from the joined result
-        const userPrefs = Array.isArray(row.conversation_preferences)
-          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
-          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
-        
         if (userPrefs) {
           conversation.preferences = mapPreferencesToCamelCase(userPrefs);
         }
-        
+        // Serialize the effective per-user archive state so the client reads
+        // one coherent flag.
+        conversation.isArchived = userPrefs?.is_archived ?? conversation.isArchived ?? false;
+
         items.push(conversation);
       }
 
-      const nextCursor = items.length === limit ? (to + 1).toString() : null;
+      // Attach the viewer's unread counts in one aggregate RPC (no N+1).
+      // The RPC derives the viewer from auth.uid(), so this only yields
+      // counts when the repository was built with the user-scoped client;
+      // service-role callers get 0s, which is fine for non-viewer flows.
+      if (items.length > 0) {
+        const { data: counts, error: countsError } = await this.supabaseClient
+          .rpc('get_unread_counts', { p_conversation_ids: items.map((c) => c.id) });
+
+        if (countsError) {
+          console.error('Error fetching unread counts:', countsError);
+        } else if (Array.isArray(counts)) {
+          const countByConversation = new Map<string, number>(
+            counts.map((row: { conversation_id: string; unread_count: number }) => [
+              row.conversation_id,
+              Number(row.unread_count) || 0,
+            ])
+          );
+          for (const conversation of items) {
+            conversation.unreadCount = countByConversation.get(conversation.id) ?? 0;
+          }
+        }
+      }
+
+      // Advance the cursor by rows consumed (not rows kept after the
+      // per-user archive filter), or pagination would skip records.
+      const nextCursor = (data?.length ?? 0) === limit ? (to + 1).toString() : null;
 
       return {
         items,
@@ -209,7 +249,6 @@ export class SupabaseConversationRepository implements IConversationRepository {
         last_activity: conversationData.lastActivity instanceof Date
           ? conversationData.lastActivity.toISOString()
           : (conversationData.lastActivity || new Date().toISOString()),
-        unread_count: {}, // Initialize empty unread count
         participants_fingerprint: conversationData.participantsFingerprint || null,
       };
 
@@ -305,43 +344,25 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async markAsRead(id: string, userId: string): Promise<boolean> {
+  async markConversationRead(id: string, userId: string): Promise<boolean> {
     try {
-      // For simplicity, we'll implement it directly without RPC
-      // First, get the current conversation to access the unread_count
-      const { data: conversation, error: fetchError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .select('unread_count')
-        .eq('id', id)
-        .single();
-        
-      if (fetchError) {
-        console.error('Error fetching conversation for markAsRead:', fetchError);
+      // Atomic: sets conversation_members.last_read_at AND inserts
+      // message_read_receipts for everything the user just saw, in one
+      // transaction. The RPC is service-role only; the route authorizes the
+      // user via requireConversationParticipant before calling this.
+      const { error } = await this.supabaseClient.rpc('mark_conversation_read', {
+        p_conversation_id: id,
+        p_user_id: userId,
+      });
+
+      if (error) {
+        console.error('Error in mark_conversation_read RPC:', error);
         return false;
       }
-      
-      if (!conversation) {
-        return false;
-      }
-      
-      // Create a new unread_count object without the user's entry
-      const unreadCount = { ...(conversation.unread_count || {}) };
-      delete unreadCount[userId];
-      
-      // Update the conversation with the new unread_count
-      const { error: updateError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .update({ unread_count: unreadCount })
-        .eq('id', id);
-        
-      if (updateError) {
-        console.error('Error updating unread_count in markAsRead:', updateError);
-        return false;
-      }
-      
+
       return true;
     } catch (error) {
-      console.error(`Repository error in markAsRead(${id}, ${userId}):`, error);
+      console.error(`Repository error in markConversationRead(${id}, ${userId}):`, error);
       throw error;
     }
   }
@@ -367,50 +388,6 @@ export class SupabaseConversationRepository implements IConversationRepository {
       return data ? mapToCamelCase(data) : null;
     } catch (error) {
       console.error(`Repository error in updateLastActivityTimestamp(${id}):`, error);
-      throw error;
-    }
-  }
-
-  async incrementUnreadCount(id: string, userIdsToIncrement: string[]): Promise<boolean> {
-    try {
-      // For simplicity, we'll implement it directly without RPC
-      // First, get the current conversation to access the unread_count
-      const { data: conversation, error: fetchError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .select('unread_count')
-        .eq('id', id)
-        .single();
-        
-      if (fetchError) {
-        console.error('Error fetching conversation for incrementUnreadCount:', fetchError);
-        return false;
-      }
-      
-      if (!conversation) {
-        return false;
-      }
-      
-      // Create a new unread_count object with incremented counts
-      const unreadCount = { ...(conversation.unread_count || {}) };
-      
-      for (const userId of userIdsToIncrement) {
-        unreadCount[userId] = (unreadCount[userId] || 0) + 1;
-      }
-      
-      // Update the conversation with the new unread_count
-      const { error: updateError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .update({ unread_count: unreadCount })
-        .eq('id', id);
-        
-      if (updateError) {
-        console.error('Error updating unread_count in incrementUnreadCount:', updateError);
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error(`Repository error in incrementUnreadCount(${id}, ${userIdsToIncrement}):`, error);
       throw error;
     }
   }
@@ -528,7 +505,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
 
       // Upsert: insert if not exists, update if exists
       const { data, error } = await this.supabaseClient
-        .from('conversation_preferences')
+        .from('conversation_members')
         .upsert(
           {
             conversation_id: conversationId,
@@ -561,7 +538,7 @@ export class SupabaseConversationRepository implements IConversationRepository {
   async getUserPreference(conversationId: string, userId: string): Promise<ConversationPreferences | null> {
     try {
       const { data, error } = await this.supabaseClient
-        .from('conversation_preferences')
+        .from('conversation_members')
         .select('*')
         .eq('conversation_id', conversationId)
         .eq('user_id', userId)
@@ -582,93 +559,12 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async findByUserGrouped(
-    userId: string,
-    options?: { includeArchived?: boolean }
-  ): Promise<GroupedConversations> {
-    try {
-      // Join conversations with user preferences to respect per-user archive status
-      // We need to get all conversations where user is a participant
-      // and optionally filter by archive status from preferences
-
-      // First, get all conversations for the user
-      const conversationsQuery = this.supabaseClient
-        .from(this.TABLE_NAME)
-        .select(`
-          *,
-          conversation_preferences!left(
-            id,
-            conversation_id,
-            user_id,
-            is_pinned,
-            pinned_order,
-            is_starred,
-            is_archived,
-            notifications_enabled,
-            created_at,
-            updated_at
-          )
-        `)
-        .contains('participants', [userId])
-        .order('last_activity', { ascending: false });
-
-      const { data, error } = await conversationsQuery;
-
-      if (error) {
-        console.error('Error fetching grouped conversations:', error);
-        throw error;
-      }
-
-      if (!data) {
-        return { direct: [], rooms: [] };
-      }
-
-      // Process results and group by type
-      const direct: Conversation[] = [];
-      const rooms: Conversation[] = [];
-
-      for (const row of data) {
-        // Find the user's preference (join result is an array)
-        const userPrefs = Array.isArray(row.conversation_preferences)
-          ? row.conversation_preferences.find((pref: any) => pref.user_id === userId)
-          : row.conversation_preferences?.user_id === userId ? row.conversation_preferences : null;
-
-        // Filter by archive status if needed
-        if (!options?.includeArchived) {
-          // Check per-user archive preference if it exists, otherwise check global
-          const isArchived = userPrefs?.is_archived ?? row.is_archived ?? false;
-          if (isArchived) {
-            continue; // Skip archived conversations
-          }
-        }
-
-        // Map conversation with preferences
-        const conversation = mapToCamelCase(row as ConversationRow);
-        if (userPrefs) {
-          conversation.preferences = mapPreferencesToCamelCase(userPrefs);
-        }
-
-        // Group by type
-        if (conversation.type === ConversationType.DIRECT) {
-          direct.push(conversation);
-        } else if (conversation.type === ConversationType.ROOM) {
-          rooms.push(conversation);
-        }
-      }
-
-      return { direct, rooms };
-    } catch (error) {
-      console.error(`Repository error in findByUserGrouped(${userId}):`, error);
-      throw error;
-    }
-  }
-
   async findPinnedByUser(userId: string): Promise<Conversation[]> {
     try {
       // Join conversations with preferences where is_pinned = true
       // Order by pinned_order ascending (lower numbers first)
       const { data, error } = await this.supabaseClient
-        .from('conversation_preferences')
+        .from('conversation_members')
         .select(`
           *,
           conversations:conversation_id (*)
@@ -703,53 +599,4 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async getUnreadSummary(userId: string): Promise<UnreadSummary> {
-    try {
-      // Get all conversations where the user is a participant
-      const { data, error } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .select('type, unread_count')
-        .contains('participants', [userId]);
-
-      if (error) {
-        console.error('Error fetching unread summary:', error);
-        throw error;
-      }
-
-      if (!data) {
-        return {
-          totalUnread: 0,
-          directUnread: 0,
-          roomUnread: 0,
-        };
-      }
-
-      // Aggregate unread counts by type
-      let totalUnread = 0;
-      let directUnread = 0;
-      let roomUnread = 0;
-
-      for (const row of data) {
-        const unreadCount = row.unread_count as Record<string, number> | null;
-        const userUnread = unreadCount?.[userId] || 0;
-
-        totalUnread += userUnread;
-
-        if (row.type === ConversationType.DIRECT) {
-          directUnread += userUnread;
-        } else if (row.type === ConversationType.ROOM) {
-          roomUnread += userUnread;
-        }
-      }
-
-      return {
-        totalUnread,
-        directUnread,
-        roomUnread,
-      };
-    } catch (error) {
-      console.error(`Repository error in getUnreadSummary(${userId}):`, error);
-      throw error;
-    }
-  }
 }

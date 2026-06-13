@@ -90,8 +90,8 @@ export default function ForgotPasswordPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enviando...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Enviando…
                 </>
               ) : (
                 'Enviar link de recuperação'
@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
 
             <Button asChild variant="ghost" className="w-full">
               <Link href="/login" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="size-4" />
                 Voltar para o login
               </Link>
             </Button>

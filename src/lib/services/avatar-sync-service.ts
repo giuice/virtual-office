@@ -305,19 +305,11 @@ export class AvatarSyncService {
     let successCount = 0;
     let failureCount = 0;
 
-    for (const userId of userIds) {
+    const settledResults = await Promise.all(userIds.map(async (userId, index) => {
       try {
+        await new Promise(resolve => setTimeout(resolve, index * 100));
         const result = await this.syncUserGoogleAvatar(userId, undefined, options);
-        results.push(result);
-        
-        if (result.success) {
-          successCount++;
-        } else {
-          failureCount++;
-        }
-        
-        // Add a small delay to avoid overwhelming the database
-        await new Promise(resolve => setTimeout(resolve, 100));
+        return result;
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -331,11 +323,13 @@ export class AvatarSyncService {
           userId,
           error: `Bulk sync failed: ${errorMessage}`
         };
-        
-        results.push(failureResult);
-        failureCount++;
+        return failureResult;
       }
-    }
+    }));
+
+    results.push(...settledResults);
+    successCount = results.filter(result => result.success).length;
+    failureCount = results.length - successCount;
 
     debugLogger.log('AvatarSyncService', 'Completed bulk Google avatar sync', {
       totalUsers: userIds.length,
@@ -468,4 +462,4 @@ export class AvatarSyncService {
 }
 
 // Export a default instance for convenience
-export const avatarSyncService = new AvatarSyncService();
+const avatarSyncService = new AvatarSyncService();

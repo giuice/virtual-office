@@ -25,7 +25,7 @@ interface ThemePreviewSwatchProps {
  */
 function ThemePreviewSwatch({ theme, isActive, size = 'sm' }: ThemePreviewSwatchProps) {
   const metadata = VO_THEME_METADATA[theme];
-  const sizeClasses = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
+  const sizeClasses = size === 'sm' ? 'size-4' : 'size-5';
 
   return (
     <div
@@ -38,7 +38,7 @@ function ThemePreviewSwatch({ theme, isActive, size = 'sm' }: ThemePreviewSwatch
       aria-hidden="true"
     >
       <div
-        className="w-1.5 h-1.5 rounded-full"
+        className="size-1.5 rounded-full"
         style={{ backgroundColor: metadata.previewColors.accent }}
       />
     </div>
@@ -186,7 +186,7 @@ export function ThemeSwitcher({
                 )}
               </div>
               {isActive && (
-                <CheckIcon className="w-4 h-4 text-[var(--vo-accent)]" aria-hidden="true" />
+                <CheckIcon className="size-4 text-[var(--vo-accent)]" aria-hidden="true" />
               )}
             </DropdownMenuItem>
           );
@@ -219,7 +219,7 @@ function CheckIcon({ className }: { className?: string }) {
  * Inline theme palette selector.
  * Alternative UI for theme selection, shows all themes as clickable swatches.
  */
-export function ThemePalette({ className }: { className?: string }) {
+function ThemePalette({ className }: { className?: string }) {
   const { theme, setTheme, themes } = useVOTheme();
 
   return (
@@ -233,11 +233,11 @@ export function ThemePalette({ className }: { className?: string }) {
         const isActive = theme === themeOption;
 
         return (
-          <button
+          <button type="button"
             key={themeOption}
             onClick={() => setTheme(themeOption)}
             className={cn(
-              'relative w-8 h-8 rounded-full transition-all duration-200',
+              'relative size-8 rounded-full transition-all duration-200',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--vo-accent)]',
               isActive ? 'ring-2 ring-[var(--vo-accent)] scale-110' : 'hover:scale-105'
             )}

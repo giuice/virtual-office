@@ -1,34 +1,38 @@
 // src/app/api/messages/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-// Removed deprecated auth-helpers client in favor of SSR client
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
-import { validateUserSession } from '@/lib/auth/session';
-import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { isAuthzFailure, jsonError, requireConversationParticipant } from '@/lib/auth/authorize';
+import { enforceRateLimit } from '@/lib/auth/rate-limit';
+
+// Audit S-03: server-side upload limits. The 'attachments' bucket enforces
+// the same caps (private bucket, signed reads) — this is the first gate.
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
 
 /**
  * Handle file upload for message attachments
  */
 export async function POST(request: NextRequest) {
   try {
-    // Validate user session
-  const { userDbId, error: sessionError } = await validateUserSession();
-
-    if (sessionError || !userDbId) {
-      return NextResponse.json({ error: sessionError || 'Unauthorized' }, { status: 401 });
-    }
-
-    // Create Supabase client with context
-  const supabase = await createSupabaseServerClient();
-  const { messageRepository } = await getSupabaseRepositories(supabase);
-    
     const formData = await request.formData();
-    
+
     // Get file and metadata from form data
     const file = formData.get('file') as File;
     const conversationId = formData.get('conversationId') as string;
     const messageId = formData.get('messageId') as string | undefined;
-    
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
@@ -36,42 +40,37 @@ export async function POST(request: NextRequest) {
     if (!conversationId) {
       return NextResponse.json({ error: 'No conversation ID provided' }, { status: 400 });
     }
-    
-    // Check if user has access to the conversation
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select('participants')
-      .eq('id', conversationId)
-      .single();
-      
-    if (convError || !conversation) {
-      console.error('Error fetching conversation:', convError);
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+
+    const ctx = await requireConversationParticipant(conversationId);
+    if (isAuthzFailure(ctx)) {
+      return ctx.errorResponse;
     }
-    
-    // Verify user is a participant in the conversation (DB IDs)
-    if (!conversation.participants.includes(userDbId)) {
-      return NextResponse.json({ error: 'Not authorized to upload to this conversation' }, { status: 403 });
+
+    const rateLimited = await enforceRateLimit(ctx.serviceClient, ctx.dbUser.id, 'message:upload');
+    if (rateLimited) {
+      return rateLimited;
     }
-    
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return jsonError(413, 'FILE_TOO_LARGE', `File exceeds the ${MAX_FILE_SIZE_BYTES / (1024 * 1024)} MB limit`);
+    }
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      return jsonError(415, 'UNSUPPORTED_FILE_TYPE', 'File type is not allowed');
+    }
+
+    const supabase = ctx.supabase;
+    const { messageRepository } = await getSupabaseRepositories(supabase);
+
     // Prepare file metadata
     const fileExtension = file.name.split('.').pop();
     const uniqueFilename = `${uuidv4()}.${fileExtension}`;
     const size = file.size;
     const type = file.type;
     const originalName = file.name;
-    
-    // Define paths in storage
+
+    // Define path in storage
     const storagePath = `message-attachments/${conversationId}/${uniqueFilename}`;
-    let thumbnailPath = null;
-    
-    // Check if image and create thumbnail
-    let thumbnailUrl = null;
-    if (type.startsWith('image/')) {
-      const thumbnailName = `thumb_${uniqueFilename}`;
-      thumbnailPath = `message-attachments/${conversationId}/thumbnails/${thumbnailName}`;
-    }
-    
+
     // Convert file to arrayBuffer for upload
     // Support environments (tests) where File.arrayBuffer might not exist
     let buffer: Uint8Array;
@@ -83,13 +82,13 @@ export async function POST(request: NextRequest) {
       const reader = (file as any).stream?.().getReader?.();
       const chunks: Uint8Array[] = [];
       if (reader) {
-        // Read all chunks
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
+        const readNextChunk = async (): Promise<void> => {
           const { done, value } = await reader.read();
-            if (done) break;
-            if (value) chunks.push(value);
-        }
+          if (done) return;
+          if (value) chunks.push(value);
+          await readNextChunk();
+        };
+        await readNextChunk();
         const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
         buffer = new Uint8Array(totalLength);
         let offset = 0;
@@ -102,91 +101,73 @@ export async function POST(request: NextRequest) {
         buffer = new Uint8Array();
       }
     }
-    
-    // Upload file to Supabase Storage
-    const { error: uploadError } = await supabase
+
+    // Audit S-03: the bucket is private — uploads go through the service
+    // client after the membership check; reads are signed via the GET
+    // attachment route. Filename is a fresh UUID, so no upsert.
+    const { error: uploadError } = await ctx.serviceClient
       .storage
-      .from('attachments') // Bucket name
+      .from('attachments')
       .upload(storagePath, buffer, {
         contentType: type,
-        upsert: true
+        upsert: false
       });
-    
+
     if (uploadError) {
       console.error('Error uploading file:', uploadError);
       return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
     }
-    
-    // If it's an image, generate and upload a thumbnail
-    if (thumbnailPath && type.startsWith('image/')) {
-      // For simplicity, we're just using the same image as thumbnail
-      // In a real implementation, you'd resize the image here
-      const { error: thumbnailError } = await supabase
-        .storage
-        .from('attachments')
-        .upload(thumbnailPath, buffer, {
-          contentType: type,
-          upsert: true
-        });
-        
-      if (!thumbnailError) {
-        // Get public URL for thumbnail
-        const { data: thumbUrlData } = await supabase
-          .storage
-          .from('attachments')
-          .getPublicUrl(thumbnailPath);
-          
-        thumbnailUrl = thumbUrlData?.publicUrl;
-      }
-    }
-    
-    // Get public URL for original file
-    const { data: urlData } = await supabase
-      .storage
-      .from('attachments')
-      .getPublicUrl(storagePath);
-      
-    if (!urlData) {
-      return NextResponse.json({ error: 'Failed to get file URL' }, { status: 500 });
-    }
-    
-    // Create file attachment record in database
+
+    // Create file attachment record in database — url stores the storage
+    // path; the serialized attachment exposes the authz'd API route instead.
     const attachmentData = {
       name: originalName,
       type,
       size,
-      url: urlData.publicUrl,
-      thumbnailUrl: thumbnailUrl === null ? undefined : thumbnailUrl
+      url: storagePath,
+      thumbnailUrl: undefined
     };
-    
+
     // If messageId is provided, link attachment to message
-    let attachment;
     if (messageId) {
       // Verify the message exists and belongs to the conversation
       const message = await messageRepository.findById(messageId);
       if (!message) {
         return NextResponse.json({ error: 'Message not found' }, { status: 404 });
       }
-      
+
       if (message.conversationId !== conversationId) {
         return NextResponse.json({ error: 'Message does not belong to the specified conversation' }, { status: 400 });
       }
-      
-      attachment = await messageRepository.addAttachment(messageId, attachmentData);
-    } else {
-      // For attachments uploaded before message creation, store in session or return to client
-      // Here we're just returning the attachment data without storing in DB yet
-      attachment = {
-        id: uuidv4(), // Temporary ID
-        ...attachmentData
-      };
+
+      const attachment = await messageRepository.addAttachment(messageId, attachmentData);
+      return NextResponse.json({
+        success: true,
+        attachment
+      });
     }
-    
-    return NextResponse.json({ 
+
+    // No DB row yet (attachment uploaded before message creation) — return a
+    // short-lived signed URL so the client can preview the file.
+    const { data: signed, error: signError } = await ctx.serviceClient
+      .storage
+      .from('attachments')
+      .createSignedUrl(storagePath, 3600);
+
+    if (signError || !signed) {
+      console.error('Error signing uploaded file URL:', signError);
+      return NextResponse.json({ error: 'Failed to get file URL' }, { status: 500 });
+    }
+
+    return NextResponse.json({
       success: true,
-      attachment
+      attachment: {
+        id: uuidv4(), // Temporary ID
+        ...attachmentData,
+        url: signed.signedUrl
+      }
     });
-    
+
   } catch (error) {
     console.error('Error handling file upload:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

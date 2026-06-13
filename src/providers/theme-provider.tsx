@@ -18,7 +18,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
  * Enhanced ThemeProvider with Virtual Office theme system.
  * Wraps next-themes with VOThemeProvider for full theme support.
  */
-export function ThemeProviderWithVO({ children, ...props }: ThemeProviderProps) {
+function ThemeProviderWithVO({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider {...props}>
       <VOThemeProvider>

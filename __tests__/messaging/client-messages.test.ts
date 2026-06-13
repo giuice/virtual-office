@@ -1,6 +1,5 @@
 // __tests__/messaging/client-messages.test.ts
 import { messagingApi } from '@/lib/messaging-api';
-import { MessageStatus } from '@/types/messaging';
 import { expect, describe, test, beforeEach, vi } from 'vitest';
 
 // Mock fetch for all tests
@@ -138,115 +137,8 @@ describe('Messaging API Client - Messages', () => {
     });
   });
 
-  // Message Status Tests
-  describe('Message Status', () => {
-    test('updateMessageStatus should update status and return successfully', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.READ, 'user-id');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/messages/status',
-        expect.objectContaining({
-          method: 'PATCH',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify({
-            messageId: 'message-id',
-            status: MessageStatus.READ,
-            userId: 'user-id'
-          }),
-        })
-      );
-    });
-
-    test('updateMessageStatus should handle errors', async () => {
-      const errorMessage = 'Not authorized to update this message';
-      const mockResponse = { error: errorMessage };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(403, mockResponse)
-      );
-
-      await expect(
-        messagingApi.updateMessageStatus('message-id', MessageStatus.READ, 'user-id')
-      ).rejects.toThrow(errorMessage);
-    });
-
-    test('updateMessageStatus should handle different status types', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementation(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.DELIVERED, 'user-id');
-      await messagingApi.updateMessageStatus('message-id', MessageStatus.SENT, 'user-id');
-
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  // Typing Indicator Tests
-  describe('Typing Indicators', () => {
-    test('sendTypingIndicator should send typing status', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.sendTypingIndicator('conversation-id', 'user-id', true);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/messages/typing',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify({
-            conversationId: 'conversation-id',
-            userId: 'user-id',
-            isTyping: true
-          }),
-        })
-      );
-    });
-
-    test('sendTypingIndicator should send stop typing status', async () => {
-      const mockResponse = { success: true };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(200, mockResponse)
-      );
-
-      await messagingApi.sendTypingIndicator('conversation-id', 'user-id', false);
-
-      const fetchCall = (global.fetch as any).mock.calls[0];
-      const body = JSON.parse(fetchCall[1].body);
-
-      expect(body.isTyping).toBe(false);
-    });
-
-    test('sendTypingIndicator should not throw on errors (fail silently)', async () => {
-      const mockResponse = { error: 'Server error' };
-
-      (global.fetch as any).mockImplementationOnce(() =>
-        mockFetchResponse(500, mockResponse)
-      );
-
-      // Should not throw - typing indicators fail silently
-      await expect(
-        messagingApi.sendTypingIndicator('conversation-id', 'user-id', true)
-      ).resolves.not.toThrow();
-    });
-  });
+  // Typing indicators are broadcast-only (useConversationPresence) — no API
+  // surface to test here (audit B-02).
 
   // Error Handling Tests
   describe('Error Handling', () => {

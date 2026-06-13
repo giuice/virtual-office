@@ -1,34 +1,49 @@
 // src/app/(auth)/set-password/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useReducerState } from '@/hooks/useReducerState';
+import { useEffect, useCallback, useRef } from 'react';
+import { redirect } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/hooks/useNotification';
-import { Loader2, KeyRound, CheckCircle, Building2 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import type { PendingInvitationResponse } from '@/app/api/invitations/pending/route';
+import { SetPasswordForm } from './SetPasswordView';
+import { SetPasswordLoading } from './SetPasswordLoading';
+import { SetPasswordSuccess } from './SetPasswordSuccess';
+
+const getPasswordSetReturnUrl = () => sessionStorage.getItem('passwordSetReturnUrl');
+
+function getSetPasswordValidationError(
+  displayName: string,
+  password: string,
+  confirmPassword: string
+) {
+  if (!displayName.trim()) return 'Por favor, informe seu nome.';
+  if (password.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (password !== confirmPassword) return 'As senhas não coincidem.';
+  return null;
+}
 
 export default function SetPasswordPage() {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [pendingInvite, setPendingInvite] = useState<PendingInvitationResponse['invitation'] | null>(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [password, setPassword] = useReducerState('');
+  const [confirmPassword, setConfirmPassword] = useReducerState('');
+  const [displayName, setDisplayName] = useReducerState('');
+  const [isLoading, setIsLoading] = useReducerState(false);
+  const [isSuccess, setIsSuccess] = useReducerState(false);
+  const [isAcceptingInvite, setIsAcceptingInvite] = useReducerState(false);
+  const [formError, setFormError] = useReducerState<string | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useReducerState(true);
+  const [successMessage, setSuccessMessage] = useReducerState('');
+  const redirectTargetRef = useRef<string | null>(null);
 
-  const router = useRouter();
   const { user, loading: authLoading, isAuthReady } = useAuth();
   const { showSuccess, showError } = useNotification();
+  const queueRedirect = useCallback((target: string) => {
+    redirectTargetRef.current = target;
+    setIsCheckingSession(false);
+  }, [setIsCheckingSession]);
 
-  // Pre-fill display name if available in user metadata
   useEffect(() => {
     if (user?.user_metadata) {
       const existingName = user.user_metadata.full_name || user.user_metadata.displayName || user.user_metadata.name;
@@ -36,7 +51,7 @@ export default function SetPasswordPage() {
         setDisplayName(existingName);
       }
     }
-  }, [user]);
+  }, [user, setDisplayName]);
 
   // Check if user has a valid session (came from invite/recovery link)
   useEffect(() => {
@@ -53,7 +68,7 @@ export default function SetPasswordPage() {
           if (error) {
             console.error('[set-password] Error exchanging code for session:', error);
             showError({ description: 'Link expirado ou inválido. Solicite um novo convite.' });
-            router.push('/login');
+            queueRedirect('/login');
             return;
           }
           url.searchParams.delete('code');
@@ -83,7 +98,7 @@ export default function SetPasswordPage() {
             if (error) {
               console.error('Error setting session:', error);
               showError({ description: 'Link expirado ou inválido. Solicite um novo convite.' });
-              router.push('/login');
+              queueRedirect('/login');
               return;
             }
             
@@ -92,7 +107,7 @@ export default function SetPasswordPage() {
           } catch (err) {
             console.error('Exception setting session:', err);
             showError({ description: 'Erro ao processar link. Tente novamente.' });
-            router.push('/login');
+            queueRedirect('/login');
             return;
           }
         }
@@ -102,15 +117,15 @@ export default function SetPasswordPage() {
     };
     
     checkSession();
-  }, [router, showError]);
+  }, [queueRedirect, showError, setIsCheckingSession]);
 
   // Redirect if no session
   useEffect(() => {
     if (!isCheckingSession && isAuthReady && !user) {
       showError({ description: 'Você precisa estar autenticado para definir uma senha.' });
-      router.push('/login');
+      queueRedirect('/login');
     }
-  }, [isCheckingSession, isAuthReady, user, router, showError]);
+  }, [isCheckingSession, isAuthReady, user, showError, queueRedirect]);
 
   /**
    * Check for pending invitation after session is established
@@ -118,7 +133,7 @@ export default function SetPasswordPage() {
    */
   const checkAndAcceptPendingInvite = useCallback(async (): Promise<boolean> => {
     try {
-      const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
+      const returnUrl = getPasswordSetReturnUrl();
       let tokenFromReturnUrl: string | null = null;
 
       if (returnUrl) {
@@ -167,7 +182,6 @@ export default function SetPasswordPage() {
       }
 
       console.log('[set-password] Found pending invitation for company:', data.invitation.companyName);
-      setPendingInvite(data.invitation);
       setIsAcceptingInvite(true);
 
       // Auto-accept the invitation
@@ -198,26 +212,15 @@ export default function SetPasswordPage() {
       setIsAcceptingInvite(false);
       return false;
     }
-  }, [displayName]);
+  }, [displayName, setIsAcceptingInvite, setSuccessMessage]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError(null);
 
-    // Validations
-    // Only require display name if it's not already set
-    if (!displayName.trim()) {
-      setFormError('Por favor, informe seu nome.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setFormError('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setFormError('As senhas não coincidem.');
+    const validationError = getSetPasswordValidationError(displayName, password, confirmPassword);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
@@ -251,7 +254,7 @@ export default function SetPasswordPage() {
       
       // Determine redirect destination
       let redirectUrl = '/onboarding';
-      const returnUrl = sessionStorage.getItem('passwordSetReturnUrl');
+      const returnUrl = getPasswordSetReturnUrl();
       sessionStorage.removeItem('passwordSetReturnUrl');
       
       if (inviteAccepted) {
@@ -279,132 +282,38 @@ export default function SetPasswordPage() {
     }
   };
 
+  if (redirectTargetRef.current) {
+    redirect(redirectTargetRef.current);
+  }
+
   // Show loading while checking session or auth
   if (isCheckingSession || authLoading || !isAuthReady) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Verificando sessão...</p>
-      </div>
-    );
+    return <SetPasswordLoading />;
   }
 
   // Show success state with invite info
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-            <CardTitle>Senha definida!</CardTitle>
-            <CardDescription>
-              {isAcceptingInvite ? (
-                <span className="flex items-center justify-center gap-2 mt-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Entrando na empresa...
-                </span>
-              ) : successMessage ? (
-                <span className="flex items-center justify-center gap-2 mt-2">
-                  <Building2 className="h-4 w-4 text-green-500" />
-                  {successMessage}
-                </span>
-              ) : (
-                'Sua senha foi configurada com sucesso. Redirecionando...'
-              )}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <SetPasswordSuccess
+        acceptingInvite={isAcceptingInvite}
+        message={successMessage}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" />
-            <CardTitle>Definir sua senha</CardTitle>
-          </div>
-          <CardDescription>
-            {user?.email ? (
-              <>Crie uma senha para a conta <strong>{user.email}</strong></>
-            ) : (
-              'Crie uma senha para acessar sua conta'
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="displayName" className="text-sm font-medium">
-                Nome completo
-              </label>
-              <Input
-                id="displayName"
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Seu nome"
-                required={!user?.user_metadata?.full_name} // Only required if not already present
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Nova senha
-              </label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite sua nova senha"
-                required
-                disabled={isLoading}
-                minLength={6}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">
-                Confirmar senha
-              </label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirme sua senha"
-                required
-                disabled={isLoading}
-                minLength={6}
-              />
-            </div>
-
-            {formError && (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-              >
-                {formError}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Salvando...
-                </span>
-              ) : (
-                'Definir senha'
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <SetPasswordForm
+      email={user?.email}
+      displayName={displayName}
+      password={password}
+      confirmPassword={confirmPassword}
+      formError={formError}
+      loading={isLoading}
+      displayNameRequired={!user?.user_metadata?.full_name}
+      onDisplayNameChange={setDisplayName}
+      onPasswordChange={setPassword}
+      onConfirmPasswordChange={setConfirmPassword}
+      onSubmit={handleSubmit}
+    />
   );
 }

@@ -75,7 +75,7 @@ export function ProfileForm() {
   if (!currentUserProfile) {
     return (
       <div className="flex justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -88,9 +88,9 @@ export function ProfileForm() {
           Gerencie suas informações pessoais e como você aparece para os outros.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6">
-          <div className="flex flex-col items-center space-y-2">
+      <CardContent className="gap-y-6">
+        <div className="flex flex-col items-center gap-y-4 sm:flex-row sm:gap-y-0 sm:gap-x-6">
+          <div className="flex flex-col items-center gap-y-2">
             <UploadableAvatar
               user={currentUserProfile}
               size="xl"
@@ -101,15 +101,15 @@ export function ProfileForm() {
             </span>
           </div>
           
-          <div className="flex-1 space-y-1 text-center sm:text-left">
+          <div className="flex-1 gap-y-1 text-center sm:text-left">
             <h3 className="text-lg font-medium">{currentUserProfile.displayName || 'Usuário sem nome'}</h3>
             <p className="text-sm text-muted-foreground">{currentUserProfile.email}</p>
             <p className="text-xs text-muted-foreground capitalize">{currentUserProfile.role}</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="gap-y-4">
+          <div className="gap-y-2">
             <Label htmlFor="displayName">Nome de exibição</Label>
             <Input
               id="displayName"
@@ -122,7 +122,7 @@ export function ProfileForm() {
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="gap-y-2">
             <Label htmlFor="statusMessage">Mensagem de status</Label>
             <Textarea
               id="statusMessage"
@@ -137,8 +137,8 @@ export function ProfileForm() {
             <Button type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Salvando…
                 </>
               ) : (
                 'Salvar alterações'

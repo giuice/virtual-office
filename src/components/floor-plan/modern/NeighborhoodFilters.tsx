@@ -67,9 +67,8 @@ export const NeighborhoodFilters: React.FC<NeighborhoodFiltersProps> = ({
   }
 
   return (
-    <div 
+    <address
       className={cn('vo-neighborhood-filters', className)}
-      role="group"
       aria-label="Filter by neighborhood"
     >
       {/* All Chip */}
@@ -108,8 +107,7 @@ export const NeighborhoodFilters: React.FC<NeighborhoodFiltersProps> = ({
       })}
 
       {/* Screen reader announcement for filter changes */}
-      <div
-        role="status"
+      <output
         aria-live="polite"
         aria-atomic="true"
         className="sr-only"
@@ -118,8 +116,8 @@ export const NeighborhoodFilters: React.FC<NeighborhoodFiltersProps> = ({
           ? 'Showing all neighborhoods'
           : `Showing ${activeFilters.size} neighborhood${activeFilters.size !== 1 ? 's' : ''}`
         }
-      </div>
-    </div>
+      </output>
+    </address>
   );
 };
 

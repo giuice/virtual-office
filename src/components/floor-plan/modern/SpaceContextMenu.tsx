@@ -95,7 +95,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
           }}
           aria-label={`Actions for ${space.name}`}
         >
-          <MoreVertical className="h-4 w-4" />
+          <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -119,7 +119,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
           }}
           disabled={isUserInSpace || (!shouldKnockFirst && !onEnter)}
         >
-          <DoorOpen className="h-4 w-4 mr-2" />
+          <DoorOpen className="size-4 mr-2" />
           {isUserInSpace ? 'Already Here' : shouldKnockFirst ? 'Knock to Enter' : 'Enter Space'}
         </DropdownMenuItem>
 
@@ -130,7 +130,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
               onKnock?.();
             }}
           >
-            <DoorOpen className="h-4 w-4 mr-2" />
+            <DoorOpen className="size-4 mr-2" />
             Knock Instead
           </DropdownMenuItem>
         )}
@@ -143,7 +143,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
               onOpenChat?.();
             }}
           >
-            <MessageSquare className="h-4 w-4 mr-2" />
+            <MessageSquare className="size-4 mr-2" />
             Open Chat
           </DropdownMenuItem>
         )}
@@ -160,7 +160,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
                   onEdit?.();
                 }}
               >
-                <Pencil className="h-4 w-4 mr-2" />
+                <Pencil className="size-4 mr-2" />
                 Edit Space
               </DropdownMenuItem>
             )}
@@ -172,7 +172,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
                   onManage?.();
                 }}
               >
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="size-4 mr-2" />
                 Manage Space
               </DropdownMenuItem>
             )}
@@ -183,7 +183,7 @@ export const SpaceContextMenu: React.FC<SpaceContextMenuProps> = ({
         <DropdownMenuSeparator />
         <div className="px-2 py-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
+            <Users className="size-3" />
             <span>Capacity: {space.capacity}</span>
           </div>
         </div>

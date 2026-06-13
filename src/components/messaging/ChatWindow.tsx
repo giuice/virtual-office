@@ -35,7 +35,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
  }) => {
    const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
    const scrollAreaRef = useRef<HTMLDivElement>(null);
-   const [isAtBottom, setIsAtBottom] = useState(true);
+   const isAtBottomRef = useRef(true);
  
 
   // Consume centralized realtime status; only "connected" when this is the active conversation
@@ -89,7 +89,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
      const isNearTop = element.scrollTop < 100;
      const isNearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 100;
      
-     setIsAtBottom(isNearBottom);
+     isAtBottomRef.current = isNearBottom;
      
      // Load more messages when scrolled near the top
      if (isNearTop && hasNextPage && !isFetchingNextPage) {
@@ -99,20 +99,20 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
  
    // Auto-scroll to bottom when new messages arrive (if user is already at bottom)
    useEffect(() => {
-     if (isAtBottom && scrollAreaRef.current) {
+     if (isAtBottomRef.current && scrollAreaRef.current) {
        const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
        if (scrollElement) {
          scrollElement.scrollTop = scrollElement.scrollHeight;
        }
      }
-   }, [allMessages, isAtBottom]);
+   }, [allMessages]);
  
    if (isError) {
      return (
        <div className={`flex flex-col h-full border rounded-lg bg-card text-card-foreground ${className}`}>
          <div className="flex-1 flex items-center justify-center p-4">
            <div className="text-center">
-             <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+             <AlertCircle className="size-8 text-destructive mx-auto mb-2" />
              <p className="text-sm text-muted-foreground">
                Failed to load messages: {error?.message}
              </p>
@@ -136,17 +136,17 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
        <div className="p-3 border-b flex items-center justify-between">
          <div className="flex items-center gap-2">
            <h2 className="font-semibold text-lg">
-             {title || `Chat: ${conversationId.slice(0, 8)}...`}
+             {title || `Chat: ${conversationId.slice(0, 8)}…`}
            </h2>
            {/* Connection status indicator */}
            <div className="flex items-center gap-1">
              {isConnected ? (
                <span title="Connected to realtime" aria-label="Connected to realtime">
-                 <Wifi className="h-4 w-4 text-green-500" />
+                 <Wifi className="size-4 text-green-500" />
                </span>
              ) : (
                <span title="Not connected to realtime" aria-label="Not connected to realtime">
-                 <WifiOff className="h-4 w-4 text-gray-400" />
+                 <WifiOff className="size-4 text-gray-400" />
                </span>
              )}
            </div>
@@ -170,8 +170,8 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
              <div className="text-center mb-4">
                {isFetchingNextPage ? (
                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                   <Loader2 className="h-4 w-4 animate-spin" />
-                   Loading older messages...
+                   <Loader2 className="size-4 animate-spin" />
+                   Loading older messages…
                  </div>
                ) : (
                  <Button 
@@ -188,8 +188,8 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
            
            {isLoading ? (
              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-8">
-               <Loader2 className="h-4 w-4 animate-spin" />
-               Loading messages...
+               <Loader2 className="size-4 animate-spin" />
+               Loading messages…
              </div>
            ) : (
              <MessageList messages={allMessages} onStartReply={handleStartReply} />

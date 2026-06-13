@@ -94,12 +94,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<ValidateInvita
       const expiresAt = new Date(invitation.expires_at);
       const now = new Date();
       if (expiresAt < now) {
-        // Update status to expired in database
-        await supabase
-          .from('invitations')
-          .update({ status: 'expired' })
-          .eq('token', token);
-
         return NextResponse.json({
           valid: false,
           error: 'Este convite expirou',

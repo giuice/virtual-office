@@ -93,7 +93,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 		});
 
 		it('applies speaking status class', () => {
-			render(<UserAvatarPresence user={mockUser} isSpeaking={true} />);
+			render(<UserAvatarPresence user={mockUser} state={{ speaking: true }} />);
 
 			const trigger = screen.getByTestId('tooltip-trigger');
 			const wrapper = trigger.firstChild as HTMLElement;
@@ -103,7 +103,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 		});
 
 		it('applies presenting status class', () => {
-			render(<UserAvatarPresence user={mockUser} isPresenting={true} />);
+			render(<UserAvatarPresence user={mockUser} state={{ presenting: true }} />);
 
 			const trigger = screen.getByTestId('tooltip-trigger');
 			const wrapper = trigger.firstChild as HTMLElement;
@@ -112,7 +112,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 		});
 
 		it('applies muted status class', () => {
-			render(<UserAvatarPresence user={mockUser} isMuted={true} />);
+			render(<UserAvatarPresence user={mockUser} state={{ muted: true }} />);
 
 			const trigger = screen.getByTestId('tooltip-trigger');
 			const wrapper = trigger.firstChild as HTMLElement;
@@ -242,7 +242,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 			render(
 				<UserAvatarPresence
 					user={mockUser}
-					isSpeaking={true}
+					state={{ speaking: true }}
 				/>
 			);
 
@@ -257,7 +257,7 @@ describe('Story 3.13: Real-Time Presence Animation', () => {
 			render(
 				<UserAvatarPresence
 					user={mockUser}
-					isPresenting={true}
+					state={{ presenting: true }}
 				/>
 			);
 

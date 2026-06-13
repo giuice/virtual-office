@@ -35,9 +35,7 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   agendaPhase,
   activityLog,
   transcript,
-  isUserInSpace,
-  isPrivate,
-  isFull,
+  state,
   knockStatus,
   knockCooldownRemaining,
   onJoin,
@@ -48,7 +46,6 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   speakingUserIds,
   presentingUserId,
   mutedUserIds,
-  isLoading,
 }) => {
   // Handle close
   const handleClose = () => {
@@ -128,9 +125,7 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
             agendaPhase={agendaPhase}
             activityLog={activityLog}
             transcript={transcript}
-            isUserInSpace={isUserInSpace}
-            isPrivate={isPrivate}
-            isFull={isFull}
+            state={state}
             knockStatus={knockStatus}
             knockCooldownRemaining={knockCooldownRemaining}
             onJoin={handleJoin}
@@ -142,7 +137,6 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
             speakingUserIds={speakingUserIds}
             presentingUserId={presentingUserId}
             mutedUserIds={mutedUserIds}
-            isLoading={isLoading}
             className="rounded-none border-none shadow-none"
           />
         </div>

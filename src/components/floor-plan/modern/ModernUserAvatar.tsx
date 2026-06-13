@@ -1,12 +1,7 @@
 // src/components/floor-plan/modern/ModernUserAvatar.tsx
 import React from 'react';
 import { UserPresenceData } from '@/types/database';
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 // EnhancedAvatarV2 is used internally by InteractiveUserAvatar
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -14,6 +9,12 @@ import { cn } from '@/lib/utils';
 import { floorPlanTokens } from './designTokens';
 // Import the AvatarUser type
 import { AvatarUser } from '@/lib/avatar-utils';
+// Temporarily disable stopPropagation to test menu
+const stopPropagationHandlers = {
+  // onClick: (e: React.MouseEvent) => e.stopPropagation(),
+} as const;
+
+const FALLBACK_USER_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 
 interface ModernUserAvatarProps {
   // Ensure the user prop type is compatible with AvatarUser
@@ -25,17 +26,18 @@ interface ModernUserAvatarProps {
   tooltipPlacement?: 'top' | 'bottom' | 'left' | 'right';
   isOverlapping?: boolean; // Used when avatars are in a group
 }
-
-const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({ 
-  user, 
-  onClick, 
+const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
+  user,
+  onClick,
   size = 'sm',
   showStatus = true,
   className = '',
   tooltipPlacement = 'top',
   isOverlapping = false
 }) => {
-  const { companyUsers } = useCompany();
+  const {
+    companyUsers
+  } = useCompany();
 
   // Find the full user data from company users to get email and supabase_uid for proper avatar display
   const fullUserData = companyUsers.find(companyUser => companyUser.id === user.id);
@@ -54,72 +56,40 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
   }
 
   // Temporarily disable stopPropagation to test menu
-  const stopPropagationHandlers = {
-    // onClick: (e: React.MouseEvent) => e.stopPropagation(),
-  } as const;
 
-  const avatarCore = (
-    <div
-      className={cn(
-        "relative inline-block",
-        isOverlapping && "ring-2 ring-background",
-        className
-      )}
-      data-avatar-interactive
-      {...stopPropagationHandlers}
-      role={onClick ? 'button' : undefined}
-      aria-label={onClick ? `User ${user.displayName}` : undefined}
-    >
-      <InteractiveUserAvatar
-        user={{
-          // Start with the most complete user data available
-          ...(fullUserData || {}),
-          // Selectively overwrite with presence data, which is more up-to-date
-          ...user,
-          // Ensure critical fields are not lost
-          id: user.id,
-          displayName: user.displayName || fullUserData?.displayName || fullUserData?.email || (user as any)?.email || 'Unknown User',
-          avatarUrl: user.avatarUrl || fullUserData?.avatarUrl,
-          status: user.status || fullUserData?.status || 'offline',
-          // Ensure fields required by the User type are present, falling back as needed
-          companyId: fullUserData?.companyId || (user as any).companyId || null,
-          supabase_uid: (fullUserData as any)?.supabase_uid || (user as any)?.supabase_uid || '',
-          email: (fullUserData as any)?.email || (user as any)?.email || '',
-          preferences: fullUserData?.preferences || (user as any).preferences || {},
-          role: fullUserData?.role || (user as any).role || 'member',
-          lastActive: fullUserData?.lastActive || (user as any).lastActive || new Date().toISOString(),
-          createdAt: fullUserData?.createdAt || (user as any).createdAt || new Date().toISOString(),
-        }}
-        size={size}
-        showStatus={showStatus}
-        showInteractionMenu={true}
-        className={cn("transition-all duration-200 border border-border")}
-        aria-label={`${user.displayName}'s avatar - click for options`}
-      />
-    </div>
-  );
-
-  return (
-    <TooltipProvider>
+  const avatarCore = <div className={cn("relative inline-block", isOverlapping && "ring-2 ring-background", className)} data-avatar-interactive {...stopPropagationHandlers} role={onClick ? 'button' : undefined} aria-label={onClick ? `User ${user.displayName}` : undefined}>
+      <InteractiveUserAvatar user={{
+      // Start with the most complete user data available
+      ...(fullUserData || {}),
+      // Selectively overwrite with presence data, which is more up-to-date
+      ...user,
+      // Ensure critical fields are not lost
+      id: user.id,
+      displayName: user.displayName || fullUserData?.displayName || fullUserData?.email || (user as any)?.email || 'Unknown User',
+      avatarUrl: user.avatarUrl || fullUserData?.avatarUrl,
+      status: user.status || fullUserData?.status || 'offline',
+      // Ensure fields required by the User type are present, falling back as needed
+      companyId: fullUserData?.companyId || (user as any).companyId || null,
+      supabase_uid: (fullUserData as any)?.supabase_uid || (user as any)?.supabase_uid || '',
+      email: (fullUserData as any)?.email || (user as any)?.email || '',
+      preferences: fullUserData?.preferences || (user as any).preferences || {},
+      role: fullUserData?.role || (user as any).role || 'member',
+      lastActive: fullUserData?.lastActive || (user as any).lastActive || FALLBACK_USER_TIMESTAMP,
+      createdAt: fullUserData?.createdAt || (user as any).createdAt || FALLBACK_USER_TIMESTAMP
+    }} size={size} display={{ status: showStatus, interactionMenu: true }} className={cn("transition-all duration-200 border border-border")} aria-label={`${user.displayName}'s avatar - click for options`} />
+    </div>;
+  return <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>{avatarCore}</TooltipTrigger>
         <TooltipContent side={tooltipPlacement} className="p-2 max-w-[200px]">
           <div className="text-center">
             <p className="font-medium">{user.displayName || fullUserData?.displayName || fullUserData?.email || (user as any)?.email || 'Unknown User'}</p>
-            {user.status && (
-              <p className="text-xs text-muted-foreground capitalize">{user.status}</p>
-            )}
-            {user.currentSpaceId && (
-              <p className="text-xs text-muted-foreground mt-1">In a space</p>
-            )}
-            {process.env.NODE_ENV === 'development' && (
-              <p className="text-[10px] text-muted-foreground mt-1">ID: {user.id}</p>
-            )}
+            {user.status && <p className="text-xs text-muted-foreground capitalize">{user.status}</p>}
+            {user.currentSpaceId && <p className="text-xs text-muted-foreground mt-1">In a space</p>}
+            {process.env.NODE_ENV === 'development' && <p className="text-[10px] text-muted-foreground mt-1">ID: {user.id}</p>}
           </div>
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
-  );
+    </TooltipProvider>;
 };
-
 export default ModernUserAvatar;

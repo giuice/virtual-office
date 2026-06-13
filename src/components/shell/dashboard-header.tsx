@@ -1,7 +1,6 @@
 // src/components/shell/dashboard-header.tsx
 'use client';
 
-import { useState } from 'react';
 import { Bell, LogOut, Settings, Home } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -28,18 +27,13 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
   const router = useRouter();
   const pathname = usePathname();
   const { showSuccess } = useNotification();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
   const handleSignOut = async () => {
     try {
-      setIsSigningOut(true);
       await signOut();
       showSuccess({ description: 'Successfully signed out!' });
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-    } finally {
-      setIsSigningOut(false);
     }
   };
 
@@ -62,7 +56,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
               <h2 className="text-lg font-semibold">Virtual Office</h2>
             ) : (
               <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold hover:text-primary">
-                <Home className="h-5 w-5" />
+                <Home className="size-5" />
                 <span>Virtual Office</span>
               </Link>
             )}
@@ -79,8 +73,8 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
 
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
+            <Bell className="size-5" />
+            <span className="absolute top-0 right-0 size-2 rounded-full bg-red-500"></span>
           </Button>
 
           {/* User Menu */}
@@ -91,7 +85,7 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
       </div>
 
       {(heading || description) && (
-        <div className="max-w-[1600px] mx-auto px-4 py-4">
+        <div className="max-w-[1600px] mx-auto p-4">
           {heading && <h1 className="text-2xl font-bold">{heading}</h1>}
           {description && <p className="text-muted-foreground">{description}</p>}
         </div>

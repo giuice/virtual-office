@@ -38,13 +38,13 @@ export function getIceServers(): RTCIceServer[] {
  * Default STUN server for quick testing
  * Note: This is a public Google STUN server
  */
-export const DEFAULT_STUN_SERVER = 'stun:stun.l.google.com:19302';
+const DEFAULT_STUN_SERVER = 'stun:stun.l.google.com:19302';
 
 /**
  * Validates that required TURN configuration is present.
  * Returns true if TURN is properly configured, false otherwise.
  */
-export function isTurnConfigured(): boolean {
+function isTurnConfigured(): boolean {
 	return !!(
 		process.env.NEXT_PUBLIC_TURN_URL &&
 		process.env.NEXT_PUBLIC_TURN_USERNAME &&

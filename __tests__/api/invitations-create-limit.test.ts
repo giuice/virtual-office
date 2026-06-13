@@ -36,6 +36,92 @@ let mockExistingInvite: any = null;
 // Mock Supabase server client
 vi.mock('@/lib/supabase/server-client', () => ({
   createSupabaseServerClient: vi.fn().mockImplementation((role?: string) => {
+    const from = (table: string) => {
+      if (table === 'users') {
+        return {
+          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === 'exact' && options?.head === true) {
+              return {
+                eq: () => Promise.resolve({ count: mockUserCount, error: null }),
+              };
+            }
+
+            return {
+              eq: () => ({
+                single: () => Promise.resolve({
+                  data: mockUserData,
+                  error: mockUserData ? null : { code: 'PGRST116' },
+                }),
+              }),
+            };
+          },
+        };
+      }
+
+      if (table === 'companies') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: mockCompanyData,
+                error: mockCompanyData ? null : { code: 'PGRST116' },
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === 'invitations') {
+        return {
+          update: () => ({
+            eq: () => ({
+              eq: () => ({
+                lte: () => Promise.resolve({ error: null }),
+              }),
+            }),
+          }),
+          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === 'exact' && options?.head === true) {
+              return {
+                eq: () => ({
+                  eq: () => ({
+                    gt: () => Promise.resolve({ count: mockPendingCount, error: null }),
+                  }),
+                }),
+              };
+            }
+
+            return {
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    gt: () => ({
+                      order: () => ({
+                        limit: () => ({
+                          maybeSingle: () => Promise.resolve({
+                            data: mockExistingInvite,
+                            error: null,
+                          }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          },
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      };
+    };
+
     if (role === 'service_role') {
       return Promise.resolve({
         auth: {
@@ -43,97 +129,14 @@ vi.mock('@/lib/supabase/server-client', () => ({
             inviteUserByEmail: (email: string, options: any) => mockAuthAdminInvite(email, options),
           },
         },
+        from,
       });
     }
     return Promise.resolve({
       auth: {
         getUser: () => mockAuthGetUser(),
       },
-      from: (table: string) => {
-        if (table === 'users') {
-          return {
-            select: (_columns: string, options?: { count?: string; head?: boolean }) => {
-              if (options?.count === 'exact' && options?.head === true) {
-                return {
-                  eq: () => Promise.resolve({ count: mockUserCount, error: null }),
-                };
-              }
-
-              return {
-                eq: () => ({
-                  single: () => Promise.resolve({
-                    data: mockUserData,
-                    error: mockUserData ? null : { code: 'PGRST116' },
-                  }),
-                }),
-              };
-            },
-          };
-        }
-
-        if (table === 'companies') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({
-                  data: mockCompanyData,
-                  error: mockCompanyData ? null : { code: 'PGRST116' },
-                }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'invitations') {
-          return {
-            update: () => ({
-              eq: () => ({
-                eq: () => ({
-                  lte: () => Promise.resolve({ error: null }),
-                }),
-              }),
-            }),
-            select: (_columns: string, options?: { count?: string; head?: boolean }) => {
-              if (options?.count === 'exact' && options?.head === true) {
-                return {
-                  eq: () => ({
-                    eq: () => ({
-                      gt: () => Promise.resolve({ count: mockPendingCount, error: null }),
-                    }),
-                  }),
-                };
-              }
-
-              return {
-                eq: () => ({
-                  eq: () => ({
-                    eq: () => ({
-                      gt: () => ({
-                        order: () => ({
-                          limit: () => ({
-                            maybeSingle: () => Promise.resolve({
-                              data: mockExistingInvite,
-                              error: null,
-                            }),
-                          }),
-                        }),
-                      }),
-                    }),
-                  }),
-                }),
-              };
-            },
-          };
-        }
-
-        return {
-          select: () => ({
-            eq: () => ({
-              single: () => Promise.resolve({ data: null, error: null }),
-            }),
-          }),
-        };
-      },
+      from,
     });
   }),
 }));

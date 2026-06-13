@@ -1,5 +1,5 @@
 // src/hooks/useAutoRoomConversation.ts
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { useSpaces } from '@/hooks/queries/useSpaces';
@@ -18,7 +18,7 @@ export function useAutoRoomConversation(spaceId: string | null) {
   const { data: spaces } = useSpaces(company?.id);
   const lastProcessedSpaceId = useRef<string | null>(null);
   
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Prevent duplicate processing for the same space
     if (spaceId && user && spaces && spaceId !== lastProcessedSpaceId.current) {
       // console.log(`[useAutoRoomConversation] Auto-creating room conversation for space: ${spaceId}`);
@@ -41,7 +41,7 @@ export function useAutoRoomConversation(spaceId: string | null) {
       // Reset when user leaves all spaces
       lastProcessedSpaceId.current = null;
     }
-  }, [spaceId, user?.id, spaces, getOrCreateRoomConversation, setActiveConversation]);
+  }, [spaceId, user, user?.id, spaces, getOrCreateRoomConversation, setActiveConversation]);
 
   return { 
     spaceId,

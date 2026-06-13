@@ -160,16 +160,20 @@ function parseStateMd(content) {
     // next_phases supports both flow array and block-list YAML forms.
     const npFlowMatch = fm.match(/^next_phases:\s*\[([^\]]*)\]/m);
     if (npFlowMatch) {
-      const items = npFlowMatch[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+      const items = npFlowMatch[1].split(',').flatMap(s => {
+        const item = s.trim().replace(/^["']|["']$/g, '');
+        return item ? [item] : [];
+      });
       state.nextPhases = items.length > 0 ? items : null;
     } else {
       const npBlockMatch = fm.match(/^next_phases:\s*\n((?:[ \t]*-[ \t]*[^\n]+\n?)*)/m);
       if (npBlockMatch) {
         const items = npBlockMatch[1]
           .split('\n')
-          .map(line => line.match(/^[ \t]*-[ \t]*(.+)$/))
-          .filter(Boolean)
-          .map(m => m[1].trim().replace(/^["']|["']$/g, ''))
+          .flatMap(line => {
+            const match = line.match(/^[ \t]*-[ \t]*(.+)$/);
+            return match ? [match[1].trim().replace(/^["']|["']$/g, '')] : [];
+          })
           .filter(Boolean);
         state.nextPhases = items.length > 0 ? items : null;
       }
@@ -368,8 +372,9 @@ function runStatusline() {
     if (session && fs.existsSync(todosDir)) {
       try {
         const files = fs.readdirSync(todosDir)
-          .filter(f => f.startsWith(session) && f.includes('-agent-') && f.endsWith('.json'))
-          .map(f => ({ name: f, mtime: fs.statSync(path.join(todosDir, f)).mtime }))
+          .flatMap(f => f.startsWith(session) && f.includes('-agent-') && f.endsWith('.json')
+            ? [{ name: f, mtime: fs.statSync(path.join(todosDir, f)).mtime }]
+            : [])
           .sort((a, b) => b.mtime - a.mtime);
 
         if (files.length > 0) {

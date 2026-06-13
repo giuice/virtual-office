@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, redirect } from 'next/navigation';
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,22 +13,19 @@ export default function OfficePage() {
   const router = useRouter();
   const { company, currentUserProfile } = useCompany();
 
-  // Redirect to floor plan
-  useEffect(() => {
-    if (isReady) {
-      router.push('/floor-plan');
-    }
-  }, [isReady, router]);
-
   if (loading) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
+      <div className="flex size-full items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold">Loading...</h2>
+          <h2 className="text-2xl font-semibold">Loading…</h2>
           <p className="text-muted-foreground">Setting up your workspace</p>
         </div>
       </div>
     );
+  }
+
+  if (isReady) {
+    redirect('/floor-plan');
   }
 
   const isAdmin = company?.adminIds.includes(currentUserProfile?.id || '') || false;
@@ -47,12 +43,12 @@ export default function OfficePage() {
             <CardDescription>Your virtual office workspace</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex flex-col space-y-1">
+            <div className="gap-y-4">
+              <div className="flex flex-col gap-y-1">
                 <span className="text-sm font-medium">Current Members</span>
                 <span className="text-2xl font-bold">{company?.adminIds.length || 0}</span>
               </div>
-              <div className="flex justify-start space-x-2">
+              <div className="flex justify-start gap-x-2">
                 <Button onClick={() => router.push('/floor-plan')}>
                   Enter Floor Plan
                 </Button>
