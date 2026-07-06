@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
 
 # next.js
 /.next/
@@ -39,6 +41,9 @@ env.example
 .env.local
 .env.development
 .env.production
+
+# local MCP config — holds the Supabase access token; use .mcp.json.example as the template
+.mcp.json
 
 # vercel
 .vercel

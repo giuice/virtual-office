@@ -146,7 +146,7 @@ saveLastSpace(spaceId, { markManualChange: false }) // automatic placement / hyd
 - Manual actions MUST use the default (guard set) — otherwise auto-placement snaps the user back to home space.
 - Automatic placements (inside `updateUserLocation`, the FloorPlan hydration effect) MUST pass `{ markManualChange: false }` — otherwise the guard gets consumed by the wrong run and a later legit auto-placement is skipped.
 - The auto-placement effect checks `manualChangeRef` FIRST and consumes it (sets it back to false).
-- Never call `setLastSpaceId` directly; always go through `saveLastSpace`.
+- Never call `setLastSpaceId` directly **to set a space**; always go through `saveLastSpace`. Exception: **clearing** to `null` MUST use `setLastSpaceId(null)` directly — `saveLastSpace(spaceId: string)` is non-nullable by design. The four existing `setLastSpaceId(null)` calls inside `useLastSpace` (SPACE_FULL dead-end, retry-exhausted, network catch, `clearLastSpace`) are intentional, not violations.
 
 The auto-placement effect also has guards you must NOT remove: `isUpdatingRef`/`isRejoinInProgress`, the `lastUpdateRef` dedup key (`${userId}-${spaceId}`), the "user already in a different space" skip, and the stale-offline refresh branch (`dbStatus === 'offline' && currentSpaceId` → re-PUT the SAME space to flip status back to online).
 
@@ -194,6 +194,7 @@ In `route.ts`, after a successful location update, if the user's DB status was `
 | `postgres_changes` listener covers the whole `users` table, no filter | `useUserPresence.ts` | Adding a filter silently stops peer updates |
 | TWO independent dedup keys `${userId}-${spaceId}` (`safeUpdateLocation.lastUpdateRef` and `useLastSpace.lastUpdateRef`) | Both hooks | They are NOT shared; don't merge or remove either |
 | `lastSpaceId` must stay aligned whether placement came from UI or auto-placement | floor-plan hydration effect + `updateUserLocation` | Grace rejoin targets the wrong space |
+| ⚠️ **Joinable-status MISMATCH (latent bug):** `useLastSpace.JOINABLE_STATUSES` = `active/available/in_use`, but the server (`route.ts`) and manual entry (`handleEnterSpace`) accept only `active/available` | `useLastSpace.ts` vs `route.ts` + `useModernFloorPlanKnock.ts` | Auto-placement/grace-rejoin can target an `in_use` space → server returns 409 `SPACE_UNAVAILABLE`, which has NO special branch in `updateUserLocation` (only `SPACE_FULL` does) → generic 2s/4s/8s retry loop → 3 failures → `lastSpaceId` cleared + "Rejoin Failed" toast, user placed nowhere. When fixing: either drop `in_use` from `JOINABLE_STATUSES` or add a `SPACE_UNAVAILABLE` fallback branch mirroring `SPACE_FULL` |
 
 ---
 
@@ -205,7 +206,9 @@ Order matters. The handler:
 2. Rejects if body `userId !== authenticatedUser.id` (`USER_MISMATCH`, 403). Parses `text/plain` bodies (beacon).
 3. **`offline: true` branch:** sets `status: 'offline'` ONLY, returns. Never touches `current_space_id` (Rule 1).
 4. For a target space: cross-company guard (403) → capacity excluding offline users and self (409 `SPACE_FULL`) → space status must be `active`/`available` (409 `SPACE_UNAVAILABLE`).
-5. **Private space (`access_control.isPublic === false`)** entry allowed by ANY of: direct access (admin/owner/allowedUsers/allowedRoles) · already in space · grace rejoin via `space_presence_log.exited_at` < 5 min · grace via `users.last_active` < 5 min (covers beacon race) · an OPEN presence log row (no `exited_at`) · an approved knock. Otherwise 403 `SPACE_ACCESS_DENIED`.
+5. **Private space (`access_control.isPublic === false`)** entry allowed by ANY of: direct access (admin/owner/allowedUsers/allowedRoles) · already in space · grace rejoin via `space_presence_log.exited_at` < 5 min · grace via `users.last_active` < 5 min · an OPEN presence log row (no `exited_at`) · an approved knock. Otherwise 403 `SPACE_ACCESS_DENIED`.
+
+   > ⚠️ **KNOWN SECURITY BUG — do NOT preserve as-is.** The `last_active` grace check (`hasGraceRejoinByLastActive`) checks ONLY the user's own activity recency — it never verifies the user was ever in THIS space (the inline code comment claims it does; the code does not). Since `SupabaseUserRepository` refreshes `last_active` on every update, **any recently-active user bypasses the knock gate for any private space**. The knock gate only holds for users idle > 5 min. Intended design: it exists to cover the beacon race for a user rejoining THEIR OWN recent space. Correct fix when touching this route: scope the check by also requiring an open or recently-exited `space_presence_log` row for the same `space_id` (or `authenticatedUser.currentSpaceId === spaceId`). Do not treat this branch as load-bearing authorization for strangers.
 6. Updates location; if user was `offline`, reactivates to `online` (Rule 7).
 7. On space change, syncs `space_presence_log` (closes previous row, inserts new one with `authorized_by`).
 8. If entry was authorized by a knock, **deletes the consumed `knock_requests` row** (single-use approval).
@@ -325,7 +328,7 @@ These have caused real regressions. If you find yourself doing any of these, STO
 2. **Clearing `current_space_id` in the beacon handler or offline branch** — beacon race; avatars disappear on reload.
 3. **Using `currentUserProfile.currentSpaceId` in an effect guard** — stale. Use `usePresence().users`.
 4. **Including offline users in `usersInSpaces`** — ghost avatars.
-5. **Calling `setLastSpaceId` without going through `saveLastSpace`** — auto-placement snaps the user to home space.
+5. **Calling `setLastSpaceId(someSpaceId)` without going through `saveLastSpace`** — auto-placement snaps the user to home space. (Clearing with `setLastSpaceId(null)` is the sanctioned exception — see Rule 4.)
 6. **Passing `currentUserProfile` into `useLastSpace`** — stale `currentSpaceId`/`dbStatus` overrides live state.
 7. **Adding a new Realtime subscription for the same data** — use the existing `postgres_changes` listener. Don't add another.
 8. **Mutating `rawUsers` query data in the presence leave handler** — breaks derivation; users appear permanently offline. Let `onlineUserIds` handle it.
