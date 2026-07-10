@@ -109,6 +109,12 @@ function isPresencePath(filePath) {
     /(^|\/)users\/location\/route\.ts$/,
     /(^|\/)ModernFloorPlan\.tsx$/,
     /(^|\/)floor-plan\/floor-plan\.tsx$/,
+    /(^|\/)useModernFloorPlanKnock\.ts$/,
+    /(^|\/)useKnockSignaling\.ts$/,
+    /(^|\/)useUserCalling\.ts$/,
+    /(^|\/)spaces\/knock\/(request|respond)\/route\.ts$/,
+    /(^|\/)presence-utils\.ts$/,
+    /(^|\/)SupabaseUserRepository\.ts$/,
   ].some((pattern) => pattern.test(normalized));
 }
 
@@ -153,25 +159,32 @@ fi
 touch "$FLAG_FILE"
 
 MESSAGE="$(cat <<EOF
-PRESENCE SAFETY GUARD ACTIVATED for: $BASENAME
+PRESENCE REMEDIATION GUARD (temporary) for: $BASENAME
 
-This file is part of the presence/space system, which has 4 interacting sources of truth.
+This subsystem is under active security remediation. The execution
+specification is:
+
+  docs/presence-safety-remediation-handoff-2026-07-09.md
+
+That handoff OVERRIDES the presence-safety skill, the pitfalls guide, and
+any older guard rules until remediation completes. Do NOT follow superseded
+rules (e.g. preserving manualChangeRef, force-including the current user,
+last_active-based authorization) merely because an old doc or test expects
+them.
 
 BEFORE proceeding, you MUST:
-1. Read the presence-safety skill:
-   - Claude: .claude/skills/presence-safety/SKILL.md
-   - Codex/Copilot/shared: .agents/skills/presence-safety/SKILL.md
-2. Verify your change follows all 5 critical rules
-3. Run the checklist at the bottom of the skill
+1. Read the handoff's "Required worker behavior", "Stop conditions", and the
+   phase you are working on. Work on ONE numbered phase at a time.
+2. Never authorize private access from last_active, users.status, Realtime
+   payloads, localStorage, or client time.
+3. Never add browser INSERT/UPDATE/DELETE on knock_requests, or new direct
+   writers of users.current_space_id / space_presence_log outside the
+   inventoried allowlist (docs/presence-remediation/phase-0-writer-caller-inventory-2026-07-10.md).
+4. Add the required failing regression test with each fix; never weaken an
+   assertion without proving it encoded a bug.
+5. Completion is user-gated: report "Status: Pending user confirmation".
 
-Key rules:
-- NEVER clear current_space_id in cleanup/disconnect paths
-- Only ONE updateLocation call per user action
-- Filter offline users from usersInSpaces (except current user)
-- manualChangeRef guard must be preserved in useLastSpace
-- Use query-derived values, NOT CompanyContext, for reactive guards
-
-Re-attempt your edit after reviewing the rules.
+Re-attempt your edit after reading the handoff sections above.
 
 Blocked path: $BLOCKED_PATH
 EOF
