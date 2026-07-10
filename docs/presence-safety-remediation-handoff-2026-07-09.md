@@ -1467,27 +1467,27 @@ Do not reorder these phases. Tests listed inside a phase ship with that phase.
 
 ### Phase 0 - Capture and freeze the current contract
 
-- [ ] Ensure this handoff itself is committed on a dedicated reviewed commit before delegating implementation phases; record that commit separately from audited baseline `b18ab26`.
-- [ ] Record current live/staging table columns, constraints, grants, RLS policies, publication membership, and relevant function definitions.
-- [ ] Record all callers/writers using searches for `/api/users/location`, `updateLocation`, `current_space_id`, `users.status`, `last_active`, `sendBeacon`, `knock_requests`, and the legacy storage keys.
-- [ ] Add `docs` notes for any live difference from this audited baseline.
-- [ ] Record verified JWT claims (especially `session_id`), configured JWT lifetime, Auth session timebox/inactivity/single-session settings, and the installed `auth.sessions` catalog shape. Prove a narrowly owned exact-session absence check and local-scope sign-out are available; stop if the auth-session ID/absence cannot be verified server-side.
-- [ ] Verify local/staging can create/read back `presence_maintenance_owner` with the exact attributes/grants/policies above and that pg_cron jobs run as `postgres`; do not begin maintenance migrations if either boundary differs.
-- [ ] Fix the database-test bootstrap blocker before any behavior migration: the audited repo has no `supabase/config.toml`, and current canonical migrations cannot create core tables/enums from an empty database. A lead/DB owner must initialize config, pin the exact Supabase CLI version in project tooling/lockfile, and commit a reviewed schema-only canonical baseline ordered before migrations that reference those objects. Do not fabricate an early timestamp or dump production data/secrets. Require `supabase db reset` on a disposable local instance from only committed files.
-- [ ] Add the test infrastructure now: `vitest.presence-db.config.mts`, the three presence package scripts, Playwright `presence` project/fixtures, deterministic fixture cleanup, and CI skeleton. Later phases add cases; Phase 8 only aggregates/enforces zero skips.
-- [ ] Add a temporary CI check that fails when a new direct location fetch or `knock_requests` browser mutation is introduced outside the allowlist.
-- [ ] Record every table/function/route that writes `users.current_space_id`, `space_presence_log`, or consumes Knock; this exact allowlist becomes the permanent movement-gate trigger/caller coverage.
-- [ ] Replace the stale rules in `.agents/hooks/presence-guard.sh` with a temporary remediation guard that points workers to this handoff and blocks known bypasses. Verify `.codex/hooks.json`, `.claude/settings.json`, and `.github/hooks/presence-guard.json` invoke that same guard.
-- [ ] Record the available observability sink. The audited repo has no metrics provider dependency; do not invent one. Until the user selects a provider, scope mandatory implementation to structured JSON server logs plus committed SQL health checks and record dashboard/alert integration as a user-gated residual.
-- [ ] Do not change application runtime behavior in this phase; test/bootstrap/guard changes are allowed.
+- [x] Ensure this handoff itself is committed on a dedicated reviewed commit before delegating implementation phases; record that commit separately from audited baseline `b18ab26`. — commit `89c87b5` (2026-07-10).
+- [x] Record current live/staging table columns, constraints, grants, RLS policies, publication membership, and relevant function definitions. — `docs/presence-remediation/phase-0-live-catalog-2026-07-10.md`.
+- [x] Record all callers/writers using searches for `/api/users/location`, `updateLocation`, `current_space_id`, `users.status`, `last_active`, `sendBeacon`, `knock_requests`, and the legacy storage keys. — `docs/presence-remediation/phase-0-writer-caller-inventory-2026-07-10.md`.
+- [x] Add `docs` notes for any live difference from this audited baseline. — migration-history drift, knock full DML, no `location_version`/revision cols yet, 1 user with 2 open logs (catalog doc + inventory deltas).
+- [~] Record verified JWT claims (especially `session_id`), configured JWT lifetime, Auth session timebox/inactivity/single-session settings, and the installed `auth.sessions` catalog shape. Prove a narrowly owned exact-session absence check and local-scope sign-out are available; stop if the auth-session ID/absence cannot be verified server-side. — DONE: `auth.sessions` shape captured (live+local match), server-side exact-session absence check proven (`auth.sessions.id`, `postgres` has SELECT), `signOut({scope:'local'})` available; NO stop condition. RESIDUAL: exact JWT lifetime/timebox/single-session numbers live in dashboard Auth config (not SQL); read before Phase 2 lease-expiry tuning.
+- [~] Verify local/staging can create/read back `presence_maintenance_owner` with the exact attributes/grants/policies above and that pg_cron jobs run as `postgres`; do not begin maintenance migrations if either boundary differs. — DONE locally: role reads back `NOLOGIN NOINHERIT NOBYPASSRLS`; `pg_cron` 1.6 installs. RESIDUAL: local `cron` schema is owned by `supabase_admin`; reconfirm jobs run as `postgres` on staging before the Phase 2 maintenance migration.
+- [x] Fix the database-test bootstrap blocker before any behavior migration: ... Require `supabase db reset` on a disposable local instance from only committed files. — `supabase/config.toml` added, CLI pinned `2.109.1`, schema-only baseline `supabase/migrations/20260610183000_baseline_core_schema.sql` ordered before the RLS migration; two clean `supabase db reset` verified; mapping in `docs/presence-remediation/phase-0-baseline-mapping-2026-07-10.md`. commit `b323645`.
+- [x] Add the test infrastructure now: `vitest.presence-db.config.mts`, the three presence package scripts, Playwright `presence` project/fixtures, deterministic fixture cleanup, and CI skeleton. Later phases add cases; Phase 8 only aggregates/enforces zero skips. — added (`test:presence-db`, `test:presence-e2e`, `test:presence`; `__tests__/presence-db/{setup,fixtures,harness}`; Playwright `presence` project; `.github/workflows/presence-remediation.yml`). Harness reaches Postgres, 2/2 pass.
+- [x] Add a temporary CI check that fails when a new direct location fetch or `knock_requests` browser mutation is introduced outside the allowlist. — `scripts/presence-movement-gate.mjs` (`npm run presence:gate`), negative-tested; wired into the CI workflow.
+- [x] Record every table/function/route that writes `users.current_space_id`, `space_presence_log`, or consumes Knock; this exact allowlist becomes the permanent movement-gate trigger/caller coverage. — inventory doc + gate allowlist (`useLastSpace.ts`, `useUserPresence.ts` for location fetch; empty allowlist for browser knock mutation).
+- [x] Replace the stale rules in `.agents/hooks/presence-guard.sh` with a temporary remediation guard that points workers to this handoff and blocks known bypasses. Verify `.codex/hooks.json`, `.claude/settings.json`, and `.github/hooks/presence-guard.json` invoke that same guard. — done (commit `ec8990f`); all three registrations resolve to the shared `.agents` script (`.claude` copy is a thin wrapper); guard widened to knock/session/repository paths.
+- [x] Record the available observability sink. ... scope mandatory implementation to structured JSON server logs plus committed SQL health checks and record dashboard/alert integration as a user-gated residual. — recorded in catalog doc: no metrics provider dep; scope = JSON logs + SQL health checks; dashboard/alerts = user-gated residual.
+- [x] Do not change application runtime behavior in this phase; test/bootstrap/guard changes are allowed. — no `src/` runtime behavior changed; only config/tests/guard/docs/migrations.
 
-Exit gate:
+Exit gate: **MET (2026-07-10)** — pending user confirmation. See progress tracker at end of document.
 
-- Read-only schema evidence exists.
-- Writer/caller inventory is complete.
-- Baseline tests and known TODO counts are recorded.
-- A clean disposable `supabase db reset` succeeds from committed files with a pinned CLI, and the presence DB test command reaches Postgres.
-- The temporary guard no longer instructs workers to preserve `manualChangeRef`, force-include the current user, or follow superseded rules.
+- [x] Read-only schema evidence exists. — catalog doc.
+- [x] Writer/caller inventory is complete. — inventory doc.
+- [x] Baseline tests and known TODO counts are recorded. — 14 files / 171 pass / 6 skip / 3 TODO at `b18ab26` (catalog doc).
+- [x] A clean disposable `supabase db reset` succeeds from committed files with a pinned CLI, and the presence DB test command reaches Postgres. — two clean resets; `npm run test:presence-db` 2/2.
+- [x] The temporary guard no longer instructs workers to preserve `manualChangeRef`, force-include the current user, or follow superseded rules. — guard rewritten (commit `ec8990f`).
 
 ### Phase 1 - Emergency private-space security closure
 
@@ -2499,3 +2499,36 @@ This remediation is complete only when all are true:
 Until then, report:
 
 `Status: Pending user confirmation`
+
+## Phase progress tracker
+
+Single source of truth for remediation status. Update this table at the end of every phase, in the same commit that closes the phase. Status values: `not started` · `in progress` · `exit-gate met (pending user confirmation)` · `confirmed`.
+
+Per-phase exit gates remain authoritative — this table only summarizes them. A phase is not `confirmed` until the user verifies its runtime evidence.
+
+| Phase | Title | Status | Closing commit(s) | Evidence | Notes / residuals |
+| ----- | ----- | ------ | ----------------- | -------- | ----------------- |
+| 0 | Capture and freeze the current contract | exit-gate met (pending user confirmation) | `89c87b5`, `ec8990f`, `b323645` | `docs/presence-remediation/phase-0-*-2026-07-10.md` (live catalog, writer/caller inventory, baseline mapping); two clean `supabase db reset`; `npm run test:presence-db` 2/2 | Residuals (non-blocking): (1) exact JWT lifetime/timebox/single-session Auth settings from dashboard before Phase 2; (2) reconfirm pg_cron runs as `postgres` on staging; (3) migration-history reconcile (`supabase migration repair`) before any prod `db push` — live `schema_migrations` has 4 entries, none map to the 8 canonical files. Data note: 1 user has 2 open `space_presence_log` rows (cleanup query must be reviewed before repair). |
+| 1 | Emergency private-space security closure | not started | — | — | SEC-01/02/03, KNOCK-02, DOC-01. Write failing RLS + route tests first. |
+| 2 | Per-tab connection leases | not started | — | — | LIFE-01/02. Needs residual (1) above (JWT settings) resolved for lease expiry. |
+| 3 | Atomic transition and capacity enforcement | not started | — | — | CAP-01, TX-01/02, SEC-03. |
+| 4 | Harden knock server APIs | not started | — | — | KNOCK-01/02/05. |
+| 5 | Unify client movement and placement initialization | not started | — | — | MOVE-01..05, KNOCK-03/06. |
+| 6 | Repair status, cache, and Realtime | not started | — | — | SEC-04, LIFE-03, CACHE-01/02/03, RT-01/02. |
+| 7 | Account, logout, storage, and multi-tab lifecycle | not started | — | — | LIFE-01, CACHE-01. |
+| 8 | Complete the safety test system | not started | — | — | DOC-02/03; enforce zero skips. |
+| 9 | Draft the replacement skill and evidence system | not started | — | — | DOC-04..07; needs eval runner + models. |
+| 10 | Rollout, observe, and remove legacy behavior | not started | — | — | Staging runtime evidence; legacy cutover gates. |
+| 11 | Promote the canonical safety skill | not started | — | — | DOC-05/06/08; canonical skill + symlinks; final guard rewrite. |
+
+### Working-agreement checklist (per phase, before marking exit-gate met)
+
+- [ ] Worked one numbered phase only; database/client/skill changes not combined in one diff.
+- [ ] Required failing regression test added **before or with** the fix; no assertion weakened without proving it encoded a bug.
+- [ ] No authorization derived from `last_active`, `users.status`, Realtime payloads, localStorage, or client time.
+- [ ] No new direct writer of `users.current_space_id` / `space_presence_log` or browser `knock_requests` mutation outside the allowlist (`npm run presence:gate` green).
+- [ ] Any new/changed migration reset-tested on the disposable local instance (`npm run db:local:reset`) from committed files only.
+- [ ] Live-vs-baseline schema differences that affect RLS/constraints/function signatures escalated, not silently patched.
+- [ ] Phase exit-gate bullets each individually checked with linked evidence.
+- [ ] This tracker table row updated in the closing commit.
+- [ ] Reported `Status: Pending user confirmation`; did not claim "done"/"fixed".
