@@ -1,0 +1,2 @@
+# Presence remediation E2E specs land here (Phases 2, 5, 7, 8).
+# The `presence` Playwright project matches **/presence/**/*.spec.ts.

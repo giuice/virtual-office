@@ -1,0 +1,49 @@
+name: presence-remediation
+
+# Phase 0 CI skeleton for the presence-safety remediation.
+# - movement-gate: cheap grep guard, always runs.
+# - presence-db: spins up local Supabase and runs the presence DB suite.
+# Later phases add cases; Phase 8 flips zero-skip enforcement on.
+
+on:
+  pull_request:
+    paths:
+      - 'src/hooks/**'
+      - 'src/contexts/**'
+      - 'src/components/floor-plan/**'
+      - 'src/app/api/users/**'
+      - 'src/app/api/spaces/knock/**'
+      - 'supabase/migrations/**'
+      - '__tests__/presence-db/**'
+      - 'scripts/presence-movement-gate.mjs'
+      - '.github/workflows/presence-remediation.yml'
+  workflow_dispatch:
+
+jobs:
+  movement-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/presence-movement-gate.mjs
+
+  presence-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+      - name: Start local Supabase
+        run: supabase start
+      - name: Verify migrations reset cleanly
+        run: supabase db reset
+      - name: Presence DB suite
+        run: npm run test:presence-db

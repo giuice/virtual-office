@@ -18,7 +18,13 @@
     "test:api:debug": "playwright test --debug",
     "test:api:ui": "playwright test --ui",
     "test:api:ci": "playwright test --project=messaging-drawer --repeat-each=3",
-    "test:all": "node run-tests.js"
+    "test:all": "node run-tests.js",
+    "db:local:start": "supabase start",
+    "db:local:reset": "supabase db reset",
+    "test:presence-db": "vitest run --config vitest.presence-db.config.mts",
+    "test:presence-e2e": "playwright test --project=presence",
+    "test:presence": "npm run test:presence-db && npm run test:presence-e2e",
+    "presence:gate": "node scripts/presence-movement-gate.mjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -66,6 +72,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/lodash": "^4.17.24",
     "@types/node": "^25.3.0",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.59.3",
@@ -78,9 +85,11 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "happy-dom": "^20.7.0",
     "jsdom": "^29.1.1",
+    "pg": "^8.22.0",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "supabase": "2.109.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^6.0.3",
     "vitest": "^4.0.18"

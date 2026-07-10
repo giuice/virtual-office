@@ -37,6 +37,13 @@ export default defineConfig({
       testMatch: ['**/epic-4A-*.spec.ts', '**/messaging-read-model.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      // Presence remediation E2E. Later phases add multi-tab lease, capacity,
+      // knock, and private-access specs here; Phase 8 enforces zero skips.
+      name: 'presence',
+      testMatch: ['**/presence/**/*.spec.ts'],
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   // Run local development server before starting the tests
   webServer: {
