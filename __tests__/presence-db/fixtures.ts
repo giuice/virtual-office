@@ -37,7 +37,8 @@ export class PresenceFixtures {
    * Namespaced by email/name suffix `::<ns>` used by the builders in later phases.
    */
   async cleanup(): Promise<void> {
-    const tag = `%::${this.ns}`;
+    // `%` on both sides: emails embed the tag mid-string (phase2-x::<ns>@example.test).
+    const tag = `%::${this.ns}%`;
     // knock_requests.space_id is ON DELETE RESTRICT (Phase 1) and auth-backed
     // test users carry valid emails that don't match the `::<ns>` tag, so knock
     // rows are also removed by namespaced space before users/spaces go.
@@ -49,6 +50,16 @@ export class PresenceFixtures {
     );
     await this.client.query(
       `delete from public.space_presence_log
+         where user_id in (select id from public.users where email like $1)`,
+      [tag],
+    );
+    await this.client.query(
+      `delete from public.user_presence_sessions
+         where user_id in (select id from public.users where email like $1)`,
+      [tag],
+    );
+    await this.client.query(
+      `delete from public.revoked_presence_auth_sessions
          where user_id in (select id from public.users where email like $1)`,
       [tag],
     );

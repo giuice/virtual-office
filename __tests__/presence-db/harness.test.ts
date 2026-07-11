@@ -30,12 +30,21 @@ describe('presence-db harness', () => {
     ]);
   });
 
-  it('sees the expected RLS policies (7: baseline 11 minus the 4 vulnerable knock policies dropped in Phase 1)', async () => {
+  it('sees the expected RLS policies (13: baseline 11 minus 4 vulnerable knock policies dropped in Phase 1, plus 6 presence_maintenance_owner policies added in Phase 2)', async () => {
     const [{ count }] = await fx.sql<{ count: string }>(
       `select count(*)::text as count from pg_policies
         where schemaname = 'public'
           and tablename in ('users','spaces','space_presence_log','knock_requests')`,
     );
-    expect(Number(count)).toBe(7);
+    expect(Number(count)).toBe(13);
+    // The 6 Phase 2 additions are scoped to presence_maintenance_owner only —
+    // no browser-facing policy was added back.
+    const [{ count: pmoCount }] = await fx.sql<{ count: string }>(
+      `select count(*)::text as count from pg_policies
+        where schemaname = 'public'
+          and tablename in ('users','spaces','space_presence_log','knock_requests')
+          and roles = '{presence_maintenance_owner}'`,
+    );
+    expect(Number(pmoCount)).toBe(6);
   });
 });

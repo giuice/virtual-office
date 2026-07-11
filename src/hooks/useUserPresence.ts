@@ -25,23 +25,6 @@ interface PresenceLeavePayload {
   leftPresences?: PresencePayload[];
 }
 
-function sendUnloadPresenceUpdate(currentUserId: string) {
-  const payload = JSON.stringify({ userId: currentUserId, spaceId: null, offline: true });
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon('/api/users/location', payload);
-    return;
-  }
-
-  void fetch('/api/users/location', {
-    method: 'POST',
-    body: payload,
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-    keepalive: true,
-  }).catch((error) => {
-    console.error('[Presence] Failed to send unload cleanup request:', error);
-  });
-}
-
 export function useUserPresence(currentUserId?: string) {
   // Log initialization with current user ID
   if (process.env.NODE_ENV === 'development') {
@@ -337,7 +320,6 @@ export function useUserPresence(currentUserId?: string) {
 
     const handleBeforeUnload = () => {
       localStorage.setItem('vo-disconnect-timestamp', Date.now().toString());
-      sendUnloadPresenceUpdate(currentUserId);
     };
 
     const handleVisibilityChange = () => {

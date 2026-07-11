@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, use, ReactNode, useMemo } from 'react';
 import { useUserPresence } from '@/hooks/useUserPresence';
+import { usePresenceSession } from '@/hooks/usePresenceSession';
 import { useAutoRoomConversation } from '@/hooks/useAutoRoomConversation';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { UserPresenceData } from '@/types/database';
@@ -20,6 +21,7 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => { // 
 
   // Pass the current user ID to useUserPresence
   const { users, usersInSpaces, isLoading, error, updateLocation } = useUserPresence(currentUserId);
+  usePresenceSession(currentUserId ?? null);
 
   // Get current user's space ID for messaging integration
   const currentUserSpaceId = users?.find(u => u.id === currentUserId)?.currentSpaceId || null;
