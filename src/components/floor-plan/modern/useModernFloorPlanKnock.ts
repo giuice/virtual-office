@@ -4,6 +4,7 @@ import { useKnock } from '@/hooks/useKnock';
 import {
   KnockRequestPayload,
   KnockResponsePayload,
+  isKnockTemporarilyUnavailableFailure,
   useKnockSignaling,
 } from '@/hooks/realtime/useKnockSignaling';
 import type { Space, User, UserPresenceData } from '@/types/database';
@@ -22,6 +23,11 @@ interface UseModernFloorPlanKnockOptions {
 interface KnockTimeoutState {
   spaceId: string | null;
 }
+
+// Phase 1 fail-closed window: re-enabled in Phase 4 via service-role transaction functions.
+const KNOCK_DISABLED = true;
+const KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  'Private spaces are temporarily unavailable unless you have direct access. Please try again later.';
 
 type KnockTimeoutAction =
   | { type: 'show'; spaceId: string | null }
@@ -98,6 +104,7 @@ export function useModernFloorPlanKnock({
   }, []);
 
   const handleIncomingKnockRequest = useCallback((payload: KnockRequestPayload) => {
+    if (KNOCK_DISABLED) return;
     playKnockCue();
     setPendingKnockRequests((prev) => {
       const next = new Map(prev);
@@ -146,16 +153,18 @@ export function useModernFloorPlanKnock({
   }, [knockBannerTimeouts]);
 
   const handleBannerApprove = useCallback(async (request: KnockRequestPayload) => {
+    if (KNOCK_DISABLED) return;
     clearPendingKnockRequest(request.spaceId);
 
     try {
-      await respondToKnockRef.current?.({
+      const result = await respondToKnockRef.current?.({
         spaceId: request.spaceId,
         requestId: request.requestId,
         requesterId: request.requesterId,
         requesterName: request.requesterName,
         decision: 'APPROVE',
       });
+      if (isKnockTemporarilyUnavailableFailure(result)) return;
       toast.success(`${request.requesterName} has been let in`);
     } catch (err) {
       toast.error('Failed to approve knock', {
@@ -165,16 +174,18 @@ export function useModernFloorPlanKnock({
   }, [clearPendingKnockRequest]);
 
   const handleBannerDeny = useCallback(async (request: KnockRequestPayload) => {
+    if (KNOCK_DISABLED) return;
     clearPendingKnockRequest(request.spaceId);
 
     try {
-      await respondToKnockRef.current?.({
+      const result = await respondToKnockRef.current?.({
         spaceId: request.spaceId,
         requestId: request.requestId,
         requesterId: request.requesterId,
         requesterName: request.requesterName,
         decision: 'DENY',
       });
+      if (isKnockTemporarilyUnavailableFailure(result)) return;
       toast.info(`Access denied to ${request.requesterName}`);
     } catch (err) {
       toast.error('Failed to deny knock', {
@@ -248,14 +259,7 @@ export function useModernFloorPlanKnock({
       );
 
       if (isRestrictedSpace && !canDirectEnter) {
-        const hasOnlineResponder = (usersInSpaces.get(spaceId) || []).some(
-          (user) => user.id !== currentUserProfile.id && user.status !== 'offline'
-        );
-        setError(
-          hasOnlineResponder
-            ? 'This space is private. Please knock to request access.'
-            : 'This private space is locked and no one is available to grant access.'
-        );
+        setError(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
         return;
       }
 
@@ -325,6 +329,7 @@ export function useModernFloorPlanKnock({
   }, [currentUserProfile?.id, updateLocation]);
 
   const handleKnockResponse = useCallback((payload: KnockResponsePayload) => {
+    if (KNOCK_DISABLED) return;
     if (!payload.responderValidated) {
       return;
     }
@@ -400,6 +405,10 @@ export function useModernFloorPlanKnock({
   }, [knockBannerTimeouts]);
 
   const handleKnock = useCallback((spaceId: string) => {
+    if (KNOCK_DISABLED) {
+      setError(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
+      return;
+    }
     if (!currentUserProfile?.id || !currentUserProfile?.displayName) {
       setError('Cannot knock: user profile not available');
       return;
@@ -416,11 +425,21 @@ export function useModernFloorPlanKnock({
     dispatchKnockTimeout({ type: 'clear' });
     void (async () => {
       try {
-        const { requestId, recipientCount } = await sendKnockRequest(spaceId, {
+        const result = await sendKnockRequest(spaceId, {
           id: currentUserProfile.id,
           name: currentUserProfile.displayName,
           avatarUrl: currentUserProfile.avatarUrl,
         });
+
+        if (isKnockTemporarilyUnavailableFailure(result)) {
+          activeKnockRequestIdRef.current = null;
+          activeKnockSpaceIdRef.current = null;
+          resetKnock();
+          toast.error(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
+          return;
+        }
+
+        const { requestId, recipientCount } = result;
 
         activeKnockRequestIdRef.current = requestId;
         toast.info('Knocking...', {
@@ -491,7 +510,7 @@ export function useModernFloorPlanKnock({
     handleBannerDeny,
     handleEnterSpace,
     handleLeaveSpace,
-    handleKnock,
+    handleKnock: KNOCK_DISABLED ? undefined : handleKnock,
     hasApprovedKnock,
     hasSpaceAccess,
     isUserInSpace,

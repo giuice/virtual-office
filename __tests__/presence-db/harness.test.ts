@@ -30,12 +30,12 @@ describe('presence-db harness', () => {
     ]);
   });
 
-  it('sees the baseline RLS policies (11 across presence tables)', async () => {
+  it('sees the expected RLS policies (7: baseline 11 minus the 4 vulnerable knock policies dropped in Phase 1)', async () => {
     const [{ count }] = await fx.sql<{ count: string }>(
       `select count(*)::text as count from pg_policies
         where schemaname = 'public'
           and tablename in ('users','spaces','space_presence_log','knock_requests')`,
     );
-    expect(Number(count)).toBe(11);
+    expect(Number(count)).toBe(7);
   });
 });

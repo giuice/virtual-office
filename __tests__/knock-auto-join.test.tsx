@@ -224,47 +224,26 @@ describe('Knock Auto-Join Flow', () => {
     usersInSpaces.set(space.id, [{ ...currentUserPresence, id: 'occupant-1', displayName: 'Morgan Occupant', currentSpaceId: space.id }]);
   });
 
-  it('auto-joins space when knock is approved', async () => {
-    mocks.knockState.status = 'knocking';
-    mocks.knockState.targetSpaceId = 'space-1';
+  it('does not start or auto-join the disabled knock flow', async () => {
     renderPlan();
     fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
 
-    await act(async () => {
-      mocks.capturedSignalingOptions?.onKnockResponse(mockApprovalPayload);
-    });
-
-    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
-    expect(mocks.onSpaceSelect).toHaveBeenCalledWith(space);
+    await waitFor(() => expect(mocks.sendKnockRequest).not.toHaveBeenCalled());
+    expect(mocks.updateLocation).not.toHaveBeenCalled();
   });
 
-  it('shows "Approved by [Name]! Joining..." toast on approval', async () => {
-    mocks.knockState.status = 'knocking';
+  it('does not process approval or denial signaling while disabled', () => {
     mocks.knockState.targetSpaceId = 'space-1';
     renderPlan();
-    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
-
-    await act(async () => {
-      mocks.capturedSignalingOptions?.onKnockResponse(mockApprovalPayload);
-    });
-
-    expect(mocks.toast.success).toHaveBeenCalledWith('Approved by Morgan Approver! Joining...');
-  });
-
-  it('shows "Access denied" toast on denial', async () => {
-    mocks.knockState.status = 'knocking';
-    mocks.knockState.targetSpaceId = 'space-1';
-    renderPlan();
-    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
 
     act(() => {
+      mocks.capturedSignalingOptions?.onKnockResponse(mockApprovalPayload);
       mocks.capturedSignalingOptions?.onKnockResponse(mockDenialPayload);
     });
 
-    expect(mocks.toast.error).toHaveBeenCalledWith('Access denied to Focus Room');
+    expect(mocks.updateLocation).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+    expect(mocks.toast.error).not.toHaveBeenCalled();
   });
 
   it('shows "No one responded" toast on 30-second timeout', () => {
@@ -277,31 +256,12 @@ describe('Knock Auto-Join Flow', () => {
     expect(mocks.toast).toHaveBeenCalledWith('No one responded. Try again later.');
   });
 
-  it('resets knock state when the server rejects a zero-recipient knock', async () => {
-    mocks.sendKnockRequest.mockRejectedValueOnce(new Error('No one is available to answer in this space'));
-
+  it('shows the temporary outage message when an inaccessible private space is entered', async () => {
     renderPlan();
-    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
 
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
-    expect(mocks.reset).toHaveBeenCalledTimes(1);
-    expect(mocks.toast.error).toHaveBeenCalledWith('Failed to send knock request', {
-      description: 'No one is available to answer in this space',
-    });
-  });
-
-  it('starts 60-second cooldown after denial', async () => {
-    mocks.knockState.status = 'knocking';
-    mocks.knockState.targetSpaceId = 'space-1';
-    renderPlan();
-    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
-
-    act(() => {
-      mocks.capturedSignalingOptions?.onKnockResponse(mockDenialPayload);
-    });
-
-    expect(mocks.handleDenial).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Private spaces are temporarily unavailable unless you have direct access. Please try again later.')).toBeInTheDocument();
+    expect(mocks.updateLocation).not.toHaveBeenCalled();
   });
 
   it('resets requester timeout presentation after timeout', () => {
@@ -317,30 +277,13 @@ describe('Knock Auto-Join Flow', () => {
     expect(mocks.reset).toHaveBeenCalledTimes(1);
   });
 
-  it('clears knock banner from space card on approval', async () => {
+  it('does not show knock banners when signaling invokes the request callback', async () => {
     renderPlan();
 
     act(() => {
       mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('Banner Riley Knocker');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-  });
-
-  it('clears knock banner from space card on denial', async () => {
-    renderPlan();
-
-    act(() => {
-      mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
-    });
-    expect(screen.getByRole('alert')).toHaveTextContent('Banner Riley Knocker');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
-
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('does not make a private space knockable when only a stale offline occupant exists', () => {
@@ -396,13 +339,13 @@ describe('Knock Auto-Join Flow', () => {
     await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
   });
 
-  it('allows knock when an online responder is present and direct access is not allowed', async () => {
+  it('does not offer knocking when an online responder is present during the outage', async () => {
     renderPlan();
 
-    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:true');
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:false');
 
     fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
 
-    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.sendKnockRequest).not.toHaveBeenCalled());
   });
 });

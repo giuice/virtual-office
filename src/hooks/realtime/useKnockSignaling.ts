@@ -50,6 +50,28 @@ export type OnKnockResponseCallback = (payload: KnockResponsePayload) => void;
 type ChannelStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CHANNEL_ERROR' | 'CLOSED' | 'SUBSCRIBING' | null;
 const POLL_INTERVAL_MS = 2000;
 const FRESH_KNOCK_WINDOW_MS = 45 * 1000;
+// Phase 1 fail-closed window: re-enabled in Phase 4 via service-role transaction functions.
+const KNOCK_DISABLED = true;
+
+export interface KnockTemporarilyUnavailableFailure {
+	ok: false;
+	error: 'Knock is temporarily unavailable';
+	code: 'KNOCK_TEMPORARILY_UNAVAILABLE';
+	status: 503;
+}
+
+type KnockOperationFailure = KnockTemporarilyUnavailableFailure;
+
+export function isKnockTemporarilyUnavailableFailure(
+	value: unknown
+): value is KnockTemporarilyUnavailableFailure {
+	return Boolean(
+		value &&
+		typeof value === 'object' &&
+		'code' in value &&
+		value.code === 'KNOCK_TEMPORARILY_UNAVAILABLE'
+	);
+}
 
 /** Shape of a knock_requests row from postgres_changes */
 interface KnockRequestRow {
@@ -123,6 +145,7 @@ export function useKnockSignaling(options: {
 
 	// Subscribe to INSERT events on knock_requests for the occupied space (occupant receives knocks)
 	useEffect(() => {
+		if (KNOCK_DISABLED) return;
 			if (!occupiedSpaceId || !currentUserId) {
 				if (occupiedChannelRef.current) {
 					supabase.removeChannel(occupiedChannelRef.current);
@@ -208,6 +231,7 @@ export function useKnockSignaling(options: {
 
 	// Subscribe to UPDATE events on knock_requests for our requests (knocker receives responses)
 	useEffect(() => {
+		if (KNOCK_DISABLED) return;
 			if (!knockingSpaceId || !currentUserId) {
 				if (knockingChannelRef.current) {
 					supabase.removeChannel(knockingChannelRef.current);
@@ -303,7 +327,7 @@ export function useKnockSignaling(options: {
 	const sendKnockRequest = useCallback(async (
 		spaceId: string,
 		userProfile: { id: string; name: string; avatarUrl?: string }
-	): Promise<{ requestId: string; recipientCount: number }> => {
+	): Promise<{ requestId: string; recipientCount: number } | KnockOperationFailure> => {
 		const requestId = createRequestId();
 		const response = await fetch('/api/spaces/knock/request', {
 			method: 'POST',
@@ -318,6 +342,14 @@ export function useKnockSignaling(options: {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
+			if (response.status === 503 && body?.code === 'KNOCK_TEMPORARILY_UNAVAILABLE') {
+				return {
+					ok: false,
+					error: 'Knock is temporarily unavailable',
+					code: 'KNOCK_TEMPORARILY_UNAVAILABLE',
+					status: 503,
+				};
+			}
 			const message = body?.error || 'Failed to send knock request';
 			throw new Error(message);
 		}
@@ -341,7 +373,7 @@ export function useKnockSignaling(options: {
 		requesterId: string;
 		requesterName: string;
 		decision: 'APPROVE' | 'DENY';
-	}) => {
+	}): Promise<Record<string, unknown> | KnockOperationFailure> => {
 		const response = await fetch('/api/spaces/knock/respond', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -350,6 +382,14 @@ export function useKnockSignaling(options: {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
+			if (response.status === 503 && body?.code === 'KNOCK_TEMPORARILY_UNAVAILABLE') {
+				return {
+					ok: false,
+					error: 'Knock is temporarily unavailable',
+					code: 'KNOCK_TEMPORARILY_UNAVAILABLE',
+					status: 503,
+				};
+			}
 			const message = body?.error || 'Failed to send knock response';
 			throw new Error(message);
 		}

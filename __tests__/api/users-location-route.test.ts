@@ -8,7 +8,24 @@ const OTHER_USER_ID = '22222222-2222-4222-8222-222222222222';
 const COMPANY_ID = '33333333-3333-4333-8333-333333333333';
 const SPACE_ID = '44444444-4444-4444-8444-444444444444';
 const RESPONDER_ID = '55555555-5555-4555-8555-555555555555';
-const APPROVED_KNOCK_ID = 'knock-approval-1';
+const APPROVED_KNOCK_ID = '66666666-6666-4666-8666-666666666666';
+
+interface KnockRow {
+  id: string;
+  requester_id: string;
+  space_id: string;
+  status: string;
+  decision: string | null;
+  responder_id: string | null;
+  expires_at: string | null;
+  consumed_at: string | null;
+}
+
+interface QueryFilter {
+  type: 'eq' | 'gt' | 'is' | 'not';
+  column: string;
+  value: unknown;
+}
 
 const mockAuthGetUser = vi.fn();
 const mockFindBySupabaseUid = vi.fn();
@@ -17,12 +34,47 @@ const mockUpdateLocation = vi.fn();
 const mockUpdate = vi.fn();
 const mockSpaceMaybeSingle = vi.fn();
 const mockUsersCount = vi.fn();
-const mockKnockMaybeSingle = vi.fn();
+const mockKnockMaybeSingle = vi.fn((filters: QueryFilter[]) => ({
+  data: findMatchingKnockRow(filters),
+  error: null,
+}));
+const mockKnockUpdate = vi.fn();
+const mockKnockUpdateEq = vi.fn();
 const mockPresenceMaybeSingle = vi.fn();
 const mockOpenPresenceLogMaybeSingle = vi.fn();
 const mockPresenceInsert = vi.fn();
 const mockPresenceUpdate = vi.fn();
 const mockDeleteEq = vi.fn();
+
+let mockKnockRows: KnockRow[] = [];
+
+function findMatchingKnockRow(filters: QueryFilter[]): KnockRow | null {
+  return (
+    mockKnockRows.find((row) =>
+      filters.every((filter) => {
+        const value = row[filter.column as keyof KnockRow];
+
+        if (filter.type === 'eq') {
+          return value === filter.value;
+        }
+
+        if (filter.type === 'is') {
+          return value === filter.value;
+        }
+
+        if (filter.type === 'not') {
+          return value !== filter.value;
+        }
+
+        if (filter.type === 'gt') {
+          return Boolean(value && new Date(value).getTime() > new Date(String(filter.value)).getTime());
+        }
+
+        return false;
+      })
+    ) ?? null
+  );
+}
 
 const mockAuthedClient = {
   auth: {
@@ -56,16 +108,42 @@ const mockAdminFrom = vi.fn((table: string) => {
   if (table === 'knock_requests') {
     return {
       select: vi.fn(() => {
+        const filters: QueryFilter[] = [];
         const chain = {
-          eq: vi.fn(() => chain),
+          eq: vi.fn((column: string, value: unknown) => {
+            filters.push({ type: 'eq', column, value });
+            return chain;
+          }),
+          gt: vi.fn((column: string, value: unknown) => {
+            filters.push({ type: 'gt', column, value });
+            return chain;
+          }),
+          is: vi.fn((column: string, value: unknown) => {
+            filters.push({ type: 'is', column, value });
+            return chain;
+          }),
+          not: vi.fn((column: string, operator: string, value: unknown) => {
+            if (operator === 'is') {
+              filters.push({ type: 'not', column, value });
+            }
+            return chain;
+          }),
           order: vi.fn(() => chain),
           limit: vi.fn(() => ({
-            maybeSingle: () => mockKnockMaybeSingle(),
+            maybeSingle: () => mockKnockMaybeSingle(filters),
           })),
+          maybeSingle: () => mockKnockMaybeSingle(filters),
         };
 
         return chain;
       }),
+      update: (payload: Record<string, unknown>) => {
+        mockKnockUpdate(payload);
+
+        return {
+          eq: (column: string, value: string) => mockKnockUpdateEq(column, value),
+        };
+      },
       delete: vi.fn(() => ({
         eq: (column: string, value: string) => mockDeleteEq(column, value),
       })),
@@ -80,7 +158,7 @@ const mockAdminFrom = vi.fn((table: string) => {
           eq: vi.fn(() => chain),
           not: vi.fn(() => chain),
           is: vi.fn(() => {
-            // .is('exited_at', null) marks this as the open presence log query
+            // .is('exited_at', null) marks this as the open presence log query.
             isOpenLogPath = true;
             return chain;
           }),
@@ -162,28 +240,47 @@ function makeAuthenticatedUser(overrides: Partial<User> = {}): User {
   };
 }
 
+function makeApprovedKnock(overrides: Partial<KnockRow> = {}): KnockRow {
+  return {
+    id: APPROVED_KNOCK_ID,
+    requester_id: APP_USER_ID,
+    space_id: SPACE_ID,
+    status: 'approved',
+    decision: 'APPROVE',
+    responder_id: RESPONDER_ID,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    consumed_at: null,
+    ...overrides,
+  };
+}
+
 function primeRestrictedSpace(options: {
   currentSpaceId?: string | null;
-  accessControl?: Record<string, unknown>;
-  approvedKnock?: { id: string; responder_id: string | null } | null;
+  accessControl?: unknown;
+  knockRows?: KnockRow[];
   priorExitAt?: string | null;
   lastActive?: string;
-  hasOpenPresenceLog?: boolean;
+  openPresenceLog?: Record<string, unknown> | null;
+  userOverrides?: Partial<User>;
 } = {}) {
   const {
     currentSpaceId = null,
     accessControl = { isPublic: false },
-    approvedKnock = null,
+    knockRows = [],
     priorExitAt = null,
     lastActive = '2026-03-19T10:00:00.000Z',
-    hasOpenPresenceLog = false,
+    openPresenceLog = null,
+    userOverrides = {},
   } = options;
 
+  mockKnockRows = knockRows;
   mockAuthGetUser.mockResolvedValue({
     data: { user: { id: AUTH_USER_ID } },
     error: null,
   });
-  mockFindBySupabaseUid.mockResolvedValue(makeAuthenticatedUser({ currentSpaceId, lastActive }));
+  mockFindBySupabaseUid.mockResolvedValue(
+    makeAuthenticatedUser({ currentSpaceId, lastActive, ...userOverrides })
+  );
   mockSpaceMaybeSingle.mockResolvedValue({
     data: {
       id: SPACE_ID,
@@ -195,18 +292,18 @@ function primeRestrictedSpace(options: {
     error: null,
   });
   mockUsersCount.mockResolvedValue({ count: 0, error: null });
-  mockKnockMaybeSingle.mockResolvedValue({ data: approvedKnock, error: null });
   mockPresenceMaybeSingle.mockResolvedValue({
     data: priorExitAt ? { exited_at: priorExitAt } : null,
     error: null,
   });
   mockOpenPresenceLogMaybeSingle.mockResolvedValue({
-    data: hasOpenPresenceLog ? { id: 'open-log-1' } : null,
+    data: openPresenceLog,
     error: null,
   });
   mockPresenceInsert.mockResolvedValue({ error: null });
   mockPresenceUpdate.mockResolvedValue({ error: null });
   mockDeleteEq.mockResolvedValue({ error: null });
+  mockKnockUpdateEq.mockResolvedValue({ error: null });
   mockUpdate.mockResolvedValue(makeAuthenticatedUser({ currentSpaceId: null, status: 'offline' }));
   mockUpdateLocation.mockImplementation(async (userId: string, spaceId: string | null) => ({
     ...makeAuthenticatedUser(),
@@ -215,9 +312,19 @@ function primeRestrictedSpace(options: {
   }));
 }
 
+async function expectAccessDenied(body: object = { userId: APP_USER_ID, spaceId: SPACE_ID }) {
+  const response = await putLocation(body);
+  const data = await response.json();
+
+  expect(response.status).toBe(403);
+  expect(data.code).toBe('SPACE_ACCESS_DENIED');
+  expect(mockUpdateLocation).not.toHaveBeenCalled();
+}
+
 describe('/api/users/location', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockKnockRows = [];
     mockFindById.mockResolvedValue(null);
   });
 
@@ -253,20 +360,52 @@ describe('/api/users/location', () => {
   it('returns 403 SPACE_ACCESS_DENIED for a restricted space with no approved knock and no recent occupancy', async () => {
     primeRestrictedSpace();
 
+    await expectAccessDenied();
+  });
+
+  it('allows public entry when access_control is null', async () => {
+    primeRestrictedSpace({ accessControl: null });
+
     const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data.code).toBe('SPACE_ACCESS_DENIED');
-    expect(mockUpdateLocation).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
   });
 
-  it('allows restricted-space entry when an approved knock row exists and inserts space_presence_log.authorized_by', async () => {
-    primeRestrictedSpace({
-      approvedKnock: { id: APPROVED_KNOCK_ID, responder_id: RESPONDER_ID },
-    });
+  it('allows public entry when access_control is an empty object', async () => {
+    primeRestrictedSpace({ accessControl: {} });
 
     const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('allows public entry when access_control.isPublic is true', async () => {
+    primeRestrictedSpace({ accessControl: { isPublic: true } });
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted-space entry when a valid exact knockRequestId exists and inserts space_presence_log.authorized_by', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock()],
+    });
+
+    const response = await putLocation({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -300,15 +439,23 @@ describe('/api/users/location', () => {
     );
   });
 
-  it('keeps restricted empty spaces locked when access rules do not allow the user', async () => {
-    primeRestrictedSpace();
+  it('allows direct restricted-space entry for admins', async () => {
+    primeRestrictedSpace({
+      userOverrides: { role: 'admin' },
+    });
 
     const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data.code).toBe('SPACE_ACCESS_DENIED');
-    expect(mockUpdateLocation).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('keeps restricted empty spaces locked when access rules do not allow the user', async () => {
+    primeRestrictedSpace();
+
+    await expectAccessDenied();
   });
 
   it('allows restricted-space grace rejoin when the latest matching space_presence_log.exited_at is within 5 minutes', async () => {
@@ -329,41 +476,153 @@ describe('/api/users/location', () => {
     );
   });
 
-  it('allows restricted-space grace rejoin via last_active when no exited_at log exists (beacon race)', async () => {
+  it('denies restricted-space grace rejoin via recent last_active when no exited_at log exists', async () => {
     primeRestrictedSpace({
       lastActive: new Date(Date.now() - 30_000).toISOString(),
     });
 
-    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+    await expectAccessDenied();
   });
 
-  it('allows restricted-space grace rejoin via open presence log when no exited_at and stale last_active', async () => {
+  it('denies restricted-space entry when last_active is in the future', async () => {
+    primeRestrictedSpace({
+      lastActive: new Date(Date.now() + 30_000).toISOString(),
+    });
+
+    await expectAccessDenied();
+  });
+
+  it('denies restricted-space entry when stale current-space assignment is the only evidence', async () => {
+    primeRestrictedSpace({
+      currentSpaceId: SPACE_ID,
+      lastActive: '2026-03-01T00:00:00.000Z',
+    });
+
+    await expectAccessDenied();
+  });
+
+  it('denies restricted-space grace rejoin via a months-old open presence log', async () => {
     primeRestrictedSpace({
       lastActive: '2026-03-01T00:00:00.000Z',
-      hasOpenPresenceLog: true,
+      openPresenceLog: { id: 'open-log-1', entered_at: '2026-01-01T00:00:00.000Z' },
     });
 
-    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(mockKnockMaybeSingle).not.toHaveBeenCalled();
+    await expectAccessDenied();
   });
 
-  it('deletes the consumed approved knock row after a successful restricted join', async () => {
+  it('denies restricted-space grace rejoin via a fresh open presence log', async () => {
     primeRestrictedSpace({
-      approvedKnock: { id: APPROVED_KNOCK_ID, responder_id: RESPONDER_ID },
+      lastActive: '2026-03-01T00:00:00.000Z',
+      openPresenceLog: { id: 'open-log-1', entered_at: new Date().toISOString() },
     });
 
-    const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+    await expectAccessDenied();
+  });
+
+  it('denies restricted-space entry for an expired exact knock approval', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock({ expires_at: new Date(Date.now() - 60_000).toISOString() })],
+    });
+
+    await expectAccessDenied({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
+  });
+
+  it('denies restricted-space entry for an approval missing responder_id', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock({ responder_id: null })],
+    });
+
+    await expectAccessDenied({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
+  });
+
+  it('denies restricted-space entry for an already consumed approval', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock({ consumed_at: new Date(Date.now() - 30_000).toISOString() })],
+    });
+
+    await expectAccessDenied({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
+  });
+
+  it('denies restricted-space entry when an approved row exists but the body has no knockRequestId', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock()],
+    });
+
+    await expectAccessDenied();
+  });
+
+  it('denies malformed access_control with SPACE_ACCESS_CONFIGURATION_INVALID before admin direct access', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    primeRestrictedSpace({
+      accessControl: { allowedUsers: [] },
+      userOverrides: { role: 'admin' },
+    });
+
+    try {
+      const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.code).toBe('SPACE_ACCESS_CONFIGURATION_INVALID');
+      expect(mockUpdateLocation).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('denies raw-string access_control with SPACE_ACCESS_CONFIGURATION_INVALID before allowedUsers direct access', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    primeRestrictedSpace({
+      accessControl: 'private',
+      userOverrides: { role: 'admin' },
+    });
+
+    try {
+      const response = await putLocation({ userId: APP_USER_ID, spaceId: SPACE_ID });
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.code).toBe('SPACE_ACCESS_CONFIGURATION_INVALID');
+      expect(mockUpdateLocation).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('updates the consumed approved knock row after a successful restricted join', async () => {
+    primeRestrictedSpace({
+      knockRows: [makeApprovedKnock()],
+    });
+
+    const response = await putLocation({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
 
     expect(response.status).toBe(200);
-    expect(mockDeleteEq).toHaveBeenCalledWith('id', APPROVED_KNOCK_ID);
+    expect(mockDeleteEq).not.toHaveBeenCalled();
+    expect(mockKnockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'consumed',
+        consumed_at: expect.any(String),
+        updated_at: expect.any(String),
+      })
+    );
+    expect(mockKnockUpdateEq).toHaveBeenCalledWith('id', APPROVED_KNOCK_ID);
   });
 });

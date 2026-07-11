@@ -8,16 +8,17 @@ const updateLocationSchema = z.object({
   userId: z.string().uuid(),
   spaceId: z.string().uuid().nullable(),
   offline: z.boolean().optional(),
+  knockRequestId: z.unknown().optional(),
 });
 
 export const dynamic = 'force-dynamic';
 const SPACE_REJOIN_GRACE_MS = 5 * 60 * 1000;
 
 interface SpaceAccessControl {
-  isPublic?: boolean;
-  allowedUsers?: string[];
-  allowedRoles?: string[];
-  ownerId?: string;
+  isPublic?: unknown;
+  allowedUsers?: unknown;
+  allowedRoles?: unknown;
+  ownerId?: unknown;
 }
 
 interface SpaceRow {
@@ -25,7 +26,7 @@ interface SpaceRow {
   company_id: string;
   status: string;
   capacity: number;
-  access_control: SpaceAccessControl | null;
+  access_control: unknown;
 }
 
 interface KnockAuthorizationRow {
@@ -37,16 +38,42 @@ interface PriorOccupancyRow {
   exited_at: string;
 }
 
-function userHasDirectSpaceAccess(user: User, accessControl: SpaceAccessControl | null): boolean {
-  if (accessControl?.isPublic !== false) {
-    return true;
+type SpaceAccessClassification = 'public' | 'restricted' | 'invalid';
+
+function classifySpaceAccessControl(accessControl: unknown): SpaceAccessClassification {
+  if (accessControl === null) {
+    return 'public';
   }
+
+  if (typeof accessControl !== 'object' || Array.isArray(accessControl)) {
+    return 'invalid';
+  }
+
+  const accessControlRecord = accessControl as SpaceAccessControl;
+  if (Object.keys(accessControlRecord).length === 0) {
+    return 'public';
+  }
+
+  if (accessControlRecord.isPublic === true) {
+    return 'public';
+  }
+
+  if (accessControlRecord.isPublic === false) {
+    return 'restricted';
+  }
+
+  return 'invalid';
+}
+
+function userHasDirectSpaceAccess(user: User, accessControl: SpaceAccessControl): boolean {
+  const allowedUsers = Array.isArray(accessControl.allowedUsers) ? accessControl.allowedUsers : [];
+  const allowedRoles = Array.isArray(accessControl.allowedRoles) ? accessControl.allowedRoles : [];
 
   return Boolean(
     user.role === 'admin' ||
     accessControl.ownerId === user.id ||
-    accessControl.allowedUsers?.includes(user.id) ||
-    (user.role && accessControl.allowedRoles?.includes(user.role))
+    allowedUsers.includes(user.id) ||
+    (user.role && allowedRoles.includes(user.role))
   );
 }
 
@@ -156,17 +183,25 @@ async function getSpaceForValidation(
 async function getApprovedKnockAuthorization(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   spaceId: string,
-  userId: string
+  userId: string,
+  knockRequestId: unknown
 ): Promise<KnockAuthorizationRow | null> {
+  const validatedKnockRequestId = z.string().uuid().safeParse(knockRequestId);
+  if (!validatedKnockRequestId.success) {
+    return null;
+  }
+
   const { data: knockAuthorization, error } = await supabase
     .from('knock_requests')
     .select('id, responder_id')
-    .eq('space_id', spaceId)
+    .eq('id', validatedKnockRequestId.data)
     .eq('requester_id', userId)
+    .eq('space_id', spaceId)
     .eq('status', 'approved')
     .eq('decision', 'APPROVE')
-    .order('updated_at', { ascending: false })
-    .limit(1)
+    .not('responder_id', 'is', null)
+    .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
     .maybeSingle();
 
   if (error) {
@@ -203,8 +238,9 @@ async function enforceSpaceAuthorization(params: {
   authenticatedUser: User;
   targetSpace: SpaceRow;
   spaceId: string;
+  knockRequestId: unknown;
 }) {
-  const { supabase, authenticatedUser, targetSpace, spaceId } = params;
+  const { supabase, authenticatedUser, targetSpace, spaceId, knockRequestId } = params;
 
   if (!authenticatedUser.companyId || authenticatedUser.companyId !== targetSpace.company_id) {
     return {
@@ -249,54 +285,56 @@ async function enforceSpaceAuthorization(params: {
     };
   }
 
-  const isRestrictedSpace = targetSpace.access_control?.isPublic === false;
-  if (!isRestrictedSpace) {
+  const accessClassification = classifySpaceAccessControl(targetSpace.access_control);
+  if (accessClassification === 'public') {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
-  const isAlreadyInSpace = authenticatedUser.currentSpaceId === spaceId;
+  if (accessClassification === 'invalid') {
+    console.error('Invalid space access_control configuration', {
+      spaceId,
+      accessControl: targetSpace.access_control,
+    });
 
-  if (userHasDirectSpaceAccess(authenticatedUser, targetSpace.access_control) || isAlreadyInSpace) {
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error: 'Space access configuration is invalid',
+          code: 'SPACE_ACCESS_CONFIGURATION_INVALID',
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  if (userHasDirectSpaceAccess(authenticatedUser, targetSpace.access_control as SpaceAccessControl)) {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
   const priorOccupancy = await getMostRecentPriorOccupancy(supabase, spaceId, authenticatedUser.id);
 
   // Primary check: exited_at from space_presence_log
+  const now = Date.now();
+  const priorExitAtMs = priorOccupancy?.exited_at
+    ? new Date(priorOccupancy.exited_at).getTime()
+    : null;
   const hasGraceRejoinByExitLog = Boolean(
-    priorOccupancy?.exited_at &&
-      Date.now() - new Date(priorOccupancy.exited_at).getTime() < SPACE_REJOIN_GRACE_MS
+    priorExitAtMs !== null &&
+      Number.isFinite(priorExitAtMs) &&
+      priorExitAtMs <= now &&
+      now - priorExitAtMs < SPACE_REJOIN_GRACE_MS
   );
 
-  // Secondary check: last_active from users table (handles beacon POST race)
-  // If user was recently active AND had this space as their previous space,
-  // they are likely rejoining after a reload where the beacon hasn't committed yet
-  const hasGraceRejoinByLastActive = Boolean(
-    !hasGraceRejoinByExitLog &&
-      authenticatedUser.lastActive &&
-      Date.now() - new Date(authenticatedUser.lastActive).getTime() < SPACE_REJOIN_GRACE_MS
-  );
-
-  // Also check if there is an OPEN (no exited_at) presence log for this user+space
-  // This handles the case where the user was in the space and reloaded before beacon
-  let hasOpenPresenceLog = false;
-  if (!hasGraceRejoinByExitLog && !hasGraceRejoinByLastActive) {
-    const { data: openLog } = await supabase
-      .from('space_presence_log')
-      .select('id')
-      .eq('user_id', authenticatedUser.id)
-      .eq('space_id', spaceId)
-      .is('exited_at', null)
-      .limit(1)
-      .maybeSingle();
-    hasOpenPresenceLog = Boolean(openLog);
-  }
-
-  if (hasGraceRejoinByExitLog || hasGraceRejoinByLastActive || hasOpenPresenceLog) {
+  if (hasGraceRejoinByExitLog) {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
-  const approvedKnock = await getApprovedKnockAuthorization(supabase, spaceId, authenticatedUser.id);
+  const approvedKnock = await getApprovedKnockAuthorization(
+    supabase,
+    spaceId,
+    authenticatedUser.id,
+    knockRequestId
+  );
   if (approvedKnock) {
     return {
       authorizedByUserId: approvedKnock.responder_id,
@@ -344,7 +382,7 @@ async function handleLocationUpdate(request: Request) {
       }, { status: 400 });
     }
 
-    const { userId, spaceId, offline = false } = validationResult.data;
+    const { userId, spaceId, offline = false, knockRequestId } = validationResult.data;
 
     if (userId !== authenticatedUser.id) {
       return NextResponse.json(
@@ -394,6 +432,7 @@ async function handleLocationUpdate(request: Request) {
         authenticatedUser,
         targetSpace,
         spaceId,
+        knockRequestId,
       });
 
       if ('errorResponse' in authorization) {
@@ -434,13 +473,17 @@ async function handleLocationUpdate(request: Request) {
     }
 
     if (consumedKnockRequestId) {
-      const { error: deleteKnockError } = await supabaseAdmin
+      const { error: consumeKnockError } = await supabaseAdmin
         .from('knock_requests')
-        .delete()
+        .update({
+          status: 'consumed',
+          consumed_at: timestamp,
+          updated_at: timestamp,
+        })
         .eq('id', consumedKnockRequestId);
 
-      if (deleteKnockError) {
-        throw new Error(`Failed to consume approved knock authorization: ${deleteKnockError.message}`);
+      if (consumeKnockError) {
+        throw new Error(`Failed to consume approved knock authorization: ${consumeKnockError.message}`);
       }
     }
 

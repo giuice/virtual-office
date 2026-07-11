@@ -38,9 +38,13 @@ export class PresenceFixtures {
    */
   async cleanup(): Promise<void> {
     const tag = `%::${this.ns}`;
+    // knock_requests.space_id is ON DELETE RESTRICT (Phase 1) and auth-backed
+    // test users carry valid emails that don't match the `::<ns>` tag, so knock
+    // rows are also removed by namespaced space before users/spaces go.
     await this.client.query(
       `delete from public.knock_requests
-         where requester_id in (select id from public.users where email like $1)`,
+         where requester_id in (select id from public.users where email like $1)
+            or space_id in (select id from public.spaces where name like $1)`,
       [tag],
     );
     await this.client.query(

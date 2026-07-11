@@ -100,8 +100,21 @@ The repo has no metrics-provider dependency (no Sentry/Datadog/OTel packages). P
 
 Prescribed presence run at audited `b18ab26`: 14 files, 171 passed, 6 skipped, 3 TODO (recorded in handoff Baseline). No `src/` changes since; baseline remains valid at the handoff commit.
 
-## Pending Phase 0 verifications (not yet captured)
+## Auth session settings (dashboard, read 2026-07-10)
 
-- Verified JWT claims (`session_id`), JWT lifetime, Auth timebox/inactivity/single-session settings — requires dashboard/Auth-config readback or a decoded live token; not queryable via SQL.
-- `presence_maintenance_owner` create/readback + pg_cron-as-postgres — requires local/staging instance (blocked on local bootstrap).
-- Local bootstrap: repo has no `supabase/config.toml`; canonical `supabase/migrations` cannot build core schema from empty DB (baseline reconstruction required).
+| Setting | Value | Design implication for presence leases (Phase 2) |
+|---|---|---|
+| Enforce single session per user | **disabled** | A user CAN hold multiple concurrent auth sessions (multi-device / multi-login). Confirms the handoff invariant: logout must fence only the current auth session and must NOT disconnect other active auth sessions. |
+| Time-box user sessions | **never** | Auth sessions never expire on a schedule. |
+| Inactivity timeout | **never** | Auth sessions never expire from inactivity. |
+| Refresh token reuse interval | **10 s** | Standard rotation grace window; minor relevance (network-retry reuse allowed for 10 s before breach detection). |
+
+**Key consequence:** because auth sessions never time out server-side, the auth session existing is NOT evidence of connectivity. Presence "connected" must derive solely from `user_presence_sessions` lease heartbeat/expiry (server clock), never from the auth session. A stale auth session can live indefinitely; only the presence lease expiry retires an occupant. This reinforces Phase 2's server-owned lease expiry as the single connectivity truth.
+
+**Access token (JWT), confirmed 2026-07-10 by decoding a live token (`exp − iat`, `expires_in`):**
+- **TTL = 1800 s (30 min)** — non-default (Supabase default is 3600 s). Client must refresh ~every 30 min; independent of the presence heartbeat (Phase 2 uses 30 s). No stop condition.
+- **`session_id` claim present** ✅ — server-verified `session_id` is available, so the exact-session absence check (`select 1 from auth.sessions where id = <session_id>`) and the logout fence are feasible. (Token/session-id values are secrets and are intentionally NOT recorded here.)
+
+## Remaining Phase 0 verifications
+
+- pg_cron-as-postgres reconfirm on staging (local `cron` schema owned by `supabase_admin`).
