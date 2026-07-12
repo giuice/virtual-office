@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@/types/database';
-import { GET } from '@/app/api/spaces/route';
+import { DELETE, GET } from '@/app/api/spaces/route';
 
 const COMPANY_ID = 'company-1';
 const OTHER_COMPANY_ID = 'company-2';
+const SPACE_ID = 'space-1';
 
 const mocks = vi.hoisted(() => ({
   requireAuthUser: vi.fn(),
   findByCompany: vi.fn(),
+  findById: vi.fn(),
+  serviceFrom: vi.fn(),
+  deleteSpaces: vi.fn(),
+  deleteEq: vi.fn(),
   supabase: {},
 }));
 
@@ -19,8 +24,21 @@ vi.mock('@/repositories/implementations/supabase', () => ({
   SupabaseSpaceRepository: function MockSpaceRepository() {
     return {
       findByCompany: (companyId: string) => mocks.findByCompany(companyId),
+      findById: (spaceId: string) => mocks.findById(spaceId),
     };
   },
+}));
+
+vi.mock('@/lib/supabase/server-client', () => ({
+  createSupabaseServerClient: vi.fn(async (role?: 'service_role') => {
+    if (role !== 'service_role') {
+      throw new Error(`Unexpected client role: ${String(role)}`);
+    }
+
+    return {
+      from: (table: string) => mocks.serviceFrom(table),
+    };
+  }),
 }));
 
 function makeUser(overrides: Partial<User> = {}): User {
@@ -46,6 +64,12 @@ function requestFor(companyId: string): Request {
   } as Request;
 }
 
+function deleteRequest(spaceId = SPACE_ID): Request {
+  return {
+    url: `https://example.com/api/spaces?id=${spaceId}`,
+  } as Request;
+}
+
 describe('/api/spaces GET', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,6 +79,17 @@ describe('/api/spaces GET', () => {
       dbUser: makeUser(),
     });
     mocks.findByCompany.mockResolvedValue([]);
+    mocks.findById.mockResolvedValue({
+      id: SPACE_ID,
+      companyId: COMPANY_ID,
+    });
+    mocks.deleteEq.mockResolvedValue({ error: null, count: 1 });
+    mocks.deleteSpaces.mockReturnValue({
+      eq: (field: string, value: string) => mocks.deleteEq(field, value),
+    });
+    mocks.serviceFrom.mockReturnValue({
+      delete: (options: { count: 'exact' }) => mocks.deleteSpaces(options),
+    });
   });
 
   it('returns spaces for the authenticated user company', async () => {
@@ -69,5 +104,25 @@ describe('/api/spaces GET', () => {
 
     expect(response.status).toBe(403);
     expect(mocks.findByCompany).not.toHaveBeenCalled();
+  });
+
+  it('maps space FK restriction failures to SPACE_IN_USE on delete', async () => {
+    mocks.deleteEq.mockResolvedValueOnce({
+      data: null,
+      count: null,
+      error: {
+        code: '23503',
+        message: 'violates foreign key constraint "users_current_space_id_fkey"',
+      },
+    });
+
+    const response = await DELETE(deleteRequest());
+    const data = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(409);
+    expect(data).toEqual({ success: false, code: 'SPACE_IN_USE' });
+    expect(mocks.serviceFrom).toHaveBeenCalledWith('spaces');
+    expect(mocks.deleteSpaces).toHaveBeenCalledWith({ count: 'exact' });
+    expect(mocks.deleteEq).toHaveBeenCalledWith('id', SPACE_ID);
   });
 });

@@ -64,6 +64,25 @@ export class PresenceFixtures {
       [tag],
     );
     await this.client.query(`delete from public.users where email like $1`, [tag]);
+    // Phase 3 RESTRICT FKs: unhook any remaining reference to tagged spaces
+    // (users/log/session rows from other namespaces) before deleting them.
+    // Gate note: runs in mode 'legacy' (tests restore it), so markerless
+    // postgres writes pass the movement gate.
+    await this.client.query(
+      `update public.users set current_space_id = null
+         where current_space_id in (select id from public.spaces where name like $1)`,
+      [tag],
+    );
+    await this.client.query(
+      `delete from public.space_presence_log
+         where space_id in (select id from public.spaces where name like $1)`,
+      [tag],
+    );
+    await this.client.query(
+      `update public.user_presence_sessions set space_id = null
+         where space_id in (select id from public.spaces where name like $1)`,
+      [tag],
+    );
     await this.client.query(`delete from public.spaces where name like $1`, [tag]);
     await this.client.query(`delete from public.companies where name like $1`, [tag]);
   }

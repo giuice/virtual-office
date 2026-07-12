@@ -12,7 +12,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
     include: ['__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['**/__tests__/api/playwright/**', '**/node_modules/**'],
+    exclude: [
+      '**/__tests__/api/playwright/**',
+      // Real-database suites need the local Supabase stack and run under
+      // vitest.presence-db.config.mts (npm run test:presence-db) only.
+      '**/__tests__/presence-db/**',
+      '**/node_modules/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

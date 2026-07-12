@@ -2,6 +2,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@/types/database';
 import { PATCH } from '@/app/api/users/update/route';
 
+// Phase 3 write gate: unit tests exercise route logic, not the DB ledger.
+// beginLegacyPresenceWrite is stubbed as an always-open legacy-mode gate.
+vi.mock('@/lib/presence/legacy-write-gate', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/presence/legacy-write-gate')>();
+  return {
+    ...actual,
+    beginLegacyPresenceWrite: vi.fn(async () => ({
+      requestId: '77777777-7777-4777-8777-777777777777',
+      deadline: new Date(Date.now() + 60_000),
+      assertCanStartDatabaseOperation: () => {},
+      close: vi.fn(async () => {}),
+    })),
+  };
+});
+
 const AUTH_USER_ID = 'auth-user-1';
 const APP_USER_ID = 'app-user-1';
 const TARGET_USER_ID = 'target-user-1';

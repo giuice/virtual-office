@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import {
+  beginLegacyPresenceWrite,
+  completionStatusForResponse,
+  isLegacyPresenceWriteGateError,
+  type LegacyPresenceCompletionStatus,
+  type LegacyPresenceWriteGate,
+} from '@/lib/presence/legacy-write-gate';
 import type { User } from '@/types/database';
 import { z } from 'zod';
 
@@ -95,10 +102,12 @@ async function syncSpacePresenceLog(params: {
   nextSpaceId: string | null;
   timestamp: string;
   authorizedByUserId?: string | null;
+  writeGate: LegacyPresenceWriteGate;
 }) {
-  const { supabase, userId, previousSpaceId, nextSpaceId, timestamp, authorizedByUserId = null } = params;
+  const { supabase, userId, previousSpaceId, nextSpaceId, timestamp, authorizedByUserId = null, writeGate } = params;
 
   if (previousSpaceId && previousSpaceId !== nextSpaceId) {
+    writeGate.assertCanStartDatabaseOperation();
     const { error: exitLogError } = await supabase
       .from('space_presence_log')
       .update({ exited_at: timestamp })
@@ -112,6 +121,7 @@ async function syncSpacePresenceLog(params: {
   }
 
   if (nextSpaceId && previousSpaceId !== nextSpaceId) {
+    writeGate.assertCanStartDatabaseOperation();
     const { error: entryLogError } = await supabase
       .from('space_presence_log')
       .insert({
@@ -127,7 +137,7 @@ async function syncSpacePresenceLog(params: {
   }
 }
 
-async function getAuthenticatedAppUser() {
+async function getAuthenticatedAppUser(writeGate: LegacyPresenceWriteGate) {
   const [supabase, supabaseAdmin] = await Promise.all([
     createSupabaseServerClient(),
     createSupabaseServerClient('service_role'),
@@ -144,6 +154,7 @@ async function getAuthenticatedAppUser() {
   }
 
   const userRepository = new SupabaseUserRepository(supabaseAdmin);
+  writeGate.assertCanStartDatabaseOperation();
   const authenticatedUser = await userRepository.findBySupabaseUid(authData.user.id);
 
   if (!authenticatedUser) {
@@ -165,8 +176,10 @@ async function getAuthenticatedAppUser() {
 
 async function getSpaceForValidation(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  spaceId: string
+  spaceId: string,
+  writeGate: LegacyPresenceWriteGate
 ): Promise<SpaceRow | null> {
+  writeGate.assertCanStartDatabaseOperation();
   const { data: space, error } = await supabase
     .from('spaces')
     .select('id, company_id, status, capacity, access_control')
@@ -184,13 +197,15 @@ async function getApprovedKnockAuthorization(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   spaceId: string,
   userId: string,
-  knockRequestId: unknown
+  knockRequestId: unknown,
+  writeGate: LegacyPresenceWriteGate
 ): Promise<KnockAuthorizationRow | null> {
   const validatedKnockRequestId = z.string().uuid().safeParse(knockRequestId);
   if (!validatedKnockRequestId.success) {
     return null;
   }
 
+  writeGate.assertCanStartDatabaseOperation();
   const { data: knockAuthorization, error } = await supabase
     .from('knock_requests')
     .select('id, responder_id')
@@ -214,8 +229,10 @@ async function getApprovedKnockAuthorization(
 async function getMostRecentPriorOccupancy(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   spaceId: string,
-  userId: string
+  userId: string,
+  writeGate: LegacyPresenceWriteGate
 ): Promise<PriorOccupancyRow | null> {
+  writeGate.assertCanStartDatabaseOperation();
   const { data: priorOccupancy, error } = await supabase
     .from('space_presence_log')
     .select('exited_at')
@@ -239,8 +256,9 @@ async function enforceSpaceAuthorization(params: {
   targetSpace: SpaceRow;
   spaceId: string;
   knockRequestId: unknown;
+  writeGate: LegacyPresenceWriteGate;
 }) {
-  const { supabase, authenticatedUser, targetSpace, spaceId, knockRequestId } = params;
+  const { supabase, authenticatedUser, targetSpace, spaceId, knockRequestId, writeGate } = params;
 
   if (!authenticatedUser.companyId || authenticatedUser.companyId !== targetSpace.company_id) {
     return {
@@ -255,6 +273,7 @@ async function enforceSpaceAuthorization(params: {
     // Only count non-offline users toward capacity.
     // Offline users keep their current_space_id set (for reload recovery)
     // but should not block others from joining.
+    writeGate.assertCanStartDatabaseOperation();
     const { count, error: countError } = await supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -311,7 +330,7 @@ async function enforceSpaceAuthorization(params: {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
-  const priorOccupancy = await getMostRecentPriorOccupancy(supabase, spaceId, authenticatedUser.id);
+  const priorOccupancy = await getMostRecentPriorOccupancy(supabase, spaceId, authenticatedUser.id, writeGate);
 
   // Primary check: exited_at from space_presence_log
   const now = Date.now();
@@ -333,7 +352,8 @@ async function enforceSpaceAuthorization(params: {
     supabase,
     spaceId,
     authenticatedUser.id,
-    knockRequestId
+    knockRequestId,
+    writeGate
   );
   if (approvedKnock) {
     return {
@@ -354,10 +374,20 @@ async function enforceSpaceAuthorization(params: {
 }
 
 async function handleLocationUpdate(request: Request) {
+  let writeGate: LegacyPresenceWriteGate | null = null;
+  let completionStatus: LegacyPresenceCompletionStatus = 'failed';
+
+  const completeWith = (response: NextResponse): NextResponse => {
+    completionStatus = completionStatusForResponse(response);
+    return response;
+  };
+
   try {
-    const authContext = await getAuthenticatedAppUser();
-    if ('errorResponse' in authContext) {
-      return authContext.errorResponse;
+    writeGate = await beginLegacyPresenceWrite();
+
+    const authContext = await getAuthenticatedAppUser(writeGate);
+    if ('errorResponse' in authContext && authContext.errorResponse) {
+      return completeWith(authContext.errorResponse);
     }
 
     const {
@@ -369,29 +399,29 @@ async function handleLocationUpdate(request: Request) {
     let requestBody;
     try {
       requestBody = await parseLocationBody(request);
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    } catch {
+      return completeWith(NextResponse.json({ error: 'Invalid request body' }, { status: 400 }));
     }
 
     const validationResult = updateLocationSchema.safeParse(requestBody);
 
     if (!validationResult.success) {
-      return NextResponse.json({ 
+      return completeWith(NextResponse.json({
         error: 'Invalid input', 
         details: validationResult.error.issues
-      }, { status: 400 });
+      }, { status: 400 }));
     }
 
     const { userId, spaceId, offline = false, knockRequestId } = validationResult.data;
 
     if (userId !== authenticatedUser.id) {
-      return NextResponse.json(
+      return completeWith(NextResponse.json(
         {
           error: 'Authenticated user does not match requested location update target',
           code: 'USER_MISMATCH',
         },
         { status: 403 }
-      );
+      ));
     }
 
     // Offline beacon (tab close / reload): only mark status offline, preserve space.
@@ -399,19 +429,20 @@ async function handleLocationUpdate(request: Request) {
     // reload (no grace-rejoin race). Offline users are filtered from space avatars
     // on the client, so stale positions don't affect other users' views.
     if (offline) {
+      writeGate.assertCanStartDatabaseOperation();
       const offlineUser = await userRepository.update(authenticatedUser.id, {
         status: 'offline',
-      });
+      }, () => writeGate?.assertCanStartDatabaseOperation());
 
       if (!offlineUser) {
-        return NextResponse.json({ error: 'Failed to update offline status' }, { status: 500 });
+        return completeWith(NextResponse.json({ error: 'Failed to update offline status' }, { status: 500 }));
       }
 
-      return NextResponse.json({
+      return completeWith(NextResponse.json({
         success: true,
         user: offlineUser,
         message: 'User marked offline',
-      }, { status: 200 });
+      }, { status: 200 }));
     }
 
     const previousSpaceId = authenticatedUser.currentSpaceId ?? null;
@@ -421,10 +452,10 @@ async function handleLocationUpdate(request: Request) {
     let consumedKnockRequestId: string | null = null;
 
     if (spaceId) {
-      const targetSpace = await getSpaceForValidation(supabaseAdmin, spaceId);
+      const targetSpace = await getSpaceForValidation(supabaseAdmin, spaceId, writeGate);
 
       if (!targetSpace) {
-        return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+        return completeWith(NextResponse.json({ error: 'Space not found' }, { status: 404 }));
       }
 
       const authorization = await enforceSpaceAuthorization({
@@ -433,29 +464,35 @@ async function handleLocationUpdate(request: Request) {
         targetSpace,
         spaceId,
         knockRequestId,
+        writeGate,
       });
 
-      if ('errorResponse' in authorization) {
-        return authorization.errorResponse;
+      if ('errorResponse' in authorization && authorization.errorResponse) {
+        return completeWith(authorization.errorResponse);
       }
 
       authorizedByUserId = authorization.authorizedByUserId ?? null;
       consumedKnockRequestId = authorization.consumedKnockRequestId ?? null;
     }
 
-    const updatedUser = await userRepository.updateLocation(authenticatedUser.id, spaceId);
+    const updatedUser = await userRepository.updateLocation(
+      authenticatedUser.id,
+      spaceId,
+      () => writeGate?.assertCanStartDatabaseOperation()
+    );
 
     if (!updatedUser) {
-      return NextResponse.json({ error: 'Failed to update user location' }, { status: 500 });
+      return completeWith(NextResponse.json({ error: 'Failed to update user location' }, { status: 500 }));
     }
 
     // Reload beacons mark users offline while preserving current_space_id. Reconnect
     // refreshes liveness in DB so server-side knock/responder checks stay accurate.
     let responseUser = updatedUser;
     if (spaceId && authenticatedUser.status === 'offline') {
+      writeGate.assertCanStartDatabaseOperation();
       const reactivatedUser = await userRepository.update(authenticatedUser.id, {
         status: 'online',
-      });
+      }, () => writeGate?.assertCanStartDatabaseOperation());
       if (reactivatedUser) {
         responseUser = reactivatedUser;
       }
@@ -469,10 +506,12 @@ async function handleLocationUpdate(request: Request) {
         nextSpaceId: spaceId,
         timestamp,
         authorizedByUserId,
+        writeGate,
       });
     }
 
     if (consumedKnockRequestId) {
+      writeGate.assertCanStartDatabaseOperation();
       const { error: consumeKnockError } = await supabaseAdmin
         .from('knock_requests')
         .update({
@@ -487,19 +526,32 @@ async function handleLocationUpdate(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    return completeWith(NextResponse.json({
       success: true,
       user: responseUser,
       message: 'Location updated successfully',
-    }, { status: 200 });
+    }, { status: 200 }));
 
   } catch (error) {
-    console.error('Error updating user location:', error);
-    return NextResponse.json({ 
+    if (isLegacyPresenceWriteGateError(error)) {
+      completionStatus = error.httpStatus >= 500 ? 'failed' : 'rejected';
+      return NextResponse.json(error.toBody(), { status: error.httpStatus });
+    }
+
+    // Never serialize raw DB/exception details into a presence response
+    // (handoff: stable codes + safe messages only; internals stay in logs).
+    const correlationId = crypto.randomUUID();
+    console.error('Error updating user location:', { correlationId, error });
+    completionStatus = 'failed';
+    return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update location',
-      details: error 
+      error: 'Failed to update location',
+      code: 'INTERNAL_ERROR',
     }, { status: 500 });
+  } finally {
+    if (writeGate) {
+      await writeGate.close(completionStatus);
+    }
   }
 }
 

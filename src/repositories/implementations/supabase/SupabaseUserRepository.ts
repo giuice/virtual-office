@@ -43,6 +43,7 @@ function mapArrayToCamelCase(dataArray: UserRow[] | null): User[] {
   return dataArray.map(item => mapToCamelCase(item));
 }
 
+type BeforeDatabaseOperation = () => void;
 
 export class SupabaseUserRepository implements IUserRepository {
   private TABLE_NAME = 'users';
@@ -142,7 +143,11 @@ export class SupabaseUserRepository implements IUserRepository {
     return mapToCamelCase(data);
   }
 
-  async update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>): Promise<User | null> {
+  async update(
+    id: string,
+    updates: Partial<Omit<User, 'id' | 'createdAt' | 'lastActive'>>,
+    beforeDatabaseOperation?: BeforeDatabaseOperation
+  ): Promise<User | null> {
      // Map camelCase fields from User type to snake_case for DB
      // Exclude fields that shouldn't be updated directly (id, createdAt, lastActive)
     const {
@@ -189,7 +194,7 @@ export class SupabaseUserRepository implements IUserRepository {
      // Update last_active automatically on any update
      dbUpdates.last_active = new Date().toISOString();
 
-
+     beforeDatabaseOperation?.();
      const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .update(dbUpdates)
@@ -221,35 +226,28 @@ export class SupabaseUserRepository implements IUserRepository {
     return (count ?? 0) > 0;
   }
 
-  async updateCompanyAssociation(userId: string, companyId: string | null): Promise<User | null> {
+  async updateCompanyAssociation(
+    userId: string,
+    companyId: string | null,
+    beforeDatabaseOperation?: BeforeDatabaseOperation
+  ): Promise<User | null> {
     // Persist null explicitly to clear association
-    return this.update(userId, { companyId: companyId });
+    return this.update(userId, { companyId: companyId }, beforeDatabaseOperation);
   }
 
-  async updateLocation(userId: string, spaceId: string | null): Promise<User | null> {
+  async updateLocation(
+    userId: string,
+    spaceId: string | null,
+    beforeDatabaseOperation?: BeforeDatabaseOperation
+  ): Promise<User | null> {
     console.log(`[updateLocation] Start for user ${userId} to space ${spaceId}`);
-
-    // 1. Call RPC 'remove_user_from_all_spaces'
-    try {
-        const { error: removeError } = await this.supabase
-          .rpc('remove_user_from_all_spaces', { user_id_param: userId });
-        if (removeError) {
-          console.error('[updateLocation] Error from RPC remove_user_from_all_spaces:', removeError);
-          // Throw a new error with a more specific message for better debugging in the API route
-          throw new Error(`RPC remove_user_from_all_spaces failed: ${removeError.message}`); 
-        } else {
-          console.log(`[updateLocation] Successfully called RPC remove_user_from_all_spaces for user ${userId}`);
-        }
-    } catch (rpcCatchError) {
-        console.error('[updateLocation] Exception during RPC call:', rpcCatchError);
-        throw rpcCatchError; // Re-throw exception to be caught by the API route
-    }
     // Steps 2 & 3 (fetching space and updating its userIds) are removed as they are redundant
     // after migrating to users.current_space_id for presence tracking.
 
     // 4. Update user's current_space_id
     try {
         console.log(`[updateLocation] Updating user ${userId} current_space_id to ${spaceId}`);
+        beforeDatabaseOperation?.();
         const { data, error } = await this.supabase
           .from(this.TABLE_NAME)
           .update({

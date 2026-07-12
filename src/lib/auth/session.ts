@@ -62,7 +62,7 @@ type RequireAuthResult =
   | { supabase: SupabaseClient; dbUser: User; authUser: SupabaseAuthUser }
   | { errorResponse: NextResponse };
 
-export async function requireAuthUser(): Promise<RequireAuthResult> {
+export async function requireAuthUser(beforeDatabaseOperation?: () => void): Promise<RequireAuthResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
 
@@ -79,6 +79,7 @@ export async function requireAuthUser(): Promise<RequireAuthResult> {
 
   let dbUser: User | null;
   try {
+    beforeDatabaseOperation?.();
     dbUser = await userRepository.findBySupabaseUid(data.user.id);
   } catch (lookupError) {
     console.error('Auth user profile lookup failed:', lookupError);
