@@ -9,16 +9,12 @@ Digital workspace: floor plans, rooms, presence, messaging, company mgmt. Next.j
 
 ### Delegation to Codex — CRITICAL (when model is Fable or Opus)
 You are the **orchestrator & architect**: plan, design, decide, review. Do NOT burn premium tokens on execution.
-- **Delegate execution to Codex**:
-	- `GPT-5.3-Codex-Spark` (extremely fast): mechanical/multi-file edits, doc updates, test writing, boilerplate, repetitive refactors.
-	- **GPT-5.6 family (Luna / Terra / Sol)** — Luna is cheapest, Sol most expensive; effort ladder is `medium < high < xhigh < extra-high < max < ultra`.
-	- Legacy `GPT-5.5 medium/high/xhigh` still available; prefer the 5.6 family below.
-- **Cost-efficiency rule (from AA Coding Agent Index v1.1): raise EFFORT on the cheaper model before switching to a pricier model.** Effort drives score more than tier in this band. Concrete frontier points: **Luna extra-high (~68) > Terra high (~65)** and **Terra xhigh (~70) > Sol medium (~67)**, each at *lower* cost. So a higher effort on the cheaper model usually wins on value.
-	- **Luna** = default workhorse. Climb Luna's effort (up to ultra ≈ index 75) before considering Terra/Sol. Covers most execution.
-	- **Terra** = only when you need the ~76–78 band or when Luna at equal score costs more.
+- **Delegate execution to Codex — minimum tier is Terra (GPT-5.6). Never use Luna or Spark**: they introduced regressions in working code (2026-07 presence bootstrap). Quality floor > cost.
+	- Effort ladder: `medium < high < xhigh < extra-high < max < ultra`.
+	- **Terra** = default workhorse for all delegated execution. Raise Terra's effort before escalating to Sol (e.g. Terra xhigh ≈ index 70 beats Sol medium ≈ 67 at lower cost).
 	- **Sol** = reserve for the top ~79–80 band on the hardest reasoning tasks; expensive — justify it.
 	- **Adversarial reviews / second opinions: medium effort is ideal** (user standing guidance). Do NOT burn xhigh/ultra/Sol on reviews.
-	- Sol/Terra and high-effort runs are **expensive for the user** — use only when the task genuinely needs Fable-tier reasoning.
+	- Sol and high-effort runs are **expensive for the user** — use only when the task genuinely needs Fable-tier reasoning.
 - **How**: `codex:codex-rescue` subagent (plugin), or parallel `tmux` sessions running the `codex` CLI — one per independent task.
 - **Codex prompts must be precise**: exact files, expected changes, acceptance checks. Codex executes; it doesn't decide architecture.
 - **Keep in main thread**: architecture decisions, root-cause debugging, security-sensitive changes, and final review of every Codex result.

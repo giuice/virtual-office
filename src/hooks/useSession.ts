@@ -78,7 +78,6 @@ export function useSession() {
         updateState((prevState) => {
           // Compare access tokens as a reliable way to check for session change
           if (prevState.session?.access_token !== session?.access_token) {
-            console.log(`Auth state changed: ${event}`, session);
             return {
               session: session,
               user: session?.user ?? null,
