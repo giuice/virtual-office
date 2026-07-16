@@ -18,6 +18,18 @@ Until this remediation is complete, the existing `presence-safety` skill is hist
 
 The final rewritten skill and its reference files replace this handoff as the long-term source of truth only after all completion gates in this document pass.
 
+### Product-operability correction - 2026-07-16
+
+The numbered phases are review and implementation boundaries, not permission to deploy an unusable intermediate product. Security work and product operability are simultaneous requirements:
+
+- A phase may be developed and reviewed independently, but every user-facing deployment must preserve a safe, compatible path for the core office workflows.
+- A security migration, kill switch, or server contract that removes rooms, avatars, movement, or Knock must ship in the same release unit as the minimum compatible server/client path that restores that workflow. A narrowly scoped emergency shutdown is an incident state with an owner and immediate restoration plan, never a completed phase.
+- A passing unit suite does not compensate for a broken runtime. Before a phase is described as exit-gate met or customer-testable, an admin and a member must complete the operability smoke defined in the working agreement below.
+- Knock is a normal social action, not only a private-room authorization mechanism. Any user may knock on another occupied same-company room, including a public room or a room they may enter directly. Access control determines whether **Enter** is also available; it does not remove **Knock**.
+- A migration is not delivered merely because its SQL file exists. The executor must name the target environment, apply or explicitly hand off the exact command, register/reconcile migration history when required, and read back the affected functions, grants, policies/publications, and runtime mode before claiming the environment is ready.
+
+If a security change makes the product impossible to test, report it as a release-blocking regression and restore the safe functional path before proceeding with a customer-facing rollout.
+
 ## Baseline
 
 - Repository: `/home/giuice/desenv/virtual-office`
@@ -50,6 +62,9 @@ Every worker must follow these rules before editing:
 13. Stop and escalate if the live schema differs from the assumptions in this document in a way that changes RLS, constraints, or function signatures.
 14. Stop and escalate if a required integration or browser test cannot run. A skipped test is not proof.
 15. Completion remains user-gated. Report `Status: Pending user confirmation` until the user verifies the runtime behavior.
+16. Treat phases as review boundaries, not deployable slices. Do not deploy a disabling migration/server change without its compatible minimum client path in the same release unit.
+17. Record every migration's target, application command/result, history state, and catalog/readback evidence. Never leave migration execution implicit for the user to discover later.
+18. Run the two-user operability smoke before and after a user-facing rollout. A broken core workflow blocks the release even when its security-specific tests pass.
 
 ## Stop conditions
 
@@ -158,6 +173,11 @@ These are behavioral invariants, not implementation accidents.
 32. A space ACL/status/company change or user role/company change invalidates old session rejoin evidence and knock grants through server-owned revision changes.
 33. Lease/knock expiry is revalidated after acquiring authorization-relevant locks; waiting cannot preserve authority past its server deadline.
 34. Logout fences the verified auth session before its tabs can register replacement leases, without disconnecting a different active auth session.
+35. Authenticated admin and member users can load the same company floor plan, see rooms, and see each active avatar exactly once.
+36. Each user can move between allowed rooms without duplicate requests, snap-back, or disappearing from the other user's view.
+37. Any user can knock on another occupied same-company room. Direct entry permission may add an **Enter** action but never suppresses **Knock**.
+38. The occupant receives one pending Knock and can approve or deny it; approval is consumable once and denial never moves the requester.
+39. A phase cannot be presented as customer-testable while a kill switch, unapplied migration, missing client path, or false empty-office state blocks these workflows.
 
 ## Confirmed defect inventory
 
@@ -1241,7 +1261,7 @@ Server behavior:
 
 1. Authenticate and derive requester ID, name, avatar, company, and role; validate the exact supplied session is active and belongs to that requester.
 2. Ignore/remove client-supplied requester identity fields.
-3. Through `create_knock_request`, load/lock the target and reject cross-company, unavailable, public, directly authorized, revision-valid rejoinable, missing, or otherwise unnecessary requests with a typed code.
+3. Through `create_knock_request`, load/lock the target and reject cross-company, unavailable, missing, already-current-room, or unoccupied requests with a typed code. **Knock is social etiquette, not authorization:** public rooms and users with direct access may still knock whenever another active occupant can answer. Access rules only determine whether Enter is also available.
 4. Count distinct responders using active revision-valid session leases plus target placement, excluding requester.
 5. Do not use `users.status` to decide responder availability.
 6. Under the same transaction/partial unique index, expire any time-stale pending/approved request for the same requester/space before inserting. If a still-live row with another request ID exists, return 409 `KNOCK_ALREADY_PENDING` and its canonical request ID; do not create another. An exact same-ID retry returns 200 idempotent success.
@@ -1591,7 +1611,9 @@ Exit gate:
 - [ ] Add exact 10-second pair/five-per-minute server rate limits and pending-request guard; client cooldown remains UX only.
 - [ ] Add requester status and responder pending-list read routes with exact ownership/session validation.
 - [ ] Make both read functions one-snapshot/read-only with safe output schemas; derived expiry/supersession cannot mutate retained history.
-- [ ] Install/test service-only requester-status and active-occupant-pending read functions/routes; revoke final browser SELECT/remove all Knock SELECT policies and `knock_requests` publication membership. Keep Knock disabled until the compatible Phase 5 client and browser tests ship.
+- [ ] Install/test service-only requester-status and active-occupant-pending read functions/routes; revoke final browser SELECT/remove all Knock SELECT policies and `knock_requests` publication membership.
+- [ ] Ship the server contract and the minimum compatible request/respond/status/pending client as one operability unit. Phase 5 may replace that compatibility path with the final transition coordinator, but Phase 4 must not leave the deployed product without Knock.
+- [ ] Render **Knock** for every occupied same-company room with an active responder, including public/direct-entry rooms. Render **Enter** independently according to access rules.
 
 Exit gate:
 
@@ -1604,6 +1626,8 @@ Exit gate:
 - Responder role/company revision after approval invalidates consumption; revision-stale rows are expired by locked creation so they do not block the partial unique index, but replacement still obeys the independent rate limiter.
 - Requester movement makes a new response to an old pending row expire it and return `KNOCK_SUPERSEDED`. An exact retry of an already approved/denied/consumed decision returns stored state without rewriting it; a stale approval remains unusable. Locked creation may expire a stale live row to remove the partial-index block, but a new explicit request still obeys the independent rate limiter.
 - Newly created Knock advances requester location version once, realigns active placement-session versions, and makes an older automatic transition superseded without changing placement.
+- In a two-user browser smoke, admin and member can knock on each other's occupied rooms; an admin/directly authorized user sees both **Enter** and **Knock**.
+- Request, pending delivery, approve, deny, status reconciliation, and one-time approved entry work without browser access to the Knock table.
 
 ### Phase 5 - Unify client movement and placement initialization
 
@@ -1621,7 +1645,7 @@ Exit gate:
 - [ ] Implement explicit Leave semantics.
 - [ ] Replace global first-login key with server-owned initial-placement state.
 - [ ] Migrate Knock request/respond/status/pending polling to exact session IDs and route approved movement through conditional `knock-enter`.
-- [ ] Enable Knock only after server plus client unit/DB/browser gates pass together.
+- [ ] Replace the Phase 4 compatible Knock movement path with the final coordinator only after server plus client unit/DB/browser gates pass together; do not introduce a second disabled interval during cutover.
 - [ ] Remove old dedup/manual refs only after replacement tests pass.
 
 Exit gate:
@@ -2302,10 +2326,10 @@ Each eval must inspect the proposed diff/answer, not merely look for a phrase. R
 
 ### Deployment order
 
-1. Deploy the emergency knock RLS/expiry plus `last_active` denial fix and explicitly disable Knock with `KNOCK_TEMPORARILY_UNAVAILABLE`.
+1. If an actively exploitable Knock path requires emergency closure, deploy the RLS/expiry plus `last_active` denial fix as an incident mitigation with an explicit owner and restoration release already prepared. Do not count the disabled runtime as a completed/customer-testable phase.
 2. Complete the local bootstrap gate, then apply additive access-revision/session/idempotency schema to staging and read it back. Do not add the unique open-log index while the old writer is live.
-3. Deploy session/snapshot/knock endpoints and atomic functions plus compatibility client A's guarded 426 handler to staging; old movement still works and Knock stays disabled.
-4. Keep client B built/tested but inactive until the approved staging maintenance cutover: commit `maintenance` mode and save shared-lock/ledger drain proof, switch old route to 426, repair/read back logs through the maintenance-only function, add the unique index, deploy/activate B, switch to `atomic`, activate reconciliation Cron, then enable only new movement and exact-session Knock. Run full soak/rollback rehearsal.
+3. Deploy session/snapshot/knock endpoints and atomic functions together with the minimum compatible exact-session Knock client and compatibility client A's guarded 426 handler to staging; old movement remains available and the social Knock smoke must pass before promotion.
+4. Keep client B built/tested but inactive until the approved staging maintenance cutover: commit `maintenance` mode and save shared-lock/ledger drain proof, switch old route to 426, repair/read back logs through the maintenance-only function, add the unique index, deploy/activate B, switch to `atomic`, activate reconciliation Cron, and migrate the already-working Knock path to the final coordinator without a disabled interval. Run full soak/rollback rehearsal.
 5. Deploy compatibility client A behavior to production while the old route still works; record adoption before any 426 response is possible.
 6. With user approval, apply only verified additive production migrations/server endpoints while compatibility client A and the security-hotfixed old writer remain active. Read back; client B stays inactive.
 7. In an approved maintenance window, repeat the staging 503/426/positive-drain/repair/unique-index/control-mode sequence, deploy/activate client B, activate/read back reconciliation Cron, and enable only new movement/Knock. Pre-compatibility tabs fail closed and require manual refresh.
@@ -2318,7 +2342,7 @@ Each eval must inspect the proposed diff/answer, not merely look for a phrase. R
 - Additive schema can remain during client rollback.
 - Keep the DB-disabled non-mutating 426 tombstone for at least one production release and its separate seven-complete-day zero-receipt artifact; do not restore the old movement implementation during rollback.
 - Transaction function changes require a new migration; never edit an applied migration.
-- If new session tracking fails after cutover, disable placement/Knock and repair or roll forward. Do not restore any old movement implementation; the unique-log/new-schema guarantees are incompatible with it.
+- If new session tracking fails after cutover, treat the release as an operability incident and roll forward or roll the server/client release unit back to the last safe compatible contract. Do not call the rollout complete while placement/Knock is disabled, and do not restore an old movement implementation that is incompatible with the unique-log/new-schema guarantees.
 - After atomic activation, disable placement only through postgres-only `enter_atomic_presence_maintenance`; capture its exclusive-lock drain evidence, repair in maintenance, and roll forward through `activate_atomic_presence_writer`. Never improvise an `atomic -> legacy` mode change.
 - Preserve audit rows; do not delete evidence to make rollback easier.
 
@@ -2468,6 +2492,9 @@ Reject any proposed implementation that does one of these:
 - Keeps global query/localStorage keys.
 - Polls only when Realtime reports failure.
 - Enables Knock before exact-session request/respond/polling/conditional movement client code ships.
+- Ships a kill switch, migration, server contract, or client change that removes a core workflow without its safe compatible replacement in the same deployment unit.
+- Treats a migration file as deployed without target-environment application, history reconciliation, and catalog/runtime readback evidence.
+- Marks a phase customer-testable when the two-user smoke cannot show rooms/avatars, move both users, and complete Knock approve/deny in both directions.
 - Adds the unique open-log index while the legacy non-transactional writer can still run.
 - Uses a fixed sleep or process-local counter instead of the database movement gate's committed shared-lock drain proof.
 - Treats `SUBSCRIBED` as proof no event was missed.
@@ -2496,6 +2523,8 @@ This remediation is complete only when all are true:
 - The final presence guard, reviewer, and all hook registrations enforce the implemented model.
 - Structured logs/health checks exist; any missing external alert provider is explicitly accepted by the user rather than silently omitted.
 - No required check is TODO, skipped, or "manually assumed".
+- The current deployed runtime passes the two-user operability smoke for login/bootstrap, rooms, avatars, movement, Knock request/approve/deny, and approved entry; direct-entry permission does not hide Knock.
+- Every required migration is applied and read back in the target environment, with no undisclosed manual migration step left to the user.
 - The user reviews the evidence and confirms the result.
 
 Until then, report:
@@ -2514,7 +2543,7 @@ Per-phase exit gates remain authoritative — this table only summarizes them. A
 | 1 | Emergency private-space security closure | exit-gate met (pending user confirmation) | `b135d3d` | `docs/presence-remediation/phase-1-evidence-2026-07-10.md`; RLS suite red(7)→green(11) around migrations; route suite red(12)→green(23); readback: knock grants NONE / policies 0 / FK RESTRICT; 92-test regression sweep green; tsc clean | SEC-01/02/03(interim), KNOCK-02(partial), DOC-01 closed. Residuals: run advisors + readback on staging after user-approved push (plus Phase 0 `migration repair` residual); `last_active` grant revoke deferred to users-write hardening (no longer authorizes); local `db reset` realtime-migrate race documented in evidence doc. |
 | 2 | Per-tab connection leases | exit-gate met (pending user confirmation) | `6f5a264` | `docs/presence-remediation/phase-2-evidence-2026-07-11.md`; presence-db suite red(3 files)→green(21/21) around the migration on clean `db reset`; 90-test regression sweep + 28 API + hook suites green; tsc clean; catalog/cron readback in suite | LIFE-01/02 (lease layer). Platform deviations documented in evidence (transient role membership/CREATE, `auth.sessions` boolean bridge, `request.jwt.claims` instead of `auth.jwt()`). Residuals: staging `has_table_privilege('postgres','auth.sessions','SELECT')` check before push; legacy capacity ghost window until Phase 3 (keep staging-only); reconcile function created but cron intentionally absent until Phase 10. |
 | 3 | Atomic transition and capacity enforcement | exit-gate met (pending user confirmation) | (uncommitted working tree) | `docs/presence-remediation/phase-3-evidence-2026-07-11.md`; presence-db 59/59 on clean `db reset` (incl. `exit-gate-races.test.ts` covering every L1565-1577 bullet, 50× register-vs-logout); API suites 78/78; tsc/lint clean; FK RESTRICT catalog readback; Codex adversarial (5 majors fixed + regression tests), rls-reviewer clean, presence-safety-reviewer no blockers | CAP-01, TX-01/02, SEC-03. Decisions/deviations: `docs/presence-remediation/phase-3-implementation-spec-2026-07-11.md` D1-D12 (knock schema + initial-placement column were already Phase 1 — D2 revised; repair/unique-index in `scripts/` per D4; runtime stays `legacy`, new routes inert until Phase 10 cutover). Residuals: rate-limit on new presence routes deferred (Phase 8); canonize `getClaims()` in CLAUDE.md; drop dead `spaces_delete_company_admin` policy; spaces DELETE bypasses repository pattern for FK-error inspection (comment/cleanup follow-up); `confirm_presence_auth_session_revoked` created here (was spec'd but absent). |
-| 4 | Harden knock server APIs | not started | — | — | KNOCK-01/02/05. |
+| 4 | Harden knock server APIs | in progress | (uncommitted working tree) | Migration `20260716143115_phase4_social_knock_server_contract.sql` applied to the linked project and registered/read back on 2026-07-16; targeted Knock/location suites 49/49; type-check clean | Restoration slice includes service-only request/respond/status/pending functions and routes, authoritative polling, social Knock UI, and one-time approval consumption through the compatibility location route. Still required before exit-gate: two-user runtime confirmation, formal DB/browser coverage, scheduled expiry/retention, minimal private Broadcast, full-suite completion, final diff review, and user confirmation. |
 | 5 | Unify client movement and placement initialization | not started | — | — | MOVE-01..05, KNOCK-03/06. |
 | 6 | Repair status, cache, and Realtime | not started | — | — | SEC-04, LIFE-03, CACHE-01/02/03, RT-01/02. |
 | 7 | Account, logout, storage, and multi-tab lifecycle | not started | — | — | LIFE-01, CACHE-01. |
@@ -2530,7 +2559,10 @@ Per-phase exit gates remain authoritative — this table only summarizes them. A
 - [ ] No authorization derived from `last_active`, `users.status`, Realtime payloads, localStorage, or client time.
 - [ ] No new direct writer of `users.current_space_id` / `space_presence_log` or browser `knock_requests` mutation outside the allowlist (`npm run presence:gate` green).
 - [ ] Any new/changed migration reset-tested on the disposable local instance (`npm run db:local:reset`) from committed files only.
+- [ ] Every migration required by the phase was applied to the named target, migration history reconciled, and grants/functions/policies/publications/runtime mode read back; commands/results are linked in evidence.
 - [ ] Live-vs-baseline schema differences that affect RLS/constraints/function signatures escalated, not silently patched.
+- [ ] Before/after two-user operability smoke passed: admin and member load rooms; both active avatars appear exactly once; both can move; each can Knock on the other's occupied room; approve and deny work; direct access shows **Enter** without hiding **Knock**.
+- [ ] No temporary kill switch or disabled compatibility path remains in the customer-testable runtime. If an emergency shutdown is active, the phase is an incident/blocker rather than exit-gate met.
 - [ ] Phase exit-gate bullets each individually checked with linked evidence.
 - [ ] This tracker table row updated in the closing commit.
 - [ ] Reported `Status: Pending user confirmation`; did not claim "done"/"fixed".

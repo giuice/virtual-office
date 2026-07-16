@@ -70,7 +70,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   isAdmin = false,
 }) => {
   const { currentUserProfile } = useCompany();
-  const { users, usersInSpaces, isLoading, updateLocation } = usePresence();
+  const { users, usersInSpaces, isLoading, updateLocation, presenceSessionId } = usePresence();
   const { speakingUsers, mutedUserIds } = useAudio();
   const {
     error,
@@ -85,7 +85,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     handleEnterSpace,
     handleLeaveSpace,
     handleKnock,
-    hasApprovedKnock,
     hasSpaceAccess,
     isUserInSpace,
   } = useModernFloorPlanKnock({
@@ -95,6 +94,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     currentUserProfile,
     isAdmin,
     updateLocation,
+    presenceSessionId,
     onSpaceSelect,
     onOpenChat,
   });
@@ -142,10 +142,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     );
     const canDirectEnter = Boolean(
       hasSpaceAccess(space) ||
-      userInSpace ||
-      hasApprovedKnock(space.id)
+      userInSpace
     );
-    const canKnock = space.accessControl?.isPublic === false && !canDirectEnter && hasOnlineResponder;
+    // Knock is social etiquette, independent from authorization. Anyone outside an
+    // occupied room may knock; access only controls whether Enter also appears.
+    const canKnock = !userInSpace && hasOnlineResponder;
     const cooldownRemaining = getCooldownRemaining(space.id);
     const currentKnockStatus = cooldownRemaining > 0
       ? 'cooldown'
@@ -174,7 +175,9 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         variant={perspective}
         speakingUserIds={currentSpeakingIds}
         mutedUserIds={mutedUserIdsList}
-        pendingKnockRequest={pendingKnockRequests.get(space.id) || null}
+        pendingKnockRequest={
+          Array.from(pendingKnockRequests.values()).find((request) => request.spaceId === space.id) ?? null
+        }
         onKnockApprove={handleBannerApprove}
         onKnockDeny={handleBannerDeny}
         onKnock={canKnock ? handleKnock : undefined}
@@ -192,7 +195,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     handleEnterSpace,
     handleKnock,
     handleLeaveSpace,
-    hasApprovedKnock,
     hasSpaceAccess,
     highlightedSpaceId,
     isAdmin,

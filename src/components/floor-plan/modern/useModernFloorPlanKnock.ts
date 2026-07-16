@@ -4,7 +4,6 @@ import { useKnock } from '@/hooks/useKnock';
 import {
   KnockRequestPayload,
   KnockResponsePayload,
-  isKnockTemporarilyUnavailableFailure,
   useKnockSignaling,
 } from '@/hooks/realtime/useKnockSignaling';
 import type { Space, User, UserPresenceData } from '@/types/database';
@@ -15,7 +14,8 @@ interface UseModernFloorPlanKnockOptions {
   usersInSpaces: Map<string | null, UserPresenceData[]>;
   currentUserProfile: User | null;
   isAdmin: boolean;
-  updateLocation: (spaceId: string | null) => Promise<void>;
+  updateLocation: (spaceId: string | null, options?: { knockRequestId?: string }) => Promise<void>;
+  presenceSessionId: string | null;
   onSpaceSelect?: (space: Space) => void;
   onOpenChat?: (space: Space) => void;
 }
@@ -23,11 +23,6 @@ interface UseModernFloorPlanKnockOptions {
 interface KnockTimeoutState {
   spaceId: string | null;
 }
-
-// Phase 1 fail-closed window: re-enabled in Phase 4 via service-role transaction functions.
-const KNOCK_DISABLED = true;
-const KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE =
-  'Private spaces are temporarily unavailable unless you have direct access. Please try again later.';
 
 type KnockTimeoutAction =
   | { type: 'show'; spaceId: string | null }
@@ -49,15 +44,15 @@ export function useModernFloorPlanKnock({
   currentUserProfile,
   isAdmin,
   updateLocation,
+  presenceSessionId,
   onSpaceSelect,
   onOpenChat,
 }: UseModernFloorPlanKnockOptions) {
   const [error, setError] = useState<string | null>(null);
   const [pendingKnockRequests, setPendingKnockRequests] = useState<Map<string, KnockRequestPayload>>(new Map());
   const [knockTimeoutState, dispatchKnockTimeout] = useReducer(knockTimeoutReducer, { spaceId: null });
-  const activeKnockRequestIdRef = useRef<string | null>(null);
+  const [activeKnockRequestId, setActiveKnockRequestId] = useState<string | null>(null);
   const activeKnockSpaceIdRef = useRef<string | null>(null);
-  const approvedKnockSpaceIdRef = useRef<string | null>(null);
   const knockStatusToastRef = useRef<string | null>(null);
   const knockBannerTimeoutsRef = useRef<Map<string, NodeJS.Timeout> | null>(null);
   const timeoutResetRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,67 +99,63 @@ export function useModernFloorPlanKnock({
   }, []);
 
   const handleIncomingKnockRequest = useCallback((payload: KnockRequestPayload) => {
-    if (KNOCK_DISABLED) return;
     playKnockCue();
     setPendingKnockRequests((prev) => {
       const next = new Map(prev);
-      next.set(payload.spaceId, payload);
+      next.set(payload.requestId, payload);
       return next;
     });
 
-    const existingTimeout = knockBannerTimeouts.get(payload.spaceId);
+    const existingTimeout = knockBannerTimeouts.get(payload.requestId);
     if (existingTimeout) {
       clearTimeout(existingTimeout);
     }
 
     const timeoutId = setTimeout(() => {
       setPendingKnockRequests((prev) => {
-        const currentRequest = prev.get(payload.spaceId);
+        const currentRequest = prev.get(payload.requestId);
         if (!currentRequest || currentRequest.requestId !== payload.requestId) {
           return prev;
         }
 
         const next = new Map(prev);
-        next.delete(payload.spaceId);
+        next.delete(payload.requestId);
         return next;
       });
-      knockBannerTimeouts.delete(payload.spaceId);
+      knockBannerTimeouts.delete(payload.requestId);
     }, 30000);
 
-    knockBannerTimeouts.set(payload.spaceId, timeoutId);
+    knockBannerTimeouts.set(payload.requestId, timeoutId);
   }, [knockBannerTimeouts, playKnockCue]);
 
-  const clearPendingKnockRequest = useCallback((spaceId: string) => {
-    const timeoutId = knockBannerTimeouts.get(spaceId);
+  const clearPendingKnockRequest = useCallback((requestId: string) => {
+    const timeoutId = knockBannerTimeouts.get(requestId);
     if (timeoutId) {
       clearTimeout(timeoutId);
-      knockBannerTimeouts.delete(spaceId);
+      knockBannerTimeouts.delete(requestId);
     }
 
     setPendingKnockRequests((prev) => {
-      if (!prev.has(spaceId)) {
+      if (!prev.has(requestId)) {
         return prev;
       }
 
       const next = new Map(prev);
-      next.delete(spaceId);
+      next.delete(requestId);
       return next;
     });
   }, [knockBannerTimeouts]);
 
   const handleBannerApprove = useCallback(async (request: KnockRequestPayload) => {
-    if (KNOCK_DISABLED) return;
-    clearPendingKnockRequest(request.spaceId);
-
     try {
-      const result = await respondToKnockRef.current?.({
+      await respondToKnockRef.current?.({
         spaceId: request.spaceId,
         requestId: request.requestId,
         requesterId: request.requesterId,
         requesterName: request.requesterName,
         decision: 'APPROVE',
       });
-      if (isKnockTemporarilyUnavailableFailure(result)) return;
+      clearPendingKnockRequest(request.requestId);
       toast.success(`${request.requesterName} has been let in`);
     } catch (err) {
       toast.error('Failed to approve knock', {
@@ -174,18 +165,15 @@ export function useModernFloorPlanKnock({
   }, [clearPendingKnockRequest]);
 
   const handleBannerDeny = useCallback(async (request: KnockRequestPayload) => {
-    if (KNOCK_DISABLED) return;
-    clearPendingKnockRequest(request.spaceId);
-
     try {
-      const result = await respondToKnockRef.current?.({
+      await respondToKnockRef.current?.({
         spaceId: request.spaceId,
         requestId: request.requestId,
         requesterId: request.requesterId,
         requesterName: request.requesterName,
         decision: 'DENY',
       });
-      if (isKnockTemporarilyUnavailableFailure(result)) return;
+      clearPendingKnockRequest(request.requestId);
       toast.info(`Access denied to ${request.requesterName}`);
     } catch (err) {
       toast.error('Failed to deny knock', {
@@ -198,9 +186,7 @@ export function useModernFloorPlanKnock({
     return occupiedSpaceId === space.id;
   }, [occupiedSpaceId]);
 
-  const hasApprovedKnock = useCallback((spaceId: string) => {
-    return approvedKnockSpaceIdRef.current === spaceId;
-  }, []);
+  const hasApprovedKnock = useCallback((_spaceId: string) => false, []);
 
   const hasSpaceAccess = useCallback((space: Space): boolean => {
     if (!currentUserProfile?.id) {
@@ -222,7 +208,7 @@ export function useModernFloorPlanKnock({
 
   const handleEnterSpace = useCallback(async (
     spaceId: string,
-    options?: { allowPrivateBypass?: boolean }
+    options?: { knockRequestId?: string }
   ) => {
     try {
       if (!currentUserProfile?.id) {
@@ -249,17 +235,15 @@ export function useModernFloorPlanKnock({
       }
 
       const isRestrictedSpace = selectedSpace.accessControl?.isPublic === false;
-      const hasApprovedKnock = approvedKnockSpaceIdRef.current === spaceId;
       const isAlreadyInSpace = currentUser?.currentSpaceId === spaceId;
       const canDirectEnter = Boolean(
         hasSpaceAccess(selectedSpace) ||
-        options?.allowPrivateBypass ||
-        hasApprovedKnock ||
+        options?.knockRequestId ||
         isAlreadyInSpace
       );
 
       if (isRestrictedSpace && !canDirectEnter) {
-        setError(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
+        setError('This private room requires an approved knock before entry.');
         return;
       }
 
@@ -273,9 +257,10 @@ export function useModernFloorPlanKnock({
       setError(null);
 
       try {
-        await updateLocation(spaceId);
-        if (approvedKnockSpaceIdRef.current === spaceId) {
-          approvedKnockSpaceIdRef.current = null;
+        if (options?.knockRequestId) {
+          await updateLocation(spaceId, options);
+        } else {
+          await updateLocation(spaceId);
         }
       } catch (error) {
         console.error('Error updating location:', error);
@@ -329,12 +314,11 @@ export function useModernFloorPlanKnock({
   }, [currentUserProfile?.id, updateLocation]);
 
   const handleKnockResponse = useCallback((payload: KnockResponsePayload) => {
-    if (KNOCK_DISABLED) return;
     if (!payload.responderValidated) {
       return;
     }
 
-    const activeRequestId = activeKnockRequestIdRef.current;
+    const activeRequestId = activeKnockRequestId;
     if (!activeRequestId || payload.requestId !== activeRequestId) {
       return;
     }
@@ -344,20 +328,19 @@ export function useModernFloorPlanKnock({
       const responderName = payload.responderName ?? 'an occupant';
       toast.success(`Approved by ${responderName}! Joining...`);
       if (knockTargetSpaceId) {
-        approvedKnockSpaceIdRef.current = knockTargetSpaceId;
-        void handleEnterSpace(knockTargetSpaceId, { allowPrivateBypass: true });
+        void handleEnterSpace(knockTargetSpaceId, { knockRequestId: payload.requestId });
       }
-      activeKnockRequestIdRef.current = null;
+      setActiveKnockRequestId(null);
       activeKnockSpaceIdRef.current = null;
       resetKnock();
     } else {
       const deniedSpaceName = spaces.find((space) => space.id === knockTargetSpaceId)?.name ?? 'this space';
       handleDenial();
-      activeKnockRequestIdRef.current = null;
+      setActiveKnockRequestId(null);
       activeKnockSpaceIdRef.current = null;
       toast.error(`Access denied to ${deniedSpaceName}`);
     }
-  }, [handleApproval, handleDenial, handleEnterSpace, knockTargetSpaceId, resetKnock, spaces]);
+  }, [activeKnockRequestId, handleApproval, handleDenial, handleEnterSpace, knockTargetSpaceId, resetKnock, spaces]);
 
   const {
     sendKnockRequest,
@@ -365,7 +348,8 @@ export function useModernFloorPlanKnock({
     occupiedChannelStatus,
   } = useKnockSignaling({
     occupiedSpaceId,
-    knockingSpaceId: knockTargetSpaceId,
+    activeRequestId: activeKnockRequestId,
+    presenceSessionId,
     currentUserId: currentUserProfile?.id,
     onKnockRequest: handleIncomingKnockRequest,
     onKnockResponse: handleKnockResponse,
@@ -378,9 +362,7 @@ export function useModernFloorPlanKnock({
       return;
     }
 
-    const isRecoverableIssue = occupiedChannelStatus === 'TIMED_OUT' ||
-      occupiedChannelStatus === 'CHANNEL_ERROR' ||
-      occupiedChannelStatus === 'CLOSED';
+    const isRecoverableIssue = occupiedChannelStatus === 'CHANNEL_ERROR';
     if (!isRecoverableIssue) {
       return;
     }
@@ -405,10 +387,6 @@ export function useModernFloorPlanKnock({
   }, [knockBannerTimeouts]);
 
   const handleKnock = useCallback((spaceId: string) => {
-    if (KNOCK_DISABLED) {
-      setError(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
-      return;
-    }
     if (!currentUserProfile?.id || !currentUserProfile?.displayName) {
       setError('Cannot knock: user profile not available');
       return;
@@ -431,17 +409,9 @@ export function useModernFloorPlanKnock({
           avatarUrl: currentUserProfile.avatarUrl,
         });
 
-        if (isKnockTemporarilyUnavailableFailure(result)) {
-          activeKnockRequestIdRef.current = null;
-          activeKnockSpaceIdRef.current = null;
-          resetKnock();
-          toast.error(KNOCK_TEMPORARILY_UNAVAILABLE_MESSAGE);
-          return;
-        }
-
         const { requestId, recipientCount } = result;
 
-        activeKnockRequestIdRef.current = requestId;
+        setActiveKnockRequestId(requestId);
         toast.info('Knocking...', {
           description:
             recipientCount > 0
@@ -450,7 +420,7 @@ export function useModernFloorPlanKnock({
           duration: 5000,
         });
       } catch (requestError) {
-        activeKnockRequestIdRef.current = null;
+        setActiveKnockRequestId(null);
         activeKnockSpaceIdRef.current = null;
         resetKnock();
         toast.error('Failed to send knock request', {
@@ -475,7 +445,7 @@ export function useModernFloorPlanKnock({
     }
 
     dispatchKnockTimeout({ type: 'show', spaceId: activeKnockSpaceIdRef.current });
-    activeKnockRequestIdRef.current = null;
+    setActiveKnockRequestId(null);
     activeKnockSpaceIdRef.current = null;
     toast('No one responded. Try again later.');
 
@@ -510,7 +480,7 @@ export function useModernFloorPlanKnock({
     handleBannerDeny,
     handleEnterSpace,
     handleLeaveSpace,
-    handleKnock: KNOCK_DISABLED ? undefined : handleKnock,
+    handleKnock,
     hasApprovedKnock,
     hasSpaceAccess,
     isUserInSpace,

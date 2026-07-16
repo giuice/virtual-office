@@ -10,7 +10,8 @@ interface PresenceContextType { users: UserPresenceData[] | undefined;
   usersInSpaces: Map<string | null, UserPresenceData[]>;
   isLoading: boolean;
   error: unknown;
-  updateLocation: (spaceId: string | null) => Promise<void>;
+  updateLocation: (spaceId: string | null, options?: { knockRequestId?: string }) => Promise<void>;
+  presenceSessionId: string | null;
   currentUserSpaceId: string | null; }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -21,7 +22,7 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => { // 
 
   // Pass the current user ID to useUserPresence
   const { users, usersInSpaces, isLoading, error, updateLocation } = useUserPresence(currentUserId);
-  usePresenceSession(currentUserId ?? null);
+  const { sessionId: presenceSessionId } = usePresenceSession(currentUserId ?? null);
 
   // Get current user's space ID for messaging integration
   const currentUserSpaceId = users?.find(u => u.id === currentUserId)?.currentSpaceId || null;
@@ -43,9 +44,10 @@ export const PresenceProvider = ({ children }: { children: ReactNode }) => { // 
       isLoading,
       error,
       updateLocation,
+      presenceSessionId,
       currentUserSpaceId
     }),
-    [currentUserSpaceId, error, isLoading, updateLocation, users, usersInSpaces]
+    [currentUserSpaceId, error, isLoading, presenceSessionId, updateLocation, users, usersInSpaces]
   );
 
   return (

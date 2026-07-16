@@ -1,13 +1,11 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import { createContext, useCallback, use, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, use, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { AuthContextType } from '@/types/auth';
-import { getUserById, syncUserProfile } from '@/lib/api';
-import { User } from '@supabase/supabase-js';
+import { getUserById } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
-import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
 import { mapSupabaseAuthError } from '@/lib/auth/error-messages';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,41 +17,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) { cons
   const isAuthReady = initialized && !sessionLoading && !actionLoading;
 
   const supabaseClient = useMemo(() => supabase, []);
-
-  const syncGoogleOAuthUser = useCallback(async (googleUser: User): Promise<void> => { try {
-      let googleAvatarUrl: string | null = null;
-
-      try {
-        googleAvatarUrl = extractGoogleAvatarUrl(googleUser.user_metadata); } catch (extractError) {
-        console.warn('Error extracting Google avatar URL:', extractError);
-      }
-
-      console.log('Syncing Google OAuth user profile:', { userId: googleUser.id, email: googleUser.email, hasGoogleAvatar: !!googleAvatarUrl, userMetadata: googleUser.user_metadata ? Object.keys(googleUser.user_metadata) : [] });
-
-      if (googleAvatarUrl) {
-        try {
-          new URL(googleAvatarUrl);
-          if (!googleAvatarUrl.includes('google')) {
-            console.warn('Avatar URL does not appear to be from Google:', googleAvatarUrl);
-            googleAvatarUrl = null;
-          }
-        } catch (urlError) {
-          console.warn('Invalid Google avatar URL format:', googleAvatarUrl);
-          googleAvatarUrl = null;
-        }
-      }
-
-      await syncUserProfile({ supabase_uid: googleUser.id, email: googleUser.email!, displayName:
-          googleUser.user_metadata?.full_name ||
-          googleUser.user_metadata?.name ||
-          googleUser.email?.split('@')[0] ||
-          '', status: 'online' as const, googleAvatarUrl: googleAvatarUrl || undefined });
-    } catch (syncError) { console.error('Error syncing Google OAuth user profile:', syncError); }
-  }, []);
-
-  useEffect(() => { if (user && user.app_metadata?.provider === 'google' && user.user_metadata) {
-      syncGoogleOAuthUser(user); }
-  }, [syncGoogleOAuthUser, user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setActionLoading(true);
@@ -75,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) { cons
     setActionLoading(true);
     setActionError(null);
     try {
-      const { data, error } = await supabaseClient.auth.signUp({
+      const { error } = await supabaseClient.auth.signUp({
         email,
         password,
         options: {
@@ -84,15 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) { cons
       });
       if (error) throw error;
 
-      if (data.user) { try {
-          await syncUserProfile({
-            supabase_uid: data.user.id, email: data.user.email!, displayName: data.user.user_metadata?.displayName || displayName || email.split('@')[0], status: 'online' as const });
-        } catch (syncError) {
-          console.error('Error syncing profile after sign up:', syncError);
-        }
-      } else {
-        console.log('Sign up successful, awaiting email confirmation potentially.');
-      }
     } catch (error: unknown) {
       console.error('Sign up error:', error);
       const friendlyMessage = mapSupabaseAuthError(error);

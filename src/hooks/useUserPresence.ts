@@ -182,7 +182,7 @@ export function useUserPresence(currentUserId?: string) {
   }, [currentUserId, currentUser?.status, currentUser?.currentSpaceId]);
 
   const debouncedUpdateLocation = useMemo(() =>
-    debounce(async (spaceId: string | null) => {
+    debounce(async (spaceId: string | null, options?: { knockRequestId?: string }) => {
       if (!currentUserId) {
         console.error("[Presence] Cannot update location: currentUserId is missing.");
         return;
@@ -191,7 +191,11 @@ export function useUserPresence(currentUserId?: string) {
         const response = await fetch('/api/users/location', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUserId, spaceId }),
+          body: JSON.stringify({
+            userId: currentUserId,
+            spaceId,
+            knockRequestId: options?.knockRequestId,
+          }),
         });
 
         if (!response.ok) {
@@ -224,7 +228,10 @@ export function useUserPresence(currentUserId?: string) {
     }, 250, { leading: true, trailing: false }) // Reduced debounce time and avoid trailing calls
   , [currentUserId, queryClient]);
 
-  const safeUpdateLocation = useCallback(async (spaceId: string | null) => {
+  const safeUpdateLocation = useCallback(async (
+    spaceId: string | null,
+    options?: { knockRequestId?: string }
+  ) => {
     if (!currentUserId) {
       console.error('[Presence] Cannot update location: currentUserId is missing');
       return;
@@ -237,7 +244,7 @@ export function useUserPresence(currentUserId?: string) {
     }
 
     // Check if this is the same update we just made
-    const updateKey = `${currentUserId}-${spaceId}`;
+    const updateKey = `${currentUserId}-${spaceId}-${options?.knockRequestId ?? 'direct'}`;
     if (lastUpdateRef.current === updateKey) {
       console.log('[Presence] Same update already processed, skipping:', updateKey);
       return;
@@ -261,7 +268,7 @@ export function useUserPresence(currentUserId?: string) {
     
     try {
       // Update immediately (apply debounce internally)
-      await debouncedUpdateLocation(spaceId);
+      await debouncedUpdateLocation(spaceId, options);
       
       // Mark this update as completed
       lastUpdateRef.current = updateKey;

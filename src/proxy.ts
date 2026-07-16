@@ -73,10 +73,24 @@ export const config = {
     /*
      * Match all request paths except for the ones starting with:
      * - _next/ (all Next.js internal/dev assets)
+     * - __nextjs (Next.js dev overlay frames)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - src/ (raw source-map fetches)
+     * - api and api/** (API route handlers are the single authoritative auth
+     *   boundary: requireAuthUser or an equivalent direct getUser() validation
+     *   in the handler. Matching API routes here would also call Auth,
+     *   double-hitting the Auth server per request (the VO-RUNTIME-002
+     *   auth-request storm). Route handlers persist rotated cookies through the
+     *   server client's setAll (src/lib/supabase/server-client.ts), while
+     *   /api/auth/callback independently exchanges its OAuth code for session
+     *   cookies. The api(?:/|$) boundary also excludes the exact /api pathname
+     *   and does NOT exclude page paths like /api-docs.
+     *
+     * The proxy continues to use getUser(), rather than getClaims(), for page
+     * protection and cookie refresh. This project uses legacy HS256 signing:
+     * its JWKS endpoint returned empty keys (verified WP0.5, 2026-07-15), so
+     * getClaims() would fall back to a network call and provide no benefit.
      */
-    // Exclude all Next internals and dev overlay frames, and raw /src/* source map fetches
-    '/((?!_next/|__nextjs|favicon.ico|src/).*)',
+    '/((?!_next/|__nextjs|favicon.ico|src/|api(?:/|$)).*)',
   ],
 };

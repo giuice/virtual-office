@@ -39,7 +39,6 @@ export function DashboardHeader({ heading, description }: DashboardHeaderProps) 
 
   // Get user initials for avatar fallback
   const getUserDisplayName = () => {
-    console.log('User META data:', user?.user_metadata);
     if (user?.user_metadata.displayName) return user.user_metadata.displayName;
     if (user?.email) return user.email.split('@')[0];
     return 'User';

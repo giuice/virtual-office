@@ -54,6 +54,7 @@ vi.mock('@/contexts/PresenceContext', () => ({
     usersInSpaces,
     isLoading: false,
     updateLocation: mocks.updateLocation,
+    presenceSessionId: '22222222-2222-4222-8222-222222222222',
   }),
 }));
 
@@ -224,11 +225,15 @@ describe('Knock Auto-Join Flow', () => {
     usersInSpaces.set(space.id, [{ ...currentUserPresence, id: 'occupant-1', displayName: 'Morgan Occupant', currentSpaceId: space.id }]);
   });
 
-  it('does not start or auto-join the disabled knock flow', async () => {
+  it('starts the server-owned knock flow for an occupied room', async () => {
     renderPlan();
     fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
 
-    await waitFor(() => expect(mocks.sendKnockRequest).not.toHaveBeenCalled());
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalledWith('space-1', {
+      id: 'user-1',
+      name: 'Taylor Requester',
+      avatarUrl: undefined,
+    }));
     expect(mocks.updateLocation).not.toHaveBeenCalled();
   });
 
@@ -256,11 +261,11 @@ describe('Knock Auto-Join Flow', () => {
     expect(mocks.toast).toHaveBeenCalledWith('No one responded. Try again later.');
   });
 
-  it('shows the temporary outage message when an inaccessible private space is entered', async () => {
+  it('explains that an inaccessible private room requires an approved knock', async () => {
     renderPlan();
     fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
 
-    expect(await screen.findByText('Private spaces are temporarily unavailable unless you have direct access. Please try again later.')).toBeInTheDocument();
+    expect(await screen.findByText('This private room requires an approved knock before entry.')).toBeInTheDocument();
     expect(mocks.updateLocation).not.toHaveBeenCalled();
   });
 
@@ -277,13 +282,13 @@ describe('Knock Auto-Join Flow', () => {
     expect(mocks.reset).toHaveBeenCalledTimes(1);
   });
 
-  it('does not show knock banners when signaling invokes the request callback', async () => {
+  it('shows canonical knock banners when polling returns a request', async () => {
     renderPlan();
 
     act(() => {
       mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
     });
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Riley Knocker');
   });
 
   it('does not make a private space knockable when only a stale offline occupant exists', () => {
@@ -339,13 +344,35 @@ describe('Knock Auto-Join Flow', () => {
     await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
   });
 
-  it('does not offer knocking when an online responder is present during the outage', async () => {
+  it('offers knocking whenever another online occupant is present', async () => {
     renderPlan();
 
-    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:false');
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
 
-    await waitFor(() => expect(mocks.sendKnockRequest).not.toHaveBeenCalled());
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalledTimes(1));
+  });
+
+  it('offers both Enter and Knock when direct access exists and the room is occupied', () => {
+    space.accessControl = { isPublic: false, allowedUsers: [currentUser.id] };
+    renderPlan();
+
+    expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:true knock:true');
+  });
+
+  it('auto-joins with the exact approved request id', async () => {
+    mocks.knockState.targetSpaceId = 'space-1';
+    renderPlan();
+    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      mocks.capturedSignalingOptions?.onKnockResponse(mockApprovalPayload);
+    });
+
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1', {
+      knockRequestId: 'request-1',
+    }));
   });
 });

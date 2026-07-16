@@ -238,7 +238,8 @@ export class SupabaseUserRepository implements IUserRepository {
   async updateLocation(
     userId: string,
     spaceId: string | null,
-    beforeDatabaseOperation?: BeforeDatabaseOperation
+    beforeDatabaseOperation?: BeforeDatabaseOperation,
+    versionGuard?: { expectedLocationVersion: number; nextLocationVersion: number }
   ): Promise<User | null> {
     console.log(`[updateLocation] Start for user ${userId} to space ${spaceId}`);
     // Steps 2 & 3 (fetching space and updating its userIds) are removed as they are redundant
@@ -248,13 +249,24 @@ export class SupabaseUserRepository implements IUserRepository {
     try {
         console.log(`[updateLocation] Updating user ${userId} current_space_id to ${spaceId}`);
         beforeDatabaseOperation?.();
-        const { data, error } = await this.supabase
+        const updatePayload: Record<string, unknown> = {
+          current_space_id: spaceId,
+          last_active: new Date().toISOString(),
+        };
+        if (versionGuard) {
+          updatePayload.location_version = versionGuard.nextLocationVersion;
+        }
+
+        let updateQuery = this.supabase
           .from(this.TABLE_NAME)
-          .update({
-            current_space_id: spaceId,
-            last_active: new Date().toISOString(),
-          })
-          .eq('id', userId)
+          .update(updatePayload)
+          .eq('id', userId);
+
+        if (versionGuard) {
+          updateQuery = updateQuery.eq('location_version', versionGuard.expectedLocationVersion);
+        }
+
+        const { data, error } = await updateQuery
           .select()
           .single();
 

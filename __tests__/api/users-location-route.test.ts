@@ -35,6 +35,11 @@ interface KnockRow {
   responder_id: string | null;
   expires_at: string | null;
   consumed_at: string | null;
+  requester_location_version: number;
+  requester_access_revision: number;
+  space_access_revision: number;
+  responder_access_revision: number | null;
+  company_id: string;
 }
 
 interface QueryFilter {
@@ -50,6 +55,7 @@ const mockUpdateLocation = vi.fn();
 const mockUpdate = vi.fn();
 const mockSpaceMaybeSingle = vi.fn();
 const mockUsersCount = vi.fn();
+const mockPresenceSessionCount = vi.fn();
 const mockKnockMaybeSingle = vi.fn((filters: QueryFilter[]) => ({
   data: findMatchingKnockRow(filters),
   error: null,
@@ -111,13 +117,48 @@ const mockAdminFrom = vi.fn((table: string) => {
 
   if (table === 'users') {
     return {
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          neq: vi.fn(() => ({
-            neq: vi.fn(() => mockUsersCount()),
+      select: vi.fn(() => {
+        let selectedUserId: string | null = null;
+        let neqCount = 0;
+        const chain = {
+          eq: vi.fn((column: string, value: string) => {
+            if (column === 'id') selectedUserId = value;
+            return chain;
+          }),
+          neq: vi.fn(() => {
+            neqCount += 1;
+            return neqCount >= 2 ? mockUsersCount() : chain;
+          }),
+          maybeSingle: vi.fn(() => ({
+            data: selectedUserId === RESPONDER_ID
+              ? {
+                  company_id: COMPANY_ID,
+                  current_space_id: SPACE_ID,
+                  presence_access_revision: 1,
+                }
+              : {
+                  company_id: COMPANY_ID,
+                  location_version: 0,
+                  presence_access_revision: 1,
+                },
+            error: null,
           })),
-        })),
-      })),
+        };
+        return chain;
+      }),
+    };
+  }
+
+  if (table === 'user_presence_sessions') {
+    return {
+      select: vi.fn(() => {
+        const chain = {
+          eq: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          gt: vi.fn(() => mockPresenceSessionCount()),
+        };
+        return chain;
+      }),
     };
   }
 
@@ -266,6 +307,11 @@ function makeApprovedKnock(overrides: Partial<KnockRow> = {}): KnockRow {
     responder_id: RESPONDER_ID,
     expires_at: new Date(Date.now() + 60_000).toISOString(),
     consumed_at: null,
+    requester_location_version: 0,
+    requester_access_revision: 1,
+    space_access_revision: 1,
+    responder_access_revision: 1,
+    company_id: COMPANY_ID,
     ...overrides,
   };
 }
@@ -304,10 +350,12 @@ function primeRestrictedSpace(options: {
       status: 'active',
       capacity: 10,
       access_control: accessControl,
+      presence_access_revision: 1,
     },
     error: null,
   });
   mockUsersCount.mockResolvedValue({ count: 0, error: null });
+  mockPresenceSessionCount.mockResolvedValue({ count: 1, error: null });
   mockPresenceMaybeSingle.mockResolvedValue({
     data: priorExitAt ? { exited_at: priorExitAt } : null,
     error: null,
@@ -328,12 +376,15 @@ function primeRestrictedSpace(options: {
   }));
 }
 
-async function expectAccessDenied(body: object = { userId: APP_USER_ID, spaceId: SPACE_ID }) {
+async function expectAccessDenied(
+  body: object = { userId: APP_USER_ID, spaceId: SPACE_ID },
+  expectedCode = 'SPACE_ACCESS_DENIED'
+) {
   const response = await putLocation(body);
   const data = await response.json();
 
   expect(response.status).toBe(403);
-  expect(data.code).toBe('SPACE_ACCESS_DENIED');
+  expect(data.code).toBe(expectedCode);
   expect(mockUpdateLocation).not.toHaveBeenCalled();
 }
 
@@ -433,6 +484,43 @@ describe('/api/users/location', () => {
         authorized_by: RESPONDER_ID,
       })
     );
+  });
+
+  it('consumes an exact social knock approval even when the room is public', async () => {
+    primeRestrictedSpace({
+      accessControl: { isPublic: true },
+      knockRows: [makeApprovedKnock()],
+    });
+
+    const response = await putLocation({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateLocation).toHaveBeenCalledWith(APP_USER_ID, SPACE_ID);
+    expect(mockKnockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'consumed',
+    }));
+  });
+
+  it('consumes an exact social knock approval for an admin with direct access', async () => {
+    primeRestrictedSpace({
+      userOverrides: { role: 'admin' },
+      knockRows: [makeApprovedKnock()],
+    });
+
+    const response = await putLocation({
+      userId: APP_USER_ID,
+      spaceId: SPACE_ID,
+      knockRequestId: APPROVED_KNOCK_ID,
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockKnockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'consumed',
+    }));
   });
 
   it('allows direct restricted-space entry when access rules allow the user and no online occupants are present', async () => {
@@ -544,7 +632,7 @@ describe('/api/users/location', () => {
       userId: APP_USER_ID,
       spaceId: SPACE_ID,
       knockRequestId: APPROVED_KNOCK_ID,
-    });
+    }, 'KNOCK_INVALID');
   });
 
   it('denies restricted-space entry for an approval missing responder_id', async () => {
@@ -556,7 +644,7 @@ describe('/api/users/location', () => {
       userId: APP_USER_ID,
       spaceId: SPACE_ID,
       knockRequestId: APPROVED_KNOCK_ID,
-    });
+    }, 'KNOCK_INVALID');
   });
 
   it('denies restricted-space entry for an already consumed approval', async () => {
@@ -568,7 +656,7 @@ describe('/api/users/location', () => {
       userId: APP_USER_ID,
       spaceId: SPACE_ID,
       knockRequestId: APPROVED_KNOCK_ID,
-    });
+    }, 'KNOCK_INVALID');
   });
 
   it('denies restricted-space entry when an approved row exists but the body has no knockRequestId', async () => {

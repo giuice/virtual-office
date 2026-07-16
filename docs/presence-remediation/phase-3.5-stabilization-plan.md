@@ -1,10 +1,26 @@
 # Phase 3.5 — Authenticated bootstrap and read-model stabilization plan
 
-Revision 2 — 2026-07-14. Incorporates the adversarial review of revision 1 (all findings accepted). Inserted before Phase 4 of the presence-safety remediation (`docs/presence-safety-remediation-handoff-2026-07-09.md`). Application layer only; no DB migrations.
+Revision 3 — 2026-07-16. Incorporates the adversarial review of revision 1 and the operability correction after the linked environment was found without required migrations and the customer-testable floor plan lost rooms, avatars, movement, and Knock. Inserted before Phase 4 of the presence-safety remediation (`docs/presence-safety-remediation-handoff-2026-07-09.md`). Phase 3.5 itself remains application-layer only; it creates no schema migration, but its release gate now verifies migration readiness and end-to-end product operability.
 
 ## Context
 
-`docs/presence-remediation/current-runtime-debug-report-2026-07-14.md` proved at runtime that a single admin login breaks the floor plan: an auth request storm → `Request rate limit reached` → API routes fail 500/401 → `CompanyContext` wipes all state → the UI shows a false "No spaces available" and Presence unsubscribes. All code claims were verified on `staging` @ `00ee8d0`. None of it originates in Phase 3; it is pre-existing bootstrap architecture exposed by Phase 3 runtime verification. Phase 4 (Knock) must not start on this state.
+`docs/presence-remediation/current-runtime-debug-report-2026-07-14.md` proved at runtime that a single admin login breaks the floor plan: an auth request storm → `Request rate limit reached` → API routes fail 500/401 → `CompanyContext` wipes all state → the UI shows a false "No spaces available" and Presence unsubscribes. All code claims were verified on `staging` @ `00ee8d0`. None of it originates in Phase 3; it is pre-existing bootstrap architecture exposed by Phase 3 runtime verification. Phase 4 must not be promoted as a normal customer-facing rollout on this state; a narrowly scoped emergency restoration may proceed only to recover a safe core workflow and remains subject to the shared operability gate below.
+
+## Operability-first release gate
+
+Phase isolation is for implementation and review; it is not permission to release an unusable intermediate product. Security and operability are simultaneous release requirements.
+
+- A passing unit suite cannot close Phase 3.5 while the runtime shows a false empty office, hides active avatars, prevents movement, or leaves the customer unable to exercise the office with two users.
+- Any required migration must be explicitly applied to the named environment, registered/reconciled in migration history, and read back. “The SQL file exists” is not deployment evidence.
+- A security kill switch is an emergency incident state, not a successful phase outcome. The safe server contract and its minimum compatible client must ship as one customer-facing release unit.
+- The shared Phase 3.5/Phase 4 product smoke uses an admin and a member in isolated browsers: both load the same rooms, both avatars appear exactly once, both can move, each can Knock on the other's occupied room, approve/deny works, and an admin/directly authorized user sees **Enter** and **Knock** independently.
+- If this smoke fails, engineering may continue locally to repair it, but the build is not customer-testable and no earlier phase may be represented as complete in practice.
+
+### Current execution checkpoint - 2026-07-16
+
+- WP1-WP3 are implemented and adversarial findings were corrected; their focused suites and type-check passed.
+- WP4-WP7 remain required to close Phase 3.5.
+- The Phase 4 social-Knock migration `20260716143115_phase4_social_knock_server_contract.sql` is now applied to the linked project, recorded in migration history, and read back. Its compatible application slice is in the working tree; the two-user runtime smoke and the remaining formal Phase 4 exit-gate evidence are still pending.
 
 ## Architecture decisions
 
@@ -29,7 +45,7 @@ Revision 2 — 2026-07-14. Incorporates the adversarial review of revision 1 (al
 
 ## Work packages
 
-Each WP ships its regression test in the same diff. Execution delegated to Codex, **minimum tier Terra** (per CLAUDE.md; Luna/Spark banned), one WP at a time, orchestrator reviews every diff. No commits — the user reviews and commits.
+Each WP ships its regression test in the same diff. Execution delegated to Codex, **minimum tier Sol high** (per current `CLAUDE.md`), one WP at a time, orchestrator reviews every diff. No commits — the user reviews and commits.
 
 ### WP0 — Preconditions and evidence capture (user + read-only investigation, no code)
 
@@ -105,11 +121,13 @@ Presence health is proven by **snapshot, never by `SUBSCRIBED` alone**: `isPrese
 8. Expired-JWT drill: expire the access token, navigate + fire concurrent API calls → clean refresh, no 401 wave.
 9. Log audit: grep dev log for `access_token|refresh_token|eyJ` → zero hits.
 10. Staging migration/catalog readback (WP0.4) reviewed before classifying any residual authenticated read failure; if a real RLS/PostgREST failure surfaces, it becomes a separate evidence-backed follow-up.
-11. Report `Status: Pending user confirmation`.
+11. Shared product smoke with Phase 4: admin and member in isolated browsers see the same rooms and both active avatars exactly once; both can move; each can Knock on the other's occupied room; approve and deny reconcile; direct entry never suppresses Knock.
+12. Confirm that every migration required by the tested runtime is present in the named environment's history and catalog. Record application/readback commands and results; do not leave an undisclosed migration step to the user.
+13. Report `Status: Pending user confirmation`.
 
 ## Out of scope
 
-Knock/Phase 4; presence files (`useUserPresence`, `useLastSpace`, `presence-utils`, `/api/users/location`, knock routes); DB migrations/RLS changes; TanStack Query migration; disabling Strict Mode; logging framework; JWT signing-key migration (if HS256 blocks `getClaims()`, that is a user decision logged in WP0); converting messaging/knock error envelopes.
+Implementation of Knock/Phase 4; presence files (`useUserPresence`, `useLastSpace`, `presence-utils`, `/api/users/location`, knock routes); authoring DB migrations/RLS changes; TanStack Query migration; disabling Strict Mode; logging framework; JWT signing-key migration (if HS256 blocks `getClaims()`, that is a user decision logged in WP0); converting messaging/knock error envelopes. This scope boundary does **not** waive the shared release smoke: Phase 3.5 may avoid editing Phase 4 code while still refusing to label a broken integrated runtime customer-testable.
 
 ## Critical files
 

@@ -7,23 +7,33 @@ Digital workspace: floor plans, rooms, presence, messaging, company mgmt. Next.j
 
 ## Core Principles
 
-### Delegation to Codex — CRITICAL (when model is Fable or Opus)
-You are the **orchestrator & architect**: plan, design, decide, review. Do NOT burn premium tokens on execution.
-- **Delegate execution to Codex — minimum tier is Terra (GPT-5.6). Never use Luna or Spark**: they introduced regressions in working code (2026-07 presence bootstrap). Quality floor > cost.
-	- Effort ladder: `medium < high < xhigh < extra-high < max < ultra`.
-	- **Terra** = default workhorse for all delegated execution. Raise Terra's effort before escalating to Sol (e.g. Terra xhigh ≈ index 70 beats Sol medium ≈ 67 at lower cost).
-	- **Sol** = reserve for the top ~79–80 band on the hardest reasoning tasks; expensive — justify it.
-	- **Adversarial reviews / second opinions: medium effort is ideal** (user standing guidance). Do NOT burn xhigh/ultra/Sol on reviews.
-	- Sol and high-effort runs are **expensive for the user** — use only when the task genuinely needs Fable-tier reasoning.
-- **How**: `codex:codex-rescue` subagent (plugin), or parallel `tmux` sessions running the `codex` CLI — one per independent task.
-- **Codex prompts must be precise**: exact files, expected changes, acceptance checks. Codex executes; it doesn't decide architecture.
-- **Keep in main thread**: architecture decisions, root-cause debugging, security-sensitive changes, and final review of every Codex result.
-- **Commits are the USER's job** — never auto-commit; the user reviews all diffs. Stage/leave changes and report what changed; commit only when explicitly asked.
+### Codex Delegation — CRITICAL
 
-### Token Economy — CRITICAL
-- Always save tokens intelligently: `rtk` on every shell command, targeted reads (grep/offset/limit before full-file reads), never re-read unchanged files, no redundant verification runs.
-- Delegate bulk exploration/reading to Codex subagents when raw output would flood the main context.
-- Concise replies — substance over narration.
+This repository is exceptionally complex. Terra and Fable have repeatedly produced incomplete or incorrect implementations, while Sol has consistently identified the remaining defects.
+
+For this project, **Sol with high reasoning is the minimum acceptable model**.
+
+* Never use Terra, Luna, or Spark for planning, implementation, debugging, or review.
+* Fable acts only as the main-thread orchestrator and architectural interface. Do not treat its plans or implementation judgments as authoritative.
+* Delegate root-cause analysis, planning, implementation, testing, and final review to **Sol high**.
+* Escalate to **Sol xhigh** when the root cause remains uncertain, the first fix fails, or the change spans multiple architectural layers.
+* Use **Sol max** only when `high` and `xhigh` remain inconclusive.
+* `ultra` is a multi-agent execution mode, not a reasoning-effort level. Use it only when the investigation can be safely divided into independent scopes.
+
+Use `codex:codex-rescue` or isolated Codex CLI sessions. Every prompt must specify the objective, observed failure, relevant scope, constraints, expected behavior, acceptance criteria, and required checks.
+
+Sol must inspect the existing implementation before editing, establish the root cause from evidence, implement the smallest complete fix, run the relevant tests, inspect the final diff, and iterate until all acceptance criteria pass.
+
+Never accept a plan or patch solely because its author says it is correct. Require evidence from tests, static analysis, runtime behavior, repository inspection, or explicit acceptance checks.
+
+Do not introduce unrelated refactors, weaken tests, suppress errors, bypass type safety, auto-commit, or claim success when verification was not completed.
+
+### Token Economy
+
+Use `rtk`, targeted searches, focused file reads, and avoid rereading unchanged files. Keep reporting concise, but never reduce model quality, reasoning effort, investigation depth, or verification merely to save tokens.
+
+For this repository, **correctness and regression prevention take priority over cost**.
+
 
 ### Planning & Execution
 - **Plan mode** for non-trivial tasks (3+ steps, arch decisions). Plan before code.

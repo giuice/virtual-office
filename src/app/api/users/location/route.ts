@@ -15,7 +15,7 @@ const updateLocationSchema = z.object({
   userId: z.string().uuid(),
   spaceId: z.string().uuid().nullable(),
   offline: z.boolean().optional(),
-  knockRequestId: z.unknown().optional(),
+  knockRequestId: z.string().uuid().optional(),
 });
 
 export const dynamic = 'force-dynamic';
@@ -34,11 +34,17 @@ interface SpaceRow {
   status: string;
   capacity: number;
   access_control: unknown;
+  presence_access_revision: number;
 }
 
 interface KnockAuthorizationRow {
   id: string;
   responder_id: string | null;
+  requester_location_version: number;
+  requester_access_revision: number;
+  space_access_revision: number;
+  responder_access_revision: number | null;
+  company_id: string;
 }
 
 interface PriorOccupancyRow {
@@ -182,7 +188,7 @@ async function getSpaceForValidation(
   writeGate.assertCanStartDatabaseOperation();
   const { data: space, error } = await supabase
     .from('spaces')
-    .select('id, company_id, status, capacity, access_control')
+    .select('id, company_id, status, capacity, access_control, presence_access_revision')
     .eq('id', spaceId)
     .maybeSingle();
 
@@ -197,19 +203,14 @@ async function getApprovedKnockAuthorization(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   spaceId: string,
   userId: string,
-  knockRequestId: unknown,
+  knockRequestId: string,
   writeGate: LegacyPresenceWriteGate
 ): Promise<KnockAuthorizationRow | null> {
-  const validatedKnockRequestId = z.string().uuid().safeParse(knockRequestId);
-  if (!validatedKnockRequestId.success) {
-    return null;
-  }
-
   writeGate.assertCanStartDatabaseOperation();
   const { data: knockAuthorization, error } = await supabase
     .from('knock_requests')
-    .select('id, responder_id')
-    .eq('id', validatedKnockRequestId.data)
+    .select('id, responder_id, requester_location_version, requester_access_revision, space_access_revision, responder_access_revision, company_id')
+    .eq('id', knockRequestId)
     .eq('requester_id', userId)
     .eq('space_id', spaceId)
     .eq('status', 'approved')
@@ -222,6 +223,48 @@ async function getApprovedKnockAuthorization(
   if (error) {
     throw new Error(`Failed to verify private space approval: ${error.message}`);
   }
+
+  if (!knockAuthorization?.responder_id || knockAuthorization.responder_access_revision === null) {
+    return null;
+  }
+
+  writeGate.assertCanStartDatabaseOperation();
+  const [{ data: requesterState, error: requesterError }, { data: responderState, error: responderError }] =
+    await Promise.all([
+      supabase
+        .from('users')
+        .select('company_id, location_version, presence_access_revision')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabase
+        .from('users')
+        .select('company_id, current_space_id, presence_access_revision')
+        .eq('id', knockAuthorization.responder_id)
+        .maybeSingle(),
+    ]);
+
+  if (requesterError || responderError) {
+    throw new Error('Failed to verify current knock participants');
+  }
+
+  if (!requesterState || !responderState) return null;
+  if (requesterState.company_id !== knockAuthorization.company_id) return null;
+  if (requesterState.location_version !== knockAuthorization.requester_location_version) return null;
+  if (requesterState.presence_access_revision !== knockAuthorization.requester_access_revision) return null;
+  if (responderState.company_id !== knockAuthorization.company_id) return null;
+  if (responderState.current_space_id !== spaceId) return null;
+  if (responderState.presence_access_revision !== knockAuthorization.responder_access_revision) return null;
+
+  writeGate.assertCanStartDatabaseOperation();
+  const { count: activeResponderSessions, error: sessionError } = await supabase
+    .from('user_presence_sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', knockAuthorization.responder_id)
+    .is('retired_at', null)
+    .gt('expires_at', new Date().toISOString());
+
+  if (sessionError) throw new Error('Failed to verify current knock responder session');
+  if (!activeResponderSessions) return null;
 
   return knockAuthorization;
 }
@@ -255,7 +298,7 @@ async function enforceSpaceAuthorization(params: {
   authenticatedUser: User;
   targetSpace: SpaceRow;
   spaceId: string;
-  knockRequestId: unknown;
+  knockRequestId?: string;
   writeGate: LegacyPresenceWriteGate;
 }) {
   const { supabase, authenticatedUser, targetSpace, spaceId, knockRequestId, writeGate } = params;
@@ -305,9 +348,6 @@ async function enforceSpaceAuthorization(params: {
   }
 
   const accessClassification = classifySpaceAccessControl(targetSpace.access_control);
-  if (accessClassification === 'public') {
-    return { authorizedByUserId: null, consumedKnockRequestId: null };
-  }
 
   if (accessClassification === 'invalid') {
     console.error('Invalid space access_control configuration', {
@@ -324,6 +364,37 @@ async function enforceSpaceAuthorization(params: {
         { status: 403 }
       ),
     };
+  }
+
+  // A supplied approval is a social Knock intent even for public/direct-access
+  // rooms. Validate and consume that exact grant so a stale approval can never
+  // auto-move a user after a newer action.
+  if (knockRequestId) {
+    const approvedKnock = await getApprovedKnockAuthorization(
+      supabase,
+      spaceId,
+      authenticatedUser.id,
+      knockRequestId,
+      writeGate
+    );
+
+    if (!approvedKnock || approvedKnock.space_access_revision !== targetSpace.presence_access_revision) {
+      return {
+        errorResponse: NextResponse.json(
+          { error: 'This knock approval is no longer valid.', code: 'KNOCK_INVALID' },
+          { status: 403 }
+        ),
+      };
+    }
+
+    return {
+      authorizedByUserId: approvedKnock.responder_id,
+      consumedKnockRequestId: approvedKnock.id,
+    };
+  }
+
+  if (accessClassification === 'public') {
+    return { authorizedByUserId: null, consumedKnockRequestId: null };
   }
 
   if (userHasDirectSpaceAccess(authenticatedUser, targetSpace.access_control as SpaceAccessControl)) {
@@ -346,20 +417,6 @@ async function enforceSpaceAuthorization(params: {
 
   if (hasGraceRejoinByExitLog) {
     return { authorizedByUserId: null, consumedKnockRequestId: null };
-  }
-
-  const approvedKnock = await getApprovedKnockAuthorization(
-    supabase,
-    spaceId,
-    authenticatedUser.id,
-    knockRequestId,
-    writeGate
-  );
-  if (approvedKnock) {
-    return {
-      authorizedByUserId: approvedKnock.responder_id,
-      consumedKnockRequestId: approvedKnock.id,
-    };
   }
 
   return {
@@ -475,14 +532,37 @@ async function handleLocationUpdate(request: Request) {
       consumedKnockRequestId = authorization.consumedKnockRequestId ?? null;
     }
 
+    writeGate.assertCanStartDatabaseOperation();
+    const { data: versionState, error: versionError } = await supabaseAdmin
+      .from('users')
+      .select('location_version')
+      .eq('id', authenticatedUser.id)
+      .maybeSingle();
+
+    if (versionError || !versionState) {
+      throw new Error('Failed to load the current location version');
+    }
+
+    const expectedLocationVersion = versionState.location_version;
+    const nextLocationVersion = spaceChanged
+      ? expectedLocationVersion + 1
+      : expectedLocationVersion;
+
     const updatedUser = await userRepository.updateLocation(
       authenticatedUser.id,
       spaceId,
-      () => writeGate?.assertCanStartDatabaseOperation()
+      () => writeGate?.assertCanStartDatabaseOperation(),
+      { expectedLocationVersion, nextLocationVersion }
     );
 
     if (!updatedUser) {
-      return completeWith(NextResponse.json({ error: 'Failed to update user location' }, { status: 500 }));
+      return completeWith(NextResponse.json(
+        {
+          error: 'Location changed before this request could be applied',
+          code: 'LOCATION_SUPERSEDED',
+        },
+        { status: 409 }
+      ));
     }
 
     // Reload beacons mark users offline while preserving current_space_id. Reconnect

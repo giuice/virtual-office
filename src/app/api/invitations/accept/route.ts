@@ -40,8 +40,6 @@ export async function POST(req: NextRequest) {
   try {
     const { token, displayName } = await req.json();
 
-    console.log('[API /invitations/accept] Processing token:', token?.substring(0, 8) + '...');
-
     // Validate input
     if (!token) {
       return NextResponse.json({ error: 'Token de convite é obrigatório' }, { status: 400 });
@@ -168,7 +166,7 @@ export async function POST(req: NextRequest) {
     // 4. Invalidate the invitation token using repository
     const updatedInvitation = await invitationRepository.updateStatus(token, 'accepted');
     if (!updatedInvitation) {
-      console.error(`Failed to update invitation status for token ${token}`);
+      console.error('[API /invitations/accept] Failed to update invitation status');
     }
 
     return NextResponse.json({
