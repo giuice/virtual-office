@@ -4,13 +4,19 @@ import { POST } from '@/app/api/spaces/knock/respond/route';
 const mocks = vi.hoisted(() => ({
   requireVerifiedPresenceAuth: vi.fn(),
   rpc: vi.fn(),
+  broadcastKnockInvalidated: vi.fn(),
 }));
 
 vi.mock('@/lib/presence/verified-session', () => ({
   requireVerifiedPresenceAuth: mocks.requireVerifiedPresenceAuth,
 }));
 
+vi.mock('@/lib/presence/knock-broadcast', () => ({
+  broadcastKnockInvalidated: mocks.broadcastKnockInvalidated,
+}));
+
 const RESPONDER_ID = '55555555-5555-4555-8555-555555555555';
+const COMPANY_ID = '33333333-3333-4333-8333-333333333333';
 const AUTH_SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const SESSION_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '66666666-6666-4666-8666-666666666666';
@@ -28,7 +34,7 @@ describe('/api/spaces/knock/respond', () => {
     vi.clearAllMocks();
     mocks.requireVerifiedPresenceAuth.mockResolvedValue({
       ok: true,
-      identity: { appUserId: RESPONDER_ID, authSessionId: AUTH_SESSION_ID, companyId: null },
+      identity: { appUserId: RESPONDER_ID, authSessionId: AUTH_SESSION_ID, companyId: COMPANY_ID },
       admin: { rpc: mocks.rpc },
     });
   });
@@ -65,6 +71,36 @@ describe('/api/spaces/knock/respond', () => {
       p_request_id: REQUEST_ID,
       p_decision: 'APPROVE',
     });
+    expect(mocks.broadcastKnockInvalidated).toHaveBeenCalledWith(
+      expect.objectContaining({ rpc: mocks.rpc }),
+      COMPANY_ID,
+    );
+  });
+
+  it('does not broadcast an idempotent replay', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        code: 'KNOCK_RESPONDED',
+        requestId: REQUEST_ID,
+        status: 'denied',
+        decision: 'DENY',
+        responderId: RESPONDER_ID,
+        expiresAt: '2026-07-16T12:00:30.000Z',
+        usable: false,
+        alreadyApplied: true,
+      },
+      error: null,
+    });
+
+    const response = await POST(createRequest({
+      sessionId: SESSION_ID,
+      requestId: REQUEST_ID,
+      decision: 'DENY',
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.broadcastKnockInvalidated).not.toHaveBeenCalled();
   });
 
   it('rejects malformed decisions before the RPC', async () => {

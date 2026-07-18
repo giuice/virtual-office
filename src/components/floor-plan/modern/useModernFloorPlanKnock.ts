@@ -347,6 +347,7 @@ export function useModernFloorPlanKnock({
     respondToKnock,
     occupiedChannelStatus,
   } = useKnockSignaling({
+    companyId: currentUserProfile?.companyId,
     occupiedSpaceId,
     activeRequestId: activeKnockRequestId,
     presenceSessionId,

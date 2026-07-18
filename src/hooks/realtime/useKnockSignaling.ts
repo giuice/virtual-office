@@ -1,6 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import {
+  KNOCK_INVALIDATED_EVENT,
+  knockChannelTopic,
+} from '@/lib/presence/knock-realtime';
 
 export interface KnockRequestPayload {
   type: 'KNOCK_REQUEST';
@@ -80,6 +85,7 @@ async function readJson<T>(response: Response): Promise<T | null> {
 }
 
 export function useKnockSignaling(options: {
+  companyId?: string | null;
   occupiedSpaceId?: string | null;
   activeRequestId?: string | null;
   presenceSessionId?: string | null;
@@ -88,6 +94,7 @@ export function useKnockSignaling(options: {
   onKnockResponse?: (payload: KnockResponsePayload) => void;
 }) {
   const {
+    companyId,
     occupiedSpaceId,
     activeRequestId,
     presenceSessionId,
@@ -97,6 +104,8 @@ export function useKnockSignaling(options: {
   } = options;
   const onKnockRequestRef = useRef(onKnockRequest);
   const onKnockResponseRef = useRef(onKnockResponse);
+  const reconcilePendingRef = useRef<(() => Promise<void>) | null>(null);
+  const reconcileStatusRef = useRef<(() => Promise<void>) | null>(null);
   const [occupiedChannelStatus, setOccupiedChannelStatus] = useState<ChannelStatus>(null);
   const [knockingChannelStatus, setKnockingChannelStatus] = useState<ChannelStatus>(null);
 
@@ -151,12 +160,16 @@ export function useKnockSignaling(options: {
       }
     };
 
+    reconcilePendingRef.current = reconcilePending;
     void reconcilePending();
     const intervalId = setInterval(() => void reconcilePending(), OCCUPANT_POLL_INTERVAL_MS);
 
     return () => {
       isActive = false;
       clearInterval(intervalId);
+      if (reconcilePendingRef.current === reconcilePending) {
+        reconcilePendingRef.current = null;
+      }
     };
   }, [currentUserId, occupiedSpaceId, presenceSessionId]);
 
@@ -204,14 +217,47 @@ export function useKnockSignaling(options: {
       }
     };
 
+    reconcileStatusRef.current = reconcileStatus;
     void reconcileStatus();
     const intervalId = setInterval(() => void reconcileStatus(), REQUESTER_POLL_INTERVAL_MS);
 
     return () => {
       isActive = false;
       clearInterval(intervalId);
+      if (reconcileStatusRef.current === reconcileStatus) {
+        reconcileStatusRef.current = null;
+      }
     };
   }, [activeRequestId, currentUserId, presenceSessionId]);
+
+  useEffect(() => {
+    if (!companyId || !currentUserId || !presenceSessionId) return;
+
+    let isActive = true;
+    const supabase = createSupabaseBrowserClient();
+    const channel = supabase
+      .channel(knockChannelTopic(companyId), {
+        config: { private: true },
+      })
+      .on('broadcast', { event: KNOCK_INVALIDATED_EVENT }, () => {
+        void reconcilePendingRef.current?.();
+        void reconcileStatusRef.current?.();
+      });
+
+    void supabase.realtime
+      .setAuth()
+      .then(() => {
+        if (isActive) channel.subscribe();
+      })
+      .catch(() => {
+        // Polling remains the authoritative delivery path.
+      });
+
+    return () => {
+      isActive = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [companyId, currentUserId, presenceSessionId]);
 
   const sendKnockRequest = useCallback(async (
     spaceId: string,

@@ -5,6 +5,7 @@ import {
   knockRequestBodySchema,
   knockRpcResultSchema,
 } from '@/lib/presence/knock-contract';
+import { broadcastKnockInvalidated } from '@/lib/presence/knock-broadcast';
 import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,10 @@ export async function POST(request: Request): Promise<NextResponse> {
           ? { 'Retry-After': String(parsedResult.data.retryAfterSeconds) }
           : undefined,
       });
+    }
+
+    if (!parsedResult.data.alreadyApplied) {
+      await broadcastKnockInvalidated(auth.admin, auth.identity.companyId);
     }
 
     return NextResponse.json(parsedResult.data);

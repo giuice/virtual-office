@@ -20,7 +20,7 @@ Phase isolation is for implementation and review; it is not permission to releas
 
 - WP1-WP3 are implemented and adversarial findings were corrected; their focused suites and type-check passed.
 - WP4-WP7 remain required to close Phase 3.5.
-- The Phase 4 social-Knock migration `20260716143115_phase4_social_knock_server_contract.sql` is now applied to the linked project, recorded in migration history, and read back. Its compatible application slice is in the working tree; the two-user runtime smoke and the remaining formal Phase 4 exit-gate evidence are still pending.
+- The Phase 4 social-Knock migration `20260716143115_phase4_social_knock_server_contract.sql` and the follow-up `20260716175515_phase4_knock_delivery_and_retention.sql` are now applied to the linked project, recorded in migration history, and read back. The post-`20260716175515` admin/member runtime smoke is user-approved. The cross-company Realtime probe, terminating full-suite result, and final explicit confirmation after those gates remain pending.
 
 ## Architecture decisions
 
