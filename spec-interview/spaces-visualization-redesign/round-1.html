@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec Interview — Round 1 · Spaces Visualization Redesign</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --card-2: #1f232c; --border: #2b303b;
+    --text: #e6e9ef; --muted: #9aa3b2; --accent: #6ea8fe; --accent-soft: #2a3b57; --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 120px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  header p { color: var(--muted); margin: 0 0 8px; }
+  .hint { background: var(--accent-soft); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: .92rem; margin: 18px 0 28px; }
+  fieldset { border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+    margin: 0 0 20px; padding: 18px 20px; }
+  legend { font-weight: 600; padding: 0 8px; font-size: 1.02rem; }
+  .domain { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: -4px 0 12px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 11px;
+    border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: background .12s, border-color .12s; }
+  .opt:hover { background: var(--card-2); }
+  .opt:focus-within { border-color: var(--accent); }
+  .opt input { margin-top: 4px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+  .rec { color: var(--ok); font-size: .78rem; font-weight: 600; margin-left: 6px; }
+  .reason { color: var(--muted); }
+  textarea { width: 100%; margin-top: 12px; background: var(--card-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font: inherit; resize: vertical; min-height: 44px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .note-label { font-size: .8rem; color: var(--muted); display: block; margin-top: 12px; }
+  .bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(6px); border-top: 1px solid var(--border); padding: 14px 20px;
+    display: flex; gap: 12px; justify-content: center; align-items: center; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 9px; padding: 11px 20px; border: 1px solid var(--border); }
+  .primary { background: var(--accent); color: #0b1020; border-color: var(--accent); }
+  .primary:hover { filter: brightness(1.08); }
+  .ghost { background: transparent; color: var(--text); }
+  .ghost:hover { background: var(--card-2); }
+  #status { color: var(--ok); font-size: .9rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Spec Interview — Round 1</h1>
+    <p>Virtual Office · Spaces Visualization Redesign</p>
+  </header>
+  <div class="hint">
+    Pick the option that fits best. <strong>Every question has a free-text field</strong> — use it to
+    write your own answer, adjust the selected option, or explain. When done, click
+    <strong>Copy answers</strong> and paste the block back into the chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copy answers</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Download answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+const QUESTIONS = [
+  { id: "q1", domain: "Problem & goals", multi: true,
+    title: "What are the biggest problems with today's design? (pick all that apply)",
+    options: [
+      ["A", "Hard to parse at a glance — can't quickly see who is where and what's happening", true, "the core job of the screen is failing"],
+      ["B", "Too much visual decoration — glassmorphism, mesh gradients, noise textures add noise, not information", true, "v3 prototype prioritizes style over signal"],
+      ["C", "Doesn't scale — with many spaces/users the grid becomes an unreadable wall of cards", false, "layout breaks down at volume"],
+      ["D", "Actions are unclear — joining, knocking, messaging someone takes too many steps or is hard to discover", false, "interaction problem, not just visual"],
+      ["E", "Feels dated / not pleasant to keep open all day", false, "aesthetic and emotional problem"],
+      ["F", "Poor on smaller screens / laptop windows", false, "responsive problem"],
+      ["G", "Performance — animations and effects feel heavy", false, "runtime problem"],
+    ] },
+  { id: "q2", domain: "Problem & goals", multi: false,
+    title: "What should \"revolutionary but useful\" primarily mean for this redesign?",
+    options: [
+      ["A", "Presence-first clarity: the office reads like a living map of people — who's available, who's together, what's active — with minimal chrome", true, "serves every role; information density done elegantly"],
+      ["B", "Immersive spatial metaphor: a zoomable office map/canvas (Gather/Teamflow style) where you move through space", false, "high wow-factor but a much bigger engineering lift and new interaction model"],
+      ["C", "Ambient dashboard: rich metrics, sparklines, logs — a control room for the company pulse", false, "serves leaders well but can alienate ICs"],
+      ["D", "Keep the current card-grid concept but radically refine its visual quality and hierarchy", false, "lowest risk, least revolutionary"],
+    ] },
+  { id: "q3", domain: "Users", multi: false,
+    title: "Who is the primary user to optimize for when tradeoffs arise?",
+    options: [
+      ["A", "Individual contributors: workers coordinating with teammates all day (leaders still served, but ICs win ties)", true, "matches 'useful for workers no matter what role'; ICs are ~90% of daily usage"],
+      ["B", "All roles exactly equally — no tie-breaker", false, "sounds fair but makes design decisions harder"],
+      ["C", "Leaders/managers monitoring the office pulse", false, "the old spec's bias — you seem to want to move away from this"],
+      ["D", "Admins managing spaces and companies", false, "smallest audience"],
+    ] },
+  { id: "q4", domain: "Users · jobs to be done", multi: true,
+    title: "What are the top jobs this screen must do brilliantly? (pick up to 4)",
+    options: [
+      ["A", "See instantly who is online/available and where they are", true, "core presence job"],
+      ["B", "Join or move to a space in one obvious action", true, "core movement job"],
+      ["C", "Understand what each space is doing right now (meeting, focus, social, free)", true, "core awareness job"],
+      ["D", "Start an interaction fast: message, knock, or pull someone into a room", false, "communication job"],
+      ["E", "Feel the company pulse ambiently without reading anything (glanceable energy)", false, "emotional/ambient job"],
+      ["F", "Find a free room / the right kind of space quickly", false, "navigation job"],
+      ["G", "Review what happened while away (logs, activity trails)", false, "async catch-up job"],
+    ] },
+  { id: "q5", domain: "Scope", multi: false,
+    title: "What surface does this redesign cover?",
+    options: [
+      ["A", "The floor-plan page: space grid/cards, NowBoard header, neighborhoods, space detail panel — the whole main screen", true, "coherent redesign of the screen users live in; leaves shell/nav alone"],
+      ["B", "Space cards + grid only; keep NowBoard and detail panels as-is", false, "smaller but risks a Frankenstein mix of old and new"],
+      ["C", "The entire app visual identity: floor plan + navigation shell + themes/tokens everywhere", false, "biggest impact, biggest scope — multi-phase effort"],
+    ] },
+  { id: "q6", domain: "Scope · layout paradigm", multi: false,
+    title: "Which layout paradigm should the new design use?",
+    options: [
+      ["A", "Refined card grid grouped by neighborhoods — evolve what exists into something dramatically cleaner and more legible", false, "safest; reuses ModernFloorPlanGrid structure"],
+      ["B", "Zoomable spatial office map — spaces have positions, you pan/zoom, avatars sit inside rooms", false, "true spatial metaphor; large rebuild of layout + interaction layer"],
+      ["C", "Hybrid: a clean grid as the default 'overview', plus a distinct zoomed/immersive view per neighborhood or space", true, "revolutionary feel where it matters without rebuilding everything at once"],
+      ["D", "People-first layout: the primary axis is people (like a team roster with spatial context), spaces secondary", false, "inverts the model; interesting for IC coordination"],
+    ] },
+  { id: "q7", domain: "Constraints", multi: true,
+    title: "Which technical constraints must the redesign honor? (pick all that apply)",
+    options: [
+      ["A", "UI-only redesign: do NOT touch the presence/realtime data model, hooks, or APIs — same data in, new pixels out", true, "the presence subsystem is fragile and just went through stabilization; redesign must not destabilize it"],
+      ["B", "Keep the Tailwind 4 + shadcn/Radix stack — no new UI framework or canvas/WebGL engine", true, "keeps maintainability and the existing component investment"],
+      ["C", "Must stay smooth with 20+ spaces and 50+ concurrent users on a mid-range laptop", false, "sets a concrete performance bar"],
+      ["D", "Must work down to tablet width (~768px); mobile phone is best-effort", false, "sets the responsive floor"],
+      ["E", "Mobile phone experience is a first-class requirement", false, "significantly expands the design work"],
+    ] },
+  { id: "q8", domain: "Business rules · theming", multi: false,
+    title: "What should happen to the multi-theme \"Realities\" concept (Neon, Zen, Obsidian, Paper...)?",
+    options: [
+      ["A", "Drop it. Ship ONE excellent light theme and ONE excellent dark theme, fully polished", true, "multi-themes multiply design/QA cost and dilute identity; one strong voice reads as more premium"],
+      ["B", "Keep 2 core themes now, architect tokens so extra themes can return later", false, "keeps the door open at small token-design cost"],
+      ["C", "Keep the multi-theme system — personalization is part of the product's identity", false, "every component must be designed and tested in every theme"],
+    ] },
+  { id: "q9", domain: "Business rules · must-preserve", multi: true,
+    title: "Which existing behaviors are must-preserve in the new design? (pick all that apply)",
+    options: [
+      ["A", "Knock-to-enter flow for private/locked spaces (banner, toast, respond)", true, "just built in phase 4 — active investment"],
+      ["B", "Space capacity limits and 'full' states", true, "existing business rule"],
+      ["C", "Neighborhood grouping and filters", false, "keep only if neighborhoods earn their place in the new layout"],
+      ["D", "NowBoard metrics/beacon queue in the header", false, "may be redesigned or absorbed elsewhere"],
+      ["E", "Activity log / transcript peeks on spaces", false, "old spec feature — confirm it's actually used"],
+      ["F", "Attention beacons (critical/warning pulses on spaces)", false, "confirm real usage before carrying forward"],
+      ["G", "Space audio controls / audio presence", false, "confirm current state"],
+    ] },
+  { id: "q10", domain: "Edge cases & failure modes", multi: true,
+    title: "Which edge scenarios must the design handle explicitly? (pick all that apply)",
+    options: [
+      ["A", "Empty office — nobody online: the screen must still feel alive and useful, not dead", true, "the most common state for small teams across timezones"],
+      ["B", "Realtime disconnect / stale presence: user must be able to tell the data is stale", true, "presence system's known failure mode"],
+      ["C", "Crowded space — far more users than avatar slots (30+ in one room)", false, "overflow design"],
+      ["D", "Many spaces (30+) across neighborhoods without infinite scroll fatigue", false, "scale design"],
+      ["E", "Users without avatar photos / broken avatar URLs", false, "fallback design"],
+      ["F", "Slow network: skeletons and progressive loading that don't jar", false, "loading design"],
+    ] },
+  { id: "q11", domain: "Acceptance criteria", multi: true,
+    title: "How should we validate the redesign succeeded? (pick all that apply)",
+    options: [
+      ["A", "Interactive HTML prototype you approve BEFORE any React implementation begins", true, "cheapest point to iterate; mirrors how the v2/v3 prototypes worked"],
+      ["B", "Task-based checks: e.g. 'find where teammate X is and join them' achievable in under ~5 seconds / 2 clicks", true, "makes 'useful' measurable"],
+      ["C", "Accessibility pass: axe/Lighthouse clean, full keyboard navigation, WCAG AA contrast", false, "carries over the old spec's AA commitment"],
+      ["D", "Performance check: no jank scrolling a full office on a mid-range machine", false, "makes the perf bar testable"],
+      ["E", "Side-by-side comparison against the current UI with your explicit sign-off", false, "final gate stays with you"],
+    ] },
+  { id: "q12", domain: "Deliverable & rollout", multi: false,
+    title: "What is the end deliverable of this SPEC, and how does it roll out?",
+    options: [
+      ["A", "SPEC → HTML prototype (v4) → after your approval, phased React implementation replacing the modern/ components in place", true, "matches your existing workflow; prototype de-risks the big visual bets"],
+      ["B", "SPEC → straight to React implementation behind a feature flag / separate route, iterate live", false, "faster to real code, slower to iterate on visuals"],
+      ["C", "SPEC only for now — implementation planned separately later (e.g. via GSD phases)", false, "pure planning artifact"],
+    ] },
+  { id: "q13", domain: "Test strategy", multi: false,
+    title: "What test strategy should the implementation phase commit to?",
+    options: [
+      ["A", "Test-after from acceptance criteria: Testing Library component tests for states/interactions + a Playwright smoke of the main flows; presence hooks untouched keep their existing tests", true, "matches the repo's Vitest/Playwright setup without slowing visual iteration"],
+      ["B", "Strict TDD: every acceptance criterion becomes a failing test before implementation", false, "rigorous but slow for visually-driven work"],
+      ["C", "Visual regression testing too (Playwright screenshots per state/theme)", false, "adds a safety net for a large visual refactor, at CI-maintenance cost"],
+    ] },
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " · multiple choice" : ""}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recommended)</span>' : ''}
+      ${reason ? ` — <span class="reason">${reason}</span>` : ''}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Other / note (write your own answer):</label>
+    <textarea id="${q.id}-note" placeholder="Write here if no option fits, or to add detail..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 1,
+    topic: "spaces-visualization-redesign",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  navigator.clipboard.writeText(data).then(
+    () => setStatus("✓ Copied! Paste the block into the chat."),
+    () => fallbackCopy(data)
+  );
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("✓ Copied! Paste the block into the chat."); }
+  catch (e) { setStatus("Couldn't copy — use 'Download answers.json'."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("✓ Downloaded answers file.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>

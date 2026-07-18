@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec Interview — Rodada 2 · Redesign da Visualização de Espaços</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --card-2: #1f232c; --border: #2b303b;
+    --text: #e6e9ef; --muted: #9aa3b2; --accent: #6ea8fe; --accent-soft: #2a3b57; --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 120px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  header p { color: var(--muted); margin: 0 0 8px; }
+  .hint { background: var(--accent-soft); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: .92rem; margin: 18px 0 28px; }
+  fieldset { border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+    margin: 0 0 20px; padding: 18px 20px; }
+  legend { font-weight: 600; padding: 0 8px; font-size: 1.02rem; }
+  .domain { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: -4px 0 12px; }
+  .explain { background: var(--card-2); border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 10px 14px; font-size: .88rem; color: var(--text); margin: 0 0 12px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 11px;
+    border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: background .12s, border-color .12s; }
+  .opt:hover { background: var(--card-2); }
+  .opt:focus-within { border-color: var(--accent); }
+  .opt input { margin-top: 4px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+  .rec { color: var(--ok); font-size: .78rem; font-weight: 600; margin-left: 6px; }
+  .reason { color: var(--muted); }
+  textarea { width: 100%; margin-top: 12px; background: var(--card-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font: inherit; resize: vertical; min-height: 44px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .note-label { font-size: .8rem; color: var(--muted); display: block; margin-top: 12px; }
+  .bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(6px); border-top: 1px solid var(--border); padding: 14px 20px;
+    display: flex; gap: 12px; justify-content: center; align-items: center; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 9px; padding: 11px 20px; border: 1px solid var(--border); }
+  .primary { background: var(--accent); color: #0b1020; border-color: var(--accent); }
+  .primary:hover { filter: brightness(1.08); }
+  .ghost { background: transparent; color: var(--text); }
+  .ghost:hover { background: var(--card-2); }
+  #status { color: var(--ok); font-size: .9rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Spec Interview — Rodada 2</h1>
+    <p>Virtual Office · Redesign da Visualização de Espaços — follow-ups da rodada 1</p>
+  </header>
+  <div class="hint">
+    Pode responder em português nas notas. <strong>Toda pergunta tem campo livre</strong> — use para
+    escrever sua própria resposta ou detalhar. Ao terminar, clique em <strong>Copiar respostas</strong>
+    e cole o bloco no chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copiar respostas</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Baixar answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+const QUESTIONS = [
+  { id: "q1", domain: "Objetivos · localizar-se", multi: true,
+    explain: "Você disse: em janela com pouca altura vertical, não dá pra ver onde o SEU usuário está. Quais comportamentos o novo design deve garantir? (pode marcar mais de um)",
+    title: "Como o design deve garantir que você sempre saiba onde VOCÊ está?",
+    options: [
+      ["A", "Indicador \"você está aqui\" sempre visível — um chip/barra fixa mostrando seu espaço atual, clicável para rolar até ele", true, "resolve o problema em qualquer tamanho de janela"],
+      ["B", "Ao abrir o floor plan, rolar/focar automaticamente no espaço onde você está", false, "resolve o primeiro olhar, mas não depois que você rola a página"],
+      ["C", "Seu card de espaço ganha destaque visual forte (borda/glow) para ser achável ao rolar", false, "ajuda, mas ainda exige rolar procurando"],
+      ["D", "Mini-overview compacto (tipo minimapa) com sua posição destacada", false, "mais ambicioso; pode virar diferencial do protótipo híbrido"],
+    ] },
+  { id: "q2", domain: "Objetivos · modos de estilo", multi: false,
+    explain: "Você mencionou \"problemas com os modos de estilo no floor plan\". Preciso entender exatamente o que incomoda.",
+    title: "Qual é o problema com os modos de estilo?",
+    options: [
+      ["A", "Os modos de layout/visualização diferentes confundem — melhor UM layout excelente que se adapta sozinho ao tamanho da tela", false, "elimina a alternância manual de modos"],
+      ["B", "Trocar de modo/tema quebra o layout ou causa comportamento estranho (bugs visuais)", false, "problema de qualidade, não de conceito"],
+      ["C", "Os modos em si são OK, o problema é que nenhum deles funciona bem em janelas pequenas/estreitas", false, "problema de responsividade"],
+      ["D", "Outra coisa — explico na nota abaixo", false, "descreva com suas palavras"],
+    ] },
+  { id: "q3", domain: "Regras de negócio · NowBoard", multi: false,
+    explain: "NowBoard é a barra no TOPO do floor plan que mostra métricas ao vivo (quantas pessoas online, espaços ativos) e a fila de alertas/beacons. Está implementada em NowBoard.tsx / NowBoardMetrics.tsx.",
+    title: "O que fazer com o NowBoard (barra de métricas no topo)?",
+    options: [
+      ["A", "Manter, mas redesenhar/simplificar — o topo da página deve servir aos trabalhadores (busca, filtros, onde estou), não só métricas", true, "alinha com o foco em ICs da rodada 1"],
+      ["B", "Manter como está", false, "sem mudança"],
+      ["C", "Remover — as métricas vão para o dashboard futuro de admins", false, "libera espaço vertical (seu problema da janela baixa)"],
+      ["D", "Não sei — decidir vendo os protótipos", false, "adia a decisão com custo baixo"],
+    ] },
+  { id: "q4", domain: "Regras de negócio · Activity Log / Transcript", multi: false,
+    explain: "Os cards de espaço mostram uma prévia de \"activity log\" e um trecho de \"transcript\" (transcrição de conversa) — componentes ActivityLogPreview.tsx e TranscriptSnippet.tsx. Isso veio do spec antigo focado em líderes. Hoje não existe transcrição real de áudio no sistema.",
+    title: "O que fazer com Activity Log / Transcript nos cards?",
+    options: [
+      ["A", "Remover dos cards — sem dado real, é decoração que ocupa espaço; se um dia existir transcrição, volta como feature própria", true, "menos ruído nos cards = mais legibilidade, seu problema nº 1"],
+      ["B", "Manter só o activity log (entrou/saiu/eventos do espaço), remover transcript", false, "log de presença tem dado real hoje"],
+      ["C", "Manter os dois como estão", false, "mantém o visual atual dos cards"],
+      ["D", "Não sei — decidir vendo os protótipos", false, "os protótipos podem mostrar com e sem"],
+    ] },
+  { id: "q5", domain: "Regras de negócio · Attention Beacons", multi: false,
+    explain: "Attention Beacon é a bolinha pulsante no canto do card que indica \"algo crítico acontecendo\" no espaço (ex.: sala muito cheia, escalação). Componentes AttentionBeacon.tsx e BeaconQueue.tsx.",
+    title: "O que fazer com os Attention Beacons (bolinha pulsante de alerta)?",
+    options: [
+      ["A", "Simplificar: virar um estado visual claro do card (ex.: \"cheio\", \"reunião ao vivo\") em vez de bolinha pulsante genérica", true, "sinal com significado concreto > alerta abstrato"],
+      ["B", "Manter como está (bolinha pulsante + fila de beacons)", false, "sem mudança"],
+      ["C", "Remover — nunca entendi/usei isso", false, "menos um conceito para aprender"],
+      ["D", "Não sei — decidir vendo os protótipos", false, "adia a decisão"],
+    ] },
+  { id: "q6", domain: "Restrições · responsividade", multi: false,
+    explain: "Seu problema nº 1 aconteceu numa janela com pouca ALTURA (ex.: navegador em meia tela). Preciso fixar o piso de suporte.",
+    title: "Qual é o piso de suporte de tela do novo design?",
+    options: [
+      ["A", "Desktop cheio + janelas reduzidas (meia tela horizontal/vertical, ~1280×600) são primeira classe; tablet funcional; celular best-effort", true, "cobre exatamente o cenário que te incomodou"],
+      ["B", "Igual ao A, mas celular também é primeira classe", false, "expande bastante o trabalho de design e teste"],
+      ["C", "Só desktop em tela cheia importa de verdade", false, "não resolve seu problema da janela baixa"],
+    ] },
+  { id: "q7", domain: "Restrições · performance", multi: false,
+    explain: "Na rodada 1 você não marcou a barra de performance. Quero confirmar se ela vira requisito testável ou não.",
+    title: "Performance vira requisito formal?",
+    options: [
+      ["A", "Sim: fluido (sem travadas perceptíveis) com 20+ espaços e 50+ usuários simultâneos em um laptop mediano", true, "barato de exigir agora, caro de consertar depois"],
+      ["B", "Não formalizar — só evitar exageros óbvios", false, "confia no bom senso da implementação"],
+    ] },
+  { id: "q8", domain: "Critérios de aceite · protótipos", multi: false,
+    explain: "Você pediu protótipos HTML para escolher, como no grid v3. Proposta: variantes com as MESMAS funcionalidades (mesmos espaços, mesmas pessoas, knock, áudio, neighborhoods), mudando só o paradigma de layout.",
+    title: "Quantos e quais protótipos HTML comparar?",
+    options: [
+      ["A", "3 variantes: (1) Grid refinado, (2) Híbrido — grid geral + zoom por neighborhood, (3) People-first — pessoas como eixo principal, espaços como contexto", true, "cobre o espectro conservador → ousado com custo razoável"],
+      ["B", "2 variantes: Grid refinado vs. Híbrido", false, "mais rápido, menos exploração"],
+      ["C", "Variações de estilo visual do MESMO paradigma (como foi v1/v2/v3)", false, "explora estética, não estrutura — mas a rodada 1 apontou problema de estrutura"],
+    ] },
+  { id: "q9", domain: "Critérios de aceite · acessibilidade", multi: false,
+    explain: "Na rodada 1 você não marcou o item de acessibilidade. O spec antigo prometia WCAG AA completo.",
+    title: "Qual nível de acessibilidade exigir?",
+    options: [
+      ["A", "Baseline pragmático: navegação completa por teclado + contraste AA nos textos + focus visível — sem auditoria formal como gate", true, "qualidade essencial sem burocratizar a entrega"],
+      ["B", "WCAG AA completo com auditoria axe/Lighthouse como critério de aceite", false, "compromisso do spec antigo, custo de verificação maior"],
+      ["C", "Não é prioridade agora", false, "risco: retrabalho se virar exigência depois"],
+    ] },
+  { id: "q10", domain: "Estratégia de teste · UAT", multi: false,
+    explain: "Você disse que o único teste real é você mesmo validando (knock, conversa entre dois usuários). Proposta: formalizar isso no spec como checklist de UAT.",
+    title: "Formalizar sua validação manual como checklist de UAT no spec?",
+    options: [
+      ["A", "Sim — o spec inclui um checklist de UAT (com 2 contas reais: knock e atender, conversar, mover de espaço, ver o outro mover) que EU executo antes de aceitar cada fase", true, "seu critério vira gate explícito e repetível"],
+      ["B", "Não precisa formalizar — eu testo informalmente como sempre fiz", false, "mais leve, menos rastreável"],
+    ] },
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " · múltipla escolha" : ""}</div>`;
+  if (q.explain) html += `<div class="explain">${q.explain}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recomendado)</span>' : ''}
+      ${reason ? ` — <span class="reason">${reason}</span>` : ''}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Outra resposta / nota:</label>
+    <textarea id="${q.id}-note" placeholder="Escreva aqui se nenhuma opção servir, ou para detalhar..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 2,
+    topic: "spaces-visualization-redesign",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  navigator.clipboard.writeText(data).then(
+    () => setStatus("✓ Copiado! Cole o bloco no chat."),
+    () => fallbackCopy(data)
+  );
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("✓ Copiado! Cole o bloco no chat."); }
+  catch (e) { setStatus("Não consegui copiar — use 'Baixar answers.json'."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("✓ Arquivo baixado.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>
