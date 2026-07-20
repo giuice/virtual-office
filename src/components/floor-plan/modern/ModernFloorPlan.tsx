@@ -16,6 +16,7 @@ export type FloorPlanPerspective = 'orbit' | 'analyst' | 'cinema';
 interface ModernFloorPlanProps {
   spaces: Space[];
   onSpaceSelect?: (space: Space) => void;
+  onSpaceLeave?: () => void;
   onSpaceDoubleClick?: (space: Space) => void;
   onUserClick?: (userId: string) => void;
   /** Handler for editing a space (admin only) */
@@ -56,6 +57,7 @@ const EMPTY_NEIGHBORHOODS: Neighborhood[] = [];
 const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   spaces = EMPTY_SPACES,
   onSpaceSelect,
+  onSpaceLeave,
   onSpaceDoubleClick,
   onUserClick,
   onEditSpace,
@@ -70,12 +72,21 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   isAdmin = false,
 }) => {
   const { currentUserProfile } = useCompany();
-  const { users, usersInSpaces, isLoading, updateLocation, presenceSessionId } = usePresence();
+  const {
+    users,
+    usersInSpaces,
+    isLoading,
+    updateLocation,
+    beginManualIntent,
+    releaseManualIntent,
+    presenceSessionId,
+  } = usePresence();
   const { speakingUsers, mutedUserIds } = useAudio();
   const {
     error,
     setError,
     pendingKnockRequests,
+    respondingKnockRequestIds,
     timeoutSpaceId,
     knockStatus,
     knockTargetSpaceId,
@@ -94,8 +105,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     currentUserProfile,
     isAdmin,
     updateLocation,
+    beginManualIntent,
+    releaseManualIntent,
     presenceSessionId,
     onSpaceSelect,
+    onSpaceLeave,
     onOpenChat,
   });
 
@@ -138,7 +152,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     const spaceUsers = usersInSpaces.get(space.id) || [];
     const userInSpace = isUserInSpace(space);
     const hasOnlineResponder = spaceUsers.some(
-      (user) => user.id !== currentUserProfile?.id && user.status !== 'offline'
+      (user) => user.id !== currentUserProfile?.id
     );
     const canDirectEnter = Boolean(
       hasSpaceAccess(space) ||
@@ -159,8 +173,8 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         key={space.id || index}
         space={space}
         usersInSpace={spaceUsers}
-        onEnterSpace={handleEnterSpace}
-        onLeaveSpace={handleLeaveSpace}
+        onEnterSpace={(spaceId) => { void handleEnterSpace(spaceId); }}
+        onLeaveSpace={() => { void handleLeaveSpace(); }}
         onOpenChat={onOpenChat}
         onUserClick={onUserClick}
         onSpaceDoubleClick={onSpaceDoubleClick}
@@ -178,8 +192,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         pendingKnockRequest={
           Array.from(pendingKnockRequests.values()).find((request) => request.spaceId === space.id) ?? null
         }
-        onKnockApprove={handleBannerApprove}
-        onKnockDeny={handleBannerDeny}
+        knockResponsePending={Array.from(pendingKnockRequests.values()).some(
+          (request) => request.spaceId === space.id && respondingKnockRequestIds.has(request.requestId)
+        )}
+        onKnockApprove={(request) => { void handleBannerApprove(request); }}
+        onKnockDeny={(request) => { void handleBannerDeny(request); }}
         onKnock={canKnock ? handleKnock : undefined}
         knockStatus={currentKnockStatus}
         knockCooldownRemaining={cooldownRemaining}
@@ -207,6 +224,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     onSpaceDoubleClick,
     onUserClick,
     pendingKnockRequests,
+    respondingKnockRequestIds,
     perspective,
     timeoutSpaceId,
     usersInSpaces,

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "caseId": 13,
+      "tag": "13-capacity-one",
+      "description": "capacity-one concurrent joins"
+    },
+    {
+      "caseId": 15,
+      "tag": "15-same-id-replay",
+      "description": "same transition ID concurrent replay"
+    },
+    {
+      "caseId": 16,
+      "tag": "16-same-user-moves",
+      "description": "distinct concurrent moves for one user"
+    },
+    {
+      "caseId": 29,
+      "tag": "29-knock-create-respond",
+      "description": "concurrent Knock create and respond"
+    },
+    {
+      "caseId": 33,
+      "tag": "33-session-invalidation",
+      "description": "disconnect, Logout, and expiry during a transition wait"
+    },
+    {
+      "caseId": 37,
+      "tag": "37-knock-rate-limits",
+      "description": "pair and global concurrent Knock rate limits"
+    },
+    {
+      "caseId": 45,
+      "tag": "45-register-logout",
+      "description": "registration versus Logout"
+    },
+    {
+      "caseId": 48,
+      "tag": "48-legacy-shared-gate",
+      "description": "legacy shared gate versus maintenance"
+    },
+    {
+      "caseId": 49,
+      "tag": "49-distinct-id-deadlock",
+      "description": "distinct transition IDs without deadlock"
+    },
+    {
+      "caseId": 50,
+      "tag": "50-different-id-logout",
+      "description": "different-ID concurrent Logout"
+    },
+    {
+      "caseId": 52,
+      "tag": "52-responder-lock-set",
+      "description": "Knock responder lock-set change"
+    },
+    {
+      "caseId": 57,
+      "tag": "57-breaking-audit-races",
+      "description": "breaking gate versus direct-write and route receipts"
+    },
+    {
+      "caseId": 58,
+      "tag": "58-adapter-disable",
+      "description": "adapter disable versus route receipt"
+    },
+    {
+      "caseId": 59,
+      "tag": "59-atomic-maintenance",
+      "description": "atomic shared gate and pre-gate transition versus maintenance"
+    }
+  ]
+}

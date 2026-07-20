@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  requireAuthUser: () => mocks.requireAuthUser(),
+  requireAuthUser: (options: unknown) => mocks.requireAuthUser(options),
 }));
 
 vi.mock('@/repositories/implementations/supabase', () => ({
@@ -80,5 +80,25 @@ describe('/api/users/list', () => {
     expect(response.status).toBe(200);
     expect(mocks.findByCompany).not.toHaveBeenCalled();
     expect(data.users).toEqual([dbUser]);
+  });
+
+  it('returns a safe correlated envelope when the repository fails', async () => {
+    mocks.requireAuthUser.mockResolvedValue({
+      supabase: mocks.supabase,
+      authUser: { id: 'auth-user-1' },
+      dbUser: makeUser(),
+    });
+    mocks.findByCompany.mockRejectedValue({ code: 'PGRST002', message: 'schema cache failure' });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toMatchObject({
+      error: 'Failed to fetch users',
+      code: 'INTERNAL_ERROR',
+      correlationId: expect.any(String),
+    });
+    expect(data.error).not.toContain('schema cache');
   });
 });

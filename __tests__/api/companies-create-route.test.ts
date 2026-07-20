@@ -1,104 +1,118 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Company, User } from '@/types/database';
 import { POST } from '@/app/api/companies/create/route';
 
-const AUTH_USER_ID = 'auth-user-1';
-const APP_USER_ID = 'app-user-1';
-const NEW_COMPANY_ID = 'company-new';
+const USER_ID = '11111111-1111-4111-8111-111111111111';
+const COMPANY_ID = '22222222-2222-4222-8222-222222222222';
 
 const mocks = vi.hoisted(() => ({
   requireAuthUser: vi.fn(),
-  companyCreate: vi.fn(),
-  userUpdate: vi.fn(),
-  supabase: {},
+  rpc: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
   requireAuthUser: () => mocks.requireAuthUser(),
 }));
 
-vi.mock('@/repositories/implementations/supabase', () => ({
-  SupabaseCompanyRepository: function MockCompanyRepository() {
-    return {
-      create: (data: Omit<Company, 'id' | 'createdAt'>) => mocks.companyCreate(data),
-    };
-  },
-  SupabaseUserRepository: function MockUserRepository() {
-    return {
-      update: (id: string, updates: Partial<User>) => mocks.userUpdate(id, updates),
-    };
-  },
+vi.mock('@/lib/supabase/server-client', () => ({
+  createSupabaseServerClient: vi.fn(async () => ({ rpc: mocks.rpc })),
 }));
 
-function makeUser(overrides: Partial<User> = {}): User {
-  return {
-    id: APP_USER_ID,
-    companyId: null,
-    supabase_uid: AUTH_USER_ID,
-    email: 'user@example.com',
-    displayName: 'Ada Lovelace',
-    status: 'online',
-    preferences: {},
-    role: 'member',
-    lastActive: '2026-01-01T00:00:00.000Z',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    currentSpaceId: null,
-    ...overrides,
-  };
-}
-
-function requestFor(body: object): Request {
-  return {
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Request;
+function requestFor(body: unknown): Request {
+  return new Request('https://example.test/api/companies/create', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 describe('/api/companies/create', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireAuthUser.mockResolvedValue({
-      supabase: mocks.supabase,
-      authUser: { id: AUTH_USER_ID },
-      dbUser: makeUser(),
+      authUser: { id: 'auth-user' },
+      dbUser: { id: USER_ID, companyId: null, role: 'member' },
+      supabase: {},
     });
-    mocks.companyCreate.mockImplementation(async (data: Omit<Company, 'id' | 'createdAt'>) => ({
-      id: NEW_COMPANY_ID,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      ...data,
-    }));
-    mocks.userUpdate.mockImplementation(async (id: string, updates: Partial<User>) => makeUser({ id, ...updates }));
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        code: 'COMPANY_CREATED',
+        userId: USER_ID,
+        companyId: COMPANY_ID,
+        name: 'Acme',
+        adminIds: [USER_ID],
+        settings: {},
+        createdAt: '2026-07-18T21:00:00.000Z',
+        previousSpaceId: null,
+        locationVersion: 0,
+        presenceAccessRevision: 2,
+        retiredSessionCount: 0,
+        closedLogCount: 0,
+        operationTime: '2026-07-18T21:00:00.000Z',
+      },
+      error: null,
+    });
   });
 
-  it('creates a company and promotes the creator to admin', async () => {
+  it('creates company and creator membership through one service RPC', async () => {
     const response = await POST(requestFor({ name: 'Acme' }));
-    const data = await response.json();
 
     expect(response.status).toBe(201);
-    expect(data.company.adminIds).toEqual([APP_USER_ID]);
-    expect(mocks.userUpdate).toHaveBeenCalledWith(APP_USER_ID, {
-      companyId: NEW_COMPANY_ID,
-      role: 'admin',
+    expect(mocks.rpc).toHaveBeenCalledWith('create_company_for_user', {
+      p_user_id: USER_ID,
+      p_name: 'Acme',
+      p_settings: {},
+    });
+    expect(await response.json()).toMatchObject({
+      code: 'COMPANY_CREATED',
+      company: { id: COMPANY_ID, adminIds: [USER_ID] },
     });
   });
 
-  it('rejects creation when the caller already belongs to a company', async () => {
-    mocks.requireAuthUser.mockResolvedValue({
-      supabase: mocks.supabase,
-      authUser: { id: AUTH_USER_ID },
-      dbUser: makeUser({ companyId: 'company-existing' }),
+  it('rejects unknown or membership-bearing request fields', async () => {
+    const response = await POST(
+      requestFor({ name: 'Acme', adminIds: [USER_ID] }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('maps the database-serialized existing-company race', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'COMPANY_CREATE_ALREADY_HAS_COMPANY' },
     });
 
     const response = await POST(requestFor({ name: 'Acme' }));
 
     expect(response.status).toBe(409);
-    expect(mocks.companyCreate).not.toHaveBeenCalled();
-    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ code: 'ALREADY_HAS_COMPANY' });
   });
 
-  it('rejects creation without a name', async () => {
-    const response = await POST(requestFor({}));
+  it('fails closed when the complete RPC payload names another user', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        code: 'COMPANY_CREATED',
+        userId: COMPANY_ID,
+        companyId: COMPANY_ID,
+        name: 'Acme',
+        adminIds: [COMPANY_ID],
+        settings: {},
+        createdAt: '2026-07-18T21:00:00.000Z',
+        previousSpaceId: null,
+        locationVersion: 0,
+        presenceAccessRevision: 2,
+        retiredSessionCount: 0,
+        closedLogCount: 0,
+        operationTime: '2026-07-18T21:00:00.000Z',
+      },
+      error: null,
+    });
 
-    expect(response.status).toBe(400);
-    expect(mocks.companyCreate).not.toHaveBeenCalled();
+    const response = await POST(requestFor({ name: 'Acme' }));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ code: 'INTERNAL_ERROR' });
   });
 });

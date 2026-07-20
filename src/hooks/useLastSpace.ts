@@ -1,467 +1,359 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { Company, Space } from '@/types/database';
-import type { UserPresenceData } from '@/types/database';
-
-const MAX_REJOIN_ATTEMPTS = 3;
-export const GRACE_PERIOD_MS = 5 * 60 * 1000;
-export const DISCONNECT_TS_KEY = 'vo-disconnect-timestamp';
-export const FIRST_LOGIN_KEY = 'vo-first-login-done';
+import type { Company, Space, UserPresenceData } from '@/types/database';
+import type { PresenceSnapshot } from '@/lib/presence/contracts';
+import type {
+  LocationTransitionInput,
+  LocationTransitionOutcome,
+  PresenceLocationSnapshot,
+} from '@/lib/presence/location-transition-coordinator';
+import {
+  createPlacementSessionState,
+  placementSessionKey,
+} from '@/lib/presence/placement-session-state';
+import { presenceStorageKeys } from '@/lib/presence/storage-keys';
 
 export interface ReconnectionContext {
-  type: 'grace-rejoin' | 'home-space' | 'default-space' | 'fallback' | 'first-time';
+  type: 'home-space' | 'default-space' | 'fallback' | 'first-time';
   spaceId: string | null;
   spaceName?: string;
   reason: string;
 }
 
-interface LocationUpdateOptions {
-  attempt?: number;
-  contextType?: ReconnectionContext['type'];
-  fallbackFromSpaceName?: string;
-  spaceName?: string;
-}
-
 interface LastSpaceUser {
   id: string;
   currentSpaceId: string | null;
+  locationVersion?: number;
   dbStatus?: UserPresenceData['dbStatus'];
 }
 
-interface SaveLastSpaceOptions {
-  markManualChange?: boolean;
+interface UseLastSpaceOptions {
+  sessionId: string | null;
+  snapshot: PresenceSnapshot | undefined;
+  transitionLocation: (input: LocationTransitionInput) => Promise<LocationTransitionOutcome>;
+  isSessionRecoveryInProgress?: boolean;
+  confirmedSessionId?: string | null;
+  isTransitionPending?: boolean;
 }
 
-const JOINABLE_STATUSES = new Set(['active', 'available', 'in_use']);
-
-function isJoinableSpace(space: Space): boolean {
-  return JOINABLE_STATUSES.has(space.status);
+interface HydratedHint {
+  key: string | null;
+  value: string | null;
 }
 
-function getActiveSpaceById(spaces: Space[], spaceId: string | null | undefined): Space | undefined {
-  if (!spaceId) {
-    return undefined;
-  }
-
-  return spaces.find((space) => space.id === spaceId && isJoinableSpace(space));
+interface PlacementCandidate {
+  spaceId: string;
+  spaceName: string;
+  reason: Extract<LocationTransitionInput['reason'], 'auto-first-placement' | 'auto-rejoin' | 'auto-fallback'>;
+  type: 'first-time' | 'rejoin' | 'fallback';
 }
 
-function getFirstActiveWorkspace(spaces: Space[]): Space | undefined {
-  return spaces.find((space) => space.type === 'workspace' && isJoinableSpace(space));
+const JOINABLE_STATUSES = new Set(['active', 'available']);
+const FALLBACK_CODES = new Set([
+  'SPACE_FULL',
+  'SPACE_UNAVAILABLE',
+  'SPACE_NOT_FOUND',
+  'SPACE_ACCESS_DENIED',
+]);
+
+function getJoinableSpace(spaces: Space[], spaceId: string | null | undefined): Space | undefined {
+  return spaceId
+    ? spaces.find((space) => space.id === spaceId && JOINABLE_STATUSES.has(space.status))
+    : undefined;
 }
 
-function getStandardPlacementContext(
-  currentUser: Pick<LastSpaceUser, 'id'>,
-  spaces: Space[],
-  company: Company | null,
-  isFirstTime: boolean
-): ReconnectionContext {
-  if (isFirstTime) {
-    const defaultSpace = getActiveSpaceById(spaces, company?.settings?.defaultSpaceId);
-    if (defaultSpace) {
-      return {
-        type: 'first-time',
-        spaceId: defaultSpace.id,
-        spaceName: defaultSpace.name,
-        reason: 'First login -- placed in company default space',
-      };
-    }
-
-    const firstWorkspace = getFirstActiveWorkspace(spaces);
-    if (firstWorkspace) {
-      return {
-        type: 'first-time',
-        spaceId: firstWorkspace.id,
-        spaceName: firstWorkspace.name,
-        reason: 'First login -- no default space set, using first workspace',
-      };
-    }
-
-    return { type: 'fallback', spaceId: null, reason: 'No active spaces available' };
-  }
-
-  const homeSpace = getActiveSpaceById(
-    spaces,
-    company?.settings?.homeSpaces?.[currentUser.id]
+function firstJoinableWorkspace(spaces: Space[], excludedIds: Set<string> = new Set()): Space | undefined {
+  return spaces.find((space) =>
+    !excludedIds.has(space.id) &&
+    space.type === 'workspace' &&
+    JOINABLE_STATUSES.has(space.status)
   );
-  if (homeSpace) {
-    return {
-      type: 'home-space',
-      spaceId: homeSpace.id,
-      spaceName: homeSpace.name,
-      reason: 'Returning user -- assigned home space',
-    };
-  }
+}
 
-  const defaultSpace = getActiveSpaceById(spaces, company?.settings?.defaultSpaceId);
-  if (defaultSpace) {
-    return {
-      type: 'default-space',
-      spaceId: defaultSpace.id,
-      spaceName: defaultSpace.name,
-      reason: 'No home space assigned -- using company default',
-    };
-  }
-
-  const firstWorkspace = getFirstActiveWorkspace(spaces);
-  if (firstWorkspace) {
-    return {
-      type: 'fallback',
-      spaceId: firstWorkspace.id,
-      spaceName: firstWorkspace.name,
-      reason: 'No home or default space -- first active workspace',
-    };
-  }
-
-  return { type: 'fallback', spaceId: null, reason: 'No active spaces available' };
+function readHint(key: string | null): HydratedHint {
+  return {
+    key,
+    value: typeof window !== 'undefined' && key ? window.localStorage.getItem(key) : null,
+  };
 }
 
 export function getReconnectionContext(
   currentUser: Pick<LastSpaceUser, 'id'>,
   spaces: Space[],
   company: Company | null,
-  lastSpaceId: string | null
+  _lastSpaceId: string | null,
+  isFirstPlacement = false
 ): ReconnectionContext {
-  const disconnectTimestamp = typeof window !== 'undefined'
-    ? window.localStorage.getItem(DISCONNECT_TS_KEY)
-    : null;
-  const disconnectTs = disconnectTimestamp ? Number.parseInt(disconnectTimestamp, 10) : 0;
-  const withinGrace = disconnectTs > 0 && Date.now() - disconnectTs < GRACE_PERIOD_MS;
+  const homeSpace = isFirstPlacement
+    ? undefined
+    : getJoinableSpace(spaces, company?.settings?.homeSpaces?.[currentUser.id]);
+  const defaultSpace = getJoinableSpace(spaces, company?.settings?.defaultSpaceId);
+  const target = homeSpace ?? defaultSpace ?? firstJoinableWorkspace(spaces);
 
-  if (withinGrace && lastSpaceId) {
-    const lastSpace = getActiveSpaceById(spaces, lastSpaceId);
-    if (lastSpace) {
-      return {
-        type: 'grace-rejoin',
-        spaceId: lastSpace.id,
-        spaceName: lastSpace.name,
-        reason: 'Within 5-minute grace period',
-      };
-    }
+  if (!target) return { type: 'fallback', spaceId: null, reason: 'No joinable spaces available' };
+  if (isFirstPlacement) {
+    return {
+      type: 'first-time',
+      spaceId: target.id,
+      spaceName: target.name,
+      reason: defaultSpace?.id === target.id
+        ? 'Server marker is empty; using company default space'
+        : 'Server marker is empty; using first available workspace',
+    };
+  }
+  if (homeSpace?.id === target.id) {
+    return {
+      type: 'home-space',
+      spaceId: target.id,
+      spaceName: target.name,
+      reason: 'Using assigned home space',
+    };
+  }
+  if (defaultSpace?.id === target.id) {
+    return {
+      type: 'default-space',
+      spaceId: target.id,
+      spaceName: target.name,
+      reason: 'Using company default space',
+    };
+  }
+  return {
+    type: 'fallback',
+    spaceId: target.id,
+    spaceName: target.name,
+    reason: 'Using first available workspace',
+  };
+}
+
+function buildPlacementCandidates(
+  currentUser: Pick<LastSpaceUser, 'id'>,
+  snapshotSpaceId: string | null,
+  spaces: Space[],
+  company: Company | null,
+  isFirstPlacement: boolean
+): PlacementCandidate[] {
+  const candidates: PlacementCandidate[] = [];
+  const seen = new Set<string>();
+  const add = (space: Space | undefined, reason: PlacementCandidate['reason'], type: PlacementCandidate['type']) => {
+    if (!space || seen.has(space.id)) return;
+    seen.add(space.id);
+    candidates.push({ spaceId: space.id, spaceName: space.name, reason, type });
+  };
+
+  if (snapshotSpaceId) {
+    const snapshotSpace = spaces.find((space) => space.id === snapshotSpaceId);
+    seen.add(snapshotSpaceId);
+    candidates.push({
+      spaceId: snapshotSpaceId,
+      spaceName: snapshotSpace?.name ?? 'your previous space',
+      reason: 'auto-rejoin',
+      type: 'rejoin',
+    });
   }
 
-  const isFirstTime = typeof window === 'undefined'
-    ? true
-    : !window.localStorage.getItem(FIRST_LOGIN_KEY);
+  if (isFirstPlacement) {
+    add(getJoinableSpace(spaces, company?.settings?.defaultSpaceId), 'auto-first-placement', 'first-time');
+    add(firstJoinableWorkspace(spaces, seen), 'auto-first-placement', 'first-time');
+  } else {
+    add(
+      getJoinableSpace(spaces, company?.settings?.homeSpaces?.[currentUser.id]),
+      'auto-fallback',
+      'fallback'
+    );
+    add(getJoinableSpace(spaces, company?.settings?.defaultSpaceId), 'auto-fallback', 'fallback');
+    add(firstJoinableWorkspace(spaces, seen), 'auto-fallback', 'fallback');
+  }
 
-  return getStandardPlacementContext(currentUser, spaces, company, isFirstTime);
+  return candidates;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
+export function useLastSpace(
+  currentUser: LastSpaceUser | null,
+  spaces: Space[],
+  company: Company | null,
+  options?: UseLastSpaceOptions
+) {
+  const companyId = company?.id ?? null;
+  const userId = currentUser?.id ?? null;
+  const storageKey = companyId && userId
+    ? presenceStorageKeys.lastSpace(companyId, userId)
+    : null;
+  const sessionId = options?.sessionId ?? null;
+  const snapshot = options?.snapshot;
+  const transitionLocation = options?.transitionLocation;
+  const isSessionRecoveryInProgress = options?.isSessionRecoveryInProgress ?? false;
+  const confirmedSessionId = options?.confirmedSessionId ?? null;
+  const isTransitionPending = options?.isTransitionPending ?? false;
 
-const PRESENCE_QUERY_KEY = ['user-presence'];
-
-export function useLastSpace(currentUser: LastSpaceUser | null, spaces: Space[], company: Company | null) {
-  const [lastSpaceId, setLastSpaceId] = useLocalStorage<string | null>('lastSpaceId', null);
+  const placementStateRef = useRef(createPlacementSessionState());
+  const activeIdentityRef = useRef<string | null>(null);
+  const committedIdentityRef = useRef<string | null>(null);
   const [isRejoinInProgress, setIsRejoinInProgress] = useState(false);
   const [rejoinAttempts, setRejoinAttempts] = useState(0);
-  const isUpdatingRef = useRef(false);
-  const lastUpdateRef = useRef<string | null>(null);
-  // When true, the auto-placement effect skips its next run.
-  // Set by saveLastSpace() so that manual space clicks (which already call
-  // updateLocation via PresenceContext) are never overwritten by auto-placement
-  // trying to move the user back to home/default space.
-  const manualChangeRef = useRef(false);
-  const queryClient = useQueryClient();
+  const [hydratedHint, setHydratedHint] = useState<HydratedHint>(() => readHint(storageKey));
+  const identityKey = companyId && userId ? `${companyId}:${userId}` : null;
 
-  const markFirstLoginComplete = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(FIRST_LOGIN_KEY, 'true');
+  useEffect(() => {
+    if (committedIdentityRef.current !== identityKey) {
+      placementStateRef.current = createPlacementSessionState();
+      committedIdentityRef.current = identityKey;
     }
-  }, []);
-
-  const clearDisconnectTimestamp = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(DISCONNECT_TS_KEY);
-    }
-  }, []);
-
-  const saveLastSpace = useCallback((spaceId: string, options: SaveLastSpaceOptions = {}) => {
-    const { markManualChange = true } = options;
-
-    if (markManualChange) {
-      // Signal that this is a manual space change — the auto-placement effect
-      // must skip its next run so it doesn't overwrite the user's click with
-      // the home/default space. The API call is handled separately by
-      // PresenceContext.updateLocation (called from ModernFloorPlan).
-      manualChangeRef.current = true;
-    }
-
-    setLastSpaceId(spaceId);
-  }, [setLastSpaceId]);
-
-  const saveDisconnectTimestamp = useCallback(() => {
-    if (typeof window !== 'undefined' && (currentUser?.currentSpaceId || lastSpaceId)) {
-      window.localStorage.setItem(DISCONNECT_TS_KEY, Date.now().toString());
-    }
-  }, [currentUser?.currentSpaceId, lastSpaceId]);
-
-  const updateUserLocation = useCallback(async (
-    userId: string,
-    spaceId: string | null,
-    options: LocationUpdateOptions = {}
-  ) => {
-    if (!spaceId) {
-      return;
-    }
-
-    if (isUpdatingRef.current) {
-      return;
-    }
-
-    const initialContextType = options.contextType;
-    let attempt = options.attempt ?? 0;
-    let targetSpaceId = spaceId;
-    let targetSpaceName = options.spaceName;
-    let contextType = initialContextType;
-    let fallbackFromSpaceName = options.fallbackFromSpaceName;
-
-    isUpdatingRef.current = true;
-    setIsRejoinInProgress(true);
-    setRejoinAttempts(attempt);
-
-    try {
-      while (attempt < MAX_REJOIN_ATTEMPTS) {
-        const response = await fetch('/api/users/location', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, spaceId: targetSpaceId }),
-        });
-
-        if (response.ok) {
-          console.log('[useLastSpace] API call succeeded, placing user in space:', targetSpaceId);
-          const updateKey = `${userId}-${targetSpaceId}`;
-          lastUpdateRef.current = updateKey;
-          // Automatic placements also need lastSpaceId persistence for grace rejoin,
-          // but must not trip the manual-change guard that protects user clicks.
-          saveLastSpace(targetSpaceId, { markManualChange: false });
-          setRejoinAttempts(0);
-          clearDisconnectTimestamp();
-
-          // Optimistically update presence query data so the user appears in their space
-          // immediately, without waiting for Realtime postgres_changes event
-          queryClient.setQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY, (old) => {
-            if (!old) return old;
-            return old.map(u =>
-              u.id === userId ? { ...u, currentSpaceId: targetSpaceId, status: u.status === 'offline' ? 'online' : u.status } : u
-            );
-          });
-
-          // Fallback: if query data wasn't available for optimistic update, force a refetch
-          // so the user appears in the space once the query loads from the (now-updated) DB
-          const currentData = queryClient.getQueryData<UserPresenceData[]>(PRESENCE_QUERY_KEY);
-          if (!currentData) {
-            void queryClient.invalidateQueries({ queryKey: PRESENCE_QUERY_KEY });
-          }
-
-          if (contextType === 'first-time') {
-            markFirstLoginComplete();
-          }
-
-          if (fallbackFromSpaceName && targetSpaceName) {
-            toast(`${fallbackFromSpaceName} is full -- moved to ${targetSpaceName}`);
-          } else if (contextType === 'grace-rejoin' && targetSpaceName) {
-            toast(`Reconnected to ${targetSpaceName}`);
-          } else if (contextType === 'first-time' && targetSpaceName) {
-            toast(`Welcome! You've been placed in ${targetSpaceName}`);
-          }
-
-          return;
-        }
-
-        const errorData = await response.json().catch(() => ({
-          code: 'UNKNOWN',
-          message: 'Failed to parse error response',
-        }));
-
-        console.error('[useLastSpace] API call failed:', { status: response.status, code: errorData.code, message: errorData.message, targetSpaceId });
-
-        if (response.status === 409 && errorData.code === 'SPACE_FULL' && currentUser) {
-          const fallbackContext = getStandardPlacementContext(
-            currentUser,
-            spaces,
-            company,
-            false
-          );
-
-          if (fallbackContext.spaceId && fallbackContext.spaceId !== targetSpaceId) {
-            fallbackFromSpaceName = targetSpaceName || 'The space';
-            targetSpaceId = fallbackContext.spaceId;
-            targetSpaceName = fallbackContext.spaceName;
-            contextType = fallbackContext.type;
-            attempt = 0;
-            setRejoinAttempts(0);
-            continue;
-          }
-
-          setLastSpaceId(null);
-          setRejoinAttempts(0);
-          toast.error('Cannot join - space is full', {
-            description: `${targetSpaceName || 'The space'} is currently at capacity. Try again later.`,
-          });
-          return;
-        }
-
-        attempt += 1;
-        setRejoinAttempts(attempt);
-
-        if (attempt >= MAX_REJOIN_ATTEMPTS) {
-          setLastSpaceId(null);
-          setRejoinAttempts(0);
-          toast.error('Rejoin Failed', {
-            description: errorData.message || response.statusText,
-          });
-          return;
-        }
-
-        const backoffDelay = Math.pow(2, attempt) * 1000;
-        await sleep(backoffDelay);
-      }
-    } catch (error) {
-      setLastSpaceId(null);
-      setRejoinAttempts(0);
-      toast.error('Rejoin Failed', {
-        description: error instanceof Error
-          ? error.message
-          : `Network error trying to rejoin ${targetSpaceName || 'last space'}.`,
-      });
-    } finally {
-      isUpdatingRef.current = false;
-      setIsRejoinInProgress(false);
-    }
-  }, [
-    clearDisconnectTimestamp,
-    company,
-    currentUser,
-    markFirstLoginComplete,
-	    queryClient,
-	    saveLastSpace,
-	    setLastSpaceId,
-	    spaces,
-	  ]);
-
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const handleDisconnect = () => {
-      saveDisconnectTimestamp();
-    };
-
-    window.addEventListener('beforeunload', handleDisconnect);
-    window.addEventListener('pagehide', handleDisconnect);
-
+    activeIdentityRef.current = identityKey;
+    setIsRejoinInProgress(false);
+    setRejoinAttempts(0);
     return () => {
-      window.removeEventListener('beforeunload', handleDisconnect);
-      window.removeEventListener('pagehide', handleDisconnect);
+      if (activeIdentityRef.current === identityKey) activeIdentityRef.current = null;
     };
-  }, [saveDisconnectTimestamp]);
+  }, [identityKey]);
 
-  useLayoutEffect(() => {
-    // Skip when saveLastSpace() was just called — the user clicked a space
-    // manually and the API call is already handled by PresenceContext.updateLocation.
-    // Auto-placement must not overwrite it with the home/default space.
-    if (manualChangeRef.current) {
-      manualChangeRef.current = false;
-      console.log('[useLastSpace] Skipped: manual space change in progress');
-      return;
-    }
+  useEffect(() => {
+    setHydratedHint(readHint(storageKey));
+  }, [storageKey]);
 
-    if (isUpdatingRef.current || isRejoinInProgress) {
-      console.log('[useLastSpace] Skipped: update in progress');
-      return;
-    }
+  const lastSpaceId = hydratedHint.key === storageKey ? hydratedHint.value : null;
 
-    if (!currentUser || spaces.length === 0) {
-      console.log('[useLastSpace] Skipped: no currentUser or no spaces', { hasUser: !!currentUser, spacesCount: spaces.length });
-      return;
-    }
-
-    const context = getReconnectionContext(currentUser, spaces, company, lastSpaceId);
-    console.log('[useLastSpace] Reconnection context:', { type: context.type, spaceId: context.spaceId, spaceName: context.spaceName, reason: context.reason, userCurrentSpaceId: currentUser.currentSpaceId, lastSpaceId });
-
-    if (!context.spaceId) {
-      console.log('[useLastSpace] Skipped: no target spaceId in context');
-      return;
-    }
-
-    if (currentUser.dbStatus === 'offline' && currentUser.currentSpaceId) {
-      const currentSpace = spaces.find((space) => space.id === currentUser.currentSpaceId);
-      console.log('[useLastSpace] Refreshing stale offline status in current DB space', {
-        currentSpaceId: currentUser.currentSpaceId,
-        targetSpaceId: context.spaceId,
-      });
-      void updateUserLocation(currentUser.id, currentUser.currentSpaceId, {
-        contextType: context.type,
-        spaceName: currentSpace?.name,
-      });
-      return;
-    }
-
-    if (currentUser.currentSpaceId === context.spaceId) {
-      const updateKey = `${currentUser.id}-${context.spaceId}`;
-      if (lastUpdateRef.current === updateKey) {
-        console.log('[useLastSpace] Skipped: already updated with this key');
-        return;
-      }
-
-      console.log('[useLastSpace] Already in target space, setting updateKey only');
-      lastUpdateRef.current = updateKey;
-      saveLastSpace(context.spaceId, { markManualChange: false });
-      if (context.type === 'first-time') {
-        markFirstLoginComplete();
-      }
-      clearDisconnectTimestamp();
-      return;
-    }
-
-    const updateKey = `${currentUser.id}-${context.spaceId}`;
-    if (lastUpdateRef.current === updateKey) {
-      console.log('[useLastSpace] Skipped: already updated with this key');
-      return;
-    }
-
-    if (currentUser.currentSpaceId && currentUser.currentSpaceId !== context.spaceId) {
-      console.log('[useLastSpace] Skipped: user already in different space', { currentSpaceId: currentUser.currentSpaceId, targetSpaceId: context.spaceId });
-      return;
-    }
-
-    console.log('[useLastSpace] Calling updateUserLocation:', { userId: currentUser.id, spaceId: context.spaceId, contextType: context.type });
-    void updateUserLocation(currentUser.id, context.spaceId, {
-      contextType: context.type,
-      spaceName: context.spaceName,
-    });
-  }, [
-    clearDisconnectTimestamp,
-    company,
-    currentUser,
-    isRejoinInProgress,
-    lastSpaceId,
-    markFirstLoginComplete,
-    saveLastSpace,
-    spaces,
-    updateUserLocation,
-  ]);
+  const saveLastSpace = useCallback((spaceId: string) => {
+    if (!storageKey || typeof window === 'undefined') return;
+    window.localStorage.setItem(storageKey, spaceId);
+    setHydratedHint({ key: storageKey, value: spaceId });
+  }, [storageKey]);
 
   const clearLastSpace = useCallback(() => {
-    saveDisconnectTimestamp();
-    setLastSpaceId(null);
-    lastUpdateRef.current = null;
-  }, [saveDisconnectTimestamp, setLastSpaceId]);
+    if (storageKey && typeof window !== 'undefined') {
+      window.localStorage.removeItem(storageKey);
+    }
+    setHydratedHint({ key: storageKey, value: null });
+  }, [storageKey]);
+
+  const suppressAutoPlacement = useCallback(() => {
+    if (!companyId || !userId) return;
+    placementStateRef.current.suppressIdentity(companyId, userId);
+    clearLastSpace();
+  }, [clearLastSpace, companyId, userId]);
+
+  const resumeAutoPlacement = useCallback(() => {
+    if (!companyId || !userId) return;
+    placementStateRef.current.resumeIdentity(companyId, userId);
+  }, [companyId, userId]);
+
+  const snapshotUser = useMemo(
+    () => snapshot?.users.find((user) => user.id === userId) ?? null,
+    [snapshot, userId]
+  );
+
+  useEffect(() => {
+    if (!companyId || !userId || !confirmedSessionId) return;
+    placementStateRef.current.markInitialized(
+      placementSessionKey(companyId, userId, confirmedSessionId)
+    );
+  }, [companyId, confirmedSessionId, userId]);
+
+  useEffect(() => {
+    if (
+      !companyId ||
+      !userId ||
+      !sessionId ||
+      !snapshot ||
+      !snapshotUser ||
+      !transitionLocation ||
+      spaces.length === 0 ||
+      hydratedHint.key !== storageKey ||
+      isSessionRecoveryInProgress ||
+      isRejoinInProgress ||
+      isTransitionPending
+    ) return;
+
+    const sessionKey = placementSessionKey(companyId, userId, sessionId);
+    if (placementStateRef.current.isIdentitySuppressed(companyId, userId)) {
+      placementStateRef.current.markInitialized(sessionKey);
+      return;
+    }
+    if (confirmedSessionId === sessionId) {
+      placementStateRef.current.markInitialized(sessionKey);
+      return;
+    }
+    const invocationIdentity = identityKey;
+    const candidates = buildPlacementCandidates(
+      { id: userId },
+      snapshotUser.currentSpaceId,
+      spaces,
+      company,
+      snapshot.currentUser.initialPlacementCompletedAt === null
+    );
+    if (candidates.length === 0) return;
+    if (!placementStateRef.current.claim(sessionKey)) return;
+
+    void (async () => {
+      setIsRejoinInProgress(true);
+      let observed: PresenceLocationSnapshot = {
+        currentSpaceId: snapshotUser.currentSpaceId,
+        locationVersion: snapshotUser.locationVersion,
+      };
+      let finalOutcome: LocationTransitionOutcome | null = null;
+      let successfulCandidate: PlacementCandidate | null = null;
+
+      for (const [index, candidate] of candidates.entries()) {
+        setRejoinAttempts(index + 1);
+        const outcome = await transitionLocation({
+          spaceId: candidate.spaceId,
+          reason: candidate.reason,
+          expectedLocationVersion: observed.locationVersion,
+        });
+        finalOutcome = outcome;
+        if (outcome.ok) {
+          successfulCandidate = candidate;
+          break;
+        }
+        if (outcome.skipped || !FALLBACK_CODES.has(outcome.code)) break;
+        if (
+          !outcome.snapshot ||
+          outcome.snapshot.locationVersion !== observed.locationVersion ||
+          outcome.snapshot.currentSpaceId !== observed.currentSpaceId
+        ) break;
+        observed = outcome.snapshot;
+      }
+
+      if (activeIdentityRef.current !== invocationIdentity) return;
+      if (successfulCandidate) {
+        saveLastSpace(successfulCandidate.spaceId);
+        if (successfulCandidate.type === 'first-time') {
+          toast(`Welcome! You've been placed in ${successfulCandidate.spaceName}`);
+        } else if (successfulCandidate.type === 'rejoin') {
+          toast(`Reconnected to ${successfulCandidate.spaceName}`);
+        }
+      } else if (finalOutcome?.ok === false && !finalOutcome.skipped) {
+        toast.error('Automatic placement failed', { description: finalOutcome.message });
+      }
+      setIsRejoinInProgress(false);
+      setRejoinAttempts(0);
+    })();
+  }, [
+    company,
+    companyId,
+    confirmedSessionId,
+    hydratedHint.key,
+    identityKey,
+    isSessionRecoveryInProgress,
+    isRejoinInProgress,
+    isTransitionPending,
+    saveLastSpace,
+    sessionId,
+    snapshot,
+    snapshotUser,
+    spaces,
+    storageKey,
+    transitionLocation,
+    userId,
+  ]);
 
   return {
     lastSpaceId,
     saveLastSpace,
     clearLastSpace,
+    suppressAutoPlacement,
+    resumeAutoPlacement,
     isRejoinInProgress,
     rejoinAttempts,
   };

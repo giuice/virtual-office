@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  DISCONNECT_TS_KEY,
-  FIRST_LOGIN_KEY,
-  GRACE_PERIOD_MS,
-  getReconnectionContext,
-} from '@/hooks/useLastSpace';
+import { getReconnectionContext } from '@/hooks/useLastSpace';
 import type { Company, Space, User } from '@/types/database';
 
 vi.mock('sonner', () => ({
@@ -100,7 +95,7 @@ const defaultOnlyCompany: Company = {
   },
 };
 
-describe('Reconnection Grace Period', () => {
+describe('server-authoritative reconnection fallback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'));
@@ -108,35 +103,30 @@ describe('Reconnection Grace Period', () => {
     vi.clearAllMocks();
   });
 
-  it('returns grace-rejoin when within 5-minute window and lastSpaceId exists', () => {
-    localStorageMock.setItem(DISCONNECT_TS_KEY, String(Date.now() - GRACE_PERIOD_MS + 1_000));
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
+  it('does not recreate placement from a scoped recovery hint', () => {
     const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
 
-    expect(context.type).toBe('grace-rejoin');
-    expect(context.spaceId).toBe('private-space');
-    expect(context.reason).toContain('5-minute grace period');
+    expect(context.type).toBe('home-space');
+    expect(context.spaceId).toBe('home-space');
+    expect(context.reason).toContain('assigned home space');
   });
 
-  it('returns home/default when grace period expired', () => {
-    localStorageMock.setItem(DISCONNECT_TS_KEY, String(Date.now() - GRACE_PERIOD_MS - 1_000));
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
-    const context = getReconnectionContext(currentUser, spaces, company, 'private-space');
+  it('falls back to home when the scoped hint is not joinable', () => {
+    const unavailableSpaces = spaces.map((space) =>
+      space.id === 'private-space' ? { ...space, status: 'maintenance' as const } : space
+    );
+    const context = getReconnectionContext(currentUser, unavailableSpaces, company, 'private-space');
 
     expect(context.type).toBe('home-space');
     expect(context.spaceId).toBe('home-space');
   });
 
-  it('returns home/default when no disconnect timestamp exists', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
+  it('uses default when no scoped hint or home assignment exists', () => {
     const context = getReconnectionContext(
       currentUser,
       spaces,
       defaultOnlyCompany,
-      'private-space'
+      null
     );
 
     expect(context.type).toBe('default-space');

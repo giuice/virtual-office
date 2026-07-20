@@ -2,6 +2,7 @@ import React, { StrictMode } from 'react';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Company, Space, User } from '@/types/database';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const passiveEffectControl = vi.hoisted(() => ({
   shouldDefer: false,
@@ -26,12 +27,15 @@ vi.mock('react', async (importOriginal) => {
 });
 import { __resetProfileSyncCache } from '@/lib/bootstrap/profile-sync';
 import { CompanyProvider, useCompany } from '@/contexts/CompanyContext';
+import { PresenceProvider } from '@/contexts/PresenceContext';
+import { ApiError } from '@/lib/api/client-error';
+import { invalidatePresenceClientLifecycle } from '@/lib/presence/client-lifecycle';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   syncUserProfile: vi.fn(),
   getUserById: vi.fn(),
-  updateUserStatus: vi.fn(),
+  updateOwnProfile: vi.fn(),
   updateUserRole: vi.fn(),
   removeUserFromCompany: vi.fn(),
   createCompany: vi.fn(),
@@ -39,6 +43,10 @@ const mocks = vi.hoisted(() => ({
   updateCompany: vi.fn(),
   getUsersByCompany: vi.fn(),
   getSpacesByCompany: vi.fn(),
+  usePresenceSession: vi.fn(),
+  usePresenceSnapshot: vi.fn(),
+  usePresenceRealtime: vi.fn(),
+  useLocationTransition: vi.fn(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -48,7 +56,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/lib/api', () => ({
   syncUserProfile: mocks.syncUserProfile,
   getUserById: mocks.getUserById,
-  updateUserStatus: mocks.updateUserStatus,
+  updateOwnProfile: mocks.updateOwnProfile,
   updateUserRole: mocks.updateUserRole,
   removeUserFromCompany: mocks.removeUserFromCompany,
   createCompany: mocks.createCompany,
@@ -56,6 +64,27 @@ vi.mock('@/lib/api', () => ({
   updateCompany: mocks.updateCompany,
   getUsersByCompany: mocks.getUsersByCompany,
   getSpacesByCompany: mocks.getSpacesByCompany,
+}));
+
+vi.mock('@/hooks/usePresenceSession', () => ({
+  usePresenceSession: mocks.usePresenceSession,
+}));
+
+vi.mock('@/hooks/queries/usePresenceSnapshot', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/hooks/queries/usePresenceSnapshot')>();
+  return {
+    ...actual,
+    usePresenceSnapshot: mocks.usePresenceSnapshot,
+  };
+});
+
+vi.mock('@/hooks/usePresenceRealtime', () => ({
+  usePresenceRealtime: mocks.usePresenceRealtime,
+}));
+
+vi.mock('@/hooks/useLocationTransition', () => ({
+  useLocationTransition: mocks.useLocationTransition,
 }));
 
 const timestamp = '2026-07-15T00:00:00.000Z';
@@ -115,19 +144,30 @@ function authState(userId: string | null) {
 
 interface CompanyStateSnapshot {
   companyId: string | null;
+  companyName: string | null;
   profileUid: string | null;
   userIds: string[];
   spaceIds: string[];
   isLoading: boolean;
   error: string | null;
+  bootstrapErrorKind: 'unauthenticated' | 'rate-limited' | 'server' | null;
 }
 
 interface CompanyStateProbeProps {
   onRender?: (snapshot: CompanyStateSnapshot) => void;
   captureCreateNewCompany?: (createNewCompany: (name: string) => Promise<string>) => void;
+  captureRefreshCompanyData?: (refreshCompanyData: () => Promise<void>) => void;
+  captureUpdateCompanyDetails?: (updateCompanyDetails: (data: Partial<Company>) => Promise<void>) => void;
+  captureUpdateUserProfile?: (updateUserProfile: (data: Partial<User>) => Promise<void>) => void;
 }
 
-function CompanyStateProbe({ onRender, captureCreateNewCompany }: CompanyStateProbeProps = {}) {
+function CompanyStateProbe({
+  onRender,
+  captureCreateNewCompany,
+  captureRefreshCompanyData,
+  captureUpdateCompanyDetails,
+  captureUpdateUserProfile,
+}: CompanyStateProbeProps = {}) {
   const {
     company,
     companyUsers,
@@ -135,19 +175,28 @@ function CompanyStateProbe({ onRender, captureCreateNewCompany }: CompanyStatePr
     spaces,
     isLoading,
     error,
+    bootstrapError,
     createNewCompany,
+    refreshCompanyData,
+    updateCompanyDetails,
+    updateUserProfile,
   } = useCompany();
   const snapshot = {
     companyId: company?.id ?? null,
+    companyName: company?.name ?? null,
     profileUid: currentUserProfile?.supabase_uid ?? null,
     userIds: companyUsers.map((user) => user.supabase_uid),
     spaceIds: spaces.map((space) => space.id),
     isLoading,
     error,
+    bootstrapErrorKind: bootstrapError?.kind ?? null,
   };
 
   onRender?.(snapshot);
   captureCreateNewCompany?.(createNewCompany);
+  captureRefreshCompanyData?.(refreshCompanyData);
+  captureUpdateCompanyDetails?.(updateCompanyDetails);
+  captureUpdateUserProfile?.(updateUserProfile);
 
   return (
     <output data-testid="company-state">
@@ -170,6 +219,23 @@ function renderProvider(probeProps: CompanyStateProbeProps = {}) {
   return render(providerTree(probeProps));
 }
 
+function renderProviderWithPresence(probeProps: CompanyStateProbeProps = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <StrictMode>
+        <CompanyProvider>
+          <PresenceProvider>
+            <CompanyStateProbe {...probeProps} />
+          </PresenceProvider>
+        </CompanyProvider>
+      </StrictMode>
+    </QueryClientProvider>
+  );
+}
+
 async function flushDeferredPassiveEffects(): Promise<void> {
   const pending = passiveEffectControl.pending.splice(0);
   passiveEffectControl.shouldDefer = false;
@@ -181,8 +247,31 @@ async function flushDeferredPassiveEffects(): Promise<void> {
   });
 }
 
+function installMemoryLocalStorage(): void {
+  const values = new Map<string, string>();
+  const storage: Storage = {
+    get length() {
+      return values.size;
+    },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => {
+      values.delete(key);
+    },
+    setItem: (key, value) => {
+      values.set(key, value);
+    },
+  };
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: storage,
+  });
+}
+
 describe('CompanyContext bootstrap', () => {
   beforeEach(() => {
+    installMemoryLocalStorage();
     __resetProfileSyncCache();
     passiveEffectControl.shouldDefer = false;
     passiveEffectControl.pending.length = 0;
@@ -190,6 +279,22 @@ describe('CompanyContext bootstrap', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mocks.usePresenceSession.mockReturnValue({
+      sessionId: null,
+      rotateSession: vi.fn(async () => null),
+    });
+    mocks.usePresenceSnapshot.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
+    mocks.usePresenceRealtime.mockReturnValue('disabled');
+    mocks.useLocationTransition.mockReturnValue({
+      transitionLocation: vi.fn(),
+      beginManualIntent: vi.fn(),
+      releaseManualIntent: vi.fn(),
+      pendingTargetSpaceId: null,
+    });
   });
 
   afterEach(() => {
@@ -236,6 +341,129 @@ describe('CompanyContext bootstrap', () => {
     expect(mocks.getCompany).toHaveBeenCalledTimes(1);
     expect(mocks.getUsersByCompany).toHaveBeenCalledTimes(1);
     expect(mocks.getSpacesByCompany).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-bootstrap clears the old company after remote membership removal', async () => {
+    const companyUser = makeUser('user-a', 'company-a');
+    const removedUser = { ...companyUser, companyId: null, role: 'member' as const };
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile
+      .mockResolvedValueOnce(companyUser)
+      .mockResolvedValueOnce(removedUser);
+    mocks.getCompany.mockResolvedValue(makeCompany('company-a'));
+    mocks.getUsersByCompany.mockResolvedValue([companyUser]);
+    mocks.getSpacesByCompany.mockResolvedValue([makeSpace('company-a')]);
+
+    renderProvider();
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent(
+        '"companyId":"company-a"',
+      );
+    });
+
+    act(() => {
+      invalidatePresenceClientLifecycle({
+        reason: 'membership-scope-invalidated',
+        userId: companyUser.id,
+        companyId: 'company-a',
+      });
+    });
+
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(state).toHaveTextContent('"companyId":null');
+      expect(state).toHaveTextContent('"userIds":[]');
+      expect(state).toHaveTextContent('"spaceIds":[]');
+      expect(mocks.syncUserProfile).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('does not retain the old membership profile when invalidation reload fails', async () => {
+    const companyUser = makeUser('user-a', 'company-a');
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile
+      .mockResolvedValueOnce(companyUser)
+      .mockRejectedValueOnce(new TypeError('membership reload offline'));
+    mocks.getUserById.mockResolvedValue(null);
+    mocks.getCompany.mockResolvedValue(makeCompany('company-a'));
+    mocks.getUsersByCompany.mockResolvedValue([companyUser]);
+    mocks.getSpacesByCompany.mockResolvedValue([makeSpace('company-a')]);
+
+    renderProvider();
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent(
+        '"companyId":"company-a"',
+      );
+    });
+
+    act(() => {
+      invalidatePresenceClientLifecycle({
+        reason: 'membership-scope-invalidated',
+        userId: companyUser.id,
+        companyId: 'company-a',
+      });
+    });
+
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(mocks.syncUserProfile).toHaveBeenCalledTimes(2);
+      expect(state).toHaveTextContent('"profileUid":null');
+      expect(state).toHaveTextContent('"companyId":null');
+      expect(state).toHaveTextContent('"userIds":[]');
+      expect(state).toHaveTextContent('"spaceIds":[]');
+      expect(state).toHaveTextContent('"isLoading":false');
+    });
+  });
+
+  it('membership generation fence rejects a delayed old-company bootstrap', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const userB = makeUser('user-a', 'company-b');
+    const companyB = makeCompany('company-b');
+    let resolveCompanyA: (company: Company) => void = () => undefined;
+    const delayedCompanyA = new Promise<Company>((resolve) => {
+      resolveCompanyA = resolve;
+    });
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile
+      .mockResolvedValueOnce(userA)
+      .mockResolvedValueOnce(userB);
+    mocks.getCompany
+      .mockReturnValueOnce(delayedCompanyA)
+      .mockResolvedValueOnce(companyB);
+    mocks.getUsersByCompany.mockResolvedValue([userB]);
+    mocks.getSpacesByCompany.mockResolvedValue([makeSpace('company-b')]);
+
+    renderProvider();
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent(
+        '"profileUid":"user-a"',
+      );
+      expect(mocks.getCompany).toHaveBeenCalledWith('company-a');
+    });
+
+    act(() => {
+      invalidatePresenceClientLifecycle({
+        reason: 'membership-scope-invalidated',
+        userId: userA.id,
+        companyId: 'company-a',
+      });
+    });
+
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(state).toHaveTextContent('"companyId":"company-b"');
+      expect(state).toHaveTextContent('"space-company-b"');
+    });
+
+    await act(async () => {
+      resolveCompanyA(makeCompany('company-a'));
+      await delayedCompanyA;
+    });
+
+    const finalState = screen.getByTestId('company-state');
+    expect(finalState).toHaveTextContent('"companyId":"company-b"');
+    expect(finalState).not.toHaveTextContent('space-company-a');
   });
 
   it('drops delayed account A responses after logout and account B bootstrap', async () => {
@@ -592,11 +820,13 @@ describe('CompanyContext bootstrap', () => {
     // must already be masked even though A owned the previously committed data.
     expect(renderSnapshots[0]).toEqual({
       companyId: null,
+      companyName: null,
       profileUid: null,
       userIds: [],
       spaceIds: [],
       isLoading: true,
       error: null,
+      bootstrapErrorKind: null,
     });
     const synchronousState = screen.getByTestId('company-state');
     expect(synchronousState).toHaveTextContent('"profileUid":null');
@@ -700,6 +930,7 @@ describe('CompanyContext bootstrap', () => {
       spaceIds: [],
       isLoading: true,
       error: null,
+      bootstrapErrorKind: null,
     });
 
     await flushDeferredPassiveEffects();
@@ -747,6 +978,603 @@ describe('CompanyContext bootstrap', () => {
     expect(mocks.getCompany).toHaveBeenCalledTimes(1);
     expect(mocks.getUsersByCompany).toHaveBeenCalledTimes(1);
     expect(mocks.getSpacesByCompany).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains confirmed company state when a refresh is rate limited', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany.mockResolvedValue(companyA);
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany
+      .mockResolvedValueOnce(spacesA)
+      .mockRejectedValueOnce(new ApiError('Request rate limit reached', {
+        status: 429,
+        code: 'RATE_LIMITED',
+        correlationId: 'corr-rate-limit',
+      }));
+
+    renderProviderWithPresence({
+      captureRefreshCompanyData: (refresh) => {
+        refreshCompanyData = refresh;
+      },
+    });
+
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(state).toHaveTextContent('"companyId":"company-a"');
+      expect(state).toHaveTextContent('"space-company-a"');
+      expect(state).toHaveTextContent('"isLoading":false');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"rate-limited"');
+    expect(state).toHaveTextContent('"profileUid":"user-a"');
+    expect(state).toHaveTextContent('"companyId":"company-a"');
+    expect(state).toHaveTextContent('"userIds":["user-a"]');
+    expect(state).toHaveTextContent('"spaceIds":["space-company-a"]');
+    expect(mocks.usePresenceSession).toHaveBeenLastCalledWith(userA.id, 'company-a');
+  });
+
+  it('does not rotate a current lease from a potentially stale disconnected snapshot', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const rotateSession = vi.fn(async () => 'session-2');
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany.mockResolvedValue(makeCompany('company-a'));
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue([makeSpace('company-a')]);
+    mocks.usePresenceSession.mockReturnValue({
+      sessionId: 'session-1',
+      rotateSession,
+    });
+    mocks.useLocationTransition.mockReturnValue({
+      transitionLocation: vi.fn(),
+      beginManualIntent: vi.fn(),
+      releaseManualIntent: vi.fn(),
+      pendingTargetSpaceId: null,
+      confirmedSessionId: 'session-1',
+      isSessionRecoveryInProgress: false,
+      isTransitionPending: false,
+    });
+    mocks.usePresenceSnapshot.mockReturnValue({
+      data: {
+        serverTime: '2026-07-18T18:00:00.000Z',
+        companyId: 'company-a',
+        viewerUserId: userA.id,
+        currentUser: { initialPlacementCompletedAt: timestamp },
+        users: [{
+          id: userA.id,
+          displayName: userA.displayName,
+          avatarUrl: null,
+          currentSpaceId: null,
+          locationVersion: 2,
+          availabilityStatus: 'online',
+          isConnected: false,
+          isOccupyingCurrentSpace: false,
+          displayStatus: 'offline',
+          statusMessage: null,
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderProviderWithPresence();
+
+    await waitFor(() => expect(mocks.usePresenceSnapshot).toHaveBeenCalled());
+    expect(rotateSession).not.toHaveBeenCalled();
+  });
+
+  it('retains presence identity when a refresh fails with a server error', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany.mockResolvedValue(companyA);
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany
+      .mockResolvedValueOnce(spacesA)
+      .mockRejectedValueOnce(new ApiError('Service unavailable', {
+        status: 503,
+        code: 'INTERNAL_ERROR',
+        correlationId: 'corr-server-error',
+      }));
+
+    renderProviderWithPresence({
+      captureRefreshCompanyData: (refresh) => {
+        refreshCompanyData = refresh;
+      },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"space-company-a"');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"server"');
+    expect(state).toHaveTextContent('"spaceIds":["space-company-a"]');
+    expect(mocks.usePresenceSession).toHaveBeenLastCalledWith(userA.id, 'company-a');
+  });
+
+  it('retains presence identity when profile sync and fallback fail at network level', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile
+      .mockResolvedValueOnce(userA)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mocks.getUserById.mockResolvedValue(null);
+    mocks.getCompany.mockResolvedValue(companyA);
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue(spacesA);
+
+    renderProviderWithPresence({
+      captureRefreshCompanyData: (refresh) => {
+        refreshCompanyData = refresh;
+      },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"space-company-a"');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"server"');
+    expect(state).toHaveTextContent('"error":"Failed to fetch"');
+    expect(state).toHaveTextContent('"profileUid":"user-a"');
+    expect(state).toHaveTextContent('"spaceIds":["space-company-a"]');
+    expect(mocks.usePresenceSession).toHaveBeenLastCalledWith(userA.id, 'company-a');
+  });
+
+  it('tears down identity on 401 and passes null to the presence session', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany
+      .mockResolvedValueOnce(companyA)
+      .mockRejectedValueOnce(new ApiError('Session expired', {
+        status: 401,
+        code: 'UNAUTHORIZED',
+        correlationId: 'corr-unauthorized',
+      }));
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue(spacesA);
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StrictMode>
+          <CompanyProvider>
+            <PresenceProvider>
+              <CompanyStateProbe
+                captureRefreshCompanyData={(refresh) => {
+                  refreshCompanyData = refresh;
+                }}
+              />
+            </PresenceProvider>
+          </CompanyProvider>
+        </StrictMode>
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-a"');
+      expect(mocks.usePresenceSession).toHaveBeenCalledWith(userA.id, 'company-a');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"unauthenticated"');
+    expect(state).toHaveTextContent('"profileUid":null');
+    expect(state).toHaveTextContent('"companyId":null');
+    expect(state).toHaveTextContent('"userIds":[]');
+    expect(state).toHaveTextContent('"spaceIds":[]');
+    expect(mocks.usePresenceSession).toHaveBeenLastCalledWith(null, null);
+  });
+
+  it('does not retain confirmed state for a non-transient 403', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany
+      .mockResolvedValueOnce(companyA)
+      .mockRejectedValueOnce(new ApiError('Access denied', {
+        status: 403,
+        code: 'FORBIDDEN',
+        correlationId: 'corr-forbidden',
+      }));
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue(spacesA);
+
+    renderProvider({
+      captureRefreshCompanyData: (refresh) => {
+        refreshCompanyData = refresh;
+      },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"space-company-a"');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"server"');
+    expect(state).toHaveTextContent('"profileUid":null');
+    expect(state).toHaveTextContent('"companyId":null');
+    expect(state).toHaveTextContent('"userIds":[]');
+    expect(state).toHaveTextContent('"spaceIds":[]');
+  });
+
+  it('preserves the original ApiError when profile-sync fallback finds no user', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const companyA = makeCompany('company-a');
+    const spacesA = [makeSpace('company-a')];
+    let refreshCompanyData: (() => Promise<void>) | null = null;
+
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile
+      .mockResolvedValueOnce(userA)
+      .mockRejectedValueOnce(new ApiError('Session expired during profile sync', {
+        status: 401,
+        code: 'UNAUTHORIZED',
+        correlationId: 'corr-sync-auth',
+      }));
+    mocks.getUserById.mockResolvedValue(null);
+    mocks.getCompany.mockResolvedValue(companyA);
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue(spacesA);
+
+    renderProvider({
+      captureRefreshCompanyData: (refresh) => {
+        refreshCompanyData = refresh;
+      },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"space-company-a"');
+    });
+    if (!refreshCompanyData) {
+      throw new Error('refreshCompanyData was not captured from the provider');
+    }
+
+    await act(async () => {
+      await refreshCompanyData?.();
+    });
+
+    const state = screen.getByTestId('company-state');
+    expect(state).toHaveTextContent('"bootstrapErrorKind":"unauthenticated"');
+    expect(state).toHaveTextContent('"error":"Session expired during profile sync"');
+    expect(state).toHaveTextContent('"profileUid":null');
+  });
+
+  it('masks authenticated company data while ownership is still unknown on first render', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const renderSnapshots: CompanyStateSnapshot[] = [];
+    mocks.useAuth.mockReturnValue(authState('user-a'));
+    mocks.syncUserProfile.mockResolvedValue(userA);
+    mocks.getCompany.mockResolvedValue(makeCompany('company-a'));
+    mocks.getUsersByCompany.mockResolvedValue([userA]);
+    mocks.getSpacesByCompany.mockResolvedValue([makeSpace('company-a')]);
+    passiveEffectControl.shouldDefer = true;
+
+    renderProvider({ onRender: (snapshot) => renderSnapshots.push(snapshot) });
+
+    expect(renderSnapshots[0]).toMatchObject({
+      companyId: null,
+      companyName: null,
+      profileUid: null,
+      userIds: [],
+      spaceIds: [],
+      isLoading: true,
+      error: null,
+      bootstrapErrorKind: null,
+    });
+
+    await flushDeferredPassiveEffects();
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-a"');
+    });
+  });
+
+  it('does not start a stale mutation during the account-switch pre-effect window', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const userB = makeUser('user-b', 'company-b');
+    let currentAuthState = authState('user-a');
+    const capturedMutation: {
+      updateUserProfile?: (data: Partial<User>) => Promise<void>;
+    } = {};
+    const probeProps: CompanyStateProbeProps = {
+      captureUpdateUserProfile: (update) => {
+        capturedMutation.updateUserProfile = update;
+      },
+    };
+
+    mocks.useAuth.mockImplementation(() => currentAuthState);
+    mocks.syncUserProfile.mockImplementation(({ supabase_uid }: { supabase_uid: string }) => (
+      Promise.resolve(supabase_uid === 'user-a' ? userA : userB)
+    ));
+    mocks.getCompany.mockImplementation((companyId: string) => Promise.resolve(makeCompany(companyId)));
+    mocks.getUsersByCompany.mockImplementation((companyId: string) => Promise.resolve(
+      companyId === 'company-a' ? [userA] : [userB],
+    ));
+    mocks.getSpacesByCompany.mockImplementation((companyId: string) => Promise.resolve([makeSpace(companyId)]));
+
+    const view = renderProvider(probeProps);
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-a"');
+    });
+    const updateUserProfile = capturedMutation.updateUserProfile;
+    if (!updateUserProfile) throw new Error('updateUserProfile was not captured');
+
+    passiveEffectControl.shouldDefer = true;
+    currentAuthState = authState('user-b');
+    view.rerender(providerTree(probeProps));
+
+    await expect(updateUserProfile({ statusMessage: 'must not reach account A' })).rejects.toThrow(
+      'Authentication changed during profile update',
+    );
+    expect(mocks.updateOwnProfile).not.toHaveBeenCalled();
+
+    await flushDeferredPassiveEffects();
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-b"');
+    });
+  });
+
+  it('does not commit a delayed account A profile update after account B bootstraps', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const userB = makeUser('user-b', 'company-b');
+    const companyA = makeCompany('company-a');
+    const companyB = makeCompany('company-b');
+    let resolveProfileUpdate: () => void = () => undefined;
+    const delayedProfileUpdate = new Promise<void>((resolve) => {
+      resolveProfileUpdate = resolve;
+    });
+    let currentAuthState = authState('user-a');
+    let updateUserProfile: ((data: Partial<User>) => Promise<void>) | null = null;
+    const probeProps: CompanyStateProbeProps = {
+      captureUpdateUserProfile: (update) => {
+        updateUserProfile = update;
+      },
+    };
+
+    mocks.useAuth.mockImplementation(() => currentAuthState);
+    mocks.syncUserProfile.mockImplementation(({ supabase_uid }: { supabase_uid: string }) => (
+      Promise.resolve(supabase_uid === 'user-a' ? userA : userB)
+    ));
+    mocks.getCompany.mockImplementation((companyId: string) => (
+      Promise.resolve(companyId === 'company-a' ? companyA : companyB)
+    ));
+    mocks.getUsersByCompany.mockImplementation((companyId: string) => (
+      Promise.resolve(companyId === 'company-a' ? [userA] : [userB])
+    ));
+    mocks.getSpacesByCompany.mockImplementation((companyId: string) => (
+      Promise.resolve([makeSpace(companyId)])
+    ));
+    mocks.updateOwnProfile.mockReturnValue(delayedProfileUpdate);
+
+    const view = renderProvider(probeProps);
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-a"');
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"isLoading":false');
+    });
+    if (!updateUserProfile) throw new Error('updateUserProfile was not captured');
+
+    let profileUpdatePromise: Promise<void> | undefined;
+    act(() => {
+      profileUpdatePromise = updateUserProfile?.({ displayName: 'Stale Account A Name' });
+    });
+    if (!profileUpdatePromise) throw new Error('updateUserProfile returned no promise');
+    const staleRejection = expect(profileUpdatePromise).rejects.toThrow(
+      'Authentication changed during profile update',
+    );
+    await waitFor(() => expect(mocks.updateOwnProfile).toHaveBeenCalledWith(
+      userA.id,
+      expect.objectContaining({ displayName: 'Stale Account A Name' }),
+    ));
+
+    currentAuthState = authState('user-b');
+    view.rerender(providerTree(probeProps));
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(state).toHaveTextContent('"profileUid":"user-b"');
+      expect(state).toHaveTextContent('"companyId":"company-b"');
+      expect(state).toHaveTextContent('"isLoading":false');
+    });
+
+    await act(async () => {
+      resolveProfileUpdate();
+      await delayedProfileUpdate;
+    });
+    await staleRejection;
+
+    const finalState = screen.getByTestId('company-state');
+    expect(finalState).toHaveTextContent('"profileUid":"user-b"');
+    expect(finalState).toHaveTextContent('"companyId":"company-b"');
+    expect(finalState).toHaveTextContent('"error":null');
+    expect(finalState).toHaveTextContent('"isLoading":false');
+    expect(finalState).not.toHaveTextContent('Stale Account A Name');
+  });
+
+  it('does not commit a delayed account A admin company update after account B bootstraps', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const userB = makeUser('user-b', 'company-b');
+    const companyA = { ...makeCompany('company-a'), adminIds: [userA.id] };
+    const companyB = { ...makeCompany('company-b'), adminIds: [userB.id] };
+    let resolveCompanyUpdate: () => void = () => undefined;
+    const delayedCompanyUpdate = new Promise<void>((resolve) => {
+      resolveCompanyUpdate = resolve;
+    });
+    let currentAuthState = authState('user-a');
+    let updateCompanyDetails: ((data: Partial<Company>) => Promise<void>) | null = null;
+    const probeProps: CompanyStateProbeProps = {
+      captureUpdateCompanyDetails: (update) => {
+        updateCompanyDetails = update;
+      },
+    };
+
+    mocks.useAuth.mockImplementation(() => currentAuthState);
+    mocks.syncUserProfile.mockImplementation(({ supabase_uid }: { supabase_uid: string }) => (
+      Promise.resolve(supabase_uid === 'user-a' ? userA : userB)
+    ));
+    mocks.getCompany.mockImplementation((companyId: string) => (
+      Promise.resolve(companyId === 'company-a' ? companyA : companyB)
+    ));
+    mocks.getUsersByCompany.mockImplementation((companyId: string) => (
+      Promise.resolve(companyId === 'company-a' ? [userA] : [userB])
+    ));
+    mocks.getSpacesByCompany.mockImplementation((companyId: string) => (
+      Promise.resolve([makeSpace(companyId)])
+    ));
+    mocks.updateCompany.mockReturnValue(delayedCompanyUpdate);
+
+    const view = renderProvider(probeProps);
+    await waitFor(() => {
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"companyId":"company-a"');
+      expect(screen.getByTestId('company-state')).toHaveTextContent('"isLoading":false');
+    });
+    if (!updateCompanyDetails) throw new Error('updateCompanyDetails was not captured');
+
+    let companyUpdatePromise: Promise<void> | undefined;
+    act(() => {
+      companyUpdatePromise = updateCompanyDetails?.({ name: 'Stale Account A Company' });
+    });
+    if (!companyUpdatePromise) throw new Error('updateCompanyDetails returned no promise');
+    const staleRejection = expect(companyUpdatePromise).rejects.toThrow(
+      'Authentication changed during company update',
+    );
+    await waitFor(() => expect(mocks.updateCompany).toHaveBeenCalledWith(
+      'company-a',
+      expect.objectContaining({ name: 'Stale Account A Company' }),
+    ));
+
+    currentAuthState = authState('user-b');
+    view.rerender(providerTree(probeProps));
+    await waitFor(() => {
+      const state = screen.getByTestId('company-state');
+      expect(state).toHaveTextContent('"companyId":"company-b"');
+      expect(state).toHaveTextContent('"companyName":"Company company-b"');
+      expect(state).toHaveTextContent('"isLoading":false');
+    });
+
+    await act(async () => {
+      resolveCompanyUpdate();
+      await delayedCompanyUpdate;
+    });
+    await staleRejection;
+
+    const finalState = screen.getByTestId('company-state');
+    expect(finalState).toHaveTextContent('"companyName":"Company company-b"');
+    expect(finalState).toHaveTextContent('"error":null');
+    expect(finalState).toHaveTextContent('"isLoading":false');
+    expect(finalState).not.toHaveTextContent('Stale Account A Company');
+  });
+
+  it('does not publish a stale account A mutation rejection into account B', async () => {
+    const userA = makeUser('user-a', 'company-a');
+    const userB = makeUser('user-b', 'company-b');
+    let rejectProfileUpdate: (error: Error) => void = () => undefined;
+    const delayedProfileUpdate = new Promise<void>((_resolve, reject) => {
+      rejectProfileUpdate = reject;
+    });
+    let currentAuthState = authState('user-a');
+    let updateUserProfile: ((data: Partial<User>) => Promise<void>) | null = null;
+    const probeProps: CompanyStateProbeProps = {
+      captureUpdateUserProfile: (update) => {
+        updateUserProfile = update;
+      },
+    };
+
+    mocks.useAuth.mockImplementation(() => currentAuthState);
+    mocks.syncUserProfile.mockImplementation(({ supabase_uid }: { supabase_uid: string }) => (
+      Promise.resolve(supabase_uid === 'user-a' ? userA : userB)
+    ));
+    mocks.getCompany.mockImplementation((companyId: string) => Promise.resolve(makeCompany(companyId)));
+    mocks.getUsersByCompany.mockImplementation((companyId: string) => Promise.resolve(
+      companyId === 'company-a' ? [userA] : [userB],
+    ));
+    mocks.getSpacesByCompany.mockImplementation((companyId: string) => Promise.resolve([makeSpace(companyId)]));
+    mocks.updateOwnProfile.mockReturnValue(delayedProfileUpdate);
+
+    const view = renderProvider(probeProps);
+    await waitFor(() => expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-a"'));
+    if (!updateUserProfile) throw new Error('updateUserProfile was not captured');
+
+    let profileUpdatePromise: Promise<void> | undefined;
+    act(() => {
+      profileUpdatePromise = updateUserProfile?.({ statusMessage: 'Account A only' });
+    });
+    if (!profileUpdatePromise) throw new Error('updateUserProfile returned no promise');
+    const staleRejection = expect(profileUpdatePromise).rejects.toThrow(
+      'Authentication changed during profile update',
+    );
+    await waitFor(() => expect(mocks.updateOwnProfile).toHaveBeenCalled());
+
+    currentAuthState = authState('user-b');
+    view.rerender(providerTree(probeProps));
+    await waitFor(() => expect(screen.getByTestId('company-state')).toHaveTextContent('"profileUid":"user-b"'));
+
+    await act(async () => {
+      rejectProfileUpdate(new Error('Account A mutation failed'));
+      await delayedProfileUpdate.catch(() => undefined);
+    });
+    await staleRejection;
+
+    const finalState = screen.getByTestId('company-state');
+    expect(finalState).toHaveTextContent('"profileUid":"user-b"');
+    expect(finalState).toHaveTextContent('"error":null');
+    expect(finalState).toHaveTextContent('"isLoading":false');
+    expect(finalState).not.toHaveTextContent('Account A mutation failed');
   });
 
   it('rejects createNewCompany and commits no stale data when auth changes mid-creation', async () => {
@@ -812,7 +1640,7 @@ describe('CompanyContext bootstrap', () => {
       await delayedCreationProfile;
     });
     await waitFor(() => {
-      expect(mocks.createCompany).toHaveBeenCalledWith('Account A Company', 'user-a', {});
+      expect(mocks.createCompany).toHaveBeenCalledWith('Account A Company', {});
     });
 
     currentAuthState = authState('user-b');

@@ -622,6 +622,25 @@ describe('ModernSpaceCard with Hover Panel', () => {
     expect(mockOnEnterSpace).not.toHaveBeenCalled();
   });
 
+  it('defers opening chat until the enter coordinator confirms the transition', () => {
+    const mockOnOpenChat = vi.fn();
+
+    render(
+      <ModernSpaceCard
+        space={mockSpace}
+        usersInSpace={mockUsers}
+        onEnterSpace={mockOnEnterSpace}
+        onOpenChat={mockOnOpenChat}
+        state={{ userInSpace: false, directEnter: true }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('space-space-1'));
+
+    expect(mockOnEnterSpace).toHaveBeenCalledWith('space-1');
+    expect(mockOnOpenChat).not.toHaveBeenCalled();
+  });
+
   it('shows aria-expanded attribute when panel visible (AC10)', async () => {
     vi.useFakeTimers();
     

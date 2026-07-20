@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { UserStatus } from '@/types/database';
+import type { PresenceAvailabilityStatus } from '@/lib/presence/contracts';
 import { UploadableAvatar } from './UploadableAvatar';
 import { avatarCacheManager } from '@/lib/avatar-utils';
 
@@ -16,7 +16,7 @@ import { avatarCacheManager } from '@/lib/avatar-utils';
 // This is just a sample implementation
 
 const statusOptions: {
-  value: UserStatus;
+  value: PresenceAvailabilityStatus;
   label: string;
   color: string;
 }[] = [{
@@ -31,10 +31,6 @@ const statusOptions: {
   value: 'busy',
   label: 'Busy',
   color: 'bg-red-500'
-}, {
-  value: 'offline',
-  label: 'Offline',
-  color: 'bg-gray-400'
 }];
 async function uploadUserAvatar(file: File, userId: string): Promise<string> {
   // Example implementation using FormData
@@ -60,6 +56,7 @@ export function EnhancedUserProfile() {
   const {
     currentUserProfile,
     updateUserProfile,
+    refreshCompanyData,
     isLoading
   } = useCompany();
   const {
@@ -67,7 +64,11 @@ export function EnhancedUserProfile() {
     showError
   } = useNotification();
   const [displayName, setDisplayName] = useState(currentUserProfile?.displayName || '');
-  const [status, setStatus] = useState<UserStatus>(currentUserProfile?.status || 'online');
+  const [status, setStatus] = useState<PresenceAvailabilityStatus>(
+    currentUserProfile?.status === 'away' || currentUserProfile?.status === 'busy'
+      ? currentUserProfile.status
+      : 'online'
+  );
   const [statusMessage, setStatusMessage] = useState(currentUserProfile?.statusMessage || '');
   const [isUploading, setIsUploading] = useState(false);
   const handleUpdateProfile = async () => {
@@ -92,13 +93,10 @@ export function EnhancedUserProfile() {
     setIsUploading(true);
     try {
       // Upload avatar and get the URL
-      const avatarUrl = await uploadUserAvatar(file, currentUserProfile.id);
+      await uploadUserAvatar(file, currentUserProfile.id);
       avatarCacheManager.invalidateUser(String(currentUserProfile.id));
 
-      // Update user profile with new avatar URL
-      await updateUserProfile({
-        avatarUrl
-      });
+      await refreshCompanyData();
       showSuccess({
         description: 'Avatar updated successfully'
       });

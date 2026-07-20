@@ -104,6 +104,7 @@ interface ModernSpaceCardProps {
   onKnock?: (spaceId: string) => void;
   /** Pending knock request for this space (shown as banner for occupants) */
   pendingKnockRequest?: KnockRequestPayload | null;
+  knockResponsePending?: boolean;
   /** Handler when occupant approves a knock */
   onKnockApprove?: (request: KnockRequestPayload) => void;
   /** Handler when occupant denies a knock */
@@ -132,6 +133,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   // Story 3.16: Knock to Enter
   onKnock,
   pendingKnockRequest = null,
+  knockResponsePending = false,
   onKnockApprove,
   onKnockDeny,
   knockStatus,
@@ -231,20 +233,14 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       return;
     }
     onEnterSpace(space.id);
-    if (onOpenChat) {
-      onOpenChat(space);
-    }
   };
 
   // Story 3.11: Handlers for detail panel actions
   const handleJoin = useCallback(() => {
     onEnterSpace(space.id);
-    if (onOpenChat) {
-      onOpenChat(space);
-    }
     setShowPanel(false);
     setBottomSheetOpen(false);
-  }, [space, onEnterSpace, onOpenChat]);
+  }, [space.id, onEnterSpace]);
   const handleLeave = useCallback(() => {
     if (onLeaveSpace) {
       onLeaveSpace(space.id);
@@ -310,7 +306,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           setShowPanel(false);
         }
       }}>
-        {pendingKnockRequest && isUserInSpace && <KnockBanner requesterName={pendingKnockRequest.requesterName} requesterAvatarUrl={pendingKnockRequest.requesterAvatarUrl} onApprove={() => onKnockApprove?.(pendingKnockRequest)} onDeny={() => onKnockDeny?.(pendingKnockRequest)} />}
+        {pendingKnockRequest && isUserInSpace && <KnockBanner requesterName={pendingKnockRequest.requesterName} requesterAvatarUrl={pendingKnockRequest.requesterAvatarUrl} responding={knockResponsePending} onApprove={() => onKnockApprove?.(pendingKnockRequest)} onDeny={() => onKnockDeny?.(pendingKnockRequest)} />}
 
         {/* Header section */}
         <div className={floorPlanTokens.spaceCard.content.header}>

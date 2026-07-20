@@ -1,15 +1,32 @@
-import { randomUUID } from 'node:crypto';
-import { Client } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PresenceFixtures } from './fixtures';
-import { LOCAL_DB_URL } from './setup';
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  ensurePresenceOpenLogUniqueIndex,
+  PresenceFixtures,
+} from "./fixtures";
+import { LOCAL_DB_URL } from "./setup";
 import {
   createAuthedUser,
   createServiceClient,
   type AuthedUser,
-} from './auth-clients';
+} from "./auth-clients";
+import {
+  presenceConcurrencyTestName,
+  standardOrHarnessIterations,
+} from "./concurrency/support";
 
 const NS = `exit-gate-races-${randomUUID()}`;
+const CONCURRENCY_SOAK_ITERATIONS = (() => {
+  const parsed = Number.parseInt(
+    process.env.PRESENCE_SOAK_ITERATIONS ?? "50",
+    10,
+  );
+  const standardIterations =
+    Number.isSafeInteger(parsed) && parsed >= 50 && parsed <= 500 ? parsed : 50;
+  return standardOrHarnessIterations(standardIterations);
+})();
+const REGISTER_LOGOUT_ITERATIONS = standardOrHarnessIterations(50);
 
 type CompanyRow = { readonly id: string };
 type SpaceRow = { readonly id: string };
@@ -47,6 +64,7 @@ type TransitionResult = {
 type RegisterSuccess = {
   readonly ok: true;
   readonly sessionId: string;
+  readonly companyId: string;
   readonly registrationId: string;
   readonly sessionSpaceId: string | null;
   readonly expiresAt: string;
@@ -55,11 +73,12 @@ type RegisterSuccess = {
 type RegisterFailure = {
   readonly ok: false;
   readonly code:
-    | 'AUTH_SESSION_REVOKED'
-    | 'SESSION_RETIRED'
-    | 'REGISTRATION_CONFLICT'
-    | 'USER_NOT_FOUND'
-    | 'NO_COMPANY';
+    | "AUTH_SESSION_REVOKED"
+    | "SESSION_RETIRED"
+    | "REGISTRATION_CONFLICT"
+    | "PRESENCE_COMPANY_SCOPE_CHANGED"
+    | "USER_NOT_FOUND"
+    | "NO_COMPANY";
 };
 type RegisterResult = RegisterSuccess | RegisterFailure;
 type SnapshotUser = {
@@ -75,7 +94,7 @@ type PresenceSnapshot = {
   readonly users: SnapshotUser[];
 };
 
-describe('presence-db Phase 3 exit-gate races', () => {
+describe("presence-db Phase 3 exit-gate races", () => {
   let fixtures: PresenceFixtures;
   let serviceClient: ReturnType<typeof createServiceClient>;
 
@@ -85,8 +104,10 @@ describe('presence-db Phase 3 exit-gate races', () => {
   });
 
   beforeEach(async () => {
-    await fixtures.sql(`grant insert on table public.space_presence_log to service_role`);
-    await resetRuntimeMode('legacy', null);
+    await fixtures.sql(
+      `grant insert on table public.space_presence_log to service_role`,
+    );
+    await resetRuntimeMode("legacy", null);
     await fixtures.sql(
       `drop index if exists public.ux_space_presence_log_one_open_per_user`,
     );
@@ -95,13 +116,19 @@ describe('presence-db Phase 3 exit-gate races', () => {
 
   afterAll(async () => {
     if (fixtures) {
-      await fixtures.sql(`grant insert on table public.space_presence_log to service_role`);
-      await resetRuntimeMode('legacy', null);
-      await fixtures.sql(
-        `drop index if exists public.ux_space_presence_log_one_open_per_user`,
-      );
-      await cleanupNamespacedRows();
-      await fixtures.end();
+      try {
+        await fixtures.sql(
+          `grant insert on table public.space_presence_log to service_role`,
+        );
+        await resetRuntimeMode("legacy", null);
+        await cleanupNamespacedRows();
+      } finally {
+        try {
+          await ensurePresenceOpenLogUniqueIndex(fixtures);
+        } finally {
+          await fixtures.end();
+        }
+      }
     }
   });
 
@@ -146,7 +173,9 @@ describe('presence-db Phase 3 exit-gate races', () => {
     );
     await fixtures.sql(`delete from public.users where email like $1`, [tag]);
     await fixtures.sql(`delete from public.spaces where name like $1`, [tag]);
-    await fixtures.sql(`delete from public.companies where name like $1`, [tag]);
+    await fixtures.sql(`delete from public.companies where name like $1`, [
+      tag,
+    ]);
   }
 
   async function asPmo<T>(fn: () => Promise<T>): Promise<T> {
@@ -161,7 +190,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
   }
 
   async function resetRuntimeMode(
-    mode: 'legacy' | 'maintenance' | 'atomic',
+    mode: "legacy" | "maintenance" | "atomic",
     cutoverId: string | null,
   ): Promise<void> {
     await asPmo(() =>
@@ -185,7 +214,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
        on public.space_presence_log (user_id)
        where exited_at is null`,
     );
-    await resetRuntimeMode('atomic', randomUUID());
+    await resetRuntimeMode("atomic", randomUUID());
   }
 
   async function createCompany(key: string): Promise<string> {
@@ -230,7 +259,10 @@ describe('presence-db Phase 3 exit-gate races', () => {
     return space.id;
   }
 
-  async function createPlainUser(companyId: string, key: string): Promise<UserRow> {
+  async function createPlainUser(
+    companyId: string,
+    key: string,
+  ): Promise<UserRow> {
     const supabaseUid = randomUUID();
     const [user] = await fixtures.sql<UserRow>(
       `insert into public.users
@@ -262,7 +294,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
        where u.id = $1`,
       [userId, spaceId],
     );
-    if (!row) throw new Error('Failed to read revision state');
+    if (!row) throw new Error("Failed to read revision state");
     return row;
   }
 
@@ -316,7 +348,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
         opts.spaceAccessRevision ?? null,
       ],
     );
-    if (!row) throw new Error('Failed to seed presence session');
+    if (!row) throw new Error("Failed to seed presence session");
     return row.id;
   }
 
@@ -329,22 +361,25 @@ describe('presence-db Phase 3 exit-gate races', () => {
     readonly reason: string;
     readonly expectedLocationVersion?: number | null;
   }): Promise<TransitionResult> {
-    const { data, error } = await serviceClient.rpc('transition_user_location', {
-      p_user_id: params.userId,
-      p_auth_session_id: params.authSessionId,
-      p_session_id: params.sessionId,
-      p_transition_id: params.transitionId ?? randomUUID(),
-      p_target_space_id: params.targetSpaceId,
-      p_reason: params.reason,
-      p_knock_request_id: null,
-      p_expected_location_version: params.expectedLocationVersion ?? null,
-    });
+    const { data, error } = await serviceClient.rpc(
+      "transition_user_location",
+      {
+        p_user_id: params.userId,
+        p_auth_session_id: params.authSessionId,
+        p_session_id: params.sessionId,
+        p_transition_id: params.transitionId ?? randomUUID(),
+        p_target_space_id: params.targetSpaceId,
+        p_reason: params.reason,
+        p_knock_request_id: null,
+        p_expected_location_version: params.expectedLocationVersion ?? null,
+      },
+    );
     if (error) {
       throw new Error(`transition_user_location failed: ${error.message}`);
     }
     const rows = data as TransitionResult[] | TransitionResult;
     const row = Array.isArray(rows) ? rows[0] : rows;
-    if (!row) throw new Error('transition_user_location returned no row');
+    if (!row) throw new Error("transition_user_location returned no row");
     return row;
   }
 
@@ -352,12 +387,17 @@ describe('presence-db Phase 3 exit-gate races', () => {
     userId: string,
     authSessionId: string,
     registrationId: string,
+    expectedCompanyId: string,
   ): Promise<RegisterResult> {
-    const { data, error } = await serviceClient.rpc('register_presence_session', {
-      p_user_id: userId,
-      p_auth_session_id: authSessionId,
-      p_registration_id: registrationId,
-    });
+    const { data, error } = await serviceClient.rpc(
+      "register_presence_session",
+      {
+        p_user_id: userId,
+        p_auth_session_id: authSessionId,
+        p_registration_id: registrationId,
+        p_expected_company_id: expectedCompanyId,
+      },
+    );
     if (error) {
       throw new Error(`register_presence_session failed: ${error.message}`);
     }
@@ -366,7 +406,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
 
   async function getSnapshot(viewerUserId: string): Promise<PresenceSnapshot> {
     const { data, error } = await serviceClient.rpc(
-      'get_company_presence_snapshot',
+      "get_company_presence_snapshot",
       { p_viewer_user_id: viewerUserId },
     );
     if (error) {
@@ -382,18 +422,20 @@ describe('presence-db Phase 3 exit-gate races', () => {
        where id = $1`,
       [userId],
     );
-    if (!row) throw new Error('Missing user placement row');
+    if (!row) throw new Error("Missing user placement row");
     return row;
   }
 
-  async function sessionPlacement(sessionId: string): Promise<SessionPlacementRow> {
+  async function sessionPlacement(
+    sessionId: string,
+  ): Promise<SessionPlacementRow> {
     const [row] = await fixtures.sql<SessionPlacementRow>(
       `select space_id, placement_version, retired_at, retirement_reason
        from public.user_presence_sessions
        where id = $1`,
       [sessionId],
     );
-    if (!row) throw new Error('Missing session row');
+    if (!row) throw new Error("Missing session row");
     return row;
   }
 
@@ -408,7 +450,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
          and transition_id = $2`,
       [userId, transitionId],
     );
-    return Number(row?.count ?? '0');
+    return Number(row?.count ?? "0");
   }
 
   async function nullTransitionResultCount(
@@ -423,10 +465,13 @@ describe('presence-db Phase 3 exit-gate races', () => {
          and result is null`,
       [userId, transitionId],
     );
-    return Number(row?.count ?? '0');
+    return Number(row?.count ?? "0");
   }
 
-  async function openLogCount(userId: string, spaceId?: string): Promise<number> {
+  async function openLogCount(
+    userId: string,
+    spaceId?: string,
+  ): Promise<number> {
     const [row] = await fixtures.sql<CountRow>(
       `select count(*)::text as count
        from public.space_presence_log
@@ -435,7 +480,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
          and ($2::uuid is null or space_id = $2)`,
       [userId, spaceId ?? null],
     );
-    return Number(row?.count ?? '0');
+    return Number(row?.count ?? "0");
   }
 
   async function activeAuthSessionCount(
@@ -451,7 +496,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
          and expires_at > pg_catalog.clock_timestamp()`,
       [userId, authSessionId],
     );
-    return Number(row?.count ?? '0');
+    return Number(row?.count ?? "0");
   }
 
   async function waitForTransitionLockWait(): Promise<void> {
@@ -462,13 +507,31 @@ describe('presence-db Phase 3 exit-gate races', () => {
          where wait_event_type = 'Lock'
            and query ilike '%transition_user_location%'`,
       );
-      if (Number(row?.count ?? '0') > 0) return;
+      if (Number(row?.count ?? "0") > 0) return;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    throw new Error('Timed out waiting for transition_user_location lock wait');
+    throw new Error("Timed out waiting for transition_user_location lock wait");
   }
 
-  async function withPgClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  async function waitForRegistrationLockWait(): Promise<void> {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const [row] = await fixtures.sql<CountRow>(
+        `select count(*)::text as count
+         from pg_catalog.pg_stat_activity
+         where wait_event_type = 'Lock'
+           and query ilike '%register_presence_session%'`,
+      );
+      if (Number(row?.count ?? "0") > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(
+      "Timed out waiting for register_presence_session lock wait",
+    );
+  }
+
+  async function withPgClient<T>(
+    fn: (client: Client) => Promise<T>,
+  ): Promise<T> {
     const client = new Client({ connectionString: LOCAL_DB_URL });
     await client.connect();
     try {
@@ -478,60 +541,65 @@ describe('presence-db Phase 3 exit-gate races', () => {
     }
   }
 
-  it('serializes two concurrent capacity-one joins into one success and one SPACE_FULL', async () => {
-    const companyId = await createCompany('capacity-race');
-    const spaceId = await createSpace(companyId, 'capacity-race-space', {
-      capacity: 1,
-    });
-    const first = await createPlainUser(companyId, 'capacity-race-first');
-    const second = await createPlainUser(companyId, 'capacity-race-second');
-    const firstAuthSessionId = randomUUID();
-    const secondAuthSessionId = randomUUID();
-    const firstSessionId = await seedSession({
-      companyId,
-      userId: first.id,
-      authSessionId: firstAuthSessionId,
-    });
-    const secondSessionId = await seedSession({
-      companyId,
-      userId: second.id,
-      authSessionId: secondAuthSessionId,
-    });
-    await activateAtomic();
-
-    const results = await Promise.all([
-      transition({
+  it(
+    presenceConcurrencyTestName(
+      "13-capacity-one",
+      "serializes two capacity-one joins into one success and one SPACE_FULL",
+    ),
+    async () => {
+      const companyId = await createCompany("capacity-race");
+      const spaceId = await createSpace(companyId, "capacity-race-space", {
+        capacity: 1,
+      });
+      const first = await createPlainUser(companyId, "capacity-race-first");
+      const second = await createPlainUser(companyId, "capacity-race-second");
+      const firstAuthSessionId = randomUUID();
+      const secondAuthSessionId = randomUUID();
+      const firstSessionId = await seedSession({
+        companyId,
         userId: first.id,
         authSessionId: firstAuthSessionId,
-        sessionId: firstSessionId,
-        transitionId: randomUUID(),
-        targetSpaceId: spaceId,
-        reason: 'manual-enter',
-      }),
-      transition({
+      });
+      const secondSessionId = await seedSession({
+        companyId,
         userId: second.id,
         authSessionId: secondAuthSessionId,
-        sessionId: secondSessionId,
-        transitionId: randomUUID(),
-        targetSpaceId: spaceId,
-        reason: 'manual-enter',
-      }),
-    ]);
+      });
+      await activateAtomic();
 
-    expect(results.map((result) => result.code).sort()).toEqual([
-      'LOCATION_UPDATED',
-      'SPACE_FULL',
-    ]);
+      const results = await Promise.all([
+        transition({
+          userId: first.id,
+          authSessionId: firstAuthSessionId,
+          sessionId: firstSessionId,
+          transitionId: randomUUID(),
+          targetSpaceId: spaceId,
+          reason: "manual-enter",
+        }),
+        transition({
+          userId: second.id,
+          authSessionId: secondAuthSessionId,
+          sessionId: secondSessionId,
+          transitionId: randomUUID(),
+          targetSpaceId: spaceId,
+          reason: "manual-enter",
+        }),
+      ]);
 
-    const [occupants] = await fixtures.sql<CountRow>(
-      `select count(*)::text as count
+      expect(results.map((result) => result.code).sort()).toEqual([
+        "LOCATION_UPDATED",
+        "SPACE_FULL",
+      ]);
+
+      const [occupants] = await fixtures.sql<CountRow>(
+        `select count(*)::text as count
        from public.users
        where id in ($1, $2)
          and current_space_id = $3`,
-      [first.id, second.id, spaceId],
-    );
-    const [sessions] = await fixtures.sql<CountRow>(
-      `select count(*)::text as count
+        [first.id, second.id, spaceId],
+      );
+      const [sessions] = await fixtures.sql<CountRow>(
+        `select count(*)::text as count
        from public.user_presence_sessions as s
        join public.users as u on u.id = s.user_id
        where s.user_id in ($1, $2)
@@ -539,159 +607,302 @@ describe('presence-db Phase 3 exit-gate races', () => {
          and s.retired_at is null
          and s.expires_at > pg_catalog.clock_timestamp()
          and s.placement_version = u.location_version`,
-      [first.id, second.id, spaceId],
-    );
-    const [logs] = await fixtures.sql<CountRow>(
-      `select count(*)::text as count
+        [first.id, second.id, spaceId],
+      );
+      const [logs] = await fixtures.sql<CountRow>(
+        `select count(*)::text as count
        from public.space_presence_log
        where user_id in ($1, $2)
          and space_id = $3
          and exited_at is null`,
-      [first.id, second.id, spaceId],
-    );
-    expect(occupants?.count).toBe('1');
-    expect(sessions?.count).toBe('1');
-    expect(logs?.count).toBe('1');
-  });
+        [first.id, second.id, spaceId],
+      );
+      expect(occupants?.count).toBe("1");
+      expect(sessions?.count).toBe("1");
+      expect(logs?.count).toBe("1");
+    },
+  );
 
-  it('leaves one final placement and matching open log after two concurrent moves for one user', async () => {
-    const companyId = await createCompany('same-user-moves');
-    const spaceAId = await createSpace(companyId, 'same-user-moves-a');
-    const spaceBId = await createSpace(companyId, 'same-user-moves-b');
-    const user = await createPlainUser(companyId, 'same-user-moves-user');
+  it(
+    presenceConcurrencyTestName(
+      "16-same-user-moves",
+      "leaves one final placement after distinct concurrent moves for one user",
+    ),
+    async () => {
+      const companyId = await createCompany("same-user-moves");
+      const spaceAId = await createSpace(companyId, "same-user-moves-a");
+      const spaceBId = await createSpace(companyId, "same-user-moves-b");
+      const user = await createPlainUser(companyId, "same-user-moves-user");
+      const authSessionId = randomUUID();
+      const sessionId = await seedSession({
+        companyId,
+        userId: user.id,
+        authSessionId,
+      });
+      const before = await userPlacement(user.id);
+      await activateAtomic();
+
+      const results = await Promise.all([
+        transition({
+          userId: user.id,
+          authSessionId,
+          sessionId,
+          transitionId: randomUUID(),
+          targetSpaceId: spaceAId,
+          reason: "manual-enter",
+        }),
+        transition({
+          userId: user.id,
+          authSessionId,
+          sessionId,
+          transitionId: randomUUID(),
+          targetSpaceId: spaceBId,
+          reason: "manual-enter",
+        }),
+      ]);
+
+      expect(
+        results.every((result) => result.code === "LOCATION_UPDATED"),
+      ).toBe(true);
+      const after = await userPlacement(user.id);
+      expect([spaceAId, spaceBId]).toContain(after.current_space_id);
+      expect(after.location_version).toBe(before.location_version + 2);
+      expect(await openLogCount(user.id)).toBe(1);
+      expect(
+        await openLogCount(user.id, after.current_space_id ?? undefined),
+      ).toBe(1);
+      await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
+        space_id: after.current_space_id,
+        placement_version: after.location_version,
+      });
+    },
+  );
+
+  it(
+    presenceConcurrencyTestName(
+      "49-distinct-id-deadlock",
+      `completes ${CONCURRENCY_SOAK_ITERATIONS} distinct-ID same-user transition pairs without deadlock`,
+    ),
+    async () => {
+      const companyId = await createCompany("transition-deadlock-soak");
+      const user = await createPlainUser(
+        companyId,
+        "transition-deadlock-soak-user",
+      );
+      const spaceAId = await createSpace(
+        companyId,
+        "transition-deadlock-soak-a",
+      );
+      const spaceBId = await createSpace(
+        companyId,
+        "transition-deadlock-soak-b",
+      );
+      const authSessionId = randomUUID();
+      const sessionId = await seedSession({
+        companyId,
+        userId: user.id,
+        authSessionId,
+      });
+      const before = await userPlacement(user.id);
+      await activateAtomic();
+
+      for (
+        let iteration = 0;
+        iteration < CONCURRENCY_SOAK_ITERATIONS;
+        iteration += 1
+      ) {
+        const results = await Promise.all([
+          transition({
+            userId: user.id,
+            authSessionId,
+            sessionId,
+            transitionId: randomUUID(),
+            targetSpaceId: spaceAId,
+            reason: "manual-enter",
+          }),
+          transition({
+            userId: user.id,
+            authSessionId,
+            sessionId,
+            transitionId: randomUUID(),
+            targetSpaceId: spaceBId,
+            reason: "manual-enter",
+          }),
+        ]);
+        if (
+          !results.every(
+            (result) =>
+              result.ok &&
+              ["LOCATION_UPDATED", "LOCATION_UNCHANGED"].includes(result.code),
+          )
+        ) {
+          throw new Error(
+            `Unexpected transition soak result at iteration ${iteration}: ${JSON.stringify(results)}`,
+          );
+        }
+      }
+
+      const after = await userPlacement(user.id);
+      expect([spaceAId, spaceBId]).toContain(after.current_space_id);
+      expect(after.location_version).toBe(
+        before.location_version + CONCURRENCY_SOAK_ITERATIONS * 2,
+      );
+      expect(await openLogCount(user.id)).toBe(1);
+      expect(
+        await openLogCount(user.id, after.current_space_id ?? undefined),
+      ).toBe(1);
+      await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
+        space_id: after.current_space_id,
+        placement_version: after.location_version,
+      });
+    },
+  );
+
+  it("rolls back placement and idempotency claim under same-connection pg_temp log failure injection", async () => {
+    const companyId = await createCompany("log-failure");
+    const user = await createPlainUser(companyId, "log-failure-user");
+    const spaceId = await createSpace(companyId, "log-failure-space");
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
-    const before = await userPlacement(user.id);
-    await activateAtomic();
-
-    const results = await Promise.all([
-      transition({
-        userId: user.id,
-        authSessionId,
-        sessionId,
-        transitionId: randomUUID(),
-        targetSpaceId: spaceAId,
-        reason: 'manual-enter',
-      }),
-      transition({
-        userId: user.id,
-        authSessionId,
-        sessionId,
-        transitionId: randomUUID(),
-        targetSpaceId: spaceBId,
-        reason: 'manual-enter',
-      }),
-    ]);
-
-    expect(results.every((result) => result.code === 'LOCATION_UPDATED')).toBe(true);
-    const after = await userPlacement(user.id);
-    expect([spaceAId, spaceBId]).toContain(after.current_space_id);
-    expect(after.location_version).toBe(before.location_version + 2);
-    expect(await openLogCount(user.id)).toBe(1);
-    expect(await openLogCount(user.id, after.current_space_id ?? undefined)).toBe(1);
-    await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
-      space_id: after.current_space_id,
-      placement_version: after.location_version,
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
     });
-  });
-
-  it('rolls back placement and idempotency claim when log insertion fails', async () => {
-    const companyId = await createCompany('log-failure');
-    const user = await createPlainUser(companyId, 'log-failure-user');
-    const spaceId = await createSpace(companyId, 'log-failure-space');
-    const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
     const transitionId = randomUUID();
     const before = await userPlacement(user.id);
     await activateAtomic();
 
-    await fixtures.sql(`revoke insert on table public.space_presence_log from service_role`);
+    await fixtures.sql("begin");
     try {
+      await fixtures.sql(
+        `create or replace function pg_temp.fail_fixture_presence_log_insert()
+         returns trigger
+         language plpgsql
+         as $function$
+         begin
+           if new.user_id::text = tg_argv[0] then
+             raise exception 'forced fixture presence-log failure';
+           end if;
+           return new;
+         end
+         $function$;
+
+         create trigger fixture_presence_log_insert_failure
+         before insert on public.space_presence_log
+         for each row
+         execute function pg_temp.fail_fixture_presence_log_insert('${user.id}')`,
+      );
+      await fixtures.sql("savepoint before_injected_transition");
       await expect(
+        fixtures.sql(
+          `select *
+           from public.transition_user_location(
+             $1::uuid,
+             $2::uuid,
+             $3::uuid,
+             $4::uuid,
+             $5::uuid,
+             'manual-enter'::text,
+             null::text,
+             null::integer
+           )`,
+          [user.id, authSessionId, sessionId, transitionId, spaceId],
+        ),
+      ).rejects.toThrow(/forced fixture presence-log failure/i);
+      await fixtures.sql("rollback to savepoint before_injected_transition");
+
+      await expect(userPlacement(user.id)).resolves.toEqual(before);
+      await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
+        space_id: null,
+        placement_version: null,
+      });
+      expect(await openLogCount(user.id)).toBe(0);
+      expect(await transitionRowCount(user.id, transitionId)).toBe(0);
+    } catch (error) {
+      await fixtures.sql("rollback").catch(() => undefined);
+      throw error;
+    }
+    await fixtures.sql("rollback");
+  });
+
+  it(
+    presenceConcurrencyTestName(
+      "15-same-id-replay",
+      "applies a concurrent and sequential replay of the same transition ID once",
+    ),
+    async () => {
+      const companyId = await createCompany("same-transition");
+      const user = await createPlainUser(companyId, "same-transition-user");
+      const spaceId = await createSpace(companyId, "same-transition-space");
+      const authSessionId = randomUUID();
+      const sessionId = await seedSession({
+        companyId,
+        userId: user.id,
+        authSessionId,
+      });
+      const before = await userPlacement(user.id);
+      const transitionId = randomUUID();
+      await activateAtomic();
+
+      const [first, second] = await Promise.all([
         transition({
           userId: user.id,
           authSessionId,
           sessionId,
           transitionId,
           targetSpaceId: spaceId,
-          reason: 'manual-enter',
+          reason: "manual-enter",
         }),
-      ).rejects.toThrow(/space_presence_log|permission denied/i);
-    } finally {
-      await fixtures.sql(`grant insert on table public.space_presence_log to service_role`);
-    }
-
-    await expect(userPlacement(user.id)).resolves.toEqual(before);
-    await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
-      space_id: null,
-      placement_version: null,
-    });
-    expect(await openLogCount(user.id)).toBe(0);
-    expect(await transitionRowCount(user.id, transitionId)).toBe(0);
-  });
-
-  it('applies a concurrent and sequential replay of the same transition ID once', async () => {
-    const companyId = await createCompany('same-transition');
-    const user = await createPlainUser(companyId, 'same-transition-user');
-    const spaceId = await createSpace(companyId, 'same-transition-space');
-    const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
-    const before = await userPlacement(user.id);
-    const transitionId = randomUUID();
-    await activateAtomic();
-
-    const [first, second] = await Promise.all([
-      transition({
+        transition({
+          userId: user.id,
+          authSessionId,
+          sessionId,
+          transitionId,
+          targetSpaceId: spaceId,
+          reason: "manual-enter",
+        }),
+      ]);
+      const replay = await transition({
         userId: user.id,
         authSessionId,
         sessionId,
         transitionId,
         targetSpaceId: spaceId,
-        reason: 'manual-enter',
-      }),
-      transition({
-        userId: user.id,
-        authSessionId,
-        sessionId,
-        transitionId,
-        targetSpaceId: spaceId,
-        reason: 'manual-enter',
-      }),
-    ]);
-    const replay = await transition({
-      userId: user.id,
-      authSessionId,
-      sessionId,
-      transitionId,
-      targetSpaceId: spaceId,
-      reason: 'manual-enter',
-    });
+        reason: "manual-enter",
+      });
 
-    for (const result of [first, second, replay]) {
-      expect(result).toMatchObject({
-        ok: true,
-        code: 'LOCATION_UPDATED',
+      for (const result of [first, second, replay]) {
+        expect(result).toMatchObject({
+          ok: true,
+          code: "LOCATION_UPDATED",
+          current_space_id: spaceId,
+          location_version: before.location_version + 1,
+        });
+      }
+      expect(
+        [first, second, replay].some((result) => result.already_applied),
+      ).toBe(true);
+      await expect(userPlacement(user.id)).resolves.toMatchObject({
         current_space_id: spaceId,
         location_version: before.location_version + 1,
       });
-    }
-    expect([first, second, replay].some((result) => result.already_applied)).toBe(true);
-    await expect(userPlacement(user.id)).resolves.toMatchObject({
-      current_space_id: spaceId,
-      location_version: before.location_version + 1,
-    });
-    expect(await openLogCount(user.id, spaceId)).toBe(1);
-    expect(await transitionRowCount(user.id, transitionId)).toBe(1);
-    expect(await nullTransitionResultCount(user.id, transitionId)).toBe(0);
-  });
+      expect(await openLogCount(user.id, spaceId)).toBe(1);
+      expect(await transitionRowCount(user.id, transitionId)).toBe(1);
+      expect(await nullTransitionResultCount(user.id, transitionId)).toBe(0);
+    },
+  );
 
-  it('stores separate results for distinct auto-fallback transition IDs', async () => {
-    const companyId = await createCompany('fallback-ids');
-    const user = await createPlainUser(companyId, 'fallback-ids-user');
-    const spaceAId = await createSpace(companyId, 'fallback-ids-a');
-    const spaceBId = await createSpace(companyId, 'fallback-ids-b');
+  it("stores separate results for distinct auto-fallback transition IDs", async () => {
+    const companyId = await createCompany("fallback-ids");
+    const user = await createPlainUser(companyId, "fallback-ids-user");
+    const spaceAId = await createSpace(companyId, "fallback-ids-a");
+    const spaceBId = await createSpace(companyId, "fallback-ids-b");
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     const before = await userPlacement(user.id);
     const firstTransitionId = randomUUID();
     const secondTransitionId = randomUUID();
@@ -703,7 +914,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
       sessionId,
       transitionId: firstTransitionId,
       targetSpaceId: spaceAId,
-      reason: 'auto-fallback',
+      reason: "auto-fallback",
       expectedLocationVersion: before.location_version,
     });
     const second = await transition({
@@ -712,12 +923,12 @@ describe('presence-db Phase 3 exit-gate races', () => {
       sessionId,
       transitionId: secondTransitionId,
       targetSpaceId: spaceBId,
-      reason: 'auto-fallback',
+      reason: "auto-fallback",
       expectedLocationVersion: before.location_version,
     });
 
-    expect(first.code).toBe('LOCATION_UPDATED');
-    expect(second.code).toBe('LOCATION_SUPERSEDED');
+    expect(first.code).toBe("LOCATION_UPDATED");
+    expect(second.code).toBe("LOCATION_SUPERSEDED");
     const rows = await fixtures.sql<{
       readonly transition_id: string;
       readonly code: string | null;
@@ -734,17 +945,24 @@ describe('presence-db Phase 3 exit-gate races', () => {
       new Set([firstTransitionId, secondTransitionId]),
     );
     expect(new Set(rows.map((row) => row.code))).toEqual(
-      new Set(['LOCATION_UPDATED', 'LOCATION_SUPERSEDED']),
+      new Set(["LOCATION_UPDATED", "LOCATION_SUPERSEDED"]),
     );
   });
 
-  it('supersedes an older automatic command after a manual transition commits elsewhere', async () => {
-    const companyId = await createCompany('manual-before-auto');
-    const user = await createPlainUser(companyId, 'manual-before-auto-user');
-    const manualSpaceId = await createSpace(companyId, 'manual-before-auto-manual');
-    const autoSpaceId = await createSpace(companyId, 'manual-before-auto-auto');
+  it("supersedes an older automatic command after a manual transition commits elsewhere", async () => {
+    const companyId = await createCompany("manual-before-auto");
+    const user = await createPlainUser(companyId, "manual-before-auto-user");
+    const manualSpaceId = await createSpace(
+      companyId,
+      "manual-before-auto-manual",
+    );
+    const autoSpaceId = await createSpace(companyId, "manual-before-auto-auto");
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     const before = await userPlacement(user.id);
     await activateAtomic();
 
@@ -755,9 +973,9 @@ describe('presence-db Phase 3 exit-gate races', () => {
         sessionId,
         transitionId: randomUUID(),
         targetSpaceId: manualSpaceId,
-        reason: 'manual-enter',
+        reason: "manual-enter",
       }),
-    ).resolves.toMatchObject({ code: 'LOCATION_UPDATED' });
+    ).resolves.toMatchObject({ code: "LOCATION_UPDATED" });
     const afterManual = await userPlacement(user.id);
 
     const auto = await transition({
@@ -766,23 +984,31 @@ describe('presence-db Phase 3 exit-gate races', () => {
       sessionId,
       transitionId: randomUUID(),
       targetSpaceId: autoSpaceId,
-      reason: 'auto-rejoin',
+      reason: "auto-rejoin",
       expectedLocationVersion: before.location_version,
     });
-    expect(auto.code).toBe('LOCATION_SUPERSEDED');
+    expect(auto.code).toBe("LOCATION_SUPERSEDED");
     await expect(userPlacement(user.id)).resolves.toEqual(afterManual);
     expect(await openLogCount(user.id, manualSpaceId)).toBe(1);
     expect(await openLogCount(user.id, autoSpaceId)).toBe(0);
   });
 
-  it('denies same-target private entry after access is removed and revision changes', async () => {
-    const companyId = await createCompany('same-target-private');
-    const user = await createPlainUser(companyId, 'same-target-private-user');
-    const privateSpaceId = await createSpace(companyId, 'same-target-private-space', {
-      accessControl: { isPublic: false, allowedUsers: [user.id] },
-    });
+  it("denies same-target private entry after access is removed and revision changes", async () => {
+    const companyId = await createCompany("same-target-private");
+    const user = await createPlainUser(companyId, "same-target-private-user");
+    const privateSpaceId = await createSpace(
+      companyId,
+      "same-target-private-space",
+      {
+        accessControl: { isPublic: false, allowedUsers: [user.id] },
+      },
+    );
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     await activateAtomic();
 
     await expect(
@@ -792,9 +1018,9 @@ describe('presence-db Phase 3 exit-gate races', () => {
         sessionId,
         transitionId: randomUUID(),
         targetSpaceId: privateSpaceId,
-        reason: 'manual-enter',
+        reason: "manual-enter",
       }),
-    ).resolves.toMatchObject({ code: 'LOCATION_UPDATED' });
+    ).resolves.toMatchObject({ code: "LOCATION_UPDATED" });
     const afterEntry = await userPlacement(user.id);
     const beforeRevision = await revisionState(user.id, privateSpaceId);
 
@@ -815,29 +1041,33 @@ describe('presence-db Phase 3 exit-gate races', () => {
       sessionId,
       transitionId: randomUUID(),
       targetSpaceId: privateSpaceId,
-      reason: 'manual-enter',
+      reason: "manual-enter",
     });
     expect(denied).toMatchObject({
       ok: false,
-      code: 'SPACE_ACCESS_DENIED',
+      code: "SPACE_ACCESS_DENIED",
       already_applied: false,
     });
     await expect(userPlacement(user.id)).resolves.toEqual(afterEntry);
     expect(await openLogCount(user.id, privateSpaceId)).toBe(1);
   });
 
-  it('returns uncached SESSION_INVALID when a session expires while the transition waits on the user lock', async () => {
-    const companyId = await createCompany('expiry-lock-wait');
-    const user = await createPlainUser(companyId, 'expiry-lock-wait-user');
-    const spaceId = await createSpace(companyId, 'expiry-lock-wait-space');
+  it("returns uncached SESSION_INVALID when a session expires while the transition waits on the user lock", async () => {
+    const companyId = await createCompany("expiry-lock-wait");
+    const user = await createPlainUser(companyId, "expiry-lock-wait-user");
+    const spaceId = await createSpace(companyId, "expiry-lock-wait-space");
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     const before = await userPlacement(user.id);
     const transitionId = randomUUID();
     await activateAtomic();
 
     await withPgClient(async (connectionA) => {
-      await connectionA.query('begin');
+      await connectionA.query("begin");
       try {
         await connectionA.query(
           `select id from public.users where id = $1 for no key update`,
@@ -849,7 +1079,7 @@ describe('presence-db Phase 3 exit-gate races', () => {
           sessionId,
           transitionId,
           targetSpaceId: spaceId,
-          reason: 'manual-enter',
+          reason: "manual-enter",
         });
         await waitForTransitionLockWait();
         await fixtures.sql(
@@ -858,14 +1088,14 @@ describe('presence-db Phase 3 exit-gate races', () => {
            where id = $1`,
           [sessionId],
         );
-        await connectionA.query('commit');
+        await connectionA.query("commit");
         await expect(transitionPromise).resolves.toMatchObject({
           ok: false,
-          code: 'SESSION_INVALID',
+          code: "SESSION_INVALID",
           already_applied: false,
         });
       } finally {
-        await connectionA.query('rollback').catch(() => undefined);
+        await connectionA.query("rollback").catch(() => undefined);
       }
     });
 
@@ -874,14 +1104,18 @@ describe('presence-db Phase 3 exit-gate races', () => {
     expect(await transitionRowCount(user.id, transitionId)).toBe(0);
   });
 
-  it('keeps presence snapshots internally consistent during concurrent commits', async () => {
-    const companyId = await createCompany('snapshot-race');
-    const user = await createPlainUser(companyId, 'snapshot-race-user');
-    const peer = await createPlainUser(companyId, 'snapshot-race-peer');
-    const spaceAId = await createSpace(companyId, 'snapshot-race-a');
-    const spaceBId = await createSpace(companyId, 'snapshot-race-b');
+  it("keeps presence snapshots internally consistent during concurrent commits", async () => {
+    const companyId = await createCompany("snapshot-race");
+    const user = await createPlainUser(companyId, "snapshot-race-user");
+    const peer = await createPlainUser(companyId, "snapshot-race-peer");
+    const spaceAId = await createSpace(companyId, "snapshot-race-a");
+    const spaceBId = await createSpace(companyId, "snapshot-race-b");
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     const expectedUserIds = new Set([peer.id, user.id]);
     await activateAtomic();
 
@@ -895,12 +1129,12 @@ describe('presence-db Phase 3 exit-gate races', () => {
           sessionId,
           transitionId: randomUUID(),
           targetSpaceId,
-          reason: 'manual-enter',
+          reason: "manual-enter",
         }),
       ]);
 
       expect(result.ok).toBe(true);
-      expect(typeof snapshot.serverTime).toBe('string');
+      expect(typeof snapshot.serverTime).toBe("string");
       expect(snapshot.companyId).toBe(companyId);
       expect(snapshot.viewerUserId).toBe(user.id);
       const ids = snapshot.users.map((snapshotUser) => snapshotUser.id);
@@ -915,50 +1149,63 @@ describe('presence-db Phase 3 exit-gate races', () => {
     }
   });
 
-  it('keeps state consistent when atomic maintenance starts while a transition is mid-flight', async () => {
-    const companyId = await createCompany('atomic-maintenance-race');
-    const user = await createPlainUser(companyId, 'atomic-maintenance-race-user');
-    const spaceId = await createSpace(companyId, 'atomic-maintenance-race-space');
+  it("keeps state consistent when atomic maintenance starts while a transition is mid-flight", async () => {
+    const companyId = await createCompany("atomic-maintenance-race");
+    const user = await createPlainUser(
+      companyId,
+      "atomic-maintenance-race-user",
+    );
+    const spaceId = await createSpace(
+      companyId,
+      "atomic-maintenance-race-space",
+    );
     const authSessionId = randomUUID();
-    const sessionId = await seedSession({ companyId, userId: user.id, authSessionId });
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
     const transitionId = randomUUID();
     await activateAtomic();
 
-    const outcome = await withPgClient<TransitionResult | Error>(async (connectionA) => {
-      await connectionA.query('begin');
-      try {
-        await connectionA.query(
-          `select id from public.users where id = $1 for no key update`,
-          [user.id],
-        );
-        const transitionPromise = transition({
-          userId: user.id,
-          authSessionId,
-          sessionId,
-          transitionId,
-          targetSpaceId: spaceId,
-          reason: 'manual-enter',
-        }).catch((error: unknown) =>
-          error instanceof Error ? error : new Error(String(error)),
-        );
-        await waitForTransitionLockWait();
-        await fixtures.sql(`select public.enter_atomic_presence_maintenance($1, $2)`, [
-          randomUUID(),
-          'exit gate mid-flight transition rehearsal',
-        ]);
-        await connectionA.query('commit');
-        return transitionPromise;
-      } finally {
-        await connectionA.query('rollback').catch(() => undefined);
-      }
-    });
+    const outcome = await withPgClient<TransitionResult | Error>(
+      async (connectionA) => {
+        await connectionA.query("begin");
+        try {
+          await connectionA.query(
+            `select id from public.users where id = $1 for no key update`,
+            [user.id],
+          );
+          const transitionPromise = transition({
+            userId: user.id,
+            authSessionId,
+            sessionId,
+            transitionId,
+            targetSpaceId: spaceId,
+            reason: "manual-enter",
+          }).catch((error: unknown) =>
+            error instanceof Error ? error : new Error(String(error)),
+          );
+          await waitForTransitionLockWait();
+          await fixtures.sql(
+            `select public.enter_atomic_presence_maintenance($1, $2)`,
+            [randomUUID(), "exit gate mid-flight transition rehearsal"],
+          );
+          await connectionA.query("commit");
+          return transitionPromise;
+        } finally {
+          await connectionA.query("rollback").catch(() => undefined);
+        }
+      },
+    );
 
-    if (outcome instanceof Error) {
-      expect(outcome.message).toMatch(/PRESENCE_MAINTENANCE/);
-      expect(await transitionRowCount(user.id, transitionId)).toBe(0);
-    } else {
-      expect(outcome.code).toBe('LOCATION_UPDATED');
-    }
+    expect(outcome).not.toBeInstanceOf(Error);
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "PRESENCE_MAINTENANCE",
+      already_applied: false,
+    });
+    expect(await transitionRowCount(user.id, transitionId)).toBe(0);
 
     const placement = await userPlacement(user.id);
     const [partial] = await fixtures.sql<CountRow>(
@@ -975,72 +1222,125 @@ describe('presence-db Phase 3 exit-gate races', () => {
          )`,
       [user.id],
     );
-    expect(partial?.count).toBe('0');
-    if (placement.current_space_id === spaceId) {
-      expect(await openLogCount(user.id, spaceId)).toBe(1);
-      await expect(sessionPlacement(sessionId)).resolves.toMatchObject({
-        space_id: spaceId,
-        placement_version: placement.location_version,
-      });
-    }
+    expect(partial?.count).toBe("0");
+    expect(placement.current_space_id).toBeNull();
+    expect(await openLogCount(user.id)).toBe(0);
   });
 
-  it('allows only register-first or logout-first outcomes across 50 register-vs-logout races', async () => {
-    const companyId = await createCompany('register-logout-race');
-    const user: AuthedUser = await createAuthedUser(fixtures, NS, {
-      key: `exit-register-logout-${randomUUID()}`,
-      companyId,
-      displayName: 'Phase 3 Exit Register Logout',
-      role: 'member',
-    });
-    await activateAtomic();
+  it("rejects an A-scoped registration after waiting on an A-to-B membership change", async () => {
+    const companyAId = await createCompany("register-scope-a");
+    const companyBId = await createCompany("register-scope-b");
+    const user = await createPlainUser(companyAId, "register-scope-user");
+    const authSessionId = randomUUID();
 
-    for (let i = 0; i < 50; i += 1) {
-      const authSessionId = randomUUID();
-      const registrationId = randomUUID();
-      const transitionId = randomUUID();
+    const result = await withPgClient(async (lockClient) => {
+      let registration: Promise<RegisterResult> | null = null;
+      await lockClient.query("begin");
+      try {
+        await lockClient.query(
+          `select pg_catalog.set_config(
+             'request.jwt.claims', '{"role":"service_role"}', true
+           )`,
+        );
+        await lockClient.query(
+          `update public.users set company_id = $1 where id = $2`,
+          [companyBId, user.id],
+        );
 
-      const [registered, logout] = await Promise.all([
-        registerSession(user.appUserId, authSessionId, registrationId),
-        transition({
-          userId: user.appUserId,
+        registration = registerSession(
+          user.id,
           authSessionId,
-          sessionId: null,
-          transitionId,
-          targetSpaceId: null,
-          reason: 'logout',
-        }),
-      ]);
-
-      expect(logout.ok).toBe(true);
-      if (registered.ok) {
-        await expect(sessionPlacement(registered.sessionId)).resolves.toMatchObject({
-          retired_at: expect.any(Date),
-          retirement_reason: 'logout',
-        });
-      } else {
-        expect(registered.code).toBe('AUTH_SESSION_REVOKED');
+          randomUUID(),
+          companyAId,
+        );
+        await waitForRegistrationLockWait();
+        await lockClient.query("commit");
+        return await registration;
+      } catch (error) {
+        await lockClient.query("rollback").catch(() => undefined);
+        if (registration) await registration.catch(() => undefined);
+        throw error;
       }
-      expect(await activeAuthSessionCount(user.appUserId, authSessionId)).toBe(0);
+    });
 
-      await fixtures.sql(
-        `delete from public.location_transition_requests
-         where user_id = $1
-           and auth_session_id = $2`,
-        [user.appUserId, authSessionId],
-      );
-      await fixtures.sql(
-        `delete from public.user_presence_sessions
-         where user_id = $1
-           and auth_session_id = $2`,
-        [user.appUserId, authSessionId],
-      );
-      await fixtures.sql(
-        `delete from public.revoked_presence_auth_sessions
-         where user_id = $1
-           and auth_session_id = $2`,
-        [user.appUserId, authSessionId],
-      );
-    }
+    expect(result).toEqual({
+      ok: false,
+      code: "PRESENCE_COMPANY_SCOPE_CHANGED",
+    });
+    expect(await activeAuthSessionCount(user.id, authSessionId)).toBe(0);
   });
+
+  it(
+    presenceConcurrencyTestName(
+      "45-register-logout",
+      `allows only register-first or logout-first outcomes across ${REGISTER_LOGOUT_ITERATIONS} races`,
+    ),
+    async () => {
+      const companyId = await createCompany("register-logout-race");
+      const user: AuthedUser = await createAuthedUser(fixtures, NS, {
+        key: `exit-register-logout-${randomUUID()}`,
+        companyId,
+        displayName: "Phase 3 Exit Register Logout",
+        role: "member",
+      });
+      await activateAtomic();
+
+      for (let i = 0; i < REGISTER_LOGOUT_ITERATIONS; i += 1) {
+        const authSessionId = randomUUID();
+        const registrationId = randomUUID();
+        const transitionId = randomUUID();
+
+        const [registered, logout] = await Promise.all([
+          registerSession(
+            user.appUserId,
+            authSessionId,
+            registrationId,
+            companyId,
+          ),
+          transition({
+            userId: user.appUserId,
+            authSessionId,
+            sessionId: null,
+            transitionId,
+            targetSpaceId: null,
+            reason: "logout",
+          }),
+        ]);
+
+        expect(logout.ok).toBe(true);
+        if (registered.ok) {
+          await expect(
+            sessionPlacement(registered.sessionId),
+          ).resolves.toMatchObject({
+            retired_at: expect.any(Date),
+            retirement_reason: "logout",
+          });
+        } else {
+          expect(registered.code).toBe("AUTH_SESSION_REVOKED");
+        }
+        expect(
+          await activeAuthSessionCount(user.appUserId, authSessionId),
+        ).toBe(0);
+
+        await fixtures.sql(
+          `delete from public.location_transition_requests
+         where user_id = $1
+           and auth_session_id = $2`,
+          [user.appUserId, authSessionId],
+        );
+        await fixtures.sql(
+          `delete from public.user_presence_sessions
+         where user_id = $1
+           and auth_session_id = $2`,
+          [user.appUserId, authSessionId],
+        );
+        await fixtures.sql(
+          `delete from public.revoked_presence_auth_sessions
+         where user_id = $1
+           and auth_session_id = $2`,
+          [user.appUserId, authSessionId],
+        );
+      }
+    },
+  );
 });

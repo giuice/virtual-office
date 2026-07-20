@@ -3,7 +3,8 @@
 
 
 import { useReducerState } from '@/hooks/useReducerState';
-import { redirect } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ function AuthLoadingScreen({ message }: { message: string }) {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useReducerState('');
   const [password, setPassword] = useReducerState('');
   const [isLoading, setIsLoading] = useReducerState(false);
@@ -46,6 +48,15 @@ export default function LoginPage() {
     actionLoading,
   } = useAuth();
   const { isLoading: companyLoading, company } = useCompany();
+  const redirectTarget = user && !companyLoading
+    ? (company ? '/floor-plan' : '/onboarding')
+    : null;
+
+  useEffect(() => {
+    if (!redirectTarget) return;
+    const redirectTimer = window.setTimeout(() => router.replace(redirectTarget), 0);
+    return () => window.clearTimeout(redirectTimer);
+  }, [redirectTarget, router]);
 
   const isBusy = isLoading || actionLoading;
   const isDisabled = isBusy || !isAuthReady;
@@ -54,8 +65,8 @@ export default function LoginPage() {
     return <AuthLoadingScreen message="Restaurando sessão..." />;
   }
 
-  if (user && !companyLoading) {
-    redirect(company ? '/floor-plan' : '/onboarding');
+  if (redirectTarget) {
+    return <AuthLoadingScreen message="Redirecionando..." />;
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

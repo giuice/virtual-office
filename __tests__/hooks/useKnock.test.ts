@@ -1,7 +1,7 @@
 // src/hooks/__tests__/useKnock.test.ts
 // Story 3.16: Knock to Enter - Unit Tests for useKnock hook
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useKnock } from '@/hooks/useKnock';
 
 // Mock localStorage
@@ -18,6 +18,7 @@ const localStorageMock = (() => {
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 describe('useKnock', () => {
+	const renderUseKnock = () => renderHook(() => useKnock('company-1', 'user-1'));
 	beforeEach(() => {
 		vi.useFakeTimers();
 		localStorageMock.clear();
@@ -30,7 +31,7 @@ describe('useKnock', () => {
 
 	describe('Initial State', () => {
 		it('should start with idle status', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 			expect(result.current.status).toBe('idle');
 			expect(result.current.targetSpaceId).toBeNull();
 			expect(result.current.cooldownRemaining).toBe(0);
@@ -39,7 +40,7 @@ describe('useKnock', () => {
 
 	describe('Knock Action', () => {
 		it('should transition to knocking status when knock is called', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -50,7 +51,7 @@ describe('useKnock', () => {
 		});
 
 		it('should allow knock when canKnock returns true', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			expect(result.current.canKnock('space-123')).toBe(true);
 		});
@@ -58,7 +59,7 @@ describe('useKnock', () => {
 
 	describe('Approval Handling', () => {
 		it('should transition to approved status on handleApproval', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -74,7 +75,7 @@ describe('useKnock', () => {
 		});
 
 		it('should reset to idle after reset is called', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -89,7 +90,7 @@ describe('useKnock', () => {
 
 	describe('Denial Handling', () => {
 		it('should transition to cooldown status on handleDenial', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -109,7 +110,7 @@ describe('useKnock', () => {
 		});
 
 		it('should start cooldown after denial', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -133,7 +134,7 @@ describe('useKnock', () => {
 			localStorageMock.clear();
 			vi.clearAllMocks();
 
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -155,7 +156,7 @@ describe('useKnock', () => {
 		});
 
 		it('should block knock during cooldown', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -168,7 +169,7 @@ describe('useKnock', () => {
 
 	describe('Timeout Handling', () => {
 		it('should auto-timeout after 30 seconds', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');
@@ -187,7 +188,7 @@ describe('useKnock', () => {
 
 	describe('Cancel Action', () => {
 		it('should reset to idle when cancelled', () => {
-			const { result } = renderHook(() => useKnock());
+			const { result } = renderUseKnock();
 
 			act(() => {
 				result.current.knock('space-123');

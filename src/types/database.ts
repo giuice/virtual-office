@@ -49,7 +49,7 @@ export interface User {
   supabase_uid: string; // Now links to Supabase Auth
   email: string;
   displayName: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
   status: UserStatus;
   statusMessage?: string;
   preferences: {
@@ -69,10 +69,15 @@ export interface UserPresenceData {
   avatarUrl?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
   dbStatus?: UserStatus;
+  availabilityStatus?: 'online' | 'away' | 'busy';
+  displayStatus?: 'online' | 'away' | 'busy' | 'offline';
   statusMessage?: string;
   isOnline?: boolean;
   lastActive?: TimeStampType;
   currentSpaceId: string | null;
+  locationVersion?: number;
+  isConnected?: boolean;
+  isOccupyingCurrentSpace?: boolean;
   // Added flag to track avatar loading state
   avatarLoading?: boolean;
   // Added flag to track avatar error state

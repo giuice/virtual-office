@@ -155,6 +155,17 @@ describe('KnockBanner', () => {
     expect(onApprove).toHaveBeenCalledTimes(1);
   });
 
+  it('does not submit twice across pointerdown and click', () => {
+    const onApprove = vi.fn();
+    render(<KnockBanner requesterName="Taylor Knock" onApprove={onApprove} onDeny={vi.fn()} />);
+
+    const approveButton = screen.getByRole('button', { name: /let taylor knock in/i });
+    fireEvent.pointerDown(approveButton);
+    fireEvent.click(approveButton);
+
+    expect(onApprove).toHaveBeenCalledTimes(1);
+  });
+
   it('calls onDeny when Deny button clicked', () => {
     const onDeny = vi.fn();
     render(<KnockBanner requesterName="Taylor Knock" onApprove={vi.fn()} onDeny={onDeny} />);
@@ -177,11 +188,11 @@ describe('KnockBanner', () => {
     expect(parentClick).not.toHaveBeenCalled();
   });
 
-  it('has relative positioning with positive z-index to stay above overlaying badges', () => {
+  it('stays above context menus and detail panels', () => {
     render(<KnockBanner requesterName="Taylor Knock" onApprove={vi.fn()} onDeny={vi.fn()} />);
 
     const banner = screen.getByRole('alert');
-    expect(banner).toHaveClass('relative', 'z-10');
+    expect(banner).toHaveClass('relative', 'z-[60]');
   });
 });
 

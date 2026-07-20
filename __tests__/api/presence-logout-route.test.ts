@@ -9,14 +9,23 @@ const AUTH_SESSION_ID = '77777777-7777-4777-8777-777777777777';
 const TRANSITION_ID = '22222222-2222-4222-8222-222222222222';
 
 const mockAuthGetClaims = vi.fn();
+const mockAuthGetUser = vi.fn();
 const mockSignOut = vi.fn();
 const mockFindBySupabaseUid = vi.fn();
 const mockRevokedMaybeSingle = vi.fn();
 const mockLogoutReplayMaybeSingle = vi.fn();
 const mockRpc = vi.fn();
+const { mockEmitPresenceEvent } = vi.hoisted(() => ({
+  mockEmitPresenceEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/presence/observability', () => ({
+  emitPresenceEvent: mockEmitPresenceEvent,
+}));
 
 const mockAuthedClient = {
   auth: {
+    getUser: () => mockAuthGetUser(),
     getClaims: () => mockAuthGetClaims(),
     signOut: (options: { scope: 'local' }) => mockSignOut(options),
   },
@@ -84,6 +93,10 @@ function makeAuthenticatedUser(overrides: Partial<User> = {}): User {
 }
 
 function primeAuth(): void {
+  mockAuthGetUser.mockResolvedValue({
+    data: { user: { id: AUTH_USER_ID } },
+    error: null,
+  });
   mockAuthGetClaims.mockResolvedValue({
     data: {
       claims: {
@@ -118,6 +131,8 @@ function rpcRow(overrides: Record<string, unknown> = {}): Record<string, unknown
     location_version: 24,
     already_applied: false,
     authorized_by: null,
+    previous_location_version: 23,
+    authorization_mode: null,
     ...overrides,
   };
 }
@@ -131,7 +146,7 @@ describe('/api/presence/logout', () => {
     vi.clearAllMocks();
     primeAuth();
     mockRpc.mockImplementation((name: string) => {
-      if (name === 'transition_user_location') {
+      if (name === 'transition_user_location_observed') {
         return Promise.resolve({ data: rpcRow(), error: null });
       }
 
@@ -153,7 +168,7 @@ describe('/api/presence/logout', () => {
       code: 'LOCATION_UPDATED',
       transitionId: TRANSITION_ID,
     });
-    expect(mockRpc).toHaveBeenCalledWith('transition_user_location', {
+    expect(mockRpc).toHaveBeenCalledWith('transition_user_location_observed', {
       p_user_id: APP_USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: null,
@@ -163,6 +178,11 @@ describe('/api/presence/logout', () => {
       p_knock_request_id: null,
       p_expected_location_version: null,
     });
+    expect(mockEmitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'logout',
+      previousLocationVersion: 23,
+      resultLocationVersion: 24,
+    }));
     expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(mockRpc).toHaveBeenCalledWith('confirm_presence_auth_session_revoked', {
       p_user_id: APP_USER_ID,
@@ -180,7 +200,7 @@ describe('/api/presence/logout', () => {
       error: null,
     });
     mockRpc.mockImplementation((name: string) => {
-      if (name === 'transition_user_location') {
+      if (name === 'transition_user_location_observed') {
         return Promise.resolve({
           data: rpcRow({ code: 'LOCATION_UNCHANGED', already_applied: true }),
           error: null,
@@ -223,7 +243,7 @@ describe('/api/presence/logout', () => {
       transitionId: TRANSITION_ID,
     });
     expect(mockRpc).not.toHaveBeenCalledWith(
-      'transition_user_location',
+      'transition_user_location_observed',
       expect.anything()
     );
     expect(mockSignOut).not.toHaveBeenCalled();
@@ -231,7 +251,7 @@ describe('/api/presence/logout', () => {
 
   it('does not clear cookies when the logout transition fails', async () => {
     mockRpc.mockImplementation((name: string) => {
-      if (name === 'transition_user_location') {
+      if (name === 'transition_user_location_observed') {
         return Promise.resolve({
           data: null,
           error: { message: 'raw database failure must not leak' },
@@ -258,7 +278,7 @@ describe('/api/presence/logout', () => {
   it('treats confirm rpc failure as non-fatal after local sign-out', async () => {
     const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockRpc.mockImplementation((name: string) => {
-      if (name === 'transition_user_location') {
+      if (name === 'transition_user_location_observed') {
         return Promise.resolve({ data: rpcRow(), error: null });
       }
 

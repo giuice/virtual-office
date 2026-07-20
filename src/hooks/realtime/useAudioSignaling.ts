@@ -45,7 +45,9 @@ export function useAudioSignaling({
 }: UseAudioSignalingOptions): SignalingState {
 	const channelRef = useRef<RealtimeChannel | null>(null);
 	const isConnectedRef = useRef(false);
+	const isMutedRef = useRef(isMuted);
 	const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
+	isMutedRef.current = isMuted;
 
 	// Handle incoming handshake
 	const handleHandshake = useCallback(
@@ -106,10 +108,14 @@ export function useAudioSignaling({
 	useEffect(() => {
 		const channel = channelRef.current;
 		if (channel && isConnectedRef.current && currentUserId) {
-			channel.track({
+			void channel.track({
 				user_id: currentUserId,
 				is_muted: isMuted,
 				online_at: new Date().toISOString(),
+			}).catch((error) => {
+				if (channelRef.current === channel) {
+					console.error('[AudioSignaling] Failed to update presence:', error);
+				}
 			});
 		}
 	}, [isMuted, currentUserId]);
@@ -128,49 +134,90 @@ export function useAudioSignaling({
 				presence: { key: currentUserId },
 			},
 		});
+		let cancelled = false;
+		channelRef.current = channel;
+		const isCurrentChannel = () => !cancelled && channelRef.current === channel;
+		const runCurrentHandler = (handler: () => Promise<void>) => {
+			if (!isCurrentChannel()) return;
+			void handler().catch((error: unknown) => {
+				if (isCurrentChannel()) {
+					console.error('[AudioSignaling] Signaling handler failed:', error);
+				}
+			});
+		};
 
 		// Set up event listeners
 		channel
-			.on('broadcast', { event: 'handshake' }, ({ payload }) => handleHandshake(payload))
-			.on('broadcast', { event: 'offer' }, ({ payload }) => handleOffer(payload))
-			.on('broadcast', { event: 'answer' }, ({ payload }) => handleAnswer(payload))
-			.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => handleIceCandidate(payload))
-			.on('presence', { event: 'sync' }, () => updatePresenceState(channel))
-			.on('presence', { event: 'join' }, () => updatePresenceState(channel))
-			.on('presence', { event: 'leave' }, () => updatePresenceState(channel))
-			.subscribe(async (status) => {
+			.on('broadcast', { event: 'handshake' }, ({ payload }) => {
+				runCurrentHandler(() => handleHandshake(payload));
+			})
+			.on('broadcast', { event: 'offer' }, ({ payload }) => {
+				runCurrentHandler(() => handleOffer(payload));
+			})
+			.on('broadcast', { event: 'answer' }, ({ payload }) => {
+				runCurrentHandler(() => handleAnswer(payload));
+			})
+			.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
+				runCurrentHandler(() => handleIceCandidate(payload));
+			})
+			.on('presence', { event: 'sync' }, () => {
+				if (isCurrentChannel()) updatePresenceState(channel);
+			})
+			.on('presence', { event: 'join' }, () => {
+				if (isCurrentChannel()) updatePresenceState(channel);
+			})
+			.on('presence', { event: 'leave' }, () => {
+				if (isCurrentChannel()) updatePresenceState(channel);
+			})
+			.subscribe((status) => {
 				// console.log('[AudioSignaling] Channel status:', status);
 
 				if (status === 'SUBSCRIBED') {
-					isConnectedRef.current = true;
-					webrtcManager.setSignalingChannel(channel);
+					void (async () => {
+						if (cancelled || channelRef.current !== channel) return;
+						isConnectedRef.current = true;
+						webrtcManager.setSignalingChannel(channel);
 
-					// Track initial state
-					await channel.track({
-						user_id: currentUserId,
-						is_muted: isMuted,
-						online_at: new Date().toISOString(),
-					});
+						try {
+							// Track initial state before announcing this peer.
+							await channel.track({
+								user_id: currentUserId,
+								is_muted: isMutedRef.current,
+								online_at: new Date().toISOString(),
+							});
 
-					// Broadcast handshake
-					await webrtcManager.broadcastHandshake();
+							// A space/manager transition may retire this subscription while
+							// track is in flight. Never handshake through a stale manager.
+							if (cancelled || channelRef.current !== channel) return;
+							await webrtcManager.broadcastHandshake();
+						} catch (error) {
+							if (!cancelled && channelRef.current === channel) {
+								isConnectedRef.current = false;
+								console.error('[AudioSignaling] Failed to initialize signaling:', error);
+							}
+						}
+					})();
 				} else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-					isConnectedRef.current = false;
+					if (channelRef.current === channel) {
+						isConnectedRef.current = false;
+					}
 				}
 			});
 
-		channelRef.current = channel;
-
 		// Cleanup on unmount
 		return () => {
+			cancelled = true;
 			console.log('[AudioSignaling] Unsubscribing from channel:', channelName);
-			// webrtcManager.setSignalingChannel(null); // Don't null it here, let manager handle its own cleanup logic if needed
-			// But since we removed unsubscribe from manager, we must unsubscribe here
-			channel.unsubscribe();
-			channelRef.current = null;
-			isConnectedRef.current = false;
+			if (channelRef.current === channel) {
+				webrtcManager.setSignalingChannel(null);
+				channelRef.current = null;
+				isConnectedRef.current = false;
+			}
+			void supabase.removeChannel(channel).catch((error: unknown) => {
+				console.error('[AudioSignaling] Failed to remove signaling channel:', error);
+			});
 		};
-		}, [spaceId, currentUserId, webrtcManager, enabled, handleHandshake, handleOffer, handleAnswer, handleIceCandidate, updatePresenceState, isMuted]);
+		}, [spaceId, currentUserId, webrtcManager, enabled, handleHandshake, handleOffer, handleAnswer, handleIceCandidate, updatePresenceState]);
 
 	return {
 		isConnected: isConnectedRef.current,

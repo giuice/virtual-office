@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PresenceFixtures } from './fixtures';
+import {
+  ensurePresenceOpenLogUniqueIndex,
+  PresenceFixtures,
+} from './fixtures';
 import { LOCAL_DB_URL } from './setup';
 import {
   createAuthedUser,
@@ -47,6 +50,10 @@ type TransitionResult = {
   readonly already_applied: boolean;
   readonly authorized_by: string | null;
 };
+type ObservedTransitionResult = TransitionResult & {
+  readonly previous_location_version: number | null;
+  readonly authorization_mode: 'public' | 'direct' | 'rejoin' | 'knock' | null;
+};
 type SnapshotUser = {
   readonly id: string;
   readonly displayName: string;
@@ -89,12 +96,16 @@ describe('presence-db atomic transition', () => {
 
   afterAll(async () => {
     if (fixtures) {
-      await resetRuntimeMode('legacy', null);
-      await fixtures.sql(
-        `drop index if exists public.ux_space_presence_log_one_open_per_user`,
-      );
-      await cleanupNamespacedRows();
-      await fixtures.end();
+      try {
+        await resetRuntimeMode('legacy', null);
+        await cleanupNamespacedRows();
+      } finally {
+        try {
+          await ensurePresenceOpenLogUniqueIndex(fixtures);
+        } finally {
+          await fixtures.end();
+        }
+      }
     }
   });
 
@@ -397,6 +408,39 @@ describe('presence-db atomic transition', () => {
     return row;
   }
 
+  async function observedTransition(params: {
+    readonly userId: string;
+    readonly authSessionId: string;
+    readonly sessionId: string;
+    readonly transitionId: string;
+    readonly targetSpaceId: string | null;
+    readonly reason: string;
+    readonly expectedLocationVersion: number | null;
+  }): Promise<ObservedTransitionResult> {
+    const { data, error } = await serviceClient.rpc(
+      'transition_user_location_observed',
+      {
+        p_user_id: params.userId,
+        p_auth_session_id: params.authSessionId,
+        p_session_id: params.sessionId,
+        p_transition_id: params.transitionId,
+        p_target_space_id: params.targetSpaceId,
+        p_reason: params.reason,
+        p_knock_request_id: null,
+        p_expected_location_version: params.expectedLocationVersion,
+      },
+    );
+    if (error) {
+      throw new Error(
+        `transition_user_location_observed failed: ${error.message}`,
+      );
+    }
+    const rows = data as ObservedTransitionResult[] | ObservedTransitionResult;
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('transition_user_location_observed returned no row');
+    return row;
+  }
+
   async function getSnapshot(viewerUserId: string): Promise<PresenceSnapshot> {
     const { data, error } = await serviceClient.rpc(
       'get_company_presence_snapshot',
@@ -552,6 +596,65 @@ describe('presence-db atomic transition', () => {
     }
     throw new Error('Timed out waiting for transition_user_location lock wait');
   }
+
+  it('returns transaction-authoritative previous version and authorization mode on replay', async () => {
+    const companyId = await createCompany('observed-transition');
+    const spaceId = await createSpace(companyId, 'observed-transition');
+    const user = await createPlainUser(companyId, 'observed-transition');
+    const authSessionId = randomUUID();
+    const sessionId = await seedSession({
+      companyId,
+      userId: user.id,
+      authSessionId,
+    });
+    const transitionId = randomUUID();
+
+    await activateAtomic();
+    const applied = await observedTransition({
+      userId: user.id,
+      authSessionId,
+      sessionId,
+      transitionId,
+      targetSpaceId: spaceId,
+      reason: 'manual-enter',
+      expectedLocationVersion: null,
+    });
+    expect(applied).toMatchObject({
+      ok: true,
+      code: 'LOCATION_UPDATED',
+      previous_location_version: 0,
+      location_version: 1,
+      authorization_mode: 'public',
+      already_applied: false,
+    });
+
+    const replay = await observedTransition({
+      userId: user.id,
+      authSessionId,
+      sessionId,
+      transitionId,
+      targetSpaceId: spaceId,
+      reason: 'manual-enter',
+      expectedLocationVersion: null,
+    });
+    expect(replay).toMatchObject({
+      ok: true,
+      previous_location_version: 0,
+      location_version: 1,
+      authorization_mode: 'public',
+      already_applied: true,
+    });
+
+    const [ledger] = await fixtures.sql<{
+      previous_location_version: number | null;
+    }>(
+      `select previous_location_version
+       from public.location_transition_requests
+       where user_id = $1 and transition_id = $2`,
+      [user.id, transitionId],
+    );
+    expect(ledger?.previous_location_version).toBe(0);
+  });
 
   it('returns uncached PRESENCE_MAINTENANCE in legacy mode without claiming idempotency', async () => {
     const companyId = await createCompany('legacy-mode');
@@ -1137,6 +1240,105 @@ describe('presence-db atomic transition', () => {
     });
   });
 
+  it('rolls back movement, log, session, idempotency, and grant under same-connection pg_temp knock failure injection', async () => {
+    const companyId = await createCompany('knock-consume-failure');
+    const requester = await createPlainUser(companyId, 'knock-failure-requester');
+    const responder = await createPlainUser(companyId, 'knock-failure-responder');
+    const spaceId = await createSpace(companyId, 'knock-failure-space', {
+      accessControl: { isPublic: false },
+    });
+    const authSessionId = randomUUID();
+    const sessionId = await seedSession({
+      companyId,
+      userId: requester.id,
+      authSessionId,
+    });
+    const expectedVersion = (await revisionState(requester.id, spaceId)).location_version;
+    const knockId = await seedApprovedKnock({
+      requesterId: requester.id,
+      responderId: responder.id,
+      spaceId,
+    });
+    const transitionId = randomUUID();
+    const beforeUser = await userPlacement(requester.id);
+    const beforeSession = await sessionPlacement(sessionId);
+    await activateAtomic();
+
+    await fixtures.sql('begin');
+    try {
+      await fixtures.sql(
+        `create or replace function pg_temp.fail_fixture_knock_consume()
+         returns trigger
+         language plpgsql
+         as $function$
+         begin
+           if old.id = tg_argv[0] and new.status = 'consumed' then
+             raise exception 'forced fixture knock-consume failure';
+           end if;
+           return new;
+         end
+         $function$;
+
+         create trigger fixture_knock_consume_failure
+         before update on public.knock_requests
+         for each row
+         execute function pg_temp.fail_fixture_knock_consume('${knockId}')`,
+      );
+      await fixtures.sql('savepoint before_injected_knock_transition');
+
+      await expect(
+        fixtures.sql(
+          `select *
+           from public.transition_user_location(
+             $1::uuid,
+             $2::uuid,
+             $3::uuid,
+             $4::uuid,
+             $5::uuid,
+             'knock-enter'::text,
+             $6::text,
+             $7::integer
+           )`,
+          [
+            requester.id,
+            authSessionId,
+            sessionId,
+            transitionId,
+            spaceId,
+            knockId,
+            expectedVersion,
+          ],
+        ),
+      ).rejects.toThrow(/forced fixture knock-consume failure/i);
+      await fixtures.sql('rollback to savepoint before_injected_knock_transition');
+
+      await expect(userPlacement(requester.id)).resolves.toEqual(beforeUser);
+      await expect(sessionPlacement(sessionId)).resolves.toEqual(beforeSession);
+      expect(await transitionRowCount(requester.id, transitionId)).toBe(0);
+      const [openLog] = await fixtures.sql<CountRow>(
+        `select count(*)::text as count
+         from public.space_presence_log
+         where user_id = $1 and exited_at is null`,
+        [requester.id],
+      );
+      expect(openLog?.count).toBe('0');
+      const [knock] = await fixtures.sql<{
+        readonly status: string;
+        readonly consumed_at: Date | null;
+      }>(
+        `select status, consumed_at
+         from public.knock_requests
+         where id = $1`,
+        [knockId],
+      );
+      expect(knock).toEqual({ status: 'approved', consumed_at: null });
+    } catch (error) {
+      await fixtures.sql('rollback').catch(() => undefined);
+      throw error;
+    }
+    await fixtures.sql('rollback');
+  });
+
   it('returns uncached SESSION_INVALID for expired, retired, and mismatched-auth leases', async () => {
     const companyId = await createCompany('session-invalid');
     const spaceId = await createSpace(companyId, 'session-invalid-space');
@@ -1371,6 +1573,56 @@ describe('presence-db atomic transition', () => {
       isConnected: false,
       displayStatus: 'offline',
     });
+  });
+
+  it('covers the complete connectivity by availability display and occupancy matrix', async () => {
+    const companyId = await createCompany('snapshot-status-matrix');
+    const spaceId = await createSpace(companyId, 'snapshot-status-matrix-space');
+    const statuses = ['online', 'away', 'busy', 'offline'] as const;
+    const cases: Array<{
+      user: UserRow;
+      connected: boolean;
+      rawStatus: (typeof statuses)[number];
+    }> = [];
+
+    for (const connected of [false, true]) {
+      for (const rawStatus of statuses) {
+        const user = await createPlainUser(
+          companyId,
+          `matrix-${connected ? 'connected' : 'disconnected'}-${rawStatus}`,
+        );
+        await fixtures.sql(
+          `update public.users set status = $1::public.user_status where id = $2`,
+          [rawStatus, user.id],
+        );
+        if (connected) {
+          await seedPlacedUser({
+            companyId,
+            userId: user.id,
+            spaceId,
+            authSessionId: randomUUID(),
+          });
+        }
+        cases.push({ user, connected, rawStatus });
+      }
+    }
+
+    const viewer = cases.find((entry) => entry.connected)?.user;
+    if (!viewer) throw new Error('matrix requires a connected viewer');
+    const snapshot = await getSnapshot(viewer.id);
+    const byId = new Map(snapshot.users.map((user) => [user.id, user]));
+
+    for (const entry of cases) {
+      const actual = byId.get(entry.user.id);
+      const normalizedAvailability =
+        entry.rawStatus === 'offline' ? 'online' : entry.rawStatus;
+      expect(actual).toMatchObject({
+        availabilityStatus: normalizedAvailability,
+        isConnected: entry.connected,
+        isOccupyingCurrentSpace: entry.connected,
+        displayStatus: entry.connected ? normalizedAvailability : 'offline',
+      });
+    }
   });
 
   it('hardens space deletion for browser users and service-role referenced deletes', async () => {

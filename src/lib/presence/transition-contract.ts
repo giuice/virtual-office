@@ -157,6 +157,8 @@ export const transitionRpcRowSchema = z
     location_version: z.number().int().nullable(),
     already_applied: z.boolean(),
     authorized_by: z.string().uuid().nullable().optional(),
+    previous_location_version: z.number().int().nonnegative().nullable(),
+    authorization_mode: z.enum(['public', 'direct', 'rejoin', 'knock']).nullable(),
   })
   .passthrough();
 

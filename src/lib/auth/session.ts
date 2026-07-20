@@ -1,6 +1,13 @@
 // src/lib/auth/session.ts
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { SupabaseClient, User as SupabaseAuthUser } from '@supabase/supabase-js';
+import { API_ERROR_CODES } from '@/lib/api/error-contract';
+import { jsonError } from '@/lib/api/server-error';
+import {
+  createAuthCorrelationId,
+  getAuthErrorCode,
+  recordAuthValidation,
+} from '@/lib/auth/auth-metrics';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import type { User } from '@/types/database';
@@ -62,15 +69,62 @@ type RequireAuthResult =
   | { supabase: SupabaseClient; dbUser: User; authUser: SupabaseAuthUser }
   | { errorResponse: NextResponse };
 
-export async function requireAuthUser(beforeDatabaseOperation?: () => void): Promise<RequireAuthResult> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
+interface RequireAuthUserOptions {
+  correlationId?: string;
+  pathname?: string;
+  beforeDatabaseOperation?: () => void;
+}
+
+type RequireAuthUserArgument = RequireAuthUserOptions | (() => void);
+
+function normalizeRequireAuthOptions(argument?: RequireAuthUserArgument): RequireAuthUserOptions {
+  return typeof argument === 'function' ? { beforeDatabaseOperation: argument } : (argument ?? {});
+}
+
+export async function requireAuthUser(argument?: RequireAuthUserArgument): Promise<RequireAuthResult> {
+  const { correlationId: providedCorrelationId, pathname, beforeDatabaseOperation } = normalizeRequireAuthOptions(argument);
+  const correlationId = providedCorrelationId ?? createAuthCorrelationId();
+  let refreshed = false;
+  const supabase = await createSupabaseServerClient(undefined, {
+    onAuthCookiesSet: () => {
+      refreshed = true;
+    },
+  });
+  let authResult: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+  try {
+    authResult = await supabase.auth.getUser();
+  } catch (error) {
+    recordAuthValidation({
+      correlationId,
+      boundary: 'route',
+      pathname: pathname ?? '/unattributed',
+      authMethod: 'getUser',
+      authStatus: 'error',
+      authErrorCode: getAuthErrorCode(error),
+      refreshed,
+    });
+    throw error;
+  }
+
+  const { data, error } = authResult;
+  recordAuthValidation({
+    correlationId,
+    boundary: 'route',
+    pathname: pathname ?? '/unattributed',
+    authMethod: 'getUser',
+    authStatus: error ? 'error' : data.user ? 'authenticated' : 'unauthenticated',
+    authErrorCode: getAuthErrorCode(error),
+    refreshed,
+  });
 
   if (error || !data.user) {
+    const isRateLimited = error?.status === 429;
     return {
-      errorResponse: NextResponse.json(
-        { error: 'Authentication required', code: 'UNAUTHORIZED' },
-        { status: 401 }
+      errorResponse: jsonError(
+        isRateLimited ? 429 : 401,
+        isRateLimited ? API_ERROR_CODES.RATE_LIMITED : API_ERROR_CODES.UNAUTHORIZED,
+        isRateLimited ? 'Authentication service rate limit reached' : 'Authentication required',
+        { correlationId, cause: error, context: 'requireAuthUser.getUser' }
       ),
     };
   }
@@ -82,20 +136,23 @@ export async function requireAuthUser(beforeDatabaseOperation?: () => void): Pro
     beforeDatabaseOperation?.();
     dbUser = await userRepository.findBySupabaseUid(data.user.id);
   } catch (lookupError) {
-    console.error('Auth user profile lookup failed:', lookupError);
     return {
-      errorResponse: NextResponse.json(
-        { error: 'Failed to load authenticated user profile' },
-        { status: 500 }
+      errorResponse: jsonError(
+        500,
+        API_ERROR_CODES.INTERNAL_ERROR,
+        'Failed to load authenticated user profile',
+        { correlationId, cause: lookupError, context: 'requireAuthUser.profileLookup' }
       ),
     };
   }
 
   if (!dbUser) {
     return {
-      errorResponse: NextResponse.json(
-        { error: 'Authenticated user profile not found' },
-        { status: 404 }
+      errorResponse: jsonError(
+        404,
+        API_ERROR_CODES.PROFILE_NOT_FOUND,
+        'Authenticated user profile not found',
+        { correlationId, context: 'requireAuthUser.profileLookup' }
       ),
     };
   }

@@ -3,11 +3,14 @@
 // Rule: every route resolves the requester, checks participation here, and only
 // then may use the service-role client for the mutation. RLS stays as
 // defense-in-depth, never the primary gate.
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { jsonError } from '@/lib/api/server-error';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { requireAuthUser } from '@/lib/auth/session';
 import type { User } from '@/types/database';
+
+export { jsonError } from '@/lib/api/server-error';
 
 export interface ConversationAccess {
   id: string;
@@ -38,10 +41,6 @@ export interface AuthzFailure {
 
 export function isAuthzFailure(result: object): result is AuthzFailure {
   return 'errorResponse' in result;
-}
-
-export function jsonError(status: number, code: string, message: string): NextResponse {
-  return NextResponse.json({ error: message, code }, { status });
 }
 
 async function loadConversationAccess(

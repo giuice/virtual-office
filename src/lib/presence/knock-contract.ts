@@ -30,10 +30,16 @@ export const knockRpcResultSchema = z.object({
   status: z.string().optional(),
   decision: z.enum(['APPROVE', 'DENY']).nullable().optional(),
   responderId: z.string().uuid().nullable().optional(),
+  requesterUserId: z.string().uuid().nullable().optional(),
   spaceId: z.string().uuid().optional(),
   expiresAt: z.string().optional(),
   consumedAt: z.string().nullable().optional(),
   requesterLocationVersion: z.number().int().nonnegative().optional(),
+  requesterLocationVersionBefore: z.number().int().nonnegative().nullable().optional(),
+  requesterLocationVersionAfter: z.number().int().nonnegative().nullable().optional(),
+  requesterAccessRevision: z.number().int().positive().nullable().optional(),
+  responderAccessRevision: z.number().int().positive().nullable().optional(),
+  spaceAccessRevision: z.number().int().positive().nullable().optional(),
   recipientCount: z.number().int().nonnegative().optional(),
   retryAfterSeconds: z.number().int().positive().optional(),
   usable: z.boolean().optional(),
@@ -50,6 +56,37 @@ export const knockRpcResultSchema = z.object({
     expiresAt: z.string(),
   })).optional(),
 }).passthrough();
+
+export type KnockRpcResult = z.infer<typeof knockRpcResultSchema>;
+
+export type KnockExpiryResult =
+  | 'live'
+  | 'expired'
+  | 'terminal'
+  | 'usable'
+  | 'unusable'
+  | null;
+
+export function knockExpiryResult(result: KnockRpcResult | undefined): KnockExpiryResult {
+  if (!result) return null;
+  if (result.code === 'KNOCK_EXPIRED' || result.status === 'expired') return 'expired';
+  if (result.status === 'denied' || result.status === 'consumed') return 'terminal';
+  if (result.usable === true) return 'usable';
+  if (result.usable === false) return 'unusable';
+  if (result.expiresAt) return 'live';
+  return null;
+}
+
+export function toPublicKnockRpcResult(result: KnockRpcResult): Record<string, unknown> {
+  const publicResult: Record<string, unknown> = { ...result };
+  delete publicResult.requesterUserId;
+  delete publicResult.requesterLocationVersionBefore;
+  delete publicResult.requesterLocationVersionAfter;
+  delete publicResult.requesterAccessRevision;
+  delete publicResult.responderAccessRevision;
+  delete publicResult.spaceAccessRevision;
+  return publicResult;
+}
 
 const KNOCK_ERROR_STATUS: Readonly<Record<string, number>> = {
   INVALID_REQUEST: 400,

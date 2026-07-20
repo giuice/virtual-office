@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { presenceStorageKeys } from '@/lib/presence/storage-keys';
 
 /**
  * The status of a knock request.
@@ -39,14 +40,22 @@ export interface UseKnockReturn {
 
 const COOLDOWN_DURATION_MS = 60 * 1000; // 60 seconds cooldown after denial
 const TIMEOUT_DURATION_MS = 30 * 1000; // 30 seconds wait for response
-const STORAGE_KEY_PREFIX = 'vo-knock-cooldown-';
+function getCooldownStorageKey(
+	companyId: string | null,
+	userId: string | null,
+	spaceId: string
+): string | null {
+	return companyId && userId ? presenceStorageKeys.knockCooldown(companyId, userId, spaceId) : null;
+}
 
 /**
  * Get cooldown expiry timestamp from localStorage for a given space.
  */
-function getCooldownExpiry(spaceId: string): number | null {
+function getCooldownExpiry(companyId: string | null, userId: string | null, spaceId: string): number | null {
 	if (typeof window === 'undefined') return null;
-	const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${spaceId}`);
+	const key = getCooldownStorageKey(companyId, userId, spaceId);
+	if (!key) return null;
+	const stored = localStorage.getItem(key);
 	if (!stored) return null;
 	return parseInt(stored, 10);
 }
@@ -54,28 +63,39 @@ function getCooldownExpiry(spaceId: string): number | null {
 /**
  * Set cooldown expiry timestamp in localStorage for a given space.
  */
-function setCooldownExpiry(spaceId: string, expiryTimestamp: number): void {
+function setCooldownExpiry(
+	companyId: string | null,
+	userId: string | null,
+	spaceId: string,
+	expiryTimestamp: number
+): void {
 	if (typeof window === 'undefined') return;
-	localStorage.setItem(`${STORAGE_KEY_PREFIX}${spaceId}`, expiryTimestamp.toString());
+	const key = getCooldownStorageKey(companyId, userId, spaceId);
+	if (key) localStorage.setItem(key, expiryTimestamp.toString());
 }
 
 /**
  * Clear cooldown from localStorage for a given space.
  */
-function clearCooldownExpiry(spaceId: string): void {
+function clearCooldownExpiry(companyId: string | null, userId: string | null, spaceId: string): void {
 	if (typeof window === 'undefined') return;
-	localStorage.removeItem(`${STORAGE_KEY_PREFIX}${spaceId}`);
+	const key = getCooldownStorageKey(companyId, userId, spaceId);
+	if (key) localStorage.removeItem(key);
 }
 
 /**
  * Get remaining cooldown in seconds for a given space.
  */
-function getRemainingCooldownSeconds(spaceId: string): number {
-	const expiry = getCooldownExpiry(spaceId);
+function getRemainingCooldownSeconds(
+	companyId: string | null,
+	userId: string | null,
+	spaceId: string
+): number {
+	const expiry = getCooldownExpiry(companyId, userId, spaceId);
 	if (!expiry) return 0;
 	const remaining = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
 	if (remaining <= 0) {
-		clearCooldownExpiry(spaceId);
+		clearCooldownExpiry(companyId, userId, spaceId);
 	}
 	return remaining;
 }
@@ -86,7 +106,7 @@ function getRemainingCooldownSeconds(spaceId: string): number {
  * States: idle -> knocking -> (approved | denied | timeout)
  * Denial triggers a cooldown period (persisted in localStorage).
  */
-export function useKnock(): UseKnockReturn {
+export function useKnock(companyId: string | null = null, userId: string | null = null): UseKnockReturn {
 	const [status, setStatus] = useState<KnockStatus>('idle');
 	const [targetSpaceId, setTargetSpaceId] = useState<string | null>(null);
 	const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
@@ -108,7 +128,7 @@ export function useKnock(): UseKnockReturn {
 	 * Returns false if the user is in cooldown for that space.
 	 */
 	const canKnock = useCallback((spaceId: string): boolean => {
-		const remaining = getRemainingCooldownSeconds(spaceId);
+		const remaining = getRemainingCooldownSeconds(companyId, userId, spaceId);
 		if (remaining > 0) {
 			setStatus('cooldown');
 			setTargetSpaceId(spaceId);
@@ -116,31 +136,31 @@ export function useKnock(): UseKnockReturn {
 			return false; // Still in cooldown
 		}
 		return status === 'idle' || status === 'cooldown';
-	}, [status]);
+	}, [companyId, status, userId]);
 
 	/**
 	 * Get the remaining cooldown for a space in seconds.
 	 */
 	const getCooldownRemaining = useCallback((spaceId: string): number => {
-		return getRemainingCooldownSeconds(spaceId);
-	}, []);
+		return getRemainingCooldownSeconds(companyId, userId, spaceId);
+	}, [companyId, userId]);
 
 	/**
 	 * Start or update a cooldown timer for a space.
 	 */
 	const startCooldown = useCallback((spaceId: string) => {
 		const expiryTimestamp = Date.now() + COOLDOWN_DURATION_MS;
-		setCooldownExpiry(spaceId, expiryTimestamp);
+		setCooldownExpiry(companyId, userId, spaceId, expiryTimestamp);
 		setStatus('cooldown');
 
 		// Update remaining time every second
 		const updateRemaining = () => {
-			const expiry = getCooldownExpiry(spaceId);
+			const expiry = getCooldownExpiry(companyId, userId, spaceId);
 			if (expiry) {
 				const remaining = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
 				setCooldownRemaining(remaining);
 				if (remaining <= 0) {
-					clearCooldownExpiry(spaceId);
+					clearCooldownExpiry(companyId, userId, spaceId);
 					setStatus('idle');
 					if (cooldownIntervalRef.current) {
 						clearInterval(cooldownIntervalRef.current);
@@ -152,7 +172,7 @@ export function useKnock(): UseKnockReturn {
 
 		updateRemaining(); // Initial update
 		cooldownIntervalRef.current = setInterval(updateRemaining, 1000);
-	}, []);
+	}, [companyId, userId]);
 
 	/**
 	 * Start the timeout timer for a knock request.

@@ -1,14 +1,10 @@
 import { syncUserProfile } from '@/lib/api';
-import type { User, UserRole, UserStatus } from '@/types/database';
+import type { User } from '@/types/database';
 
 interface SyncUserProfilePayload {
   supabase_uid: string;
   email: string;
   displayName?: string;
-  status?: UserStatus;
-  companyId?: string;
-  role?: UserRole;
-  googleAvatarUrl?: string;
 }
 
 const inFlightProfileSyncs = new Map<string, Promise<User>>();

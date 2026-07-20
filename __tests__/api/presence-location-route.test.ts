@@ -11,10 +11,15 @@ const KNOCK_REQUEST_ID = '44444444-4444-4444-8444-444444444444';
 const mocks = vi.hoisted(() => ({
   requireVerifiedPresenceAuth: vi.fn(),
   rpc: vi.fn(),
+  emitPresenceEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/presence/verified-session', () => ({
   requireVerifiedPresenceAuth: mocks.requireVerifiedPresenceAuth,
+}));
+
+vi.mock('@/lib/presence/observability', () => ({
+  emitPresenceEvent: mocks.emitPresenceEvent,
 }));
 
 function primeAuth(): void {
@@ -67,6 +72,8 @@ function rpcRow(
     location_version: ok ? 12 : null,
     already_applied: false,
     authorized_by: null,
+    previous_location_version: ok ? 11 : null,
+    authorization_mode: ok ? 'public' : null,
     ...overrides,
   };
 }
@@ -144,7 +151,7 @@ describe('/api/presence/location', () => {
       locationVersion: 12,
       alreadyApplied: false,
     });
-    expect(mocks.rpc).toHaveBeenCalledWith('transition_user_location', {
+    expect(mocks.rpc).toHaveBeenCalledWith('transition_user_location_observed', {
       p_user_id: APP_USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,
@@ -154,9 +161,24 @@ describe('/api/presence/location', () => {
       p_knock_request_id: null,
       p_expected_location_version: null,
     });
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      resultCode: 'LOCATION_UPDATED',
+      expectedLocationVersion: null,
+      previousLocationVersion: 11,
+      resultLocationVersion: 12,
+      authorizationMode: 'public',
+    }));
   });
 
   it('accepts knock-enter with exact reason shape', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: rpcRow('LOCATION_UPDATED', true, {
+        location_version: 4,
+        previous_location_version: 3,
+        authorization_mode: 'knock',
+      }),
+      error: null,
+    });
     const response = await POST(
       jsonRequest(
         defaultBody({
@@ -169,13 +191,20 @@ describe('/api/presence/location', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledWith(
-      'transition_user_location',
+      'transition_user_location_observed',
       expect.objectContaining({
         p_reason: 'knock-enter',
         p_knock_request_id: KNOCK_REQUEST_ID,
         p_expected_location_version: 3,
       })
     );
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: KNOCK_REQUEST_ID,
+      requesterLocationVersionBefore: 3,
+      requesterLocationVersionAfter: 4,
+      consumeResult: 'consumed',
+      authorizationMode: 'knock',
+    }));
   });
 
   it('returns 401 when the verified auth session is fenced', async () => {

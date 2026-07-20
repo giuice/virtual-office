@@ -20,6 +20,18 @@ export class PresenceFixtures {
   static async connect(namespace: string): Promise<PresenceFixtures> {
     const client = new Client({ connectionString: LOCAL_DB_URL });
     await client.connect();
+    // The harness connection represents trusted fixture/setup work. Phase 6's
+    // catch-all users UPDATE audit deliberately rejects an unclassified JWT
+    // role, so keep raw fixture SQL classified as the service path. Tests that
+    // exercise authenticated or malformed claims override this setting inside
+    // their own transaction and automatically return to service_role.
+    await client.query(
+      `select pg_catalog.set_config(
+         'request.jwt.claims',
+         '{"role":"service_role"}',
+         false
+       )`,
+    );
     return new PresenceFixtures(client, namespace);
   }
 
@@ -39,6 +51,12 @@ export class PresenceFixtures {
   async cleanup(): Promise<void> {
     // `%` on both sides: emails embed the tag mid-string (phase2-x::<ns>@example.test).
     const tag = `%::${this.ns}%`;
+    await this.client.query(
+      `delete from public.invitations
+         where email like $1
+            or company_id in (select id from public.companies where name like $1)`,
+      [tag],
+    );
     // knock_requests.space_id is ON DELETE RESTRICT (Phase 1) and auth-backed
     // test users carry valid emails that don't match the `::<ns>` tag, so knock
     // rows are also removed by namespaced space before users/spaces go.
@@ -90,4 +108,15 @@ export class PresenceFixtures {
   async end(): Promise<void> {
     await this.client.end();
   }
+}
+
+/** Restore the permanent Phase 10 invariant after tests that exercise cutover without it. */
+export async function ensurePresenceOpenLogUniqueIndex(
+  fixtures: PresenceFixtures,
+): Promise<void> {
+  await fixtures.sql(
+    `create unique index if not exists ux_space_presence_log_one_open_per_user
+     on public.space_presence_log (user_id)
+     where exited_at is null`,
+  );
 }

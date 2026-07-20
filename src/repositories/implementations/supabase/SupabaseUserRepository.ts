@@ -159,6 +159,14 @@ export class SupabaseUserRepository implements IUserRepository {
       currentSpaceId,
       ...restUpdates
     } = updates; // email, status, preferences, role
+    if (currentSpaceId !== undefined) {
+      throw new Error(
+        'PRESENCE_PLACEMENT_REQUIRES_ATOMIC_TRANSITION_OR_LEGACY_ADAPTER',
+      );
+    }
+    if (restUpdates.status === 'offline') {
+      throw new Error('PERSISTED_OFFLINE_NOT_ALLOWED');
+    }
     const dbUpdates: Partial<{
       email: string;
       status: UserStatus;
@@ -169,8 +177,6 @@ export class SupabaseUserRepository implements IUserRepository {
       avatar_url: string | null;
       status_message: string | null;
       supabase_uid: string;
-      last_active: string;
-      current_space_id: string | null;
     }> = { ...restUpdates } as Partial<{
       email: string;
       status: UserStatus;
@@ -181,8 +187,6 @@ export class SupabaseUserRepository implements IUserRepository {
       avatar_url: string | null;
       status_message: string | null;
       supabase_uid: string;
-      last_active: string;
-      current_space_id: string | null;
     }>;
 
      if (companyId !== undefined) dbUpdates.company_id = companyId;
@@ -190,10 +194,6 @@ export class SupabaseUserRepository implements IUserRepository {
      if (avatarUrl !== undefined) dbUpdates.avatar_url = avatarUrl;
      if (statusMessage !== undefined) dbUpdates.status_message = statusMessage;
      if (supabase_uid !== undefined) dbUpdates.supabase_uid = supabase_uid; // Allow updating this.supabase_uid if needed
-     if (currentSpaceId !== undefined) dbUpdates.current_space_id = currentSpaceId;
-     // Update last_active automatically on any update
-     dbUpdates.last_active = new Date().toISOString();
-
      beforeDatabaseOperation?.();
      const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
@@ -288,21 +288,6 @@ export class SupabaseUserRepository implements IUserRepository {
          console.error('[updateLocation] Exception during user current_space_id update:', userUpdateCatchError);
          throw userUpdateCatchError; // Re-throw exception
     }
-  }
-
-  async updateCurrentSpace(userId: string, spaceId: string | null): Promise<User | null> {
-    const { data, error } = await this.supabase
-      .from(this.TABLE_NAME)
-      .update({ current_space_id: spaceId })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating user current_space_id:', error);
-      throw error;
-    }
-    return data ? mapToCamelCase(data) : null;
   }
 
   async findAll(): Promise<User[]> {

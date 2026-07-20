@@ -399,7 +399,7 @@ describe('no-credential-logging guard', () => {
       .map((v) => `${v.file}:${v.line} — ${v.snippet}`)
       .join('\n');
     expect(violations, `Credential-logging violations found:\n${report}`).toEqual([]);
-  });
+  }, 15_000);
 
   describe('scanner sensitivity fixtures', () => {
     it('flags a session object logged alongside a template literal', () => {

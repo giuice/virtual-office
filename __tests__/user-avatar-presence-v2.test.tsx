@@ -6,6 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import UserAvatarPresence, { UserAvatarPresenceProps } from '../src/components/floor-plan/UserAvatarPresence';
+import AvatarGroup from '@/components/floor-plan/modern/AvatarGroup';
 import { UserPresenceData } from '@/types/database';
 
 // Mock the EnhancedAvatarV2 component
@@ -37,6 +38,14 @@ vi.mock('@/components/ui/tooltip', () => ({
 // Mock utils
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
+}));
+
+vi.mock('@/components/floor-plan/modern/ModernUserAvatar', () => ({
+  default: ({ user }: { user: UserPresenceData }) => (
+    <div data-testid="modern-user-avatar" data-user-id={user.id}>
+      {user.displayName}
+    </div>
+  ),
 }));
 
 describe('UserAvatarPresence - Story 3.3 Tests', () => {
@@ -366,34 +375,59 @@ describe('UserAvatarPresence - Story 3.3 Tests', () => {
 });
 
 describe('AvatarGroup - Story 3.3 Tests', () => {
-  // Note: AvatarGroup tests would require importing the component
-  // These are placeholder tests showing what should be tested
+  const users: UserPresenceData[] = Array.from({ length: 6 }, (_, index) => ({
+    id: `group-user-${index + 1}`,
+    displayName: `Group User ${index + 1}`,
+    avatarUrl: undefined,
+    status: 'online',
+    currentSpaceId: 'space-1',
+  }));
   
   describe('AC4 - Smart Stacking', () => {
-    it.skip('limits visible avatars to 4 by default', () => {
-      // Test that max defaults to 4
+    it('limits visible avatars to 4 by default', () => {
+      render(<AvatarGroup users={users} />);
+
+      expect(screen.getAllByTestId('modern-user-avatar')).toHaveLength(4);
     });
 
-    it.skip('applies negative margin overlap (-10px)', () => {
-      // Test marginLeft: -10px on avatars after first
+    it('applies negative margin overlap (-10px)', () => {
+      const { container } = render(<AvatarGroup users={users.slice(0, 3)} />);
+      const avatarItems = container.querySelectorAll<HTMLElement>('.vo-avatar-item');
+
+      expect(avatarItems[0]).toHaveStyle({ marginLeft: '0' });
+      expect(avatarItems[1]).toHaveStyle({ marginLeft: '-10px' });
+      expect(avatarItems[2]).toHaveStyle({ marginLeft: '-10px' });
     });
 
-    it.skip('applies z-index layering (rightmost on top)', () => {
-      // Test zIndex increases with index
+    it('applies z-index layering (rightmost on top)', () => {
+      const { container } = render(<AvatarGroup users={users.slice(0, 3)} />);
+      const avatarItems = container.querySelectorAll<HTMLElement>('.vo-avatar-item');
+
+      expect(avatarItems[0]).toHaveStyle({ zIndex: '1' });
+      expect(avatarItems[1]).toHaveStyle({ zIndex: '2' });
+      expect(avatarItems[2]).toHaveStyle({ zIndex: '3' });
     });
   });
 
   describe('AC5 - Overflow Badge', () => {
-    it.skip('displays overflow badge when participants exceed max', () => {
-      // Test +N badge appears when users.length > max
+    it('displays overflow badge when participants exceed max', () => {
+      render(<AvatarGroup users={users} max={5} />);
+
+      expect(screen.getByRole('button', { name: '1 more participants' })).toBeInTheDocument();
     });
 
-    it.skip('overflow badge shows correct count', () => {
-      // Test badge shows correct remaining count
+    it('overflow badge shows correct count', () => {
+      render(<AvatarGroup users={users} />);
+
+      expect(screen.getByRole('button', { name: '2 more participants' })).toHaveTextContent('+2');
     });
 
-    it.skip('overflow badge uses theme tokens', () => {
-      // Test badge uses --vo-pill-bg and --vo-pill-text
+    it('overflow badge uses the theme-token-backed style contract', () => {
+      render(<AvatarGroup users={users} />);
+
+      expect(screen.getByRole('button', { name: '2 more participants' })).toHaveClass(
+        'vo-avatar-overflow',
+      );
     });
   });
 });

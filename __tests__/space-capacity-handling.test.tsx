@@ -192,10 +192,3 @@ describe('Story 3.12: Space Capacity and Room Full Handling', () => {
     });
   });
 });
-
-describe('API Capacity Validation (AC5)', () => {
-  // Integration test for API endpoint
-  it.todo('returns 409 Conflict when space is full');
-  it.todo('allows join when space has available capacity');
-  it.todo('handles race conditions atomically');
-});

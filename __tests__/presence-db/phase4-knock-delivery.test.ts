@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PresenceFixtures } from './fixtures';
+import { createServiceClient } from './auth-clients';
 
 const NS = `phase4-knock-delivery-${randomUUID()}`;
 
@@ -9,12 +10,15 @@ describe('presence-db Phase 4 Knock delivery and retention', () => {
   let companyId: string;
   let spaceId: string;
   let requesterId: string;
+  let requesterSupabaseUid: string;
   let requesterLocationVersion: number;
   let requesterAccessRevision: string;
   let spaceAccessRevision: string;
+  let serviceClient: ReturnType<typeof createServiceClient>;
 
   beforeAll(async () => {
     fixtures = await PresenceFixtures.connect(NS);
+    serviceClient = createServiceClient();
 
     const [company] = await fixtures.sql<{ id: string }>(
       `insert into public.companies (name, settings)
@@ -43,6 +47,7 @@ describe('presence-db Phase 4 Knock delivery and retention', () => {
     spaceId = space.id;
     spaceAccessRevision = space.presence_access_revision;
 
+    requesterSupabaseUid = randomUUID();
     const [requester] = await fixtures.sql<{
       id: string;
       location_version: number;
@@ -52,7 +57,7 @@ describe('presence-db Phase 4 Knock delivery and retention', () => {
          (supabase_uid, email, display_name, company_id, role)
        values ($1, $2, 'Phase 4 requester', $3, 'member'::public.user_role)
        returning id, location_version, presence_access_revision`,
-      [randomUUID(), `phase4-requester::${NS}@example.test`, companyId],
+      [requesterSupabaseUid, `phase4-requester::${NS}@example.test`, companyId],
     );
     if (!requester) throw new Error('Failed to create Phase 4 requester fixture');
     requesterId = requester.id;
@@ -64,6 +69,321 @@ describe('presence-db Phase 4 Knock delivery and retention', () => {
     if (fixtures) {
       await fixtures.cleanup();
       await fixtures.end();
+    }
+  });
+
+  it('returns exact Knock versions and revisions through service-only observed wrappers', async () => {
+    const responderSupabaseUid = randomUUID();
+    const responderAuthSessionId = randomUUID();
+    const requesterAuthSessionId = randomUUID();
+    const [responder] = await fixtures.sql<{
+      id: string;
+      location_version: number;
+      presence_access_revision: string;
+    }>(
+      `insert into public.users
+         (supabase_uid, email, display_name, company_id, role, current_space_id)
+       values ($1, $2, 'Phase 4 responder', $3, 'member'::public.user_role, $4)
+       returning id, location_version, presence_access_revision`,
+      [
+        responderSupabaseUid,
+        `phase4-responder::${NS}@example.test`,
+        companyId,
+        spaceId,
+      ],
+    );
+    if (!responder) throw new Error('Failed to create observed Knock responder');
+
+    const [requesterSession] = await fixtures.sql<{ id: string }>(
+      `insert into public.user_presence_sessions
+         (registration_id, user_id, auth_session_id, company_id,
+          connected_at, last_seen_at, expires_at)
+       values ($1, $2, $3, $4, pg_catalog.clock_timestamp(),
+               pg_catalog.clock_timestamp(),
+               pg_catalog.clock_timestamp() + interval '90 seconds')
+       returning id`,
+      [randomUUID(), requesterId, requesterAuthSessionId, companyId],
+    );
+    const [responderSession] = await fixtures.sql<{ id: string }>(
+      `insert into public.user_presence_sessions
+         (registration_id, user_id, auth_session_id, company_id, space_id,
+          placement_version, user_access_revision, space_access_revision,
+          connected_at, last_seen_at, expires_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8,
+               pg_catalog.clock_timestamp(), pg_catalog.clock_timestamp(),
+               pg_catalog.clock_timestamp() + interval '90 seconds')
+       returning id`,
+      [
+        randomUUID(),
+        responder.id,
+        responderAuthSessionId,
+        companyId,
+        spaceId,
+        responder.location_version,
+        responder.presence_access_revision,
+        spaceAccessRevision,
+      ],
+    );
+    if (!requesterSession || !responderSession) {
+      throw new Error('Failed to seed observed Knock sessions');
+    }
+
+    const missingStatusRpc = await serviceClient.rpc(
+      'get_knock_request_status_observed',
+      {
+        p_requester_id: requesterId,
+        p_auth_session_id: requesterAuthSessionId,
+        p_session_id: requesterSession.id,
+        p_request_id: randomUUID(),
+      },
+    );
+    expect(missingStatusRpc.error).toBeNull();
+    expect(missingStatusRpc.data).toMatchObject({
+      ok: false,
+      code: 'KNOCK_NOT_FOUND',
+    });
+    expect(missingStatusRpc.data).not.toHaveProperty('spaceId');
+    expect(missingStatusRpc.data).not.toHaveProperty('requesterUserId');
+
+    const missingCreateRpc = await serviceClient.rpc('create_knock_request_observed', {
+      p_requester_id: requesterId,
+      p_auth_session_id: requesterAuthSessionId,
+      p_session_id: requesterSession.id,
+      p_space_id: randomUUID(),
+      p_request_id: randomUUID(),
+    });
+    expect(missingCreateRpc.error).toBeNull();
+    expect(missingCreateRpc.data).toMatchObject({
+      ok: false,
+      code: 'SPACE_NOT_FOUND',
+    });
+    expect(missingCreateRpc.data).not.toHaveProperty(
+      'requesterLocationVersionAfter',
+    );
+
+    const requestId = randomUUID();
+    const createdRpc = await serviceClient.rpc('create_knock_request_observed', {
+      p_requester_id: requesterId,
+      p_auth_session_id: requesterAuthSessionId,
+      p_session_id: requesterSession.id,
+      p_space_id: spaceId,
+      p_request_id: requestId,
+    });
+    expect(createdRpc.error).toBeNull();
+    expect(createdRpc.data).toMatchObject({
+      ok: true,
+      code: 'KNOCK_CREATED',
+      requestId,
+      requesterLocationVersionBefore: requesterLocationVersion,
+      requesterLocationVersionAfter: requesterLocationVersion + 1,
+      requesterAccessRevision: Number(requesterAccessRevision),
+      spaceAccessRevision: Number(spaceAccessRevision),
+    });
+
+    const pendingStatusRpc = await serviceClient.rpc(
+      'get_knock_request_status_observed',
+      {
+        p_requester_id: requesterId,
+        p_auth_session_id: requesterAuthSessionId,
+        p_session_id: requesterSession.id,
+        p_request_id: requestId,
+      },
+    );
+    expect(pendingStatusRpc.error).toBeNull();
+    expect(pendingStatusRpc.data).toMatchObject({
+      ok: true,
+      status: 'pending',
+      requesterUserId: requesterId,
+      spaceId,
+    });
+    expect(pendingStatusRpc.data).not.toHaveProperty('responderAccessRevision');
+
+    const foreignCompanyId = randomUUID();
+    const [foreignResponder] = await fixtures.sql<{ id: string }>(
+      `with company as (
+         insert into public.companies (id, name)
+         values ($1, $2)
+         returning id
+       )
+       insert into public.users
+         (supabase_uid, email, display_name, company_id, role)
+       select $3, $4, 'Foreign responder', company.id, 'member'::public.user_role
+       from company
+       returning id`,
+      [
+        foreignCompanyId,
+        `Phase 4 foreign company::${NS}`,
+        randomUUID(),
+        `phase4-foreign-responder::${NS}@example.test`,
+      ],
+    );
+    if (!foreignResponder) throw new Error('Failed to seed foreign responder');
+    const foreignAuthSessionId = randomUUID();
+    const [foreignSession] = await fixtures.sql<{ id: string }>(
+      `insert into public.user_presence_sessions
+         (registration_id, user_id, auth_session_id, company_id,
+          connected_at, last_seen_at, expires_at)
+       values ($1, $2, $3, $4, pg_catalog.clock_timestamp(),
+               pg_catalog.clock_timestamp(),
+               pg_catalog.clock_timestamp() + interval '90 seconds')
+       returning id`,
+      [randomUUID(), foreignResponder.id, foreignAuthSessionId, foreignCompanyId],
+    );
+    if (!foreignSession) throw new Error('Failed to seed foreign responder session');
+
+    const crossTenantResponse = await serviceClient.rpc(
+      'respond_to_knock_observed',
+      {
+        p_responder_id: foreignResponder.id,
+        p_auth_session_id: foreignAuthSessionId,
+        p_session_id: foreignSession.id,
+        p_request_id: requestId,
+        p_decision: 'APPROVE',
+      },
+    );
+    expect(crossTenantResponse.error).toBeNull();
+    expect(crossTenantResponse.data).toMatchObject({
+      ok: false,
+      code: 'SESSION_INVALID',
+    });
+    expect(crossTenantResponse.data).not.toHaveProperty('spaceId');
+    expect(crossTenantResponse.data).not.toHaveProperty('requesterUserId');
+
+    const respondedRpc = await serviceClient.rpc('respond_to_knock_observed', {
+      p_responder_id: responder.id,
+      p_auth_session_id: responderAuthSessionId,
+      p_session_id: responderSession.id,
+      p_request_id: requestId,
+      p_decision: 'APPROVE',
+    });
+    expect(respondedRpc.error).toBeNull();
+    expect(respondedRpc.data).toMatchObject({
+      ok: true,
+      code: 'KNOCK_RESPONDED',
+      requesterUserId: requesterId,
+      spaceId,
+      requesterLocationVersionAfter: requesterLocationVersion + 1,
+      requesterAccessRevision: Number(requesterAccessRevision),
+      responderAccessRevision: Number(responder.presence_access_revision),
+      spaceAccessRevision: Number(spaceAccessRevision),
+      usable: true,
+    });
+
+    const statusRpc = await serviceClient.rpc('get_knock_request_status_observed', {
+      p_requester_id: requesterId,
+      p_auth_session_id: requesterAuthSessionId,
+      p_session_id: requesterSession.id,
+      p_request_id: requestId,
+    });
+    expect(statusRpc.error).toBeNull();
+    expect(statusRpc.data).toMatchObject({
+      ok: true,
+      requesterUserId: requesterId,
+      spaceId,
+      requesterLocationVersionAfter: requesterLocationVersion + 1,
+      requesterAccessRevision: Number(requesterAccessRevision),
+      responderAccessRevision: Number(responder.presence_access_revision),
+      spaceAccessRevision: Number(spaceAccessRevision),
+    });
+
+    await fixtures.sql(`delete from public.knock_requests where id = $1`, [requestId]);
+  });
+
+  it('resolves the authenticated company from Realtime JWT claims', async () => {
+    await fixtures.sql('begin');
+    try {
+      await fixtures.sql('set local role authenticated');
+      await fixtures.sql(
+        `select pg_catalog.set_config('request.jwt.claims', $1, true)`,
+        [JSON.stringify({ role: 'authenticated', sub: requesterSupabaseUid })],
+      );
+      const [result] = await fixtures.sql<{ company_id: string | null }>(
+        `select private.current_presence_company_id() as company_id`,
+      );
+
+      expect(result?.company_id).toBe(companyId);
+    } finally {
+      await fixtures.sql('rollback');
+    }
+  });
+
+  it('delivers Knock broadcasts only on the unfenced own-company topic', async () => {
+    const authSessionId = randomUUID();
+    const topic = `company:${companyId}:knock`;
+    const otherTopic = `company:${randomUUID()}:knock`;
+
+    await fixtures.sql('begin');
+    try {
+      const [message] = await fixtures.sql<{ id: string }>(
+        `insert into realtime.messages (topic, extension)
+         values ($1, 'broadcast')
+         returning id`,
+        [topic],
+      );
+      if (!message) throw new Error('Failed to create synthetic Knock broadcast');
+
+      await fixtures.sql(
+        `select pg_catalog.set_config('request.jwt.claims', $1, true)`,
+        [JSON.stringify({
+          role: 'authenticated',
+          sub: requesterSupabaseUid,
+          session_id: authSessionId,
+        })],
+      );
+      await fixtures.sql(
+        `select pg_catalog.set_config('realtime.topic', $1, true)`,
+        [topic],
+      );
+      await fixtures.sql('set local role authenticated');
+      expect(await fixtures.sql<{ id: string }>(
+        `select id from realtime.messages where id = $1`,
+        [message.id],
+      )).toEqual([{ id: message.id }]);
+
+      await fixtures.sql(
+        `select pg_catalog.set_config('realtime.topic', $1, true)`,
+        [otherTopic],
+      );
+      expect(await fixtures.sql(
+        `select id from realtime.messages where id = $1`,
+        [message.id],
+      )).toEqual([]);
+
+      await fixtures.sql(
+        `select pg_catalog.set_config('realtime.topic', $1, true)`,
+        [topic],
+      );
+      await fixtures.sql(
+        `select pg_catalog.set_config('request.jwt.claims', $1, true)`,
+        [JSON.stringify({ role: 'authenticated', sub: requesterSupabaseUid })],
+      );
+      expect(await fixtures.sql(
+        `select id from realtime.messages where id = $1`,
+        [message.id],
+      )).toEqual([]);
+
+      await fixtures.sql('reset role');
+      await fixtures.sql(
+        `insert into public.revoked_presence_auth_sessions
+           (auth_session_id, user_id, revoked_at)
+         values ($1, $2, pg_catalog.clock_timestamp())`,
+        [authSessionId, requesterId],
+      );
+      await fixtures.sql(
+        `select pg_catalog.set_config('request.jwt.claims', $1, true)`,
+        [JSON.stringify({
+          role: 'authenticated',
+          sub: requesterSupabaseUid,
+          session_id: authSessionId,
+        })],
+      );
+      await fixtures.sql('set local role authenticated');
+      expect(await fixtures.sql(
+        `select id from realtime.messages where id = $1`,
+        [message.id],
+      )).toEqual([]);
+    } finally {
+      await fixtures.sql('rollback');
     }
   });
 
@@ -214,6 +534,12 @@ describe('presence-db Phase 4 Knock delivery and retention', () => {
     const pendingId = randomUUID();
     const retainedId = randomUUID();
     const purgedId = randomUUID();
+
+    await fixtures.sql(
+      `delete from public.knock_requests
+       where requester_id = $1 and space_id = $2`,
+      [requesterId, spaceId],
+    );
 
     await fixtures.sql(
       `insert into public.knock_requests (

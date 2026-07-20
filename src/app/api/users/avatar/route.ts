@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
+import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { requireAuthUser } from '@/lib/auth/session';
 import { extractUserUploadsPath } from '@/lib/user-uploads-storage';
@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
       return authContext.errorResponse;
     }
 
-    const { userRepository } = await getSupabaseRepositories(authContext.supabase);
     const userDbId = authContext.dbUser.id;
     const oldAvatarUrl = authContext.dbUser.avatarUrl;
     // Parse the multipart form data
@@ -145,6 +144,7 @@ export async function POST(req: NextRequest) {
     // Upload the file to Supabase Storage using service role client to bypass RLS
     // We can do this safely on the server since we've already authenticated the user
     const serviceRoleSupabase = await createSupabaseServerClient('service_role');
+    const userRepository = new SupabaseUserRepository(serviceRoleSupabase);
     const { error: uploadError } = await serviceRoleSupabase.storage
       .from('user-uploads')
       .upload(filePath, buffer, {
@@ -166,11 +166,24 @@ export async function POST(req: NextRequest) {
       .getPublicUrl(filePath);
 
     // Update the user using the repository with userDbId (the database UUID)
-    const updatedUser = await userRepository.update(userDbId, {
-      avatarUrl: publicUrl
-    });
+    let updatedUser;
+    try {
+      updatedUser = await userRepository.update(userDbId, {
+        avatarUrl: publicUrl
+      });
+    } catch (updateError) {
+      await serviceRoleSupabase.storage
+        .from('user-uploads')
+        .remove([filePath])
+        .catch(() => undefined);
+      throw updateError;
+    }
 
     if (!updatedUser) {
+      await serviceRoleSupabase.storage
+        .from('user-uploads')
+        .remove([filePath])
+        .catch(() => undefined);
       return NextResponse.json(
         { error: 'Failed to update user profile' },
         { status: 500 }

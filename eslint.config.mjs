@@ -11,7 +11,13 @@ const __dirname = dirname(__filename);
 /** @type {import('eslint').Linter.FlatConfig[]} */
 const eslintConfig = [
   {
-    ignores: [".next/**/*", "node_modules/**/*"],
+    ignores: [
+      ".next/**/*",
+      ".next-auth-metrics*/**/*",
+      "node_modules/**/*",
+      "playwright-report/**/*",
+      "test-results/**/*",
+    ],
   },
   {
     files: ["**/*.{js,jsx,ts,tsx}"],

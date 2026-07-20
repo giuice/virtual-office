@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { ISpaceRepository } from '@/repositories/interfaces';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
 import { Space } from '@/types/database';
+import { API_ERROR_CODES } from '@/lib/api/error-contract';
+import { createCorrelationId, jsonError, jsonSuccess } from '@/lib/api/server-error';
 import { requireAuthUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
@@ -22,8 +24,10 @@ function isSpaceInUseDeleteError(error: unknown): boolean {
 }
 
 export async function GET(request: Request) {
+  const correlationId = createCorrelationId();
+
   try {
-    const authContext = await requireAuthUser();
+    const authContext = await requireAuthUser({ correlationId, pathname: '/api/spaces' });
     if ('errorResponse' in authContext) {
       return authContext.errorResponse;
     }
@@ -32,20 +36,29 @@ export async function GET(request: Request) {
     const companyId = searchParams.get('companyId');
 
     if (!companyId) {
-      return NextResponse.json({ message: 'Company ID is required' }, { status: 400 });
+      return jsonError(400, API_ERROR_CODES.BAD_REQUEST, 'Company ID is required', {
+        correlationId,
+        context: 'spaces.get',
+      });
     }
 
     if (companyId !== authContext.dbUser.companyId) {
-      return NextResponse.json({ message: 'Cannot access spaces outside your company' }, { status: 403 });
+      return jsonError(403, API_ERROR_CODES.FORBIDDEN, 'Cannot access spaces outside your company', {
+        correlationId,
+        context: 'spaces.get',
+      });
     }
 
     const spaceRepository: ISpaceRepository = new SupabaseSpaceRepository(authContext.supabase);
     const spaces = await spaceRepository.findByCompany(companyId);
 
-    return NextResponse.json({ spaces: spaces });
+    return jsonSuccess({ spaces }, correlationId);
   } catch (error: unknown) {
-    console.error('Error fetching spaces:', error);
-    return NextResponse.json({ message: error instanceof Error ? error.message : 'Failed to fetch spaces' }, { status: 500 });
+    return jsonError(500, API_ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch spaces', {
+      correlationId,
+      cause: error,
+      context: 'spaces.get',
+    });
   }
 }
 

@@ -3,26 +3,26 @@ import { SupabaseUserRepository } from '@/repositories/implementations/supabase'
 import { requireAuthUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import {
+  companyMemberRoleUpdateRequestSchema,
+  companyMemberRoleUpdateRpcErrorMap,
+  parseCompanyMemberRoleUpdateRpcErrorCode,
+  parseCompanyMemberRoleUpdateRpcResult,
+} from '@/lib/api/company-membership-contracts';
+import { selfProfileUpdateSchema } from '@/lib/presence/user-write-contracts';
+import {
   beginLegacyPresenceWrite,
   completionStatusForResponse,
   isLegacyPresenceWriteGateError,
   type LegacyPresenceCompletionStatus,
   type LegacyPresenceWriteGate,
 } from '@/lib/presence/legacy-write-gate';
-import type { User, UserRole, UserStatus } from '@/types/database';
+import type { User } from '@/types/database';
+import {
+  isLegacyPresenceRouteAuditError,
+  recordLegacyPresenceRouteCall,
+} from '@/lib/presence/legacy-route-audit';
 
 export const dynamic = 'force-dynamic';
-
-const USER_ROLES = ['admin', 'member'] as const satisfies readonly UserRole[];
-const USER_STATUSES = ['online', 'away', 'busy', 'offline'] as const satisfies readonly UserStatus[];
-
-function isUserRole(value: unknown): value is UserRole {
-  return typeof value === 'string' && USER_ROLES.some(role => role === value);
-}
-
-function isUserStatus(value: unknown): value is UserStatus {
-  return typeof value === 'string' && USER_STATUSES.some(status => status === value);
-}
 
 export async function PATCH(
   request: Request,
@@ -36,14 +36,34 @@ export async function PATCH(
   };
 
   try {
-    writeGate = await beginLegacyPresenceWrite();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return completeWith(NextResponse.json({
+        success: false,
+        code: 'INVALID_JSON',
+        error: 'Invalid JSON payload',
+      }, { status: 400 }));
+    }
 
-    const authContext = await requireAuthUser(() => writeGate?.assertCanStartDatabaseOperation());
+    const attemptedOffline =
+      typeof body === 'object' &&
+      body !== null &&
+      'status' in body &&
+      body.status === 'offline';
+
+    const authContext = await requireAuthUser();
     if ('errorResponse' in authContext) {
       return completeWith(authContext.errorResponse);
     }
 
-    const userRepository = new SupabaseUserRepository(authContext.supabase);
+    if (attemptedOffline) {
+      await recordLegacyPresenceRouteCall('users-offline-status');
+      writeGate = await beginLegacyPresenceWrite();
+    }
+
+    const readRepository = new SupabaseUserRepository(authContext.supabase);
 
     // Get ID from query parameters
     const { searchParams } = new URL(request.url);
@@ -55,11 +75,7 @@ export async function PATCH(
 
     // Get user data from request body
     // Ensure lastActive is excluded if present, as the repository handles it.
-    const body: Partial<User> = await request.json();
-    if (id !== authContext.dbUser.id) {
-      writeGate.assertCanStartDatabaseOperation();
-    }
-    const targetUser = id === authContext.dbUser.id ? authContext.dbUser : await userRepository.findById(id);
+    const targetUser = id === authContext.dbUser.id ? authContext.dbUser : await readRepository.findById(id);
 
     if (!targetUser) {
       return completeWith(NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 }));
@@ -68,15 +84,17 @@ export async function PATCH(
     let userData: Partial<User>;
 
     if (id === authContext.dbUser.id) {
-      if (body.status !== undefined && !isUserStatus(body.status)) {
-        return completeWith(NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 }));
+      const parsed = selfProfileUpdateSchema.safeParse(body);
+      if (!parsed.success) {
+        return completeWith(NextResponse.json({
+          success: false,
+          code: attemptedOffline ? 'PERSISTED_OFFLINE_NOT_ALLOWED' : 'INVALID_PROFILE_UPDATE',
+          error: attemptedOffline
+            ? 'Offline is derived from connectivity and cannot be persisted'
+            : 'Invalid profile update',
+        }, { status: 400 }));
       }
-
-      userData = {};
-      if (body.displayName !== undefined) userData.displayName = body.displayName;
-      if (body.statusMessage !== undefined) userData.statusMessage = body.statusMessage;
-      if (body.status !== undefined) userData.status = body.status;
-      if (body.preferences !== undefined) userData.preferences = body.preferences;
+      userData = parsed.data;
     } else {
       if (authContext.dbUser.role !== 'admin') {
         return completeWith(NextResponse.json({ success: false, error: 'Only admins can update other users' }, { status: 403 }));
@@ -86,22 +104,67 @@ export async function PATCH(
         return completeWith(NextResponse.json({ success: false, error: 'Cannot update users outside your company' }, { status: 403 }));
       }
 
-      if (!isUserRole(body.role)) {
-        return completeWith(NextResponse.json({ success: false, error: 'Cross-user updates may only change role' }, { status: 400 }));
+      const parsed = companyMemberRoleUpdateRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return completeWith(NextResponse.json({ success: false, code: 'INVALID_ROLE_UPDATE', error: 'Cross-user updates may only change role' }, { status: 400 }));
       }
 
-      userData = { role: body.role };
+      userData = parsed.data;
+
+      const companyId = authContext.dbUser.companyId;
+      const admin = await createSupabaseServerClient('service_role');
+      const { data: roleResult, error: roleError } = await admin.rpc(
+        'update_company_member_role',
+        {
+          p_actor_user_id: authContext.dbUser.id,
+          p_target_user_id: id,
+          p_company_id: companyId,
+          p_role: parsed.data.role,
+        },
+      );
+      if (roleError) {
+        const errorCode = parseCompanyMemberRoleUpdateRpcErrorCode(roleError.message);
+        const contract = errorCode
+          ? companyMemberRoleUpdateRpcErrorMap[errorCode]
+          : null;
+        if (contract) {
+          return completeWith(
+            NextResponse.json(contract.body, { status: contract.status }),
+          );
+        }
+        return completeWith(NextResponse.json({
+          success: false,
+          code: 'INTERNAL_ERROR',
+          error: 'Failed to update user',
+        }, { status: 500 }));
+      }
+
+      const result = parseCompanyMemberRoleUpdateRpcResult(roleResult, {
+        actorUserId: authContext.dbUser.id,
+        targetUserId: id,
+        companyId,
+        role: parsed.data.role,
+      });
+      if (!result) {
+        return completeWith(NextResponse.json({
+          success: false,
+          code: 'INTERNAL_ERROR',
+          error: 'Failed to update user',
+        }, { status: 500 }));
+      }
+
+      return completeWith(NextResponse.json({
+        success: true,
+        user: { ...targetUser, role: parsed.data.role },
+        message: 'User updated successfully',
+      }));
     }
 
-    const updateRepository = id === authContext.dbUser.id
-      ? userRepository
-      : new SupabaseUserRepository(await createSupabaseServerClient('service_role'));
-
-    const updatedUser = await updateRepository.update(
-      id,
-      userData,
-      () => writeGate?.assertCanStartDatabaseOperation()
+    const updateRepository = new SupabaseUserRepository(
+      await createSupabaseServerClient('service_role')
     );
+
+    const updatedUser = await updateRepository.update(id, userData);
 
     if (!updatedUser) {
       return completeWith(NextResponse.json({ success: false, message: 'User not found or update failed' }, { status: 404 }));
@@ -115,6 +178,15 @@ export async function PATCH(
     }, { status: 200 }));
 
   } catch (error) {
+    if (isLegacyPresenceRouteAuditError(error)) {
+      completionStatus = 'failed';
+      return NextResponse.json({
+        success: false,
+        code: error.code,
+        retryable: true,
+      }, { status: 503 });
+    }
+
     if (isLegacyPresenceWriteGateError(error)) {
       completionStatus = error.httpStatus >= 500 ? 'failed' : 'rejected';
       return NextResponse.json(error.toBody(), { status: error.httpStatus });

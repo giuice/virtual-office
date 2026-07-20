@@ -6,7 +6,7 @@ import { useEffect, useCallback } from 'react';
 import { Space, User, RoomTemplate } from '@/types/database';
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RoomDialog } from './room-dialog/index';
 import { RoomManagement } from './room-management';
@@ -15,7 +15,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation'; // Import useRouter
-import { getReconnectionContext, useLastSpace } from '@/hooks/useLastSpace'; // Import the new hook
 import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
 import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
 import { usePresence } from '@/contexts/PresenceContext';
@@ -41,16 +40,21 @@ export function FloorPlan() {
 
   // Context hooks
   const {
-    company,
     spaces,
     companyUsers,
     isLoading: isCompanyLoading,
-    currentUserProfile
+    currentUserProfile,
+    bootstrapError,
+    refreshCompanyData
   } = useCompany();
   const router = useRouter();
   const {
     usersInSpaces,
-    users
+    users,
+    saveLastSpace,
+    realtimeConnectionStatus,
+    error: presenceError,
+    retryPresence,
   } = usePresence();
   const {
     getOrCreateRoomConversation,
@@ -89,12 +93,9 @@ export function FloorPlan() {
   } = useToast();
   // Derived values needed by hooks below
   const currentUserPresence = users?.find(u => u.id === currentUserProfile?.id);
-  const currentSpaceId = currentUserPresence?.currentSpaceId || undefined;
-  const {
-    lastSpaceId,
-    saveLastSpace,
-    clearLastSpace
-  } = useLastSpace(currentUserPresence ?? null, spaces, company);
+  const currentSpaceId = currentUserPresence?.isOccupyingCurrentSpace
+    ? currentUserPresence.currentSpaceId ?? undefined
+    : undefined;
 
   // Effect: Log spaces for debugging
   useEffect(() => {
@@ -112,21 +113,19 @@ export function FloorPlan() {
     if (!currentUserProfile || spaces.length === 0) {
       return;
     }
-    const targetSpaceId = currentSpaceId || getReconnectionContext(currentUserProfile, spaces, company, lastSpaceId).spaceId;
+    const targetSpaceId = currentSpaceId;
     if (!targetSpaceId) {
+      setSelectedSpace(null);
+      setHighlightedSpaceId(null);
       return;
     }
     const space = spaces.find(candidate => candidate.id === targetSpaceId);
     if (space) {
       setSelectedSpace(space);
       setHighlightedSpaceId(space.id);
-      // Keep visual hydration aligned with localStorage so grace rejoin uses
-      // the same lastSpaceId whether placement came from UI or auto-placement.
-      saveLastSpace(targetSpaceId, {
-        markManualChange: false
-      });
+      saveLastSpace(targetSpaceId);
     }
-  }, [company, currentSpaceId, currentUserProfile, lastSpaceId, saveLastSpace, spaces, setSelectedSpace, setHighlightedSpaceId]);
+  }, [currentSpaceId, currentUserProfile, saveLastSpace, spaces, setSelectedSpace, setHighlightedSpaceId]);
 
   // Callback: Handle opening chat for a room via unified messaging drawer
   const handleOpenChat = useCallback(async (room: Space) => {
@@ -173,6 +172,10 @@ export function FloorPlan() {
       }
     }
   }, [spaces, setHighlightedSpaceId, setSelectedSpace]);
+  const handleSpaceLeave = useCallback(() => {
+    setSelectedSpace(null);
+    setHighlightedSpaceId(null);
+  }, [setHighlightedSpaceId, setSelectedSpace]);
 
   // === EARLY RETURN — all hooks have been called above ===
   if (!isAuthReady || isCompanyLoading) {
@@ -182,6 +185,56 @@ export function FloorPlan() {
           Preparing your floor plan…
         </p>
       </div>;
+  }
+
+  if (bootstrapError && spaces.length === 0) {
+    const isUnauthenticated = bootstrapError.kind === 'unauthenticated';
+    const isRateLimited = bootstrapError.kind === 'rate-limited';
+    const title = isUnauthenticated
+      ? 'Your session has expired'
+      : isRateLimited
+        ? 'Your office is temporarily busy'
+        : "We couldn't load your office";
+    const description = isUnauthenticated
+      ? 'Sign in again to reconnect to your office.'
+      : isRateLimited
+        ? 'Please wait a moment, then try again.'
+        : bootstrapError.message;
+
+    return <div
+      className="flex min-h-[420px] w-full flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center"
+      role="alert"
+    >
+      <AlertTriangle className="size-8 text-destructive" aria-hidden="true" />
+      <div className="max-w-lg space-y-2">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        {bootstrapError.kind === 'server' && bootstrapError.correlationId ? <p className="text-xs text-muted-foreground">
+          Reference: {bootstrapError.correlationId}
+        </p> : null}
+      </div>
+      {isUnauthenticated ? <Button onClick={() => router.push('/login')}>Sign in</Button> : <Button
+        onClick={() => void refreshCompanyData()}
+      >
+        Retry
+      </Button>}
+    </div>;
+  }
+
+  if (presenceError && users === undefined) {
+    return <div
+      className="flex min-h-[420px] w-full flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center"
+      role="alert"
+    >
+      <AlertTriangle className="size-8 text-destructive" aria-hidden="true" />
+      <div className="max-w-lg space-y-2">
+        <h2 className="text-lg font-semibold">We couldn&apos;t load live presence</h2>
+        <p className="text-sm text-muted-foreground">
+          The office loaded, but its live occupants did not. Retry before using the floor plan.
+        </p>
+      </div>
+      <Button onClick={retryPresence}>Retry live presence</Button>
+    </div>;
   }
 
   // === NON-HOOK CODE BELOW (handlers, derived values, render) ===
@@ -234,8 +287,31 @@ export function FloorPlan() {
       }
     });
   };
-  return <AudioProvider spaceId={currentSpaceId || selectedSpace?.id} userId={currentUserProfile?.id}>
-      <div className="space-y-4 w-full">
+  return <AudioProvider spaceId={currentSpaceId} userId={currentUserProfile?.id}>
+      <div
+        className="space-y-4 w-full"
+        data-presence-realtime-status={realtimeConnectionStatus}
+      >
+        {bootstrapError && bootstrapError.kind !== 'unauthenticated' ? <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+          role="alert"
+        >
+          <div>
+            <p className="font-medium">Showing saved office data</p>
+            <p className="text-muted-foreground">
+              {bootstrapError.kind === 'rate-limited'
+                ? 'Updates are temporarily rate limited.'
+                : bootstrapError.message}
+              {bootstrapError.kind === 'server' && bootstrapError.correlationId
+                ? ` Reference: ${bootstrapError.correlationId}`
+                : ''}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void refreshCompanyData()}>
+            Retry
+          </Button>
+        </div> : null}
+
         {/* Add debug button and panel */}
         <div className="flex justify-end mb-2">
           <Button variant="outline" size="sm" onClick={() => setShowDebugPanel(!showDebugPanel)} className="text-xs">
@@ -269,7 +345,7 @@ export function FloorPlan() {
         <Card className="w-full">
           <div className="p-4 min-h-[600px]"> {/* Added min-height */}
             {isCompanyLoading ? <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-          : <ModernFloorPlan spaces={neighborhoodFilteredSpaces || []} neighborhoods={neighborhoods} enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0} onSpaceSelect={handleSpaceSelect} onOpenChat={handleOpenChat} onSpaceDoubleClick={space => void handleOpenChat(space)} onEditSpace={isAdmin ? handleEditSpace : undefined} highlightedSpaceId={highlightedSpaceId} perspective={perspective} isAdmin={isAdmin} />}
+          : <ModernFloorPlan spaces={neighborhoodFilteredSpaces || []} neighborhoods={neighborhoods} enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0} onSpaceSelect={handleSpaceSelect} onSpaceLeave={handleSpaceLeave} onOpenChat={space => void handleOpenChat(space)} onSpaceDoubleClick={space => void handleOpenChat(space)} onEditSpace={isAdmin ? handleEditSpace : undefined} highlightedSpaceId={highlightedSpaceId} perspective={perspective} isAdmin={isAdmin} />}
           </div>
         </Card>
 

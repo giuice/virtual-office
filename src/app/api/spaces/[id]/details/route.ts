@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabaseSpaceRepository } from '@/repositories/implementations/supabase/SupabaseSpaceRepository';
 import { requireAuthUser } from '@/lib/auth/session';
+import { createCorrelationId, jsonSuccess } from '@/lib/api/server-error';
 // For now, return empty activity log (table may not exist yet)
 const activityLog: Array<{
   id: string;
@@ -34,8 +35,12 @@ interface RouteParams {
 export async function GET(request: NextRequest, {
   params
 }: RouteParams): Promise<NextResponse> {
+  const correlationId = createCorrelationId();
   try {
-    const authContext = await requireAuthUser();
+    const authContext = await requireAuthUser({
+      correlationId,
+      pathname: '/api/spaces/details',
+    });
     if ('errorResponse' in authContext) {
       return authContext.errorResponse;
     }
@@ -125,11 +130,11 @@ export async function GET(request: NextRequest, {
     } catch {
       // Gracefully continue without transcript if query fails
     }
-    return NextResponse.json({
+    return jsonSuccess({
       agenda,
       activityLog,
       transcript
-    });
+    }, correlationId);
   } catch (error) {
     console.error('Error fetching space details:', error);
     return NextResponse.json({

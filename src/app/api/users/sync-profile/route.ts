@@ -1,10 +1,18 @@
 // src/app/api/users/sync-profile/route.ts
-import { NextResponse } from 'next/server';
 // import { cookies } from 'next/headers'; // No longer needed directly here
 // import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Replaced
 import { createSupabaseServerClient } from '@/lib/supabase/server-client'; // Use the new server client helper
+import { getAuthErrorCode, recordAuthValidation } from '@/lib/auth/auth-metrics';
+import { API_ERROR_CODES } from '@/lib/api/error-contract';
+import { createCorrelationId, jsonError, jsonSuccess, logServerError } from '@/lib/api/server-error';
 import { IUserRepository } from '@/repositories/interfaces';
 import { SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { syncUserProfileSchema } from '@/lib/presence/user-write-contracts';
+import { extractGoogleAvatarUrl } from '@/lib/avatar-utils';
+import {
+  isLegacyPresenceRouteAuditError,
+  recordLegacyPresenceRouteCall,
+} from '@/lib/presence/legacy-route-audit';
 
 // Helper function to validate Google avatar URLs
 function isValidGoogleAvatarUrl(url: string): boolean {
@@ -12,14 +20,11 @@ function isValidGoogleAvatarUrl(url: string): boolean {
     const parsedUrl = new URL(url);
     
     // Check for Google domains
-    const googleDomains = [
-      'googleapis.com',
-      'googleusercontent.com',
-      'google.com'
-    ];
+    const googleDomains = ['googleapis.com', 'googleusercontent.com', 'google.com'];
     
-    const isGoogleDomain = googleDomains.some(domain => 
-      parsedUrl.hostname.includes(domain)
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isGoogleDomain = googleDomains.some(
+      domain => hostname === domain || hostname.endsWith(`.${domain}`)
     );
     
     if (!isGoogleDomain) {
@@ -42,90 +47,138 @@ function isValidGoogleAvatarUrl(url: string): boolean {
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const correlationId = createCorrelationId();
+  let refreshed = false;
+
   try {
     // Get Supabase client using the server helper
-    const supabase = await createSupabaseServerClient(); // Use the async helper
+    const supabase = await createSupabaseServerClient(undefined, {
+      onAuthCookiesSet: () => {
+        refreshed = true;
+      },
+    });
 
     // First verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    let authResult: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+    try {
+      authResult = await supabase.auth.getUser();
+    } catch (authValidationError) {
+      recordAuthValidation({
+        correlationId,
+        boundary: 'route',
+        pathname: '/api/users/sync-profile',
+        authMethod: 'getUser',
+        authStatus: 'error',
+        authErrorCode: getAuthErrorCode(authValidationError),
+        refreshed,
+      });
+      throw authValidationError;
+    }
+    const { data: { user }, error: authError } = authResult;
+    recordAuthValidation({
+      correlationId,
+      boundary: 'route',
+      pathname: '/api/users/sync-profile',
+      authMethod: 'getUser',
+      authStatus: authError ? 'error' : user ? 'authenticated' : 'unauthenticated',
+      authErrorCode: getAuthErrorCode(authError),
+      refreshed,
+    });
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const isRateLimited = authError?.status === 429;
+      return jsonError(
+        isRateLimited ? 429 : 401,
+        isRateLimited ? API_ERROR_CODES.RATE_LIMITED : API_ERROR_CODES.UNAUTHORIZED,
+        isRateLimited ? 'Authentication service rate limit reached' : 'Authentication required',
+        { correlationId, cause: authError, context: 'users.syncProfile.getUser' }
+      );
     }
 
     const supabaseAdmin = await createSupabaseServerClient('service_role');
     const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
 
-    const userData = await request.json();
-
-    // Validate required fields
-    if (!userData.supabaseUid || !userData.email) {
-      return NextResponse.json(
-        { error: 'Missing required fields: supabaseUid and email are required' },
-        { status: 400 }
-      );
+    const rawBody: unknown = await request.json();
+    if (
+      typeof rawBody === 'object' &&
+      rawBody !== null &&
+      'status' in rawBody &&
+      rawBody.status === 'offline'
+    ) {
+      await recordLegacyPresenceRouteCall('users-offline-status');
     }
+
+    const parsedBody = syncUserProfileSchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return jsonError(400, API_ERROR_CODES.BAD_REQUEST, 'Invalid profile sync request', {
+        correlationId,
+        context: 'users.syncProfile',
+      });
+    }
+    const userData = parsedBody.data;
 
     if (userData.supabaseUid !== user.id || userData.email !== user.email) {
-      return NextResponse.json(
-        { error: 'Profile data does not match authenticated user' },
-        { status: 403 }
-      );
+      return jsonError(403, API_ERROR_CODES.FORBIDDEN, 'Profile data does not match authenticated user', {
+        correlationId,
+        context: 'users.syncProfile',
+      });
     }
 
-    // Validate Google avatar URL if provided
-    if (userData.googleAvatarUrl) {
-      if (typeof userData.googleAvatarUrl !== 'string') {
-        return NextResponse.json(
-          { error: 'Invalid googleAvatarUrl: must be a string' },
-          { status: 400 }
-        );
-      }
-      
-      if (!isValidGoogleAvatarUrl(userData.googleAvatarUrl)) {
-        console.warn('Invalid Google avatar URL provided:', userData.googleAvatarUrl);
+    // Derive avatar data from the verified Auth user, never from request input.
+    const metadataAvatarUrl = extractGoogleAvatarUrl(user.user_metadata);
+    let googleAvatarUrl = metadataAvatarUrl ?? undefined;
+    if (googleAvatarUrl && !isValidGoogleAvatarUrl(googleAvatarUrl)) {
+        console.warn(JSON.stringify({
+          event: 'api_warning',
+          correlationId,
+          context: 'users.syncProfile.googleAvatarUrl',
+          code: 'INVALID_GOOGLE_AVATAR_URL',
+        }));
         // Don't fail the request, just log the warning and continue without the avatar
-        userData.googleAvatarUrl = undefined;
-      }
+        googleAvatarUrl = undefined;
     }
 
     // Check if user already exists
     const existingUser = await userRepository.findBySupabaseUid(userData.supabaseUid);
     if (existingUser) {
       // If user exists but we have a Google avatar URL to update, update it
-      if (userData.googleAvatarUrl && userData.googleAvatarUrl !== existingUser.avatarUrl) {
+      if (googleAvatarUrl && googleAvatarUrl !== existingUser.avatarUrl) {
         console.log('Updating existing user with Google avatar URL:', {
           userId: existingUser.id,
           currentAvatarUrl: existingUser.avatarUrl,
-          newGoogleAvatarUrl: userData.googleAvatarUrl
+          newGoogleAvatarUrl: googleAvatarUrl
         });
         
         try {
           const updatedUser = await userRepository.update(existingUser.id, {
-            avatarUrl: userData.googleAvatarUrl
+            avatarUrl: googleAvatarUrl
           });
           
-          return NextResponse.json({
+          return jsonSuccess({
             success: true,
             user: updatedUser,
             message: 'User profile updated with Google avatar'
-          });
+          }, correlationId);
         } catch (updateError) {
-          console.error('Error updating user with Google avatar:', updateError);
+          logServerError(500, API_ERROR_CODES.INTERNAL_ERROR, 'Failed to update profile avatar', {
+            correlationId,
+            cause: updateError,
+            context: 'users.syncProfile.avatarUpdate',
+          });
           // Return existing user if update fails
-          return NextResponse.json({
+          return jsonSuccess({
             success: true,
             user: existingUser,
             message: 'User profile exists, avatar update failed'
-          });
+          }, correlationId);
         }
       }
       
-      return NextResponse.json({
+      return jsonSuccess({
         success: true,
         user: existingUser,
         message: 'User profile already exists'
-      });
+      }, correlationId);
     }
 
     // Create new user profile with Google avatar if provided
@@ -133,31 +186,47 @@ export async function POST(request: Request) {
       supabase_uid: userData.supabaseUid,
       email: userData.email,
       displayName: userData.displayName || userData.email.split('@')[0],
-      status: userData.status || 'online',
+      status: 'online',
       companyId: null,
       role: 'member',
       preferences: {},
-      avatarUrl: userData.googleAvatarUrl || undefined, // Store Google avatar URL if provided
+      avatarUrl: googleAvatarUrl || undefined, // Store Google avatar URL if provided
       currentSpaceId: null
     });
 
     console.log('Created new user profile with Google avatar:', {
       userId: newUser.id,
       email: newUser.email,
-      hasGoogleAvatar: !!userData.googleAvatarUrl
+      hasGoogleAvatar: !!googleAvatarUrl
     });
 
-    return NextResponse.json({
+    return jsonSuccess({
       success: true,
       user: newUser,
       message: 'User profile created successfully'
-    }, { status: 201 });
+    }, correlationId, { status: 201 });
 
   } catch (error) {
-    console.error('Error in sync-profile:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to sync user profile'
-    }, { status: 500 });
+    if (isLegacyPresenceRouteAuditError(error)) {
+      return jsonError(503, error.code, 'Legacy presence audit unavailable', {
+        correlationId,
+        cause: error,
+        context: 'users.syncProfile.legacyAudit',
+      });
+    }
+
+    if (error instanceof SyntaxError) {
+      return jsonError(400, API_ERROR_CODES.BAD_REQUEST, 'Invalid JSON payload', {
+        correlationId,
+        cause: error,
+        context: 'users.syncProfile',
+      });
+    }
+
+    return jsonError(500, API_ERROR_CODES.INTERNAL_ERROR, 'Failed to sync user profile', {
+      correlationId,
+      cause: error,
+      context: 'users.syncProfile',
+    });
   }
 }

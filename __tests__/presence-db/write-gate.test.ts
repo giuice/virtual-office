@@ -1,13 +1,17 @@
-import { randomUUID } from 'node:crypto';
-import { Client } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PresenceFixtures } from './fixtures';
-import { LOCAL_DB_URL } from './setup';
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  ensurePresenceOpenLogUniqueIndex,
+  PresenceFixtures,
+} from "./fixtures";
+import { LOCAL_DB_URL } from "./setup";
 import {
   createAuthedUser,
   createServiceClient,
   type AuthedUser,
-} from './auth-clients';
+} from "./auth-clients";
+import { presenceConcurrencyTestName } from "./concurrency/support";
 
 const NS = `write-gate-${randomUUID()}`;
 const COMPANY_NAME = `phase3-write-gate-company::${NS}`;
@@ -23,7 +27,7 @@ type UserRow = {
 };
 type CountRow = { readonly count: string };
 type ControlRow = {
-  readonly mode: 'legacy' | 'maintenance' | 'atomic';
+  readonly mode: "legacy" | "maintenance" | "atomic";
   readonly cutover_id: string | null;
 };
 type RepairResult = {
@@ -36,7 +40,7 @@ type RepairResult = {
   readonly after_mismatched_rows: number;
 };
 
-describe('presence-db write gate', () => {
+describe("presence-db write gate", () => {
   let fixtures: PresenceFixtures;
   let serviceClient: ReturnType<typeof createServiceClient>;
   let companyId: string;
@@ -57,24 +61,24 @@ describe('presence-db write gate', () => {
        returning id`,
       [COMPANY_NAME],
     );
-    if (!company) throw new Error('Failed to create write-gate company');
+    if (!company) throw new Error("Failed to create write-gate company");
     companyId = company.id;
 
     spaceAId = await createSpace(SPACE_A_NAME);
     spaceBId = await createSpace(SPACE_B_NAME);
     spaceCId = await createSpace(SPACE_C_NAME);
-    primaryUser = await createPlainUser('primary');
-    secondaryUser = await createPlainUser('secondary');
+    primaryUser = await createPlainUser("primary");
+    secondaryUser = await createPlainUser("secondary");
     authBackedUser = await createAuthedUser(fixtures, NS, {
-      key: 'write-gate-member',
+      key: "write-gate-member",
       companyId,
-      displayName: 'Phase 3 Write Gate Member',
-      role: 'member',
+      displayName: "Phase 3 Write Gate Member",
+      role: "member",
     });
   });
 
   beforeEach(async () => {
-    await resetWriteGate('legacy', null);
+    await resetWriteGate("legacy", null);
     await asPmo(() =>
       fixtures.sql(`delete from private.presence_legacy_writer_inflight`),
     );
@@ -96,12 +100,16 @@ describe('presence-db write gate', () => {
 
   afterAll(async () => {
     if (fixtures) {
-      await resetWriteGate('legacy', null);
-      await fixtures.sql(
-        `drop index if exists public.ux_space_presence_log_one_open_per_user`,
-      );
-      await fixtures.cleanup();
-      await fixtures.end();
+      try {
+        await resetWriteGate("legacy", null);
+        await fixtures.cleanup();
+      } finally {
+        try {
+          await ensurePresenceOpenLogUniqueIndex(fixtures);
+        } finally {
+          await fixtures.end();
+        }
+      }
     }
   });
 
@@ -150,7 +158,7 @@ describe('presence-db write gate', () => {
   }
 
   async function resetWriteGate(
-    mode: 'legacy' | 'maintenance' | 'atomic',
+    mode: "legacy" | "maintenance" | "atomic",
     cutoverId: string | null,
   ): Promise<void> {
     await asPmo(() =>
@@ -177,26 +185,32 @@ describe('presence-db write gate', () => {
       ),
     );
     const row = rows[0];
-    if (!row) throw new Error('Missing presence_runtime_control row');
+    if (!row) throw new Error("Missing presence_runtime_control row");
     return row;
   }
 
   async function beginLegacyWrite(requestId = randomUUID()): Promise<Date> {
-    const { data, error } = await serviceClient.rpc('begin_legacy_presence_write', {
-      p_request_id: requestId,
-    });
+    const { data, error } = await serviceClient.rpc(
+      "begin_legacy_presence_write",
+      {
+        p_request_id: requestId,
+      },
+    );
     if (error) throw new Error(error.message);
     return new Date(data as string);
   }
 
   async function endLegacyWrite(
     requestId: string,
-    status: 'completed' | 'rejected' | 'failed' | string,
+    status: "completed" | "rejected" | "failed" | string,
   ): Promise<boolean> {
-    const { data, error } = await serviceClient.rpc('end_legacy_presence_write', {
-      p_request_id: requestId,
-      p_completion_status: status,
-    });
+    const { data, error } = await serviceClient.rpc(
+      "end_legacy_presence_write",
+      {
+        p_request_id: requestId,
+        p_completion_status: status,
+      },
+    );
     if (error) throw new Error(error.message);
     return Boolean(data);
   }
@@ -219,13 +233,13 @@ describe('presence-db write gate', () => {
   }
 
   async function attemptMarkedUserUpdate(params: {
-    readonly mode: 'legacy' | 'maintenance' | 'atomic';
+    readonly mode: "legacy" | "maintenance" | "atomic";
     readonly marker: string;
     readonly jwtClaims?: string;
   }): Promise<void> {
     await resetWriteGate(params.mode, randomUUID());
     await withClient(async (client) => {
-      await client.query('begin');
+      await client.query("begin");
       try {
         await client.query(
           `select set_config('request.jwt.claims', $1, true)`,
@@ -241,15 +255,15 @@ describe('presence-db write gate', () => {
            where id = $2`,
           [spaceAId, primaryUser.id],
         );
-        await client.query('commit');
+        await client.query("commit");
       } catch (error) {
-        await client.query('rollback');
+        await client.query("rollback");
         throw error;
       }
     });
   }
 
-  it('enforces the control singleton and hides private gate tables from browser and service clients', async () => {
+  it("enforces the control singleton and hides private gate tables from browser and service clients", async () => {
     // As the owner role (implicit ACL) the insert must still fail on the
     // singleton primary key, proving a second control row is impossible.
     await expect(
@@ -261,36 +275,39 @@ describe('presence-db write gate', () => {
       ),
     ).rejects.toThrow();
 
-    for (const table of ['presence_runtime_control', 'presence_legacy_writer_inflight']) {
+    for (const table of [
+      "presence_runtime_control",
+      "presence_legacy_writer_inflight",
+    ]) {
       const { error: authSelectError } = await authBackedUser.client
-        .schema('private')
+        .schema("private")
         .from(table)
-        .select('*');
+        .select("*");
       expect(authSelectError, `authenticated SELECT ${table}`).not.toBeNull();
 
       const { error: serviceSelectError } = await serviceClient
-        .schema('private')
+        .schema("private")
         .from(table)
-        .select('*');
+        .select("*");
       expect(serviceSelectError, `service SELECT ${table}`).not.toBeNull();
 
       const { error: serviceInsertError } = await serviceClient
-        .schema('private')
+        .schema("private")
         .from(table)
         .insert({});
       expect(serviceInsertError, `service INSERT ${table}`).not.toBeNull();
     }
   });
 
-  it('allows current legacy movement writes in legacy mode', async () => {
+  it("allows current legacy movement writes in legacy mode", async () => {
     const { error: userError } = await serviceClient
-      .from('users')
+      .from("users")
       .update({ current_space_id: spaceAId })
-      .eq('id', primaryUser.id);
+      .eq("id", primaryUser.id);
     expect(userError).toBeNull();
 
     const { error: logError } = await serviceClient
-      .from('space_presence_log')
+      .from("space_presence_log")
       .insert({
         user_id: primaryUser.id,
         space_id: spaceAId,
@@ -299,81 +316,128 @@ describe('presence-db write gate', () => {
     expect(logError).toBeNull();
   });
 
-  it('drains shared gate locks before entering maintenance and then blocks later legacy writes', async () => {
-    const cutoverId = randomUUID();
-    const connectionA = new Client({ connectionString: LOCAL_DB_URL });
-    const connectionB = new Client({ connectionString: LOCAL_DB_URL });
-    await connectionA.connect();
-    await connectionB.connect();
+  it(
+    presenceConcurrencyTestName(
+      "48-legacy-shared-gate",
+      "drains an observed legacy shared gate before maintenance and blocks later writes",
+    ),
+    async () => {
+      const cutoverId = randomUUID();
+      const connectionA = new Client({ connectionString: LOCAL_DB_URL });
+      const connectionB = new Client({ connectionString: LOCAL_DB_URL });
+      await connectionA.connect();
+      await connectionB.connect();
 
-    try {
-      await connectionA.query('begin');
-      await connectionA.query(
-        `insert into public.space_presence_log (user_id, space_id, entered_at)
-         values ($1, $2, pg_catalog.clock_timestamp())`,
-        [primaryUser.id, spaceAId],
-      );
-
-      let maintenanceCommitted = false;
-      const maintenancePromise = connectionB
-        .query(`select public.enter_presence_maintenance($1)`, [cutoverId])
-        .then(() => {
-          maintenanceCommitted = true;
-        });
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(maintenanceCommitted).toBe(false);
-
-      await connectionA.query('commit');
-      await maintenancePromise;
-      expect(maintenanceCommitted).toBe(true);
-
-      await expect(
-        fixtures.sql(
+      try {
+        const holderPid = Number(
+          (
+            await connectionA.query<{ readonly pid: number }>(
+              "select pg_catalog.pg_backend_pid() as pid",
+            )
+          ).rows[0]?.pid,
+        );
+        const maintenancePid = Number(
+          (
+            await connectionB.query<{ readonly pid: number }>(
+              "select pg_catalog.pg_backend_pid() as pid",
+            )
+          ).rows[0]?.pid,
+        );
+        await connectionA.query("begin");
+        await connectionA.query(
           `insert into public.space_presence_log (user_id, space_id, entered_at)
-           values ($1, $2, pg_catalog.clock_timestamp())`,
-          [secondaryUser.id, spaceBId],
-        ),
-      ).rejects.toThrow(/PRESENCE_MAINTENANCE/);
+         values ($1, $2, pg_catalog.clock_timestamp())`,
+          [primaryUser.id, spaceAId],
+        );
 
-      await asPmo(() =>
-        fixtures.sql(
-          `insert into private.presence_legacy_writer_inflight
+        const maintenancePromise = connectionB.query(
+          `select public.enter_presence_maintenance($1)`,
+          [cutoverId],
+        );
+
+        let observedWait = false;
+        for (let attempt = 0; attempt < 80; attempt += 1) {
+          const [evidence] = await fixtures.sql<{
+            readonly wait_event_type: string | null;
+            readonly blockers: number[];
+            readonly ungranted: string;
+          }>(
+            `select activity.wait_event_type,
+                  pg_catalog.pg_blocking_pids(activity.pid) as blockers,
+                  (
+                    select pg_catalog.count(*)::text
+                    from pg_catalog.pg_locks as lock_row
+                    where lock_row.pid = activity.pid
+                      and not lock_row.granted
+                  ) as ungranted
+           from pg_catalog.pg_stat_activity as activity
+           where activity.pid = $1`,
+            [maintenancePid],
+          );
+          if (
+            evidence?.wait_event_type === "Lock" &&
+            evidence.blockers.includes(holderPid) &&
+            Number(evidence.ungranted) > 0
+          ) {
+            observedWait = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        expect(observedWait).toBe(true);
+
+        await connectionA.query("commit");
+        await maintenancePromise;
+
+        await expect(
+          fixtures.sql(
+            `insert into public.space_presence_log (user_id, space_id, entered_at)
+           values ($1, $2, pg_catalog.clock_timestamp())`,
+            [secondaryUser.id, spaceBId],
+          ),
+        ).rejects.toThrow(/PRESENCE_MAINTENANCE/);
+
+        await asPmo(() =>
+          fixtures.sql(
+            `insert into private.presence_legacy_writer_inflight
              (request_id, started_at, hard_deadline)
            values (
              $1,
              pg_catalog.clock_timestamp() - interval '120 seconds',
              pg_catalog.clock_timestamp() - interval '60 seconds'
            )`,
-          [randomUUID()],
-        ),
-      );
+            [randomUUID()],
+          ),
+        );
 
-      await expect(
-        fixtures.sql(
-          `update public.users
+        await expect(
+          fixtures.sql(
+            `update public.users
            set current_space_id = $1
            where id = $2`,
-          [spaceBId, secondaryUser.id],
-        ),
-      ).rejects.toThrow(/PRESENCE_MAINTENANCE/);
-    } finally {
-      await connectionA.query('rollback').catch(() => undefined);
-      await connectionA.end();
-      await connectionB.end();
-    }
-  });
+            [spaceBId, secondaryUser.id],
+          ),
+        ).rejects.toThrow(/PRESENCE_MAINTENANCE/);
+      } finally {
+        await connectionA.query("rollback").catch(() => undefined);
+        await connectionA.end();
+        await connectionB.end();
+      }
+    },
+  );
 
-  it('gates legacy writer ledger begin/end by runtime mode and validates completion', async () => {
+  it("gates legacy writer ledger begin/end by runtime mode and validates completion", async () => {
     const requestId = randomUUID();
     const deadline = await beginLegacyWrite(requestId);
     const secondsOut = (deadline.getTime() - Date.now()) / 1000;
     expect(secondsOut).toBeGreaterThan(45);
     expect(secondsOut).toBeLessThanOrEqual(65);
-    await expect(endLegacyWrite(requestId, 'completed')).resolves.toBe(true);
+    await expect(endLegacyWrite(requestId, "completed")).resolves.toBe(true);
 
-    await expect(endLegacyWrite(randomUUID(), 'completed')).resolves.toBe(false);
-    await expect(endLegacyWrite(randomUUID(), 'bogus')).rejects.toThrow(
+    await expect(endLegacyWrite(randomUUID(), "completed")).resolves.toBe(
+      false,
+    );
+    await expect(endLegacyWrite(randomUUID(), "bogus")).rejects.toThrow(
       /PRESENCE_COMPLETION_STATUS_INVALID/,
     );
 
@@ -381,31 +445,33 @@ describe('presence-db write gate', () => {
     await fixtures.sql(`select public.enter_presence_maintenance($1)`, [
       maintenanceCutoverId,
     ]);
-    await expectRpcCode(() => beginLegacyWrite(), 'PRESENCE_MAINTENANCE');
+    await expectRpcCode(() => beginLegacyWrite(), "PRESENCE_MAINTENANCE");
 
-    await resetWriteGate('atomic', maintenanceCutoverId);
-    await expectRpcCode(() => beginLegacyWrite(), 'CLIENT_UPGRADE_REQUIRED');
+    await resetWriteGate("atomic", maintenanceCutoverId);
+    await expectRpcCode(() => beginLegacyWrite(), "CLIENT_UPGRADE_REQUIRED");
   });
 
-  it('rejects authenticated marker spoofing and invalid markers while allowing reviewed maintenance repair', async () => {
-    for (const mode of ['legacy', 'maintenance', 'atomic'] as const) {
+  it("rejects authenticated marker spoofing and invalid markers while allowing reviewed maintenance repair", async () => {
+    for (const mode of ["legacy", "maintenance", "atomic"] as const) {
       await expect(
         attemptMarkedUserUpdate({
           mode,
-          marker: 'atomic-transition',
+          marker: "atomic-transition",
           jwtClaims: '{"role":"authenticated"}',
         }),
-      ).rejects.toThrow(/PRESENCE_INTERNAL_WRITER_FORBIDDEN|PRESENCE_INTERNAL_WRITER_MODE_INVALID/);
+      ).rejects.toThrow(
+        /PRESENCE_INTERNAL_WRITER_FORBIDDEN|PRESENCE_INTERNAL_WRITER_MODE_INVALID/,
+      );
     }
 
     await expect(
       attemptMarkedUserUpdate({
-        mode: 'atomic',
-        marker: 'not-a-reviewed-writer',
+        mode: "atomic",
+        marker: "not-a-reviewed-writer",
       }),
     ).rejects.toThrow(/PRESENCE_INTERNAL_WRITER_INVALID/);
 
-    await resetWriteGate('legacy', null);
+    await resetWriteGate("legacy", null);
     await fixtures.sql(
       `update public.users
        set current_space_id = $1
@@ -419,7 +485,9 @@ describe('presence-db write gate', () => {
       [primaryUser.id, spaceAId, spaceBId],
     );
     const cutoverId = randomUUID();
-    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [cutoverId]);
+    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [
+      cutoverId,
+    ]);
     const [repair] = await fixtures.sql<RepairResult>(
       `select * from public.repair_presence_logs_for_cutover($1)`,
       [cutoverId],
@@ -429,7 +497,7 @@ describe('presence-db write gate', () => {
     expect(repair?.after_mismatched_rows).toBe(0);
   });
 
-  it('repairs duplicate and mismatched open space presence logs for the active cutover', async () => {
+  it("repairs duplicate and mismatched open space presence logs for the active cutover", async () => {
     await fixtures.sql(
       `update public.users
        set current_space_id = case
@@ -441,6 +509,31 @@ describe('presence-db write gate', () => {
       [primaryUser.id, spaceAId, secondaryUser.id, spaceBId],
     );
 
+    const [baseline] = await fixtures.sql<{
+      readonly open_rows: number;
+      readonly duplicate_users: number;
+      readonly mismatched_rows: number;
+    }>(`
+      select
+        (select pg_catalog.count(*)::integer
+         from public.space_presence_log as log_row
+         where log_row.exited_at is null) as open_rows,
+        (select pg_catalog.count(*)::integer
+         from (
+           select log_row.user_id
+           from public.space_presence_log as log_row
+           where log_row.exited_at is null
+           group by log_row.user_id
+           having pg_catalog.count(*) > 1
+         ) as duplicated) as duplicate_users,
+        (select pg_catalog.count(*)::integer
+         from public.space_presence_log as log_row
+         join public.users as member on member.id = log_row.user_id
+         where log_row.exited_at is null
+           and log_row.space_id is distinct from member.current_space_id) as mismatched_rows
+    `);
+    if (!baseline) throw new Error("Failed to read repair baseline");
+
     await fixtures.sql(
       `insert into public.space_presence_log (user_id, space_id, entered_at)
        values
@@ -451,15 +544,17 @@ describe('presence-db write gate', () => {
     );
 
     const cutoverId = randomUUID();
-    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [cutoverId]);
+    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [
+      cutoverId,
+    ]);
     const [repair] = await fixtures.sql<RepairResult>(
       `select * from public.repair_presence_logs_for_cutover($1)`,
       [cutoverId],
     );
 
-    expect(repair?.before_open_rows).toBe(3);
-    expect(repair?.before_duplicate_users).toBe(1);
-    expect(repair?.before_mismatched_rows).toBe(2);
+    expect(repair?.before_open_rows).toBe(baseline.open_rows + 3);
+    expect(repair?.before_duplicate_users).toBe(baseline.duplicate_users + 1);
+    expect(repair?.before_mismatched_rows).toBe(baseline.mismatched_rows + 2);
     expect(repair?.after_duplicate_users).toBe(0);
     expect(repair?.after_mismatched_rows).toBe(0);
 
@@ -474,11 +569,15 @@ describe('presence-db write gate', () => {
     expect(Number(closed?.count)).toBeGreaterThanOrEqual(3);
   });
 
-  it('activates atomic mode only after index/readiness checks and then rejects marker-less DML', async () => {
+  it("activates atomic mode only after index/readiness checks and then rejects marker-less DML", async () => {
     const cutoverId = randomUUID();
-    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [cutoverId]);
+    await fixtures.sql(`select public.enter_presence_maintenance($1)`, [
+      cutoverId,
+    ]);
     await expect(
-      fixtures.sql(`select public.activate_atomic_presence_writer($1)`, [cutoverId]),
+      fixtures.sql(`select public.activate_atomic_presence_writer($1)`, [
+        cutoverId,
+      ]),
     ).rejects.toThrow(/PRESENCE_OPEN_LOG_UNIQUE_INDEX_REQUIRED/);
 
     await fixtures.sql(
@@ -487,18 +586,20 @@ describe('presence-db write gate', () => {
        where exited_at is null`,
     );
 
-    await fixtures.sql(`select public.activate_atomic_presence_writer($1)`, [cutoverId]);
+    await fixtures.sql(`select public.activate_atomic_presence_writer($1)`, [
+      cutoverId,
+    ]);
     const control = await controlRow();
-    expect(control.mode).toBe('atomic');
+    expect(control.mode).toBe("atomic");
 
     const { error: markerlessServiceError } = await serviceClient
-      .from('users')
+      .from("users")
       .update({ current_space_id: spaceAId })
-      .eq('id', primaryUser.id);
+      .eq("id", primaryUser.id);
     expect(markerlessServiceError).not.toBeNull();
 
     await withClient(async (client) => {
-      await client.query('begin');
+      await client.query("begin");
       try {
         await client.query(
           `select set_config('app.presence_internal_writer', 'atomic-transition', true)`,
@@ -509,38 +610,40 @@ describe('presence-db write gate', () => {
            where id = $2`,
           [spaceAId, primaryUser.id],
         );
-        await client.query('commit');
+        await client.query("commit");
       } catch (error) {
-        await client.query('rollback');
+        await client.query("rollback");
         throw error;
       }
     });
   });
 
-  it('supports atomic incident maintenance and has no function path back to legacy', async () => {
+  it("supports atomic incident maintenance and has no function path back to legacy", async () => {
     await expect(
       fixtures.sql(`select public.enter_atomic_presence_maintenance($1, $2)`, [
         randomUUID(),
-        'not atomic yet',
+        "not atomic yet",
       ]),
     ).rejects.toThrow(/PRESENCE_ATOMIC_MAINTENANCE_REQUIRES_ATOMIC/);
 
     const atomicCutoverId = randomUUID();
-    await resetWriteGate('atomic', atomicCutoverId);
+    await resetWriteGate("atomic", atomicCutoverId);
     const maintenanceCutoverId = randomUUID();
-    await fixtures.sql(`select public.enter_atomic_presence_maintenance($1, $2)`, [
-      maintenanceCutoverId,
-      'incident rehearsal',
-    ]);
+    await fixtures.sql(
+      `select public.enter_atomic_presence_maintenance($1, $2)`,
+      [maintenanceCutoverId, "incident rehearsal"],
+    );
 
     const control = await controlRow();
     expect(control).toMatchObject({
-      mode: 'maintenance',
+      mode: "maintenance",
       cutover_id: maintenanceCutoverId,
     });
 
     await expect(
-      fixtures.sql(`select public.enter_presence_maintenance($1)`, [randomUUID()]),
+      fixtures.sql(`select public.enter_presence_maintenance($1)`, [
+        randomUUID(),
+      ]),
     ).rejects.toThrow(/PRESENCE_MAINTENANCE_REQUIRES_LEGACY/);
 
     const legacyEntryFunctions = await fixtures.sql<CountRow>(
@@ -554,10 +657,10 @@ describe('presence-db write gate', () => {
            'exit_presence_maintenance'
          )`,
     );
-    expect(legacyEntryFunctions[0]?.count).toBe('0');
+    expect(legacyEntryFunctions[0]?.count).toBe("0");
   });
 
-  it('catalog grants expose only the reviewed function execution surface', async () => {
+  it("catalog grants expose only the reviewed function execution surface", async () => {
     const functions = await fixtures.sql<{
       readonly function_name: string;
       readonly owner_name: string;
@@ -605,16 +708,18 @@ describe('presence-db write gate', () => {
 
     expect(functions).toHaveLength(6);
     const expectedGrants = new Map<string, readonly string[]>([
-      ['activate_atomic_presence_writer', ['postgres:EXECUTE']],
-      ['begin_legacy_presence_write', ['service_role:EXECUTE']],
-      ['end_legacy_presence_write', ['service_role:EXECUTE']],
-      ['enter_atomic_presence_maintenance', ['postgres:EXECUTE']],
-      ['enter_presence_maintenance', ['postgres:EXECUTE']],
-      ['repair_presence_logs_for_cutover', ['postgres:EXECUTE']],
+      ["activate_atomic_presence_writer", ["postgres:EXECUTE"]],
+      ["begin_legacy_presence_write", ["service_role:EXECUTE"]],
+      ["end_legacy_presence_write", ["service_role:EXECUTE"]],
+      ["enter_atomic_presence_maintenance", ["postgres:EXECUTE"]],
+      ["enter_presence_maintenance", ["postgres:EXECUTE"]],
+      ["repair_presence_logs_for_cutover", ["postgres:EXECUTE"]],
     ]);
 
     for (const fn of functions) {
-      expect(fn.owner_name, fn.function_name).toBe('presence_maintenance_owner');
+      expect(fn.owner_name, fn.function_name).toBe(
+        "presence_maintenance_owner",
+      );
       expect(fn.prosecdef, fn.function_name).toBe(true);
       expect(fn.search_path_fixed, fn.function_name).toBe(true);
       expect(fn.grants.sort(), fn.function_name).toEqual(

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '@/app/onboarding/page';
 
 const pushMock = vi.fn();
+const authUser = { id: 'user-1' };
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -12,7 +13,9 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'user-1' },
+    // Keep the mocked context value referentially stable. The real AuthContext
+    // does not manufacture a new user object on every consumer render.
+    user: authUser,
     isAuthReady: true,
   }),
 }));

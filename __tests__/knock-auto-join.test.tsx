@@ -6,6 +6,16 @@ import type { KnockStatus } from '@/hooks/useKnock';
 import type { KnockRequestPayload, KnockResponsePayload } from '@/hooks/realtime/useKnockSignaling';
 import type { Space, User, UserPresenceData } from '@/types/database';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 const mocks = vi.hoisted(() => {
   const toast = Object.assign(vi.fn(), {
     success: vi.fn(),
@@ -26,6 +36,7 @@ const mocks = vi.hoisted(() => {
     knock: vi.fn(),
     canKnock: vi.fn(),
     getCooldownRemaining: vi.fn(),
+    releaseManualIntent: vi.fn(),
     capturedSignalingOptions: undefined as undefined | {
       onKnockRequest: (payload: KnockRequestPayload) => void;
       onKnockResponse: (payload: KnockResponsePayload) => void;
@@ -54,6 +65,8 @@ vi.mock('@/contexts/PresenceContext', () => ({
     usersInSpaces,
     isLoading: false,
     updateLocation: mocks.updateLocation,
+    beginManualIntent: () => 42,
+    releaseManualIntent: mocks.releaseManualIntent,
     presenceSessionId: '22222222-2222-4222-8222-222222222222',
   }),
 }));
@@ -104,6 +117,7 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
     pendingKnockRequest,
     onKnockApprove,
     onKnockDeny,
+    knockResponsePending,
   }: {
     space: Space;
     onEnterSpace: (spaceId: string) => void;
@@ -112,6 +126,7 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
     pendingKnockRequest?: KnockRequestPayload | null;
     onKnockApprove?: (payload: KnockRequestPayload) => void;
     onKnockDeny?: (payload: KnockRequestPayload) => void;
+    knockResponsePending?: boolean;
   }) => (
     <div data-testid={`space-${space.id}`}>
       <div data-testid={`space-state-${space.id}`}>{`direct:${Boolean(state?.directEnter)} knock:${Boolean(onKnock)}`}</div>
@@ -120,8 +135,8 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
       {pendingKnockRequest && (
         <div role="alert">
           Banner {pendingKnockRequest.requesterName}
-          <button type="button" onClick={() => onKnockApprove?.(pendingKnockRequest)}>Approve</button>
-          <button type="button" onClick={() => onKnockDeny?.(pendingKnockRequest)}>Deny</button>
+          <button type="button" disabled={knockResponsePending} onClick={() => onKnockApprove?.(pendingKnockRequest)}>Approve</button>
+          <button type="button" disabled={knockResponsePending} onClick={() => onKnockDeny?.(pendingKnockRequest)}>Deny</button>
         </div>
       )}
     </div>
@@ -178,6 +193,7 @@ const mockApprovalPayload: KnockResponsePayload = {
   responderValidated: true,
   decision: 'APPROVE',
   timestamp: Date.now(),
+  requesterLocationVersion: 7,
 };
 
 const mockDenialPayload: KnockResponsePayload = {
@@ -215,9 +231,13 @@ describe('Knock Auto-Join Flow', () => {
     mocks.knockState.cooldownRemaining = 0;
     mocks.canKnock.mockReturnValue(true);
     mocks.getCooldownRemaining.mockReturnValue(0);
-    mocks.sendKnockRequest.mockResolvedValue({ requestId: 'request-1', recipientCount: 1 });
+    mocks.sendKnockRequest.mockResolvedValue({
+      requestId: 'request-1',
+      recipientCount: 1,
+      requesterLocationVersion: 7,
+    });
     mocks.respondToKnock.mockResolvedValue(undefined);
-    mocks.updateLocation.mockResolvedValue(undefined);
+    mocks.updateLocation.mockResolvedValue({ ok: true });
     currentUser.role = 'member';
     space.capacity = 4;
     space.accessControl = { isPublic: false };
@@ -291,16 +311,54 @@ describe('Knock Auto-Join Flow', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Riley Knocker');
   });
 
+  it('serializes rapid responder decisions for the same request', async () => {
+    const response = deferred<void>();
+    mocks.respondToKnock.mockReturnValue(response.promise);
+    renderPlan();
+
+    act(() => {
+      mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
+    });
+    const approve = screen.getByRole('button', { name: 'Approve' });
+    fireEvent.click(approve);
+    fireEvent.click(approve);
+
+    expect(mocks.respondToKnock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeDisabled();
+
+    await act(async () => response.resolve());
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'does not update responder UI when a pending decision %s after unmount',
+    async (settlement) => {
+      const response = deferred<void>();
+      mocks.respondToKnock.mockReturnValue(response.promise);
+      const { unmount } = renderPlan();
+      act(() => {
+        mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+      unmount();
+
+      await act(async () => {
+        if (settlement === 'resolve') response.resolve();
+        else response.reject(new Error('late failure'));
+        await response.promise.catch(() => undefined);
+      });
+
+      expect(mocks.toast.success).not.toHaveBeenCalled();
+      expect(mocks.toast.info).not.toHaveBeenCalled();
+      expect(mocks.toast.error).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not make a private space knockable when only a stale offline occupant exists', () => {
-    usersInSpaces.set(space.id, [
-      {
-        ...currentUserPresence,
-        id: 'offline-occupant-1',
-        displayName: 'Offline Occupant',
-        currentSpaceId: space.id,
-        status: 'offline',
-      },
-    ]);
+    // The authoritative selector excludes disconnected/stale placements before
+    // responder logic consumes the occupant map.
+    usersInSpaces.clear();
     renderPlan();
 
     expect(screen.getByTestId('space-state-space-1')).toHaveTextContent('direct:false knock:false');
@@ -320,28 +378,24 @@ describe('Knock Auto-Join Flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
 
-    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1', {
+      reason: 'manual-enter',
+    }));
     expect(mocks.sendKnockRequest).not.toHaveBeenCalled();
   });
 
   it('does not count stale offline occupants against client-side capacity', async () => {
     space.capacity = 1;
     space.accessControl = { isPublic: false, allowedUsers: [currentUser.id] };
-    usersInSpaces.set(space.id, [
-      {
-        ...currentUserPresence,
-        id: 'offline-occupant-1',
-        displayName: 'Offline Occupant',
-        currentSpaceId: space.id,
-        status: 'offline',
-      },
-    ]);
+    usersInSpaces.clear();
 
     renderPlan();
 
     fireEvent.click(screen.getByRole('button', { name: 'Enter Focus Room' }));
 
-    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1'));
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1', {
+      reason: 'manual-enter',
+    }));
   });
 
   it('offers knocking whenever another online occupant is present', async () => {
@@ -372,7 +426,38 @@ describe('Knock Auto-Join Flow', () => {
     });
 
     await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1', {
+      reason: 'knock-enter',
       knockRequestId: 'request-1',
+      expectedLocationVersion: 7,
+      intentGeneration: 42,
     }));
+    expect(mocks.releaseManualIntent).toHaveBeenCalledWith(42);
+  });
+
+  it('does not select the room when an approved knock was superseded by another move', async () => {
+    mocks.knockState.targetSpaceId = 'space-1';
+    mocks.updateLocation.mockResolvedValue({
+      ok: false,
+      code: 'LOCATION_SUPERSEDED',
+      message: 'Location transition was superseded',
+      retryable: false,
+      skipped: true,
+    });
+    renderPlan();
+    fireEvent.click(screen.getByRole('button', { name: 'Knock Focus Room' }));
+    await waitFor(() => expect(mocks.sendKnockRequest).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      mocks.capturedSignalingOptions?.onKnockResponse(mockApprovalPayload);
+    });
+
+    await waitFor(() => expect(mocks.updateLocation).toHaveBeenCalledWith('space-1', {
+      reason: 'knock-enter',
+      knockRequestId: 'request-1',
+      expectedLocationVersion: 7,
+      intentGeneration: 42,
+    }));
+    expect(mocks.onSpaceSelect).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 });

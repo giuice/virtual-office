@@ -8,6 +8,10 @@ import {
   type LegacyPresenceCompletionStatus,
   type LegacyPresenceWriteGate,
 } from '@/lib/presence/legacy-write-gate';
+import {
+  isLegacyPresenceRouteAuditError,
+  recordLegacyPresenceRouteCall,
+} from '@/lib/presence/legacy-route-audit';
 import type { User } from '@/types/database';
 import { z } from 'zod';
 
@@ -143,7 +147,7 @@ async function syncSpacePresenceLog(params: {
   }
 }
 
-async function getAuthenticatedAppUser(writeGate: LegacyPresenceWriteGate) {
+async function getAuthenticatedAppUser() {
   const [supabase, supabaseAdmin] = await Promise.all([
     createSupabaseServerClient(),
     createSupabaseServerClient('service_role'),
@@ -160,7 +164,6 @@ async function getAuthenticatedAppUser(writeGate: LegacyPresenceWriteGate) {
   }
 
   const userRepository = new SupabaseUserRepository(supabaseAdmin);
-  writeGate.assertCanStartDatabaseOperation();
   const authenticatedUser = await userRepository.findBySupabaseUid(authData.user.id);
 
   if (!authenticatedUser) {
@@ -440,12 +443,15 @@ async function handleLocationUpdate(request: Request) {
   };
 
   try {
-    writeGate = await beginLegacyPresenceWrite();
-
-    const authContext = await getAuthenticatedAppUser(writeGate);
+    const authContext = await getAuthenticatedAppUser();
     if ('errorResponse' in authContext && authContext.errorResponse) {
       return completeWith(authContext.errorResponse);
     }
+
+    // Only verified legacy clients contribute to the removal gate; otherwise
+    // anonymous probes could indefinitely poison the global seven-day window.
+    await recordLegacyPresenceRouteCall('users-location');
+    writeGate = await beginLegacyPresenceWrite();
 
     const {
       supabaseAdmin,
@@ -613,6 +619,15 @@ async function handleLocationUpdate(request: Request) {
     }, { status: 200 }));
 
   } catch (error) {
+    if (isLegacyPresenceRouteAuditError(error)) {
+      completionStatus = 'failed';
+      return NextResponse.json({
+        success: false,
+        code: error.code,
+        retryable: true,
+      }, { status: 503 });
+    }
+
     if (isLegacyPresenceWriteGateError(error)) {
       completionStatus = error.httpStatus >= 500 ? 'failed' : 'rejected';
       return NextResponse.json(error.toBody(), { status: error.httpStatus });

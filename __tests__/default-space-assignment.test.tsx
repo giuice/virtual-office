@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  DISCONNECT_TS_KEY,
-  FIRST_LOGIN_KEY,
-  getReconnectionContext,
-} from '@/hooks/useLastSpace';
+import { getReconnectionContext } from '@/hooks/useLastSpace';
 import type { Company, Space, User } from '@/types/database';
 
 vi.mock('sonner', () => ({
@@ -116,7 +112,7 @@ describe('getReconnectionContext', () => {
   });
 
   it('returns first-time placement to company default space for new users', () => {
-    const context = getReconnectionContext(currentUser, spaces, company, null);
+    const context = getReconnectionContext(currentUser, spaces, company, null, true);
 
     expect(context.type).toBe('first-time');
     expect(context.spaceId).toBe('space-default');
@@ -128,7 +124,8 @@ describe('getReconnectionContext', () => {
       currentUser,
       spaces,
       { ...company, settings: { theme: 'light' } },
-      null
+      null,
+      true
     );
 
     expect(context.type).toBe('first-time');
@@ -136,8 +133,6 @@ describe('getReconnectionContext', () => {
   });
 
   it('returns home-space for returning user with assigned home space', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
     const context = getReconnectionContext(currentUser, spaces, company, null);
 
     expect(context.type).toBe('home-space');
@@ -145,8 +140,6 @@ describe('getReconnectionContext', () => {
   });
 
   it('returns default-space for returning user with no home space', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
     const context = getReconnectionContext(
       currentUser,
       spaces,
@@ -159,8 +152,6 @@ describe('getReconnectionContext', () => {
   });
 
   it('returns fallback to first workspace when no home or default', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
     const context = getReconnectionContext(
       currentUser,
       spaces,
@@ -173,8 +164,6 @@ describe('getReconnectionContext', () => {
   });
 
   it('returns null spaceId when no active spaces available', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-
     const context = getReconnectionContext(
       currentUser,
       spaces.map((space) => ({ ...space, status: 'maintenance' as const })),
@@ -187,9 +176,6 @@ describe('getReconnectionContext', () => {
   });
 
   it('skips inactive/maintenance spaces in all tiers', () => {
-    localStorageMock.setItem(FIRST_LOGIN_KEY, 'true');
-    localStorageMock.setItem(DISCONNECT_TS_KEY, String(Date.now()));
-
     const context = getReconnectionContext(
       currentUser,
       spaces,

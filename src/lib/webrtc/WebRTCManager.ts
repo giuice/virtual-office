@@ -130,7 +130,7 @@ export class WebRTCManager {
 	/**
 	 * Set the signaling channel for WebRTC negotiations
 	 */
-	setSignalingChannel(channel: RealtimeChannel): void {
+	setSignalingChannel(channel: RealtimeChannel | null): void {
 		this.signalingChannel = channel;
 	}
 

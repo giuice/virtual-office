@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   requireVerifiedPresenceAuth: vi.fn(),
   rpc: vi.fn(),
   broadcastKnockInvalidated: vi.fn(),
+  emitPresenceEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/presence/verified-session', () => ({
@@ -15,11 +16,17 @@ vi.mock('@/lib/presence/knock-broadcast', () => ({
   broadcastKnockInvalidated: mocks.broadcastKnockInvalidated,
 }));
 
+vi.mock('@/lib/presence/observability', () => ({
+  emitPresenceEvent: mocks.emitPresenceEvent,
+}));
+
 const RESPONDER_ID = '55555555-5555-4555-8555-555555555555';
 const COMPANY_ID = '33333333-3333-4333-8333-333333333333';
 const AUTH_SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const SESSION_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '66666666-6666-4666-8666-666666666666';
+const REQUESTER_ID = '77777777-7777-4777-8777-777777777777';
+const SPACE_ID = '88888888-8888-4888-8888-888888888888';
 
 function createRequest(body: unknown): Request {
   return new Request('http://localhost/api/spaces/knock/respond', {
@@ -51,6 +58,12 @@ describe('/api/spaces/knock/respond', () => {
         expiresAt: '2026-07-16T12:00:30.000Z',
         usable: true,
         alreadyApplied: false,
+        requesterUserId: REQUESTER_ID,
+        spaceId: SPACE_ID,
+        requesterLocationVersionAfter: 7,
+        requesterAccessRevision: 2,
+        responderAccessRevision: 4,
+        spaceAccessRevision: 3,
       },
       error: null,
     });
@@ -64,7 +77,7 @@ describe('/api/spaces/knock/respond', () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(mocks.rpc).toHaveBeenCalledWith('respond_to_knock', {
+    expect(mocks.rpc).toHaveBeenCalledWith('respond_to_knock_observed', {
       p_responder_id: RESPONDER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,
@@ -75,6 +88,19 @@ describe('/api/spaces/knock/respond', () => {
       expect.objectContaining({ rpc: mocks.rpc }),
       COMPANY_ID,
     );
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).not.toHaveProperty('requesterUserId');
+    expect(body).not.toHaveProperty('responderAccessRevision');
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      requesterUserId: REQUESTER_ID,
+      responderUserId: RESPONDER_ID,
+      spaceId: SPACE_ID,
+      requesterLocationVersionAfter: 7,
+      requesterAccessRevision: 2,
+      responderAccessRevision: 4,
+      spaceAccessRevision: 3,
+      expiryResult: 'usable',
+    }));
   });
 
   it('does not broadcast an idempotent replay', async () => {

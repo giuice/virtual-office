@@ -1,198 +1,145 @@
-// src/app/api/platform-admin/create-company/route.ts
-// Story: story-platform-admin - AC 2.3
-// API route for Platform Admins to create companies and invite initial admin
-
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import {
+  parsePlatformCompanyCreationRpcErrorCode,
+  parsePlatformCompanyCreationRpcResult,
+  platformCompanyCreationRequestSchema,
+  platformCompanyCreationRpcErrorMap,
+} from '@/lib/api/company-membership-contracts';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SupabasePlatformAdminRepository } from '@/repositories/implementations/supabase/SupabasePlatformAdminRepository';
-import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
-import { SupabaseInvitationRepository } from '@/repositories/implementations/supabase/SupabaseInvitationRepository';
-import { Company, Invitation, UserRole } from '@/types/database';
-import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 function resolveAppBaseUrl(request: Request): string {
-	const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-	if (configuredAppUrl) {
-		try {
-			return new URL(configuredAppUrl).origin;
-		} catch (error) {
-			console.warn('[API platform-admin/create-company] Invalid NEXT_PUBLIC_APP_URL, falling back to request origin:', error);
-		}
-	}
-
-	try {
-		return new URL(request.url).origin;
-	} catch {
-		return 'http://localhost:3000';
-	}
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredAppUrl) {
+    try {
+      return new URL(configuredAppUrl).origin;
+    } catch {
+      // Fall through to the request origin without logging configuration data.
+    }
+  }
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
 }
 
-export async function POST(request: Request) {
-	try {
-		// Get authenticated user
-		const supabase = await createSupabaseServerClient();
-		const { data: { user }, error: authError } = await supabase.auth.getUser();
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Usuário não autenticado' }, { status: 401 });
+    }
 
-		if (authError || !user) {
-			return NextResponse.json(
-				{ error: 'Usuário não autenticado' },
-				{ status: 401 }
-			);
-		}
+    // Fast UX preflight only. The database repeats this check while locking the
+    // platform_admin row before inserting company + invitation atomically.
+    const platformAdminRepository = new SupabasePlatformAdminRepository(supabase);
+    if (!(await platformAdminRepository.isUserPlatformAdmin(user.id))) {
+      return NextResponse.json(
+        { error: 'Acesso negado. Apenas Platform Admins podem criar empresas.' },
+        { status: 403 },
+      );
+    }
 
-		// Verify user is a platform admin (AC 2.1 guard at API level)
-		const platformAdminRepository = new SupabasePlatformAdminRepository(supabase);
-		const isPlatformAdmin = await platformAdminRepository.isUserPlatformAdmin(user.id);
+    const parsedBody = platformCompanyCreationRequestSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
+      const invalidCompanyName = parsedBody.error.issues.some(
+        (issue) => issue.path[0] === 'companyName',
+      );
+      const invalidAdminEmail = parsedBody.error.issues.some(
+        (issue) => issue.path[0] === 'adminEmail' && issue.code !== 'too_big',
+      );
+      if (invalidCompanyName) {
+        return NextResponse.json({ error: 'Nome da empresa é obrigatório' }, { status: 400 });
+      }
+      if (invalidAdminEmail) {
+        return NextResponse.json({ error: 'Formato de email inválido' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Dados da empresa inválidos' }, { status: 400 });
+    }
+    const { companyName, adminEmail, planType } = parsedBody.data;
 
-		if (!isPlatformAdmin) {
-			console.warn(`[API platform-admin/create-company] Non-platform admin attempted access: ${user.id}`);
-			return NextResponse.json(
-				{ error: 'Acesso negado. Apenas Platform Admins podem criar empresas.' },
-				{ status: 403 }
-			);
-		}
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const settings = {
+      theme: 'neon' as const,
+      ...(planType ? { planType } : {}),
+    };
+    const supabaseAdmin = await createSupabaseServerClient('service_role');
+    const { data, error } = await supabaseAdmin.rpc(
+      'create_company_with_initial_admin_invitation',
+      {
+        p_platform_admin_auth_user_id: user.id,
+        p_name: companyName,
+        p_settings: settings,
+        p_email: adminEmail,
+        p_token: token,
+        p_expires_at: expiresAt,
+      },
+    );
 
-		// Parse request body
-		const { companyName, adminEmail, planType } = await request.json();
-		const normalizedAdminEmail = typeof adminEmail === 'string' ? adminEmail.trim().toLowerCase() : '';
+    if (error) {
+      const errorCode = parsePlatformCompanyCreationRpcErrorCode(error.message);
+      const contract = errorCode
+        ? platformCompanyCreationRpcErrorMap[errorCode]
+        : null;
+      if (contract) {
+        return NextResponse.json(contract.body, { status: contract.status });
+      }
+      console.error('Atomic platform company creation failed', { databaseCode: error.code });
+      return NextResponse.json({ error: 'Falha ao criar empresa' }, { status: 500 });
+    }
+    const result = parsePlatformCompanyCreationRpcResult(data, {
+      companyName,
+      email: adminEmail,
+      token,
+      settings,
+    });
+    if (!result) {
+      return NextResponse.json({ error: 'Falha ao criar empresa' }, { status: 500 });
+    }
 
-		// Validate required fields
-		if (!companyName?.trim()) {
-			return NextResponse.json(
-				{ error: 'Nome da empresa é obrigatório' },
-				{ status: 400 }
-			);
-		}
+    const inviteUrl = `${resolveAppBaseUrl(request)}/join?token=${result.token}`;
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(adminEmail, {
+      redirectTo: inviteUrl,
+      data: {
+        invitation_token: result.token,
+        invited_company_id: result.companyId,
+        invited_role: result.role,
+      },
+    });
 
-		if (!normalizedAdminEmail) {
-			return NextResponse.json(
-				{ error: 'Email do admin é obrigatório' },
-				{ status: 400 }
-			);
-		}
-
-		// Validate email format
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(normalizedAdminEmail)) {
-			return NextResponse.json(
-				{ error: 'Formato de email inválido' },
-				{ status: 400 }
-			);
-		}
-
-		console.log('[API platform-admin/create-company] Creating company:', {
-			companyName,
-			adminEmail: normalizedAdminEmail,
-			planType,
-			platformAdminId: user.id
-		});
-
-		const supabaseAdmin = await createSupabaseServerClient('service_role');
-		const companyRepository = new SupabaseCompanyRepository(supabaseAdmin);
-
-		const companyData: Omit<Company, 'id' | 'createdAt'> = {
-			name: companyName.trim(),
-			adminIds: [], // Will be populated when admin accepts invite
-			settings: {
-				theme: 'neon',
-				// Store plan type in settings
-				...(planType && { planType }),
-			},
-		};
-
-		const newCompany = await companyRepository.create(companyData);
-
-		if (!newCompany) {
-			console.error('[API platform-admin/create-company] Failed to create company');
-			return NextResponse.json(
-				{ error: 'Falha ao criar empresa' },
-				{ status: 500 }
-			);
-		}
-
-		console.log('[API platform-admin/create-company] Company created:', newCompany.id);
-
-		// AC 2.3.2: Create invitation record with admin role
-		const token = crypto.randomBytes(32).toString('hex');
-		const expiresAtMs = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
-
-		const invitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
-
-		const invitationData: Omit<Invitation, 'id' | 'createdAt' | 'status'> = {
-			email: normalizedAdminEmail,
-			companyId: newCompany.id,
-			role: 'admin' as UserRole, // Always admin for initial company admin
-			token,
-			expiresAt: expiresAtMs,
-		};
-
-		const createdInvitation = await invitationRepository.create(invitationData);
-
-		if (!createdInvitation) {
-			console.error('[API platform-admin/create-company] Failed to create invitation');
-			// Try to clean up the company
-			// (In production, consider using a transaction)
-			return NextResponse.json(
-				{ error: 'Empresa criada, mas falha ao criar convite. Contate o suporte.' },
-				{ status: 500 }
-			);
-		}
-
-		console.log('[API platform-admin/create-company] Invitation created:', createdInvitation.id);
-
-		// AC 2.3.3: Send invitation email via Supabase Auth
-		const baseUrl = resolveAppBaseUrl(request);
-		const redirectTo = `${baseUrl}/join?token=${token}`;
-
-		const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-			normalizedAdminEmail,
-			{
-				redirectTo,
-				data: {
-					invitation_token: token,
-					invited_company_id: newCompany.id,
-					invited_role: 'admin',
-				}
-			}
-		);
-
-		if (inviteError) {
-			console.error('[API platform-admin/create-company] Email invite error:', inviteError);
-			// Don't fail completely - the link can still be shared manually
-			console.warn('[API platform-admin/create-company] Admin should share the link manually');
-		} else {
-			console.log('[API platform-admin/create-company] Invite email sent successfully');
-		}
-
-		// Build the full invite URL for sharing (AC 2.4)
-		const inviteUrl = `${baseUrl}/join?token=${token}`;
-
-		// Return success response
-		return NextResponse.json({
-			success: true,
-			message: 'Empresa e convite criados com sucesso',
-			company: {
-				id: newCompany.id,
-				name: newCompany.name,
-				settings: newCompany.settings,
-			},
-			invitation: {
-				id: createdInvitation.id,
-				email: normalizedAdminEmail,
-				token,
-				expiresAt: new Date(expiresAtMs).toISOString(),
-				inviteUrl,
-				emailSent: !inviteError, // Indicates if email was successfully sent
-			},
-		}, { status: 201 });
-
-	} catch (error) {
-		console.error('[API platform-admin/create-company] Unexpected error:', error);
-		return NextResponse.json({
-			success: false,
-			error: error instanceof Error ? error.message : 'Erro interno ao criar empresa'
-		}, { status: 500 });
-	}
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Empresa e convite criados com sucesso',
+        company: {
+          id: result.companyId,
+          name: result.companyName,
+          settings: result.companySettings,
+        },
+        invitation: {
+          id: result.invitationId,
+          email: result.email,
+          token: result.token,
+          expiresAt: new Date(result.expiresAt).toISOString(),
+          inviteUrl,
+          emailSent: !inviteError,
+        },
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error('Platform company creation failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return NextResponse.json({ success: false, error: 'Erro interno ao criar empresa' }, { status: 500 });
+  }
 }

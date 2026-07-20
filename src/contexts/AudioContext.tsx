@@ -10,7 +10,7 @@
  * - Permission state
  */
 
-import React, { createContext, use, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, use, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useReducerState } from '@/hooks/useReducerState';
 import { WebRTCManager, ROOM_LIMITS } from '@/lib/webrtc';
 import { useAudioSignaling } from '@/hooks/realtime/useAudioSignaling';
@@ -57,12 +57,23 @@ interface AudioProviderProps { spaceId: string | undefined;
 	userId?: string; // Internal user.id (from profile), not supabase_uid
 	children: ReactNode; }
 
+interface OwnedWebRTCManager {
+	manager: WebRTCManager;
+	spaceId: string;
+	userId: string;
+}
+
 export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { user } = useAuth();
 	// Use internal userId if provided, otherwise fall back to supabase uid
 	const currentUserId = userId || user?.id;
 
 	// State
-	const [webrtcManager, updateWebrtcManager] = useReducerState<WebRTCManager | null>(null);
+	const [ownedWebrtcManager, updateOwnedWebrtcManager] = useReducerState<OwnedWebRTCManager | null>(null);
+	const webrtcManager = ownedWebrtcManager &&
+		ownedWebrtcManager.spaceId === spaceId &&
+		ownedWebrtcManager.userId === currentUserId
+		? ownedWebrtcManager.manager
+		: null;
 	const [isMuted, updateIsMutedState] = useReducerState(true); // Default: muted on entry
 	const [isAudioEnabled, updateIsAudioEnabled] = useReducerState(false);
 	const [isInitializing, updateIsInitializing] = useReducerState(false);
@@ -91,10 +102,12 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 
 		const manager = new WebRTCManager(spaceId, currentUserId, {
 			onPeerConnected: (peerId) => {
+				if (managerRef.current !== manager) return;
 				console.log('[AudioProvider] Peer connected:', peerId);
 				updatePeerCount((prev) => prev + 1);
 			},
 			onPeerDisconnected: (peerId) => {
+				if (managerRef.current !== manager) return;
 				console.log('[AudioProvider] Peer disconnected:', peerId);
 				updatePeerCount((prev) => Math.max(0, prev - 1));
 				// Clear speaking state for disconnected peer
@@ -103,13 +116,9 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 					next.delete(peerId);
 					return next;
 				});
-				updateSpeakingUsers((prev) => {
-					const next = new Map(prev);
-					next.delete(peerId);
-					return next;
-				});
 			},
 			onPeerSpeaking: (peerId, isSpeaking) => {
+				if (managerRef.current !== manager) return;
 				updateSpeakingUsers((prev) => {
 					const next = new Map(prev);
 					if (isSpeaking) {
@@ -121,9 +130,11 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				});
 			},
 			onRoomLimitWarning: (count) => {
+				if (managerRef.current !== manager) return;
 				toast.warning(`Sala com ${count} usuários. Performance pode ser afetada acima de ${ROOM_LIMITS.SOFT_WARNING} pessoas.`);
 			},
 			onError: (err) => {
+				if (managerRef.current !== manager) return;
 				console.error('[AudioProvider] Error:', err);
 				if (err.message === 'AUTOPLAY_BLOCKED') {
 					updateError('Clique para habilitar o áudio');
@@ -133,7 +144,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			},
 		});
 
-		updateWebrtcManager(manager);
+		updateOwnedWebrtcManager({ manager, spaceId, userId: currentUserId });
 		managerRef.current = manager;
 
 		// Browser audio policy: resume any blocked audio on ANY user interaction
@@ -146,12 +157,14 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			console.log('[AudioProvider] Cleaning up manager');
 			window.removeEventListener('click', handleGlobalClick);
 			manager.cleanup();
-			updateWebrtcManager(null);
+			updateOwnedWebrtcManager(null);
 			managerRef.current = null;
+			updateIsMutedState(true);
 			updateIsAudioEnabled(false);
+			updateSpeakingUsers(new Map());
 			updatePeerCount(0);
 		};
-		}, [spaceId, currentUserId, updatePeerCount, updateSpeakingUsers, updateError, updateWebrtcManager, updateIsAudioEnabled]);
+		}, [spaceId, currentUserId, updatePeerCount, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsMutedState]);
 
 	/**
 	 * Initialize audio (must be called from user gesture for Safari)

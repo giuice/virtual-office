@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   requireVerifiedPresenceAuth: vi.fn(),
   rpc: vi.fn(),
   broadcastKnockInvalidated: vi.fn(),
+  emitPresenceEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/presence/verified-session', () => ({
@@ -13,6 +14,10 @@ vi.mock('@/lib/presence/verified-session', () => ({
 
 vi.mock('@/lib/presence/knock-broadcast', () => ({
   broadcastKnockInvalidated: mocks.broadcastKnockInvalidated,
+}));
+
+vi.mock('@/lib/presence/observability', () => ({
+  emitPresenceEvent: mocks.emitPresenceEvent,
 }));
 
 const USER_ID = '55555555-5555-4555-8555-555555555555';
@@ -50,6 +55,10 @@ describe('/api/spaces/knock/request', () => {
         expiresAt: '2026-07-16T12:00:30.000Z',
         recipientCount: 1,
         requesterLocationVersion: 7,
+        requesterLocationVersionBefore: 6,
+        requesterLocationVersionAfter: 7,
+        requesterAccessRevision: 2,
+        spaceAccessRevision: 3,
         alreadyApplied: false,
       },
       error: null,
@@ -63,7 +72,7 @@ describe('/api/spaces/knock/request', () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(mocks.rpc).toHaveBeenCalledWith('create_knock_request', {
+    expect(mocks.rpc).toHaveBeenCalledWith('create_knock_request_observed', {
       p_requester_id: USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,
@@ -74,6 +83,16 @@ describe('/api/spaces/knock/request', () => {
       expect.objectContaining({ rpc: mocks.rpc }),
       COMPANY_ID,
     );
+    expect(await response.json()).not.toEqual(expect.objectContaining({
+      requesterAccessRevision: expect.anything(),
+    }));
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      requesterLocationVersionBefore: 6,
+      requesterLocationVersionAfter: 7,
+      requesterAccessRevision: 2,
+      spaceAccessRevision: 3,
+      expiryResult: 'live',
+    }));
   });
 
   it('does not broadcast an idempotent replay', async () => {
@@ -139,5 +158,89 @@ describe('/api/spaces/knock/request', () => {
 
     expect(response.status).toBe(429);
     expect(response.headers.get('Retry-After')).toBe('12');
+  });
+
+  it('retries only an unstable lock set with the exact same RPC arguments', async () => {
+    mocks.rpc
+      .mockResolvedValueOnce({
+        data: { ok: false, code: 'RETRY_LOCK_SET' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          code: 'KNOCK_CREATED',
+          requestId: REQUEST_ID,
+          status: 'pending',
+          expiresAt: '2026-07-16T12:00:30.000Z',
+          recipientCount: 1,
+          requesterLocationVersion: 7,
+          alreadyApplied: false,
+        },
+        error: null,
+      });
+
+    const response = await POST(createRequest({
+      sessionId: SESSION_ID,
+      spaceId: SPACE_ID,
+      requestId: REQUEST_ID,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(mocks.rpc.mock.calls[1]).toEqual(mocks.rpc.mock.calls[0]);
+    expect(mocks.broadcastKnockInvalidated).toHaveBeenCalledTimes(1);
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      resultCode: 'KNOCK_CREATED',
+    }));
+  });
+
+  it('fails closed after four unstable lock sets without exposing the internal code', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { ok: false, code: 'RETRY_LOCK_SET' },
+      error: null,
+    });
+
+    const response = await POST(createRequest({
+      sessionId: SESSION_ID,
+      spaceId: SPACE_ID,
+      requestId: REQUEST_ID,
+    }));
+    const body = await response.json();
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(4);
+    expect(new Set(mocks.rpc.mock.calls.map((call) => JSON.stringify(call))).size).toBe(1);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('1');
+    expect(body).toMatchObject({
+      error: 'Knock operation failed.',
+      code: 'KNOCK_INTERNAL_ERROR',
+    });
+    expect(JSON.stringify(body)).not.toContain('RETRY_LOCK_SET');
+    expect(mocks.broadcastKnockInvalidated).not.toHaveBeenCalled();
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.emitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      resultCode: 'KNOCK_INTERNAL_ERROR',
+      retryable: true,
+    }));
+  });
+
+  it('does not retry an RPC transport failure', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'transport unavailable' },
+    });
+
+    const response = await POST(createRequest({
+      sessionId: SESSION_ID,
+      spaceId: SPACE_ID,
+      requestId: REQUEST_ID,
+    }));
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Retry-After')).toBeNull();
+    expect(await response.json()).toMatchObject({ code: 'KNOCK_INTERNAL_ERROR' });
   });
 });

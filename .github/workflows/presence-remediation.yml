@@ -1,22 +1,35 @@
 name: presence-remediation
 
-# Phase 0 CI skeleton for the presence-safety remediation.
-# - movement-gate: cheap grep guard, always runs.
-# - presence-db: spins up local Supabase and runs the presence DB suite.
-# Later phases add cases; Phase 8 flips zero-skip enforcement on.
+# Phase 8 terminating CI gates for the presence-safety remediation.
 
 on:
   pull_request:
     paths:
-      - 'src/hooks/**'
-      - 'src/contexts/**'
-      - 'src/components/floor-plan/**'
-      - 'src/app/api/users/**'
-      - 'src/app/api/spaces/knock/**'
-      - 'supabase/migrations/**'
-      - '__tests__/presence-db/**'
-      - 'scripts/presence-movement-gate.mjs'
-      - '.github/workflows/presence-remediation.yml'
+      - "src/hooks/**"
+      - "src/contexts/**"
+      - "src/components/floor-plan/**"
+      - "src/app/api/presence/**"
+      - "src/app/api/users/**"
+      - "src/app/api/companies/**"
+      - "src/app/api/invitations/**"
+      - "src/app/api/spaces/knock/**"
+      - "src/lib/auth/**"
+      - "src/lib/presence/**"
+      - "src/lib/supabase/**"
+      - "src/repositories/**"
+      - "src/proxy.ts"
+      - "supabase/migrations/**"
+      - "__tests__/**"
+      - "__tests__/presence-db/**"
+      - "scripts/presence-movement-gate.mjs"
+      - "scripts/run-presence-concurrency.mjs"
+      - "vitest.presence.config.mts"
+      - "vitest.presence-db.config.mts"
+      - "vitest.presence-concurrency.config.mts"
+      - "playwright.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/presence-remediation.yml"
   workflow_dispatch:
 
 jobs:
@@ -28,6 +41,26 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/presence-movement-gate.mjs
+
+  presence-unit-and-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Presence unit, API, hook, and boundary suites
+        run: npm run test:presence
+      - name: Full isolated unit suite
+        run: npm test
+      - name: Type check
+        run: npm run type-check
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
 
   presence-db:
     runs-on: ubuntu-latest
@@ -46,4 +79,65 @@ jobs:
       - name: Verify migrations reset cleanly
         run: supabase db reset
       - name: Presence DB suite
-        run: npm run test:presence-db
+        run: npm run test:presence:db
+      - name: Exact Presence concurrency gate - 50 iterations per case
+        run: npm run test:presence:concurrency
+      - name: Upload Presence concurrency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: presence-concurrency-ndjson
+          path: ${{ runner.temp }}/virtual-office-presence-concurrency/report.ndjson
+          if-no-files-found: error
+          retention-days: 7
+
+  presence-e2e:
+    runs-on: ubuntu-latest
+    env:
+      VO_AUTH_METRICS: "1"
+      PRESENCE_E2E_PROVISION_LOCAL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+      - name: Start clean local Supabase
+        run: |
+          supabase start
+          supabase db reset
+      - name: Export disposable local Supabase credentials
+        shell: bash
+        run: |
+          while IFS='=' read -r name value; do
+            value="${value%\"}"
+            value="${value#\"}"
+            case "$name" in
+              API_URL) api_url="$value" ;;
+              ANON_KEY) anon_key="$value" ;;
+              SERVICE_ROLE_KEY) service_role_key="$value" ;;
+              DB_URL) database_url="$value" ;;
+            esac
+          done < <(supabase status -o env)
+
+          : "${api_url:?Supabase API_URL was not reported}"
+          : "${anon_key:?Supabase ANON_KEY was not reported}"
+          : "${service_role_key:?Supabase SERVICE_ROLE_KEY was not reported}"
+          : "${database_url:?Supabase DB_URL was not reported}"
+
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon_key"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service_role_key"
+            echo "PRESENCE_E2E_LOCAL_DB_URL=$database_url"
+          } >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium
+      - name: Presence browser suite against disposable local fixture
+        run: npm run test:presence:e2e
+      - name: Stop disposable local Supabase
+        if: always()
+        run: supabase stop --no-backup

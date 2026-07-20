@@ -2,7 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-export async function createSupabaseServerClient(role?: 'service_role'): Promise<SupabaseClient> {
+interface ServerClientOptions {
+  onAuthCookiesSet?: () => void;
+}
+
+export async function createSupabaseServerClient(
+  role?: 'service_role',
+  options: ServerClientOptions = {}
+): Promise<SupabaseClient> {
   // If service_role is requested, use the service role key instead of the anon key
   if (role === 'service_role') {
     // Make sure the SUPABASE_SERVICE_ROLE_KEY is set in your environment variables
@@ -36,6 +43,9 @@ export async function createSupabaseServerClient(role?: 'service_role'): Promise
           return cookieStore.getAll().map(({ name, value }) => ({ name, value }))
         },
         setAll(cookiesToSet) {
+          if (cookiesToSet.length > 0) {
+            options.onAuthCookiesSet?.();
+          }
           try {
             for (const { name, value, options } of cookiesToSet) {
               cookieStore.set(name, value, options)

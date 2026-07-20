@@ -1,367 +1,162 @@
-// __tests__/api/invitations-accept.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/invitations/accept/route';
 
-// Mock next/headers
-vi.mock('next/headers', () => ({
-  cookies: vi.fn().mockReturnValue({
-    getAll: vi.fn().mockReturnValue([]),
-  }),
+const USER_ID = '11111111-1111-4111-8111-111111111111';
+const INVITATION_ID = '22222222-2222-4222-8222-222222222222';
+const COMPANY_ID = '33333333-3333-4333-8333-333333333333';
+
+const mocks = vi.hoisted(() => ({
+  requireAuthUser: vi.fn(),
+  invitationMaybeSingle: vi.fn(),
+  rpc: vi.fn(),
 }));
 
-// Setup mock objects that will be used in the mock implementations
-const mockInvitationRepoMethods = {
-  findByToken: vi.fn(),
-  updateStatus: vi.fn(),
-};
+vi.mock('@/lib/auth/session', () => ({
+  requireAuthUser: () => mocks.requireAuthUser(),
+}));
 
-const mockUserRepoMethods = {
-  findBySupabaseUid: vi.fn(),
-  update: vi.fn(),
-  create: vi.fn(),
-};
-
-const mockAuthGetUser = vi.fn();
-const mockFromSelect = vi.fn();
-
-// Mock Supabase server client
 vi.mock('@/lib/supabase/server-client', () => ({
-  createSupabaseServerClient: vi.fn().mockResolvedValue({
-    auth: {
-      getUser: () => mockAuthGetUser(),
-    },
+  createSupabaseServerClient: vi.fn(async () => ({
     from: () => ({
       select: () => ({
-        eq: () => ({
-          single: () => mockFromSelect(),
-        }),
+        eq: () => ({ maybeSingle: () => mocks.invitationMaybeSingle() }),
       }),
     }),
-  }),
+    rpc: mocks.rpc,
+  })),
 }));
 
-// Mock repositories with actual class constructors
-vi.mock('@/repositories/implementations/supabase', () => {
-  // Create mock class constructors
-  function MockInvitationRepository() {
-    return {
-      findByToken: (token: string) => mockInvitationRepoMethods.findByToken(token),
-      updateStatus: (token: string, status: string) => mockInvitationRepoMethods.updateStatus(token, status),
-    };
-  }
-  
-  function MockUserRepository() {
-    return {
-      findBySupabaseUid: (uid: string) => mockUserRepoMethods.findBySupabaseUid(uid),
-      update: (id: string, data: object) => mockUserRepoMethods.update(id, data),
-      create: (data: object) => mockUserRepoMethods.create(data),
-    };
-  }
-
-  return {
-    SupabaseInvitationRepository: MockInvitationRepository,
-    SupabaseUserRepository: MockUserRepository,
-  };
-});
+function requestFor(body: unknown): Request {
+  return new Request('https://example.test/api/invitations/accept', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
 
 describe('/api/invitations/accept', () => {
   beforeEach(() => {
-    // Reset all mock implementations
-    mockInvitationRepoMethods.findByToken.mockReset();
-    mockInvitationRepoMethods.updateStatus.mockReset();
-    mockUserRepoMethods.findBySupabaseUid.mockReset();
-    mockUserRepoMethods.update.mockReset();
-    mockUserRepoMethods.create.mockReset();
-    mockAuthGetUser.mockReset();
-    mockFromSelect.mockReset();
+    vi.clearAllMocks();
+    mocks.requireAuthUser.mockResolvedValue({
+      authUser: { id: 'auth-user' },
+      dbUser: { id: USER_ID, companyId: null, role: 'member' },
+      supabase: {},
+    });
+    mocks.invitationMaybeSingle.mockResolvedValue({
+      data: { id: INVITATION_ID, company_id: COMPANY_ID },
+      error: null,
+    });
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        code: 'COMPANY_INVITATION_ACCEPTED',
+        userId: USER_ID,
+        invitationId: INVITATION_ID,
+        companyId: COMPANY_ID,
+        role: 'member',
+        previousSpaceId: null,
+        locationVersion: 0,
+        presenceAccessRevision: 2,
+        retiredSessionCount: 0,
+        closedLogCount: 0,
+        operationTime: '2026-07-18T21:00:00.000Z',
+      },
+      error: null,
+    });
   });
 
-  // Use mock object pattern instead of new NextRequest
-  const createRequest = (body: object) => {
-    return {
-      method: 'POST',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      json: vi.fn().mockResolvedValue(body),
-    } as any;
-  };
-
-  it('returns 401 when user is not authenticated', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: null },
-      error: { message: 'Not authenticated' },
+  it('returns 401 without reading the invitation when auth fails', async () => {
+    mocks.requireAuthUser.mockResolvedValue({
+      errorResponse: Response.json({ error: 'Authentication required' }, { status: 401 }),
     });
 
-    const request = createRequest({ token: 'test-token' });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(requestFor({ token: 'token' }));
 
     expect(response.status).toBe(401);
-    expect(data.error).toContain('Autenticação necessária');
+    expect(mocks.invitationMaybeSingle).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when token is missing', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
+  it('accepts membership and invitation status through one locked RPC', async () => {
+    const response = await POST(
+      requestFor({ token: 'token', displayName: 'Ada Lovelace' }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      'accept_company_invitation_membership',
+      {
+        p_user_id: USER_ID,
+        p_invitation_id: INVITATION_ID,
+        p_company_id: COMPANY_ID,
+        p_display_name: 'Ada Lovelace',
+      },
+    );
+    expect(await response.json()).toMatchObject({
+      success: true,
+      code: 'COMPANY_INVITATION_ACCEPTED',
     });
-
-    const request = createRequest({});
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('Token de convite é obrigatório');
   });
 
-  it('returns 404 when invitation not found', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue(null);
+  it('returns 404 when the token lookup has no row', async () => {
+    mocks.invitationMaybeSingle.mockResolvedValue({ data: null, error: null });
 
-    const request = createRequest({ token: 'nonexistent-token' });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(requestFor({ token: 'missing' }));
 
     expect(response.status).toBe(404);
-    expect(data.error).toContain('Convite não encontrado');
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when invitation is already used', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
+  it('fails closed when the invitation lookup omits its company identity', async () => {
+    mocks.invitationMaybeSingle.mockResolvedValue({
+      data: { id: INVITATION_ID },
       error: null,
     });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'used-token',
-      status: 'accepted',
-      companyId: 'company-1',
-      email: 'test@example.com',
-      expiresAt: Date.now() + 86400000,
-    });
 
-    const request = createRequest({ token: 'used-token' });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(requestFor({ token: 'token' }));
 
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('já utilizado ou expirado');
+    expect(response.status).toBe(500);
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it('returns 410 when invitation is expired', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
+  it('maps the database email/status/expiry recheck as forbidden', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'INVITATION_ACCEPT_FORBIDDEN' },
     });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'expired-token',
-      status: 'pending',
-      companyId: 'company-1',
-      email: 'test@example.com',
-      expiresAt: Date.now() - 86400000, // Past date
-    });
-    mockInvitationRepoMethods.updateStatus.mockResolvedValue({});
 
-    const request = createRequest({ token: 'expired-token' });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(requestFor({ token: 'token' }));
 
-    expect(response.status).toBe(410);
-    expect(data.error).toContain('expirado');
-    expect(mockInvitationRepoMethods.updateStatus).toHaveBeenCalledWith('expired-token', 'expired');
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'INVITATION_FORBIDDEN' });
   });
 
-  it('returns 403 when invitation email does not match authenticated user email (Security)', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'different@example.com' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-1',
-      email: 'invited@example.com', // Different email
-      expiresAt: Date.now() + 86400000,
+  it('maps the locked member-capacity rejection', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'INVITATION_ACCEPT_LIMIT_REACHED' },
     });
 
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
+    const response = await POST(requestFor({ token: 'token' }));
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toContain('convite foi enviado para outro email');
+    expect(data.code).toBe('USER_LIMIT_REACHED');
   });
 
-  it('accepts invitation with case-insensitive email match', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'Test@Example.COM' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-1',
-      role: 'member',
-      email: 'test@example.com', // Same email, different case
-      expiresAt: Date.now() + 86400000,
-    });
-    mockUserRepoMethods.findBySupabaseUid.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: null,
-      email: 'test@example.com',
-    });
-    mockUserRepoMethods.update.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: 'company-1',
-      email: 'test@example.com',
-    });
-    mockInvitationRepoMethods.updateStatus.mockResolvedValue({});
-
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-  });
-
-  it('returns 409 when user already belongs to another company (AC6)', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-new',
-      email: 'test@example.com',
-      expiresAt: Date.now() + 86400000,
-    });
-    mockUserRepoMethods.findBySupabaseUid.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: 'company-existing', // Different company
-      email: 'test@example.com',
-    });
-    mockFromSelect.mockResolvedValue({
-      data: { name: 'Existing Company' },
+  it('fails closed on a mismatched RPC identity', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        code: 'COMPANY_INVITATION_ACCEPTED',
+        userId: USER_ID,
+        invitationId: INVITATION_ID,
+        companyId: INVITATION_ID,
+      },
       error: null,
     });
 
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(requestFor({ token: 'token' }));
 
-    expect(response.status).toBe(409);
-    expect(data.error).toContain('já pertence a outra empresa');
-    expect(data.companyName).toBe('Existing Company');
-  });
-
-  it('successfully accepts invitation for user without company', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-1',
-      role: 'member',
-      email: 'test@example.com',
-      expiresAt: Date.now() + 86400000,
-    });
-    mockUserRepoMethods.findBySupabaseUid.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: null, // No company yet
-      email: 'test@example.com',
-    });
-    mockUserRepoMethods.update.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: 'company-1',
-      email: 'test@example.com',
-    });
-    mockInvitationRepoMethods.updateStatus.mockResolvedValue({});
-
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.redirect).toBe('/dashboard');
-    expect(mockUserRepoMethods.update).toHaveBeenCalledWith('db-user-1', {
-      companyId: 'company-1',
-      role: 'member',
-    });
-    expect(mockInvitationRepoMethods.updateStatus).toHaveBeenCalledWith('valid-token', 'accepted');
-  });
-
-  it('successfully accepts invitation when user already in same company', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-1',
-      role: 'member',
-      email: 'test@example.com',
-      expiresAt: Date.now() + 86400000,
-    });
-    mockUserRepoMethods.findBySupabaseUid.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: 'company-1', // Same company
-      email: 'test@example.com',
-    });
-    mockInvitationRepoMethods.updateStatus.mockResolvedValue({});
-
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    // Should not call update since user already in same company
-    expect(mockUserRepoMethods.update).not.toHaveBeenCalled();
-    expect(mockInvitationRepoMethods.updateStatus).toHaveBeenCalledWith('valid-token', 'accepted');
-  });
-
-  it('handles user created by trigger (AC7)', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
-    });
-    mockInvitationRepoMethods.findByToken.mockResolvedValue({
-      token: 'valid-token',
-      status: 'pending',
-      companyId: 'company-1',
-      role: 'member',
-      email: 'test@example.com',
-      expiresAt: Date.now() + 86400000,
-    });
-    // First call returns null (user not created yet)
-    // Second call returns user (created by trigger)
-    mockUserRepoMethods.findBySupabaseUid
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 'db-user-1',
-        companyId: null,
-        email: 'test@example.com',
-      });
-    mockUserRepoMethods.update.mockResolvedValue({
-      id: 'db-user-1',
-      companyId: 'company-1',
-      email: 'test@example.com',
-    });
-    mockInvitationRepoMethods.updateStatus.mockResolvedValue({});
-
-    const request = createRequest({ token: 'valid-token' });
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(mockUserRepoMethods.findBySupabaseUid).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ code: 'INTERNAL_ERROR' });
   });
 });

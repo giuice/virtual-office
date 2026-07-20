@@ -45,7 +45,7 @@ export function UploadableAvatar({
   onAvatarChange,
   onUploadSuccess,
   uploading = false,
-  showUploadButton = false
+  showUploadButton
 }: UploadableAvatarProps) {
   const [hovered, setHovered] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -92,6 +92,7 @@ export function UploadableAvatar({
 
   // Get active avatar URL (preview or current)
   const avatarUrl = preview || user.avatarUrl;
+  const showUploadControls = showUploadButton ?? Boolean(onAvatarChange || onUploadSuccess);
 
   // Get initials for fallback
   const initials = getUserInitials(user.displayName);
@@ -195,7 +196,7 @@ export function UploadableAvatar({
         {user.status && <span className={cn('absolute bottom-0 right-0 size-3 rounded-full border-2 border-background', getStatusColorClass(user.status))} />}
         
         {/* Upload controls (on hover) */}
-        {hovered && !isActive && <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-full">
+        {showUploadControls && hovered && !isActive && <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-full">
             <div className="flex gap-2">
               <TooltipProvider>
                 <Tooltip>

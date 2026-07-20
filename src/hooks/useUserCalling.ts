@@ -65,7 +65,7 @@ export function useUserCalling(): UseUserCallingReturn {
   // Resolve a human-friendly display name for the current user
   const getDisplayName = useCallback((): string => {
     if (currentUserProfile?.displayName) return currentUserProfile.displayName;
-    const meta = (user?.user_metadata || {}) as Record<string, any>;
+    const meta = (user?.user_metadata || {}) as Record<string, unknown>;
     const fromMeta = meta.displayName || meta.full_name || meta.name;
     if (fromMeta) return String(fromMeta);
     if (user?.email) return user.email.split('@')[0];
@@ -187,18 +187,11 @@ export function useUserCalling(): UseUserCallingReturn {
       const call = incomingCalls.find(c => c.id === callId);
       if (!call) return;
 
-      // Update call status
-      setIncomingCalls(prev => 
-        prev.map(c => 
-          c.id === callId 
-            ? { ...c, status: 'accepted' }
-            : c
-        )
-      );
-
       if (call.type === 'teleport' && call.spaceId) {
-        // Handle teleportation
-        await updateLocation(call.spaceId);
+        const outcome = await updateLocation(call.spaceId, { reason: 'teleport-accept' });
+        if (!outcome.ok) {
+          throw new Error(outcome.message);
+        }
         
         // Send confirmation message
         const conversation = await getOrCreateUserConversation(call.callerId);
@@ -225,6 +218,14 @@ export function useUserCalling(): UseUserCallingReturn {
         // Here you would integrate with WebRTC or calling service
         console.log(`[useUserCalling] Starting ${call.type} call with ${call.callerName}`);
       }
+
+      setIncomingCalls(prev =>
+        prev.map(c =>
+          c.id === callId
+            ? { ...c, status: 'accepted' }
+            : c
+        )
+      );
 
       console.log(`[useUserCalling] Accepted call ${callId}`);
     } catch (error) {

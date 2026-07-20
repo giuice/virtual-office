@@ -1,7 +1,9 @@
 // src/lib/api.ts
 // Client-side API functions for interacting with server-side endpoints
 
-import { Company, User, UserRole, Space, UserStatus } from '@/types/database'; // Added Space
+import { Company, User, UserRole, Space } from '@/types/database'; // Added Space
+import type { PresenceAvailabilityStatus } from '@/lib/presence/contracts';
+import { throwApiError } from '@/lib/api/client-error';
 
 /**
  * Ensures a user profile exists in the database for the authenticated user,
@@ -11,10 +13,6 @@ export async function syncUserProfile(userData: {
   supabase_uid: string; // Renamed from supabase_uid for consistency
   email: string;
   displayName?: string;
-  status?: UserStatus; // Optional status
-  companyId?: string; // Optional company ID
-  role?: UserRole; // Optional role
-  googleAvatarUrl?: string; // Google avatar URL from OAuth
 }): Promise<User> {
   try {
     console.log('Syncing user profile via API:', userData);
@@ -28,29 +26,29 @@ export async function syncUserProfile(userData: {
         supabaseUid: userData.supabase_uid, // Use consistent naming
         email: userData.email,
         displayName: userData.displayName,
-        status: userData.status, // Optional status
-        companyId: userData.companyId, // Optional company ID
-        role: userData.role, // Optional role
-        googleAvatarUrl: userData.googleAvatarUrl, // Google avatar URL from OAuth
       }),
     });
 
-// Handle both success and conflict (user already exists) responses
-    if (response.ok || response.status === 409) {
-    const result = await response.json();
+    // Preserve the legacy conflict-as-success path when the route returns the
+    // existing user, but parse actual conflict envelopes as ApiError.
+    if (response.status === 409) {
+      const result = await response.clone().json().catch(() => ({}));
+      if (result.user) {
+        return result.user;
+      }
+      await throwApiError(response);
+    }
 
-    // If the API returned a user object, use it
+    if (!response.ok) {
+      await throwApiError(response);
+    }
+
+    const result = await response.json();
     if (result.user) {
       return result.user;
     }
-// If the API returned a message, throw it as an error
-      if (result.message) {
-        throw new Error(result.message);
-      }
-    }
 
-    // If the response is not ok and not a conflict, throw an error
-    throw new Error(`Failed to create user: ${response.statusText}`);
+    throw new Error(result.message || 'Failed to sync user profile');
   } catch (error) {
     console.error('Error creating user:', error);
         throw error;
@@ -82,30 +80,29 @@ export async function getUserById(supabase_uid: string): Promise<User | null> {
 /**
  * Update user status via the server-side API
   */
-export async function updateUserStatus(
+export async function updateOwnProfile(
   userDbId: string,
-  status: 'online' | 'offline' | 'away' | 'busy',
-  statusMessage?: string
+  data: {
+    displayName?: string;
+    status?: PresenceAvailabilityStatus;
+    statusMessage?: string;
+    preferences?: User['preferences'];
+  },
 ): Promise<void> {
   try {
-        const response = await fetch(`/api/users/update?id=${userDbId}`, {
+    const response = await fetch(`/api/users/update?id=${userDbId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        status,
-        statusMessage,
-        lastActive: new Date().toISOString()
-      }),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to update user status');
+      await throwApiError(response);
     }
   } catch (error) {
-    console.error('API error updating user status:', error);
+    console.error('API error updating user profile:', error);
     throw error;
   }
 }
@@ -116,7 +113,6 @@ export async function updateUserStatus(
 // Updated signature to accept specific fields needed by the API route
 export async function createCompany(
   name: string,
-  creatorSupabaseUid: string, 
   settings?: Partial<Company['settings']> // Optional settings
 ): Promise<Company> { // Return the full Company object
   try {
@@ -125,8 +121,7 @@ export async function createCompany(
       headers: {
         'Content-Type': 'application/json',
       },
-      // Send the body structure expected by the API route
-      body: JSON.stringify({ name, creatorSupabaseUid, settings }), // Use creatorSupabaseUid
+      body: JSON.stringify({ name, settings }),
     });
 
     if (!response.ok) {
@@ -156,8 +151,7 @@ export async function getCompany(companyId: string): Promise<Company | null> {
       if (response.status === 404) {
         return null;
       }
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to get company');
+      await throwApiError(response);
     }
 
     const data = await response.json();
@@ -199,8 +193,7 @@ export async function getUsersByCompany(companyId: string): Promise<User[]> {
     const response = await fetch(`/api/users/by-company?companyId=${companyId}`);
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to get users');
+      await throwApiError(response);
     }
 
     const data = await response.json();
@@ -276,14 +269,14 @@ export async function updateUserRole(userDbId: string, role: UserRole): Promise<
  * Note: This function's parameter `userId` should be the Database User ID (UUID)
  * based on typical REST patterns for specific resource modification.
  */
-export async function removeUserFromCompany(userDbId: string, companyId: string): Promise<void> { // Changed parameter name
+export async function removeUserFromCompany(userDbId: string): Promise<void> { // Changed parameter name
   try {
     const response = await fetch(`/api/users/remove-from-company`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId: userDbId, companyId }), // Send database ID
+      body: JSON.stringify({ userId: userDbId }), // Company is derived from the authenticated server profile.
     });
 
     if (!response.ok) {
@@ -304,13 +297,12 @@ export async function getSpacesByCompany(companyId: string): Promise<Space[]> {
     const response = await fetch(`/api/spaces?companyId=${companyId}`);
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to get spaces');
+      await throwApiError(response);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { spaces: Array<Space & { users?: User[] }> };
     // Ensure users array exists, even if empty
-    return data.spaces.map((space: any) => ({
+    return data.spaces.map((space) => ({
       ...space,
       users: space.users || []
     }));

@@ -50,7 +50,7 @@ describe('canonical knock read routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.rpc).toHaveBeenCalledWith('get_knock_request_status', {
+    expect(mocks.rpc).toHaveBeenCalledWith('get_knock_request_status_observed', {
       p_requester_id: USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,

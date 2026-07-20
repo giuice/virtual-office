@@ -47,6 +47,7 @@ type SessionRow = {
 type RegisterSuccess = {
   readonly ok: true;
   readonly sessionId: string;
+  readonly companyId: string;
   readonly registrationId: string;
   readonly sessionSpaceId: string | null;
   readonly expiresAt: string;
@@ -77,6 +78,9 @@ type RpcFailure = {
 type RegisterResult = RegisterSuccess | RpcFailure;
 type HeartbeatResult = HeartbeatSuccess | RpcFailure;
 type DisconnectResult = DisconnectSuccess | RpcFailure;
+type ObservedRegisterResult = RegisterResult & { readonly activeSessionCount: number };
+type ObservedHeartbeatResult = HeartbeatResult & { readonly activeSessionCount: number };
+type ObservedDisconnectResult = DisconnectResult & { readonly activeSessionCount: number };
 
 type RevisionState = {
   readonly location_version: number;
@@ -102,6 +106,28 @@ describe("presence-db session leases", () => {
   let noCompanyUser: UserRow;
   let authBackedUser: AuthedUser;
   let liveAuthSessionId: string;
+
+  async function setRuntimeMode(
+    mode: 'legacy' | 'atomic',
+    cutoverId: string | null,
+  ): Promise<void> {
+    await fixtures.sql('grant presence_maintenance_owner to postgres');
+    await fixtures.sql('set role presence_maintenance_owner');
+    try {
+      await fixtures.sql(
+        `update private.presence_runtime_control
+         set mode = $1,
+             cutover_id = $2,
+             changed_at = pg_catalog.clock_timestamp(),
+             changed_by = 'session-lease-test'
+         where singleton_id`,
+        [mode, cutoverId],
+      );
+    } finally {
+      await fixtures.sql('reset role').catch(() => undefined);
+      await fixtures.sql('revoke presence_maintenance_owner from postgres');
+    }
+  }
 
   beforeAll(async () => {
     fixtures = await PresenceFixtures.connect(NS);
@@ -212,6 +238,7 @@ describe("presence-db session leases", () => {
         p_user_id: userId,
         p_auth_session_id: authSessionId,
         p_registration_id: registrationId,
+        p_expected_company_id: companyId,
       },
     );
     if (error) {
@@ -394,6 +421,103 @@ describe("presence-db session leases", () => {
     }
   }
 
+  it("reports the exact active unfenced session count after each observed mutation", async () => {
+    const user = await createPlainUser(`observed-${randomUUID()}`, companyId);
+    const firstAuthSessionId = randomUUID();
+    const secondAuthSessionId = randomUUID();
+
+    const firstRegistration = await serviceClient.rpc(
+      "register_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: firstAuthSessionId,
+        p_registration_id: randomUUID(),
+        p_expected_company_id: companyId,
+      },
+    );
+    expect(firstRegistration.error).toBeNull();
+    const first = firstRegistration.data as ObservedRegisterResult;
+    expect(first).toMatchObject({ ok: true, activeSessionCount: 1 });
+
+    const secondRegistration = await serviceClient.rpc(
+      "register_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: secondAuthSessionId,
+        p_registration_id: randomUUID(),
+        p_expected_company_id: companyId,
+      },
+    );
+    expect(secondRegistration.error).toBeNull();
+    const second = secondRegistration.data as ObservedRegisterResult;
+    expect(second).toMatchObject({ ok: true, activeSessionCount: 2 });
+
+    const heartbeat = await serviceClient.rpc(
+      "heartbeat_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: firstAuthSessionId,
+        p_session_id: first.ok ? first.sessionId : randomUUID(),
+      },
+    );
+    expect(heartbeat.error).toBeNull();
+    expect(heartbeat.data as ObservedHeartbeatResult).toMatchObject({
+      ok: true,
+      activeSessionCount: 2,
+    });
+
+    const disconnected = await serviceClient.rpc(
+      "disconnect_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: firstAuthSessionId,
+        p_session_id: first.ok ? first.sessionId : randomUUID(),
+      },
+    );
+    expect(disconnected.error).toBeNull();
+    expect(disconnected.data as ObservedDisconnectResult).toMatchObject({
+      ok: true,
+      activeSessionCount: 1,
+      alreadyDisconnected: false,
+    });
+
+    const replay = await serviceClient.rpc(
+      "disconnect_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: firstAuthSessionId,
+        p_session_id: first.ok ? first.sessionId : randomUUID(),
+      },
+    );
+    expect(replay.error).toBeNull();
+    expect(replay.data as ObservedDisconnectResult).toMatchObject({
+      ok: true,
+      activeSessionCount: 1,
+      alreadyDisconnected: true,
+    });
+
+    await fixtures.sql(
+      `insert into public.revoked_presence_auth_sessions
+         (auth_session_id, user_id, revoked_at)
+       values ($1, $2, pg_catalog.clock_timestamp())`,
+      [secondAuthSessionId, user.id],
+    );
+    const fencedHeartbeat = await serviceClient.rpc(
+      "heartbeat_presence_session_observed",
+      {
+        p_user_id: user.id,
+        p_auth_session_id: secondAuthSessionId,
+        p_session_id: second.ok ? second.sessionId : randomUUID(),
+      },
+    );
+    expect(fencedHeartbeat.error).toBeNull();
+    expect(fencedHeartbeat.data as ObservedHeartbeatResult).toMatchObject({
+      ok: false,
+      code: "AUTH_SESSION_REVOKED",
+      activeSessionCount: 0,
+    });
+  });
+
   it("a: browser roles cannot access lease tables or public RPCs directly", async () => {
     const anonClient = createAnonClient();
     const clients = [anonClient, authBackedUser.client];
@@ -482,6 +606,7 @@ describe("presence-db session leases", () => {
           p_user_id: primaryUser.id,
           p_auth_session_id: randomUUID(),
           p_registration_id: randomUUID(),
+          p_expected_company_id: companyId,
         },
       ],
       [
@@ -899,9 +1024,15 @@ describe("presence-db session leases", () => {
       retirementReason: "explicit-disconnect",
     });
 
-    const [result] = await fixtures.sql<{ readonly cleared: number }>(
-      `select public.reconcile_stale_presence_placements() as cleared`,
-    );
+    await setRuntimeMode('atomic', randomUUID());
+    let result: { readonly cleared: number } | undefined;
+    try {
+      [result] = await fixtures.sql<{ readonly cleared: number }>(
+        `select public.reconcile_stale_presence_placements() as cleared`,
+      );
+    } finally {
+      await setRuntimeMode('legacy', null);
+    }
     expect(result?.cleared).toBeGreaterThanOrEqual(1);
 
     const [staleAfter] = await fixtures.sql<{

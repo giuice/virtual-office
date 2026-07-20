@@ -15,8 +15,13 @@
 /test-results
 /playwright-report
 
+# Raw Presence rollout evidence contains stable UUIDs; keep it in the approved
+# access-controlled evidence repository, never in the application worktree.
+/artifacts/presence-rollout/
+
 # next.js
 /.next/
+/.next-auth-metrics*/
 /out/
 
 # production

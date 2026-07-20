@@ -14,12 +14,21 @@ const EXPIRES_AT = '2026-07-11T12:01:30.000Z';
 const RETIRED_AT = '2026-07-11T12:00:00.000Z';
 
 const mockAuthGetClaims = vi.fn();
+const mockAuthGetUser = vi.fn();
 const mockFindBySupabaseUid = vi.fn();
 const mockFenceMaybeSingle = vi.fn();
 const mockRpc = vi.fn();
+const { mockEmitPresenceEvent } = vi.hoisted(() => ({
+  mockEmitPresenceEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/presence/observability', () => ({
+  emitPresenceEvent: mockEmitPresenceEvent,
+}));
 
 const mockAuthedClient = {
   auth: {
+    getUser: () => mockAuthGetUser(),
     getClaims: () => mockAuthGetClaims(),
   },
 };
@@ -79,6 +88,10 @@ function makeAuthenticatedUser(overrides: Partial<User> = {}): User {
 }
 
 function primeAuth(): void {
+  mockAuthGetUser.mockResolvedValue({
+    data: { user: { id: AUTH_USER_ID } },
+    error: null,
+  });
   mockAuthGetClaims.mockResolvedValue({
     data: {
       claims: {
@@ -93,10 +106,14 @@ function primeAuth(): void {
 }
 
 function jsonRequest(body: unknown): Request {
+  const normalizedBody =
+    typeof body === 'object' && body !== null && 'registrationId' in body
+      ? { expectedCompanyId: COMPANY_ID, ...body }
+      : body;
   return new Request('http://test.local/api/presence/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(normalizedBody),
   });
 }
 
@@ -130,10 +147,12 @@ describe('/api/presence/sessions', () => {
       data: {
         ok: true,
         sessionId: SESSION_ID,
+        companyId: COMPANY_ID,
         registrationId: REGISTRATION_ID,
         expiresAt: EXPIRES_AT,
         sessionSpaceId: null,
         refreshed: false,
+        activeSessionCount: 1,
       },
       error: null,
     });
@@ -212,6 +231,34 @@ describe('/api/presence/sessions', () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
+  it('rejects a stale expected company before creating a session', async () => {
+    const response = await registerSession(
+      jsonRequest({
+        registrationId: REGISTRATION_ID,
+        expectedCompanyId: '44444444-4444-4444-8444-444444444444',
+      }),
+    );
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(409);
+    expect(data.code).toBe('PRESENCE_COMPANY_SCOPE_CHANGED');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects companyless registration before creating a session', async () => {
+    mockFindBySupabaseUid.mockResolvedValueOnce(
+      makeAuthenticatedUser({ companyId: null }),
+    );
+    const response = await registerSession(
+      jsonRequest({ registrationId: REGISTRATION_ID }),
+    );
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(403);
+    expect(data.code).toBe('NO_COMPANY');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it('returns 401 when the auth-session fence pre-check finds a revoked session', async () => {
     mockFenceMaybeSingle.mockResolvedValueOnce({
       data: { auth_session_id: AUTH_SESSION_ID },
@@ -228,12 +275,16 @@ describe('/api/presence/sessions', () => {
 
   it.each([
     ['AUTH_SESSION_REVOKED', 401],
+    ['PRESENCE_COMPANY_SCOPE_CHANGED', 409],
     ['NO_COMPANY', 403],
     ['USER_NOT_FOUND', 404],
     ['SESSION_RETIRED', 409],
     ['REGISTRATION_CONFLICT', 409],
   ])('maps register rpc code %s to HTTP %i', async (code, status) => {
-    mockRpc.mockResolvedValueOnce({ data: { ok: false, code }, error: null });
+    mockRpc.mockResolvedValueOnce({
+      data: { ok: false, code, activeSessionCount: 0 },
+      error: null,
+    });
 
     const response = await registerSession(jsonRequest({ registrationId: REGISTRATION_ID }));
     const data = await expectJson(response);
@@ -249,15 +300,21 @@ describe('/api/presence/sessions', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({
       sessionId: SESSION_ID,
+      companyId: COMPANY_ID,
       registrationId: REGISTRATION_ID,
       expiresAt: EXPIRES_AT,
       sessionSpaceId: null,
     });
-    expect(mockRpc).toHaveBeenCalledWith('register_presence_session', {
+    expect(mockRpc).toHaveBeenCalledWith('register_presence_session_observed', {
       p_user_id: APP_USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_registration_id: REGISTRATION_ID,
+      p_expected_company_id: COMPANY_ID,
     });
+    expect(mockEmitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'register',
+      activeSessionCount: 1,
+    }));
   });
 
   it('returns a sanitized 500 when the register rpc transport fails', async () => {
@@ -286,6 +343,7 @@ describe('/api/presence/sessions/[sessionId]/heartbeat', () => {
       data: {
         ok: true,
         expiresAt: EXPIRES_AT,
+        activeSessionCount: 1,
       },
       error: null,
     });
@@ -304,11 +362,15 @@ describe('/api/presence/sessions/[sessionId]/heartbeat', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ expiresAt: EXPIRES_AT });
     expect(request.json).not.toHaveBeenCalled();
-    expect(mockRpc).toHaveBeenCalledWith('heartbeat_presence_session', {
+    expect(mockRpc).toHaveBeenCalledWith('heartbeat_presence_session_observed', {
       p_user_id: APP_USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,
     });
+    expect(mockEmitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'heartbeat',
+      activeSessionCount: 1,
+    }));
   });
 
   it.each([
@@ -318,7 +380,10 @@ describe('/api/presence/sessions/[sessionId]/heartbeat', () => {
     ['SESSION_RETIRED', 409],
     ['REGISTRATION_CONFLICT', 409],
   ])('maps heartbeat rpc code %s to HTTP %i', async (code, status) => {
-    mockRpc.mockResolvedValueOnce({ data: { ok: false, code }, error: null });
+    mockRpc.mockResolvedValueOnce({
+      data: { ok: false, code, activeSessionCount: 0 },
+      error: null,
+    });
 
     const response = await heartbeatSession(emptyRequest(), routeParams());
     const data = await expectJson(response);
@@ -354,6 +419,7 @@ describe('/api/presence/sessions/[sessionId]/disconnect', () => {
         ok: true,
         retiredAt: RETIRED_AT,
         alreadyDisconnected: false,
+        activeSessionCount: 0,
       },
       error: null,
     });
@@ -368,11 +434,15 @@ describe('/api/presence/sessions/[sessionId]/disconnect', () => {
       retiredAt: RETIRED_AT,
       alreadyDisconnected: false,
     });
-    expect(mockRpc).toHaveBeenCalledWith('disconnect_presence_session', {
+    expect(mockRpc).toHaveBeenCalledWith('disconnect_presence_session_observed', {
       p_user_id: APP_USER_ID,
       p_auth_session_id: AUTH_SESSION_ID,
       p_session_id: SESSION_ID,
     });
+    expect(mockEmitPresenceEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'disconnect',
+      activeSessionCount: 0,
+    }));
   });
 
   it('accepts empty bodies without parsing JSON', async () => {
@@ -393,7 +463,10 @@ describe('/api/presence/sessions/[sessionId]/disconnect', () => {
     ['SESSION_RETIRED', 409],
     ['REGISTRATION_CONFLICT', 409],
   ])('maps disconnect rpc code %s to HTTP %i', async (code, status) => {
-    mockRpc.mockResolvedValueOnce({ data: { ok: false, code }, error: null });
+    mockRpc.mockResolvedValueOnce({
+      data: { ok: false, code, activeSessionCount: 0 },
+      error: null,
+    });
 
     const response = await disconnectSession(emptyRequest(), routeParams());
     const data = await expectJson(response);

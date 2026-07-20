@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
+import { emitPresenceEvent } from '@/lib/presence/observability';
 
 export type LegacyPresenceCompletionStatus = 'completed' | 'rejected' | 'failed';
 
@@ -102,10 +103,13 @@ class SupabaseLegacyPresenceWriteGate implements LegacyPresenceWriteGate {
     });
 
     if (error) {
-      console.error('Failed to close legacy presence write gate', {
-        requestId: this.requestId,
-        completionStatus,
-        error,
+      emitPresenceEvent({
+        category: 'location',
+        action: 'legacy-gate-close',
+        resultCode: 'LEGACY_GATE_CLOSE_FAILED',
+        correlationId: this.requestId,
+        stateTransition: completionStatus,
+        retryable: true,
       });
     }
   }

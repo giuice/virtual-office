@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  requireAuthUser: () => mocks.requireAuthUser(),
+  requireAuthUser: (options: unknown) => mocks.requireAuthUser(options),
 }));
 
 vi.mock('@/repositories/implementations/supabase', () => ({
@@ -104,6 +104,38 @@ describe('/api/spaces GET', () => {
 
     expect(response.status).toBe(403);
     expect(mocks.findByCompany).not.toHaveBeenCalled();
+  });
+
+  it('redacts a PostgREST-shaped failure from the response and keeps diagnostics in the correlated log', async () => {
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.findByCompany.mockRejectedValueOnce({
+      code: '42501',
+      message: 'permission denied for table spaces',
+      details: 'sensitive database detail',
+      hint: 'sensitive database hint',
+      status: 403,
+    });
+
+    const response = await GET(requestFor(COMPANY_ID));
+    const data = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(500);
+    expect(data).toMatchObject({
+      error: 'Failed to fetch spaces',
+      code: 'INTERNAL_ERROR',
+      correlationId: expect.any(String),
+    });
+    expect(JSON.stringify(data)).not.toContain('sensitive database detail');
+    expect(JSON.stringify(data)).not.toContain('sensitive database hint');
+    expect(JSON.stringify(data)).not.toContain('42501');
+
+    const logLine = logSpy.mock.calls.map(([line]) => String(line)).find((line) => line.includes('"context":"spaces.get"'));
+    expect(logLine).toContain('42501');
+    expect(logLine).toContain('sensitive database detail');
+    expect(logLine).toContain('sensitive database hint');
+    expect(logLine).toContain(String(data.correlationId));
+
+    logSpy.mockRestore();
   });
 
   it('maps space FK restriction failures to SPACE_IN_USE on delete', async () => {

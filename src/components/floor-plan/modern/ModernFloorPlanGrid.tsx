@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { Neighborhood, Space } from '@/types/database';
 import { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 
@@ -10,7 +10,14 @@ interface ModernFloorPlanGridProps {
   gridLayoutClass: string;
   gridLayoutStyle: React.CSSProperties;
   renderSpaceCard: (space: Space, index: number) => React.ReactNode;
+  emptyState?: ReactNode;
 }
+
+const DEFAULT_EMPTY_STATE = (
+  <div className="col-span-full rounded-lg border border-dashed border-muted-foreground/50 p-8 text-center">
+    <p className="text-muted-foreground">No spaces available</p>
+  </div>
+);
 
 export const ModernFloorPlanGrid: React.FC<ModernFloorPlanGridProps> = ({
   spaces,
@@ -20,19 +27,17 @@ export const ModernFloorPlanGrid: React.FC<ModernFloorPlanGridProps> = ({
   gridLayoutClass,
   gridLayoutStyle,
   renderSpaceCard,
+  emptyState,
 }) => {
   const shouldGroup = enableNeighborhoodGrouping && neighborhoods.length > 0;
+  const resolvedEmptyState = emptyState ?? DEFAULT_EMPTY_STATE;
 
   if (!shouldGroup) {
     return (
       <div className={gridLayoutClass} style={gridLayoutStyle}>
         {spaces.map(renderSpaceCard)}
 
-        {spaces.length === 0 && (
-          <div className="col-span-full p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
-            <p className="text-muted-foreground">No spaces available</p>
-          </div>
-        )}
+        {spaces.length === 0 ? resolvedEmptyState : null}
       </div>
     );
   }
@@ -82,11 +87,7 @@ export const ModernFloorPlanGrid: React.FC<ModernFloorPlanGridProps> = ({
         </UngroupedSection>
       )}
 
-      {spaces.length === 0 && (
-        <div className="p-8 text-center rounded-lg border border-dashed border-muted-foreground/50">
-          <p className="text-muted-foreground">No spaces available</p>
-        </div>
-      )}
+      {spaces.length === 0 ? resolvedEmptyState : null}
     </div>
   );
 };

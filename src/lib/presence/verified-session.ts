@@ -53,10 +53,27 @@ async function deriveVerifiedPresenceIdentity(): Promise<VerifiedPresenceAuthRes
     createSupabaseServerClient('service_role'),
   ]);
 
+  // Server routes must first validate the access token with the Auth server.
+  // Claims are read only afterward for the exact auth-session identifier.
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return {
+      ok: false,
+      status: 401,
+      code: 'UNAUTHORIZED',
+      error: 'Authentication required',
+    };
+  }
+
   const { data, error } = await supabase.auth.getClaims();
   const claims = (data as ClaimsData | null)?.claims;
 
-  if (error || !claims || typeof claims.sub !== 'string' || claims.sub.length === 0) {
+  if (
+    error ||
+    !claims ||
+    typeof claims.sub !== 'string' ||
+    claims.sub !== userData.user.id
+  ) {
     return {
       ok: false,
       status: 401,

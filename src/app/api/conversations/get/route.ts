@@ -5,6 +5,7 @@ import { IConversationRepository } from '@/repositories/interfaces';
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { requireAuthUser } from '@/lib/auth/session';
 import { PaginationOptions } from '@/types/common';
+import { createCorrelationId, jsonSuccess } from '@/lib/api/server-error';
 
 // Helper to serialize conversation dates and preferences
 function serializeConversation(conversation: Conversation) {
@@ -22,7 +23,11 @@ function serializeConversation(conversation: Conversation) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuthUser();
+  const correlationId = createCorrelationId();
+  const auth = await requireAuthUser({
+    correlationId,
+    pathname: '/api/conversations/get',
+  });
   if ('errorResponse' in auth) {
     return auth.errorResponse;
   }
@@ -42,9 +47,9 @@ export async function GET(request: NextRequest) {
     if (pinnedOnly) {
       const pinnedConversations = await conversationRepository.findPinnedByUser(requesterProfile.id);
 
-      return NextResponse.json({
+      return jsonSuccess({
         conversations: pinnedConversations.map((conversation) => serializeConversation(conversation)),
-      });
+      }, correlationId);
     }
 
     // Standard paginated query
@@ -63,11 +68,11 @@ export async function GET(request: NextRequest) {
 
     const result = await conversationRepository.findByUser(requesterProfile.id, paginationOptions);
 
-    return NextResponse.json({
+    return jsonSuccess({
       conversations: result.items.map((conversation) => serializeConversation(conversation)),
       nextCursor: result.nextCursor ?? null,
       hasMore: result.hasMore,
-    });
+    }, correlationId);
   } catch (error) {
     console.error('Error getting conversations:', error);
     return NextResponse.json({ error: 'Failed to retrieve conversations' }, { status: 500 });

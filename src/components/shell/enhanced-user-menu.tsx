@@ -8,7 +8,6 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
-import { useRouter } from 'next/navigation';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
 import { UploadableAvatar } from '@/components/profile/UploadableAvatar';
@@ -18,7 +17,6 @@ export function EnhancedUserMenu() {
   const { user, signOut } = useAuth();
   const { currentUserProfile } = useCompany();
   const { users } = usePresence();
-  const router = useRouter();
   const { showSuccess, showError } = useNotification();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -32,7 +30,7 @@ export function EnhancedUserMenu() {
       setIsSigningOut(true);
       await signOut();
       showSuccess({ description: 'Successfully signed out!' });
-      router.push('/login');
+      window.location.replace('/login');
     } catch (error) {
       console.error('Error signing out:', error);
       showError({ 
@@ -105,6 +103,7 @@ export function EnhancedUserMenu() {
       <PopoverTrigger asChild>
         <button
           type="button"
+          data-testid="account-menu-trigger"
           className="relative size-10 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <UploadableAvatar
@@ -158,7 +157,7 @@ export function EnhancedUserMenu() {
             <Button 
               variant="ghost" 
               className="flex items-center justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-9" 
-              onClick={handleSignOut}
+              onClick={() => void handleSignOut()}
               disabled={isSigningOut}
             >
               <LogOut className="size-4" />

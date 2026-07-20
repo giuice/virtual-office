@@ -3,8 +3,26 @@ import { ICompanyRepository } from '@/repositories/interfaces';
 import { SupabaseCompanyRepository } from '@/repositories/implementations/supabase/SupabaseCompanyRepository';
 import { requireAuthUser } from '@/lib/auth/session';
 import type { Company } from '@/types/database';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
+
+const companyUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    settings: z
+      .object({
+        allowGuestAccess: z.boolean().optional(),
+        maxRooms: z.number().int().nonnegative().optional(),
+        theme: z.string().max(64).optional(),
+        defaultSpaceId: z.string().uuid().optional(),
+        homeSpaces: z.record(z.string(), z.string().uuid()).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0);
 
 export async function PATCH(request: Request) {
   try {
@@ -23,7 +41,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Only company admins can update this company' }, { status: 403 });
     }
 
-    const companyData: Partial<Omit<Company, 'id' | 'createdAt' | 'updatedAt'>> = await request.json();
+    const parsedCompanyData = companyUpdateSchema.safeParse(await request.json());
+    if (!parsedCompanyData.success) {
+      return NextResponse.json(
+        { error: 'Invalid company update', code: 'INVALID_COMPANY_UPDATE' },
+        { status: 400 },
+      );
+    }
+    const companyData: Partial<Omit<Company, 'id' | 'createdAt'>> = parsedCompanyData.data;
 
     const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(authContext.supabase);
     const updatedCompany = await companyRepository.update(id, companyData);

@@ -10,6 +10,7 @@ interface KnockBannerProps {
   requesterAvatarUrl?: string;
   onApprove: () => void;
   onDeny: () => void;
+  responding?: boolean;
 }
 
 export const KnockBanner: React.FC<KnockBannerProps> = ({
@@ -17,15 +18,20 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
   requesterAvatarUrl,
   onApprove,
   onDeny,
+  responding = false,
 }) => {
-  const handleApprove = (event: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+  const handleApprove = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onApprove();
   };
 
-  const handleDeny = (event: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+  const handleDeny = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onDeny();
+  };
+
+  const stopPointerDownPropagation = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
   };
 
   return (
@@ -37,7 +43,7 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
-        'relative z-10 flex items-center gap-3 p-3 rounded-lg border',
+        'relative z-[60] flex items-center gap-3 p-3 rounded-lg border',
         'bg-[var(--vo-signal-success)]/10 border-[var(--vo-signal-success)]/30',
         'animate-in slide-in-from-top-2 duration-300 motion-reduce:animate-none'
       )}
@@ -72,9 +78,10 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
       <button
         type="button"
         data-avatar-interactive="true"
-        onPointerDown={handleApprove}
+        onPointerDown={stopPointerDownPropagation}
         onClick={handleApprove}
-        className="size-9 rounded-lg bg-[var(--vo-signal-success)]/20 hover:bg-[var(--vo-signal-success)]/30 text-[var(--vo-signal-success)] flex items-center justify-center"
+        disabled={responding}
+        className="size-9 rounded-lg bg-[var(--vo-signal-success)]/20 hover:bg-[var(--vo-signal-success)]/30 text-[var(--vo-signal-success)] flex items-center justify-center disabled:cursor-wait disabled:opacity-50"
         aria-label={`Let ${requesterName} in`}
       >
         <Check className="size-4" />
@@ -83,9 +90,10 @@ export const KnockBanner: React.FC<KnockBannerProps> = ({
       <button
         type="button"
         data-avatar-interactive="true"
-        onPointerDown={handleDeny}
+        onPointerDown={stopPointerDownPropagation}
         onClick={handleDeny}
-        className="size-9 rounded-lg bg-[var(--vo-signal-critical)]/20 hover:bg-[var(--vo-signal-critical)]/30 text-[var(--vo-signal-critical)] flex items-center justify-center"
+        disabled={responding}
+        className="size-9 rounded-lg bg-[var(--vo-signal-critical)]/20 hover:bg-[var(--vo-signal-critical)]/30 text-[var(--vo-signal-critical)] flex items-center justify-center disabled:cursor-wait disabled:opacity-50"
         aria-label={`Deny ${requesterName}`}
       >
         <X className="size-4" />

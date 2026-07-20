@@ -1,354 +1,257 @@
-// __tests__/api/invitations-create-limit.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/invitations/create/route';
 
-// Mock next/headers
-vi.mock('next/headers', () => ({
-  headers: vi.fn().mockResolvedValue({
-    get: vi.fn().mockReturnValue('localhost:3000'),
-  }),
-  cookies: vi.fn().mockReturnValue({
-    getAll: vi.fn().mockReturnValue([]),
-  }),
-}));
-
-// Mock crypto for token generation
 vi.mock('crypto', () => ({
   default: {
     randomBytes: vi.fn().mockReturnValue({
-      toString: vi.fn().mockReturnValue('mock-token-abc123'),
+      toString: vi.fn().mockReturnValue('a'.repeat(64)),
     }),
   },
 }));
 
-// Setup mock objects
-const mockInvitationRepoCreate = vi.fn();
 const mockAuthGetUser = vi.fn();
 const mockAuthAdminInvite = vi.fn();
+const mockInvitationRpc = vi.fn();
 
-// Mock data store for flexible responses
-let mockCompanyData: any = null;
-let mockUserData: any = null;
-let mockUserCount: number = 0;
-let mockPendingCount: number = 0;
-let mockExistingInvite: any = null;
+let mockCompanyData: { id: string; admin_ids: string[] } | null;
+let mockUserData: { id: string; role: string; company_id: string | null } | null;
 
-// Mock Supabase server client
 vi.mock('@/lib/supabase/server-client', () => ({
   createSupabaseServerClient: vi.fn().mockImplementation((role?: string) => {
-    const from = (table: string) => {
-      if (table === 'users') {
-        return {
-          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
-            if (options?.count === 'exact' && options?.head === true) {
-              return {
-                eq: () => Promise.resolve({ count: mockUserCount, error: null }),
-              };
-            }
-
-            return {
-              eq: () => ({
-                single: () => Promise.resolve({
-                  data: mockUserData,
-                  error: mockUserData ? null : { code: 'PGRST116' },
-                }),
-              }),
-            };
-          },
-        };
-      }
-
-      if (table === 'companies') {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: () => Promise.resolve({
-                data: mockCompanyData,
-                error: mockCompanyData ? null : { code: 'PGRST116' },
-              }),
-            }),
-          }),
-        };
-      }
-
-      if (table === 'invitations') {
-        return {
-          update: () => ({
-            eq: () => ({
-              eq: () => ({
-                lte: () => Promise.resolve({ error: null }),
-              }),
-            }),
-          }),
-          select: (_columns: string, options?: { count?: string; head?: boolean }) => {
-            if (options?.count === 'exact' && options?.head === true) {
-              return {
-                eq: () => ({
-                  eq: () => ({
-                    gt: () => Promise.resolve({ count: mockPendingCount, error: null }),
-                  }),
-                }),
-              };
-            }
-
-            return {
-              eq: () => ({
-                eq: () => ({
-                  eq: () => ({
-                    gt: () => ({
-                      order: () => ({
-                        limit: () => ({
-                          maybeSingle: () => Promise.resolve({
-                            data: mockExistingInvite,
-                            error: null,
-                          }),
-                        }),
-                      }),
-                    }),
-                  }),
-                }),
-              }),
-            };
-          },
-        };
-      }
-
-      return {
-        select: () => ({
-          eq: () => ({
-            single: () => Promise.resolve({ data: null, error: null }),
-          }),
-        }),
-      };
-    };
-
     if (role === 'service_role') {
       return Promise.resolve({
         auth: {
           admin: {
-            inviteUserByEmail: (email: string, options: any) => mockAuthAdminInvite(email, options),
+            inviteUserByEmail: mockAuthAdminInvite,
           },
         },
-        from,
+        rpc: mockInvitationRpc,
       });
     }
+
     return Promise.resolve({
-      auth: {
-        getUser: () => mockAuthGetUser(),
-      },
-      from,
+      auth: { getUser: mockAuthGetUser },
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            single: () =>
+              Promise.resolve(
+                table === 'companies'
+                  ? {
+                      data: mockCompanyData,
+                      error: mockCompanyData ? null : { code: 'PGRST116' },
+                    }
+                  : {
+                      data: mockUserData,
+                      error: mockUserData ? null : { code: 'PGRST116' },
+                    },
+              ),
+          }),
+        }),
+      }),
     });
   }),
 }));
 
-// Mock repository
-vi.mock('@/repositories/implementations/supabase', () => {
-  function MockInvitationRepository() {
-    return {
-      create: (data: any) => mockInvitationRepoCreate(data),
-    };
-  }
-  return {
-    SupabaseInvitationRepository: MockInvitationRepository,
-  };
-});
+const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+const USER_ID = '22222222-2222-4222-8222-222222222222';
+const TOKEN = 'a'.repeat(64);
 
-describe('/api/invitations/create - User Limit (AC4)', () => {
+function createRequest(overrides: Record<string, unknown> = {}): Request {
+  return new Request('http://localhost:3000/api/invitations/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'new@example.com',
+      role: 'member',
+      companyId: COMPANY_ID,
+      ...overrides,
+    }),
+  });
+}
+
+function successfulRpcResult(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    ok: true,
+    code: 'COMPANY_INVITATION_CREATED',
+    created: true,
+    invitationId: '33333333-3333-4333-8333-333333333333',
+    companyId: COMPANY_ID,
+    email: 'new@example.com',
+    role: 'member',
+    token: TOKEN,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: '2026-07-18T21:00:00.000Z',
+    memberCount: 5,
+    pendingCount: 3,
+    ...overrides,
+  };
+}
+
+describe('/api/invitations/create - atomic authorization and capacity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvitationRepoCreate.mockReset();
-    mockAuthGetUser.mockReset();
-    mockAuthAdminInvite.mockReset();
-    mockCompanyData = null;
-    mockUserData = null;
-    mockUserCount = 0;
-    mockPendingCount = 0;
-    mockExistingInvite = null;
-  });
-
-  const createRequest = (body: object) => {
-    return {
-      method: 'POST',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      json: vi.fn().mockResolvedValue(body),
-    } as any;
-  };
-
-  it('returns 403 with USER_LIMIT_REACHED when total users >= 10 (AC4)', async () => {
+    mockCompanyData = { id: COMPANY_ID, admin_ids: [USER_ID] };
+    mockUserData = { id: USER_ID, role: 'admin', company_id: COMPANY_ID };
     mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
+      data: { user: { id: 'auth-user-123' } },
       error: null,
     });
-    
-    mockCompanyData = { id: 'company-1', admin_ids: ['db-user-1'] };
-    mockUserData = { id: 'db-user-1', role: 'admin' };
-    mockUserCount = 8;
-    mockPendingCount = 2; // total = 10
-
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
+    mockInvitationRpc.mockResolvedValue({
+      data: successfulRpcResult(),
+      error: null,
     });
-    const response = await POST(request);
+    mockAuthAdminInvite.mockResolvedValue({ data: { user: { id: 'invited' } }, error: null });
+  });
+
+  it('maps the atomic capacity rejection to USER_LIMIT_REACHED', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'INVITATION_CREATE_LIMIT_REACHED' },
+    });
+
+    const response = await POST(createRequest());
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toBe('USER_LIMIT_REACHED');
-    expect(data.message).toContain('10 usuários');
-    expect(data.limit).toBe(10);
-    expect(data.current).toBe(10);
-    expect(data.remaining).toBe(0);
+    expect(data).toMatchObject({
+      error: 'USER_LIMIT_REACHED',
+      limit: 10,
+      remaining: 0,
+    });
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when users + pending > 10', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-    
-    mockCompanyData = { id: 'company-1', admin_ids: ['db-user-1'] };
-    mockUserData = { id: 'db-user-1', role: 'admin' };
-    mockUserCount = 7;
-    mockPendingCount = 4; // total = 11
-
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
-    });
-    const response = await POST(request);
+  it('creates through the service-only RPC and returns authoritative remaining capacity', async () => {
+    const response = await POST(createRequest());
     const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data).toMatchObject({ success: true, limit: 10, remaining: 2 });
+    expect(data.invitation.inviteUrl).toBe(`http://localhost:3000/join?token=${TOKEN}`);
+    expect(mockInvitationRpc).toHaveBeenCalledWith('create_company_invitation', {
+      p_actor_user_id: USER_ID,
+      p_company_id: COMPANY_ID,
+      p_email: 'new@example.com',
+      p_role: 'member',
+      p_token: TOKEN,
+      p_expires_at: expect.any(String),
+    });
+  });
+
+  it('returns only an opaque delivery failure when the Auth provider rejects email', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockAuthAdminInvite.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'provider account secret and recipient internals',
+        status: 502,
+      },
+    });
+
+    const response = await POST(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.invitation).toMatchObject({
+      emailSent: false,
+      emailSendError: 'DELIVERY_FAILED',
+    });
+    expect(JSON.stringify(data)).not.toContain('provider account secret');
+    expect(warning).toHaveBeenCalledWith(
+      'Invitation email delivery failed',
+      expect.objectContaining({ providerStatus: 502 }),
+    );
+    warning.mockRestore();
+  });
+
+  it('rejects an admin from another company during the fast preflight', async () => {
+    mockCompanyData = { id: COMPANY_ID, admin_ids: [] };
+    mockUserData = {
+      id: USER_ID,
+      role: 'admin',
+      company_id: '44444444-4444-4444-8444-444444444444',
+    };
+
+    const response = await POST(createRequest());
 
     expect(response.status).toBe(403);
-    expect(data.error).toBe('USER_LIMIT_REACHED');
+    expect(mockInvitationRpc).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when admin belongs to another company and is not in admin_ids', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
+  it('rejects a current member from the authoritative RPC', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'INVITATION_CREATE_EXISTING_MEMBER' },
     });
 
-    mockCompanyData = { id: 'company-1', admin_ids: ['another-admin-id'] };
-    mockUserData = { id: 'db-user-1', role: 'admin', company_id: 'company-2' };
-
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
-    });
-
-    const response = await POST(request);
+    const response = await POST(createRequest({ email: 'member@example.com' }));
     const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toBe('ALREADY_COMPANY_MEMBER');
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
+  });
+
+  it('rejects when admin rights are revoked after preflight but before the RPC lock', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'INVITATION_CREATE_FORBIDDEN' },
+    });
+
+    const response = await POST(createRequest());
 
     expect(response.status).toBe(403);
-    expect(data.error).toContain('administradores');
+    expect(mockInvitationRpc).toHaveBeenCalledOnce();
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
   });
 
-  it('allows invitation when total < 10', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
+  it('reuses an existing live invite without sending another email', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: successfulRpcResult({
+        code: 'COMPANY_INVITATION_REUSED',
+        created: false,
+        memberCount: 6,
+        pendingCount: 3,
+      }),
       error: null,
-    });
-    
-    mockCompanyData = { id: 'company-1', admin_ids: ['db-user-1'] };
-    mockUserData = { id: 'db-user-1', role: 'admin' };
-    mockUserCount = 5;
-    mockPendingCount = 2; // total = 7
-    
-    mockAuthAdminInvite.mockResolvedValue({
-      data: { user: { id: 'invited-user' } },
-      error: null,
-    });
-    
-    mockInvitationRepoCreate.mockResolvedValue({
-      id: 'inv-1',
-      email: 'new@example.com',
-      token: 'mock-token-abc123',
     });
 
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
-    });
-    const response = await POST(request);
+    const response = await POST(createRequest());
     const data = await response.json();
 
-    expect(response.status).toBe(201);
-    expect(data.success).toBe(true);
-    expect(data.remaining).toBe(2); // 10 - 7 - 1 = 2
-    expect(data.limit).toBe(10);
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({ success: true, remaining: 1 });
+    expect(data.invitation.emailSent).toBe(false);
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
   });
 
-  it('returns inviteUrl in successful response (AC6)', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
+  it('fails closed when the RPC response identity does not match the request', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: successfulRpcResult({ companyId: '55555555-5555-4555-8555-555555555555' }),
       error: null,
     });
-    
-    mockCompanyData = { id: 'company-1', admin_ids: ['db-user-1'] };
-    mockUserData = { id: 'db-user-1', role: 'admin' };
-    mockUserCount = 3;
-    mockPendingCount = 1; // total = 4
-    
-    mockAuthAdminInvite.mockResolvedValue({
-      data: { user: { id: 'invited-user' } },
-      error: null,
-    });
-    
-    mockInvitationRepoCreate.mockResolvedValue({
-      id: 'inv-1',
-      email: 'new@example.com',
-      token: 'mock-token-abc123',
-    });
 
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
-    });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(createRequest());
 
-    expect(response.status).toBe(201);
-    expect(data.invitation.inviteUrl).toContain('/join?token=');
-    expect(data.invitation.inviteUrl).toContain('mock-token-abc123');
+    expect(response.status).toBe(500);
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
   });
 
-  it('handles edge case: exactly 9 total allows one more', async () => {
-    mockAuthGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
+  it('fails closed when created and code disagree in a partial RPC contract', async () => {
+    mockInvitationRpc.mockResolvedValue({
+      data: successfulRpcResult({
+        code: 'COMPANY_INVITATION_REUSED',
+        created: true,
+      }),
       error: null,
     });
-    
-    mockCompanyData = { id: 'company-1', admin_ids: ['db-user-1'] };
-    mockUserData = { id: 'db-user-1', role: 'admin' };
-    mockUserCount = 6;
-    mockPendingCount = 3; // total = 9
-    
-    mockAuthAdminInvite.mockResolvedValue({
-      data: { user: { id: 'invited-user' } },
-      error: null,
-    });
-    
-    mockInvitationRepoCreate.mockResolvedValue({
-      id: 'inv-1',
-      email: 'new@example.com',
-      token: 'mock-token-abc123',
-    });
 
-    const request = createRequest({
-      email: 'new@example.com',
-      role: 'member',
-      companyId: 'company-1',
-    });
-    const response = await POST(request);
-    const data = await response.json();
+    const response = await POST(createRequest());
 
-    expect(response.status).toBe(201);
-    expect(data.success).toBe(true);
-    expect(data.remaining).toBe(0); // 10 - 9 - 1 = 0
+    expect(response.status).toBe(500);
+    expect(mockAuthAdminInvite).not.toHaveBeenCalled();
   });
 });

@@ -73,8 +73,6 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
   }
 
   async findByCompany(companyId: string, _options?: PaginationOptions): Promise<Space[]> {
-    console.log(`Fetching spaces for company ID: ${companyId}`);
-    
     const { data, error } = await this.supabase
       .from(this.TABLE_NAME)
       .select('*')
@@ -86,8 +84,6 @@ export class SupabaseSpaceRepository implements ISpaceRepository {
     }
     
     // Log raw data from Supabase to see what we're actually getting
-    console.log('Raw Supabase spaces data:', JSON.stringify(data, null, 2));
-    
     if (!data || data.length === 0) {
       console.log('No spaces found for this company');
       return [];

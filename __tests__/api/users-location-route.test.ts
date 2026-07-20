@@ -2,6 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@/types/database';
 import { PUT } from '@/app/api/users/location/route';
 
+const routeAuditMocks = vi.hoisted(() => ({ record: vi.fn() }));
+
+vi.mock('@/lib/presence/legacy-route-audit', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/presence/legacy-route-audit')>();
+  return {
+    ...actual,
+    recordLegacyPresenceRouteCall: (...args: unknown[]) => routeAuditMocks.record(...args),
+  };
+});
+
 // Phase 3 write gate: unit tests exercise route logic, not the DB ledger.
 // beginLegacyPresenceWrite is stubbed as an always-open legacy-mode gate.
 vi.mock('@/lib/presence/legacy-write-gate', async (importOriginal) => {
@@ -393,6 +404,9 @@ describe('/api/users/location', () => {
     vi.clearAllMocks();
     mockKnockRows = [];
     mockFindById.mockResolvedValue(null);
+    routeAuditMocks.record.mockReset();
+    routeAuditMocks.record.mockResolvedValue(undefined);
+    primeRestrictedSpace();
   });
 
   it('returns 401 when auth.getUser() has no user', async () => {
@@ -406,7 +420,20 @@ describe('/api/users/location', () => {
 
     expect(response.status).toBe(401);
     expect(data.code).toBe('UNAUTHORIZED');
+    expect(routeAuditMocks.record).not.toHaveBeenCalled();
     expect(mockFindBySupabaseUid).not.toHaveBeenCalled();
+  });
+
+  it('fails closed after auth but before mutation when route receipt recording is unavailable', async () => {
+    const { LegacyPresenceRouteAuditError } = await import('@/lib/presence/legacy-route-audit');
+    routeAuditMocks.record.mockRejectedValueOnce(new LegacyPresenceRouteAuditError());
+
+    const response = await putLocation({ userId: APP_USER_ID, spaceId: null });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: 'LEGACY_AUDIT_UNAVAILABLE' });
+    expect(mockAuthGetUser).toHaveBeenCalledOnce();
+    expect(mockUpdateLocation).not.toHaveBeenCalled();
   });
 
   it('returns 403 USER_MISMATCH when payload userId does not equal the authenticated app user id', async () => {

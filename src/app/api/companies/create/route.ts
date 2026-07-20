@@ -1,83 +1,98 @@
-import { ICompanyRepository, IUserRepository } from '@/repositories/interfaces';
-import { SupabaseCompanyRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
-import { Company } from '@/types/database';
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import {
+  companyCreationRequestSchema,
+  companyCreationRpcErrorMap,
+  parseCompanyCreationRpcErrorCode,
+  parseCompanyCreationRpcResult,
+} from '@/lib/api/company-membership-contracts';
 import { requireAuthUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
+  const correlationId = randomUUID();
+
   try {
-    const authContext = await requireAuthUser();
-    if ('errorResponse' in authContext) {
-      return authContext.errorResponse;
-    }
-
-    if (authContext.dbUser.companyId) {
-      return NextResponse.json(
-        { success: false, error: 'You already belong to a company. Leave your current company before creating a new one.' },
-        { status: 409 }
-      );
-    }
-
-    const supabaseAdmin = await createSupabaseServerClient('service_role');
-    const companyRepository: ICompanyRepository = new SupabaseCompanyRepository(supabaseAdmin);
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
-    const { name, settings } = await request.json();
-
-    // Validate required fields
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name is required.' },
-        { status: 400 }
-      );
-    }
-
-    // 2. Prepare company data with the correct Supabase User UUID as admin
-    const companyData: Omit<Company, 'id' | 'createdAt'> = {
-      name: name,
-      adminIds: [authContext.dbUser.id],
-      settings: settings || {}, // Use provided settings or default to empty object
-    };
-
-    // Create the company using the repository
-    const newCompany = await companyRepository.create(companyData);
-
-    if (!newCompany) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to create company (repository)' },
-        { status: 500 }
-      );
-    }
-
-    // 3. Update the creator's user record with the new company ID
+    let body: unknown;
     try {
-      const updatedUser = await userRepository.update(authContext.dbUser.id, { companyId: newCompany.id, role: 'admin' });
-      if (!updatedUser) {
-        console.warn(`Company ${newCompany.id} created, but failed to update user ${authContext.dbUser.id} with companyId.`);
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, code: 'INVALID_REQUEST', error: 'Invalid request' },
+        { status: 400 },
+      );
+    }
+    const parsed = companyCreationRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, code: 'INVALID_REQUEST', error: 'Invalid request' },
+        { status: 400 },
+      );
+    }
+
+    const auth = await requireAuthUser();
+    if ('errorResponse' in auth) return auth.errorResponse;
+
+    const admin = await createSupabaseServerClient('service_role');
+    const { data, error } = await admin.rpc('create_company_for_user', {
+      p_user_id: auth.dbUser.id,
+      p_name: parsed.data.name,
+      p_settings: parsed.data.settings ?? {},
+    });
+
+    if (error) {
+      const errorCode = parseCompanyCreationRpcErrorCode(error.message);
+      const contract = errorCode ? companyCreationRpcErrorMap[errorCode] : null;
+      if (contract) {
+        return NextResponse.json(contract.body, { status: contract.status });
       }
-    } catch (userUpdateError) {
-      console.error(`Error updating user ${authContext.dbUser.id} after company creation:`, userUpdateError);
-      // Log and continue, returning the created company.
+      console.error('Atomic company creation failed', {
+        correlationId,
+        databaseCode: error.code,
+      });
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to create company' },
+        { status: 500 },
+      );
     }
 
-    // Return success with the created company object
-    return NextResponse.json({
-      success: true,
-      company: newCompany,
-      message: 'Company created successfully'
-    }, { status: 201 });
+    const result = parseCompanyCreationRpcResult(data, {
+      userId: auth.dbUser.id,
+      name: parsed.data.name,
+      settings: parsed.data.settings ?? {},
+    });
+    if (!result) {
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to create company' },
+        { status: 500 },
+      );
+    }
 
+    return NextResponse.json(
+      {
+        success: true,
+        code: result.code,
+        company: {
+          id: result.companyId,
+          name: result.name,
+          adminIds: result.adminIds,
+          settings: result.settings,
+          createdAt: result.createdAt,
+        },
+        message: 'Company created successfully',
+      },
+      { status: 201 },
+    );
   } catch (error) {
-    console.error('Error creating company:', error);
-    // Check if the error is the specific UUID error from the initial steps
-    if (error instanceof Error && error.message.includes('invalid input syntax for type uuid')) {
-      console.error("UUID Syntax Error detected during company creation/user update phase.");
-    }
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to create company'
-    }, { status: 500 });
+    console.error('Company creation failed', {
+      correlationId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return NextResponse.json(
+      { success: false, code: 'INTERNAL_ERROR', error: 'Failed to create company' },
+      { status: 500 },
+    );
   }
 }

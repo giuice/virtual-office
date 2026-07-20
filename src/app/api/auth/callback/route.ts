@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
           if (user.app_metadata?.provider === 'google' && user.user_metadata) {
             try {
               console.log(`[Callback] Processing Google OAuth user avatar for user: ${user.id}`);
-              const userRepository = new SupabaseUserRepository(supabase);
+              const userRepository = new SupabaseUserRepository(
+                await createSupabaseServerClient('service_role')
+              );
               const googleAvatarService = new GoogleAvatarService(userRepository);
               const avatarResult = await googleAvatarService.extractAndStoreGoogleAvatar(
                 user.id,

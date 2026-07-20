@@ -4,6 +4,7 @@ import { requireAuthUser } from '@/lib/auth/session';
 import { IUserRepository } from '@/repositories/interfaces';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { extractUserUploadsPath } from '@/lib/user-uploads-storage';
+import { removeAvatarSchema } from '@/lib/presence/user-write-contracts';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,11 +13,16 @@ export async function POST(req: NextRequest) {
       return authContext.errorResponse;
     }
 
-    const { dbUser, supabase } = authContext;
+    const { dbUser } = authContext;
 
     // Callers may still send a userId, but it can only target the caller's own profile
-    const body = await req.json().catch(() => ({}));
-    if (body?.userId && body.userId !== dbUser.id) {
+    const parsedBody = removeAvatarSchema.safeParse(
+      await req.json().catch(() => ({}))
+    );
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid avatar removal request' }, { status: 400 });
+    }
+    if (parsedBody.data.userId && parsedBody.data.userId !== dbUser.id) {
       return NextResponse.json(
         { error: 'You do not have permission to update this profile' },
         { status: 403 }
@@ -26,9 +32,10 @@ export async function POST(req: NextRequest) {
     const oldAvatarPath = extractUserUploadsPath(dbUser.avatarUrl);
 
     // Update user profile to remove avatar URL
-    const userRepository: IUserRepository = new SupabaseUserRepository(supabase);
+    const serviceRoleSupabase = await createSupabaseServerClient('service_role');
+    const userRepository: IUserRepository = new SupabaseUserRepository(serviceRoleSupabase);
     const updateOk = await userRepository.update(dbUser.id, {
-      avatarUrl: ''
+      avatarUrl: null
     });
 
     if (!updateOk) {
@@ -40,7 +47,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (oldAvatarPath) {
-      const serviceRoleSupabase = await createSupabaseServerClient('service_role');
       const { error: removeAvatarError } = await serviceRoleSupabase.storage
         .from('user-uploads')
         .remove([oldAvatarPath]);

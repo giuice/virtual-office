@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { emitPresenceEvent } from '@/lib/presence/observability';
 import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 
 export const dynamic = 'force-dynamic';
@@ -45,15 +46,35 @@ function valueContainsCode(value: unknown, code: string): boolean {
 }
 
 export async function GET(): Promise<NextResponse> {
+  const correlationId = randomUUID();
+  const startedAt = Date.now();
+  let appUserId: string | null = null;
+  let companyId: string | null = null;
+  const observe = (resultCode: string, retryable = false): void => {
+    emitPresenceEvent({
+      category: 'snapshot',
+      action: 'read',
+      resultCode,
+      correlationId,
+      durationMs: Date.now() - startedAt,
+      retryable,
+      appUserId,
+      companyId,
+    });
+  };
+
   try {
     const auth = await requireVerifiedPresenceAuth();
     if (!auth.ok) {
+      observe(auth.code, auth.code === 'UNAUTHORIZED');
       if (auth.code === 'AUTH_SESSION_REVOKED') {
         return errorResponse('AUTH_SESSION_REVOKED', 401, 'Authentication session revoked', false);
       }
 
       return errorResponse('UNAUTHORIZED', 401, 'Authentication required', true);
     }
+    appUserId = auth.identity.appUserId;
+    companyId = auth.identity.companyId;
 
     const { data, error } = await auth.admin.rpc('get_company_presence_snapshot', {
       p_viewer_user_id: auth.identity.appUserId,
@@ -61,7 +82,7 @@ export async function GET(): Promise<NextResponse> {
 
     if (error) {
       if (valueContainsCode(error, 'PRESENCE_SNAPSHOT_TOO_LARGE')) {
-        console.error('Presence snapshot too large', { viewerUserId: auth.identity.appUserId });
+        observe('PRESENCE_SNAPSHOT_TOO_LARGE');
         return errorResponse(
           'PRESENCE_SNAPSHOT_TOO_LARGE',
           503,
@@ -71,6 +92,7 @@ export async function GET(): Promise<NextResponse> {
       }
 
       if (valueContainsCode(error, 'PRESENCE_VIEWER_NO_COMPANY')) {
+        observe('PRESENCE_VIEWER_NO_COMPANY');
         return errorResponse(
           'PRESENCE_VIEWER_NO_COMPANY',
           409,
@@ -79,6 +101,7 @@ export async function GET(): Promise<NextResponse> {
         );
       }
 
+      observe('INTERNAL_ERROR', true);
       return internalErrorResponse();
     }
 
@@ -88,19 +111,14 @@ export async function GET(): Promise<NextResponse> {
       parsedSnapshot.data.companyId !== auth.identity.companyId ||
       parsedSnapshot.data.viewerUserId !== auth.identity.appUserId
     ) {
-      const correlationId = randomUUID();
-      console.error('Presence snapshot identity mismatch', {
-        correlationId,
-        expectedCompanyId: auth.identity.companyId,
-        expectedViewerUserId: auth.identity.appUserId,
-      });
+      observe('INTERNAL_ERROR', true);
       return internalErrorResponse();
     }
 
+    observe('SNAPSHOT_OK');
     return NextResponse.json(data);
-  } catch (error) {
-    const correlationId = randomUUID();
-    console.error('Presence snapshot failed', { correlationId, error });
+  } catch {
+    observe('INTERNAL_ERROR', true);
     return internalErrorResponse();
   }
 }

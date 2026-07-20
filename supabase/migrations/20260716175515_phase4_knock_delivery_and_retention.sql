@@ -40,7 +40,7 @@ begin
     from public.users as u
     where u.supabase_uid = v_sub;
 
-    if pg_catalog.coalesce(pg_catalog.array_length(v_company_ids, 1), 0) <> 1 then
+    if coalesce(pg_catalog.array_length(v_company_ids, 1), 0) <> 1 then
         return null;
     end if;
 

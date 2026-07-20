@@ -8,18 +8,21 @@ vi.unmock('@supabase/supabase-js');
 import { createClient } from '@supabase/supabase-js';
 import { SupabaseMessageRepository } from '@/repositories/implementations/supabase/SupabaseMessageRepository';
 import { MessageType, MessageStatus } from '@/types/messaging';
-import dotenv from 'dotenv';
-import path from 'path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-// Load environment variables from .env.local
-dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+if (process.env.RUN_REMOTE_MESSAGING_INTEGRATION !== '1') {
+	throw new Error(
+		'Remote messaging integration is disabled. Set RUN_REMOTE_MESSAGING_INTEGRATION=1 and dedicated REMOTE_MESSAGING_* credentials to opt in.',
+	);
+}
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.REMOTE_MESSAGING_SUPABASE_URL;
+const supabaseServiceKey = process.env.REMOTE_MESSAGING_SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-	throw new Error('Missing Supabase credentials in .env.local');
+	throw new Error(
+		'Missing REMOTE_MESSAGING_SUPABASE_URL or REMOTE_MESSAGING_SUPABASE_SERVICE_ROLE_KEY.',
+	);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -30,12 +33,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 const repository = new SupabaseMessageRepository(supabase);
 
-console.log('Supabase URL:', supabaseUrl);
-console.log('Service Key length:', supabaseServiceKey.length);
-console.log('Supabase Auth Admin exists:', !!supabase.auth.admin);
-
 describe('Pin and Star Integration Test', () => {
 	let conversationId: string;
+	let authUserId: string;
 	let userId: string;
 	let messageId: string;
 
@@ -58,8 +58,8 @@ describe('Pin and Star Integration Test', () => {
 				throw userError;
 			}
 			if (!user.user) throw new Error('User creation failed');
-			userId = user.user.id;
-			console.log('Test user created:', userId);
+			authUserId = user.user.id;
+			userId = authUserId;
 
 			// 1.1 Wait for trigger to populate public.users, or insert if missing
 			// Give the trigger a moment
@@ -74,7 +74,6 @@ describe('Pin and Star Integration Test', () => {
 				.single();
 
 			if (existingUser) {
-				console.log('User found in public.users:', existingUser.id);
 				publicUserId = existingUser.id;
 			} else {
 				console.log('User not found in public.users, inserting manually...');
@@ -104,9 +103,7 @@ describe('Pin and Star Integration Test', () => {
 
 			// Update userId variable to point to public ID for subsequent tests
 			// But keep auth ID if needed? The repository methods likely expect public ID.
-			const authUserId = userId;
 			userId = publicUserId;
-			console.log('Using Public User ID for tests:', userId);
 
 			// 2. Create a conversation
 			const { data: conversation, error: convError } = await supabase
@@ -123,7 +120,6 @@ describe('Pin and Star Integration Test', () => {
 				throw convError;
 			}
 			conversationId = conversation.id;
-			console.log('Test conversation created:', conversationId);
 
 			// 3. (Removed) Add user to conversation participants - table does not exist
 			// Participants are handled via the array column in conversations table
@@ -134,14 +130,23 @@ describe('Pin and Star Integration Test', () => {
 	});
 
 	afterAll(async () => {
-		// Cleanup
+		const cleanupErrors: Error[] = [];
+
 		if (conversationId) {
-			// Messages and pins/stars should cascade delete or we delete them manually if needed
-			// But for now, just deleting conversation might be enough if cascade is set up
-			// Or just leave it, it's a test DB
+			const { error } = await supabase.from('conversations').delete().eq('id', conversationId);
+			if (error) cleanupErrors.push(new Error(`Conversation cleanup failed: ${error.message}`));
 		}
 		if (userId) {
-			await supabase.auth.admin.deleteUser(userId);
+			const { error } = await supabase.from('users').delete().eq('id', userId);
+			if (error) cleanupErrors.push(new Error(`App-user cleanup failed: ${error.message}`));
+		}
+		if (authUserId) {
+			const { error } = await supabase.auth.admin.deleteUser(authUserId);
+			if (error) cleanupErrors.push(new Error(`Auth-user cleanup failed: ${error.message}`));
+		}
+
+		if (cleanupErrors.length > 0) {
+			throw new AggregateError(cleanupErrors, 'Remote messaging fixture cleanup failed');
 		}
 	});
 

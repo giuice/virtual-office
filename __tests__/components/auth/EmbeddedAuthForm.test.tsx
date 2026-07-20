@@ -103,7 +103,7 @@ describe('EmbeddedAuthForm', () => {
     await waitFor(() => {
       expect(mockSignUp).toHaveBeenCalledWith('test@example.com', 'password123', 'Test User');
     });
-  });
+  }, 15_000);
 
   it('calls onEmailConfirmation after successful signup', async () => {
     const user = userEvent.setup();

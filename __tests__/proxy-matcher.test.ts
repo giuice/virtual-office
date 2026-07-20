@@ -12,6 +12,9 @@ describe('proxy matcher', () => {
     '/api',
     '/api/',
     '/favicon.ico',
+    '/images/virtual-office.png',
+    '/fonts/office.woff2',
+    '/manifest.webmanifest',
     '/_next/static/chunk.js',
   ])('does not match %s', (pathname) => {
     expect(

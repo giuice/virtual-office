@@ -1,187 +1,124 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { IInvitationRepository, IUserRepository } from '@/repositories/interfaces';
-import { SupabaseInvitationRepository, SupabaseUserRepository } from '@/repositories/implementations/supabase';
+import { randomUUID } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import {
+  invitationAcceptanceRequestSchema,
+  invitationAcceptanceRpcErrorMap,
+  invitationMembershipLookupSchema,
+  parseInvitationAcceptanceRpcErrorCode,
+  parseInvitationAcceptanceRpcResult,
+} from '@/lib/api/company-membership-contracts';
+import { requireAuthUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 
-export async function POST(req: NextRequest) {
-  // Regular client for authentication check
-  // Service role client for invitation operations (bypasses RLS)
-  // Needed because the invited user may not yet belong to the company,
-  // so RLS policies on invitations would block reads/writes.
-  const [supabase, supabaseAdmin] = await Promise.all([
-    createSupabaseServerClient(),
-    createSupabaseServerClient('service_role'),
-  ]);
-
-  // Get authenticated user from session (AC4 - use real supabaseUid from session)
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-  console.log('[API /invitations/accept] Auth check:', {
-    hasUser: !!authUser,
-    email: authUser?.email,
-    supabaseUid: authUser?.id,
-    authError: authError?.message
-  });
-
-  if (authError || !authUser) {
-    return NextResponse.json({
-      success: false,
-      error: 'Autenticação necessária. Faça login para aceitar o convite.'
-    }, { status: 401 });
-  }
-
-  const supabaseUid = authUser.id;
-
-  // Use service_role client for invitation ops (RLS bypass)
-  const invitationRepository: IInvitationRepository = new SupabaseInvitationRepository(supabaseAdmin);
-  // Use service_role for user ops too (user may not have company_id yet, RLS might block)
-  const userRepository: IUserRepository = new SupabaseUserRepository(supabaseAdmin);
+export async function POST(request: Request): Promise<NextResponse> {
+  const correlationId = randomUUID();
 
   try {
-    const { token, displayName } = await req.json();
-
-    // Validate input
-    if (!token) {
-      return NextResponse.json({ error: 'Token de convite é obrigatório' }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, code: 'INVALID_REQUEST', error: 'Invalid request' },
+        { status: 400 },
+      );
+    }
+    const parsed = invitationAcceptanceRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, code: 'INVALID_REQUEST', error: 'Invalid request' },
+        { status: 400 },
+      );
     }
 
-    // 1. Get and validate invitation using repository
-    const invitation = await invitationRepository.findByToken(token);
-    console.log('[API /invitations/accept] Invitation found:', {
-      found: !!invitation,
-      status: invitation?.status,
-      email: invitation?.email,
-      companyId: invitation?.companyId
-    });
-    
+    const auth = await requireAuthUser();
+    if ('errorResponse' in auth) return auth.errorResponse;
+
+    const admin = await createSupabaseServerClient('service_role');
+    const { data: invitation, error: invitationError } = await admin
+      .from('invitations')
+      .select('id, company_id')
+      .eq('token', parsed.data.token)
+      .maybeSingle();
+
+    if (invitationError) {
+      console.error('Invitation lookup failed', {
+        correlationId,
+        databaseCode: invitationError.code,
+      });
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to accept invitation' },
+        { status: 500 },
+      );
+    }
     if (!invitation) {
-      return NextResponse.json({ error: 'Convite não encontrado ou inválido' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, code: 'INVITATION_NOT_FOUND', error: 'Convite não encontrado ou inválido' },
+        { status: 404 },
+      );
+    }
+    const parsedInvitation = invitationMembershipLookupSchema.safeParse(invitation);
+    if (!parsedInvitation.success) {
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to accept invitation' },
+        { status: 500 },
+      );
     }
 
-    if (invitation.status !== 'pending') {
-      return NextResponse.json({ error: 'Convite já utilizado ou expirado' }, { status: 400 });
+    const { data, error } = await admin.rpc(
+      'accept_company_invitation_membership',
+      {
+        p_user_id: auth.dbUser.id,
+        p_invitation_id: parsedInvitation.data.id,
+        p_company_id: parsedInvitation.data.company_id,
+        p_display_name: parsed.data.displayName ?? null,
+      },
+    );
+
+    if (error) {
+      const errorCode = parseInvitationAcceptanceRpcErrorCode(error.message);
+      const contract = errorCode ? invitationAcceptanceRpcErrorMap[errorCode] : null;
+      if (contract) {
+        return NextResponse.json(contract.body, { status: contract.status });
+      }
+
+      console.error('Atomic invitation acceptance failed', {
+        correlationId,
+        databaseCode: error.code,
+      });
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to accept invitation' },
+        { status: 500 },
+      );
     }
 
-    // Check expiration (expiresAt is Unix timestamp in milliseconds)
-    const now = Date.now();
-    if (invitation.expiresAt < now) {
-      await invitationRepository.updateStatus(token, 'expired');
-      return NextResponse.json({ error: 'Convite expirado' }, { status: 410 }); // Use 410 Gone for expired
-    }
-
-    // Security: Verify invitation email matches authenticated user's email (AC4 security)
-    if (invitation.email.toLowerCase() !== authUser.email?.toLowerCase()) {
-      return NextResponse.json({ 
-        error: 'Este convite foi enviado para outro email. Use a conta correta para aceitar.' 
-      }, { status: 403 });
-    }
-
-    // 2. Check if user profile already exists for this supabaseUid using repository
-    let userProfile = await userRepository.findBySupabaseUid(supabaseUid);
-    const userIdToUpdate: string | undefined = userProfile?.id;
-
-    console.log('[API /invitations/accept] User profile lookup:', {
-      found: !!userProfile,
-      userId: userProfile?.id,
-      currentCompanyId: userProfile?.companyId,
-      supabaseUid
+    const result = parseInvitationAcceptanceRpcResult(data, {
+      userId: auth.dbUser.id,
+      invitationId: parsedInvitation.data.id,
+      companyId: parsedInvitation.data.company_id,
     });
-
-    if (userProfile) {
-      // 3a. User exists - check if they already belong to a company (AC6)
-      if (userProfile.companyId && userProfile.companyId !== invitation.companyId) {
-        // Get current company name for the error message (use admin client - RLS on companies)
-        const { data: currentCompany } = await supabaseAdmin
-          .from('companies')
-          .select('name')
-          .eq('id', userProfile.companyId)
-          .single();
-          
-        return NextResponse.json({ 
-          error: 'Você já pertence a outra empresa',
-          companyName: currentCompany?.name || 'uma empresa'
-        }, { status: 409 });
-      } else if (!userProfile.companyId) {
-        // User exists but has no company - update their profile using repository
-        console.log(`[API /invitations/accept] Updating user ${userIdToUpdate} with company ${invitation.companyId} and role ${invitation.role}`);
-        
-        const updateData: any = {
-          companyId: invitation.companyId,
-          role: invitation.role
-        };
-        
-        if (displayName) {
-          updateData.displayName = displayName;
-        }
-
-        const updatedUser = await userRepository.update(userIdToUpdate!, updateData);
-        console.log('[API /invitations/accept] User update result:', {
-          success: !!updatedUser,
-          newCompanyId: updatedUser?.companyId
-        });
-        if (!updatedUser) {
-          throw new Error(`Falha ao associar usuário à empresa`);
-        }
-        userProfile = updatedUser;
-      }
-      // If userProfile.companyId === invitation.companyId, user is already in this company
-      // This is fine, just mark invitation as accepted
-    } else {
-      // 3b. User does not exist - this should be handled by handle_new_user() trigger (AC7)
-      // But as a fallback, we wait a moment and check again
-      // The trigger creates the user with company_id = NULL
-      console.log(`User profile not found for supabaseUid ${supabaseUid}, waiting for trigger...`);
-      
-      // Wait briefly for trigger to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Try again
-      userProfile = await userRepository.findBySupabaseUid(supabaseUid);
-      
-      if (userProfile) {
-        // Trigger created the user, now update with company info
-        const updateData: any = {
-          companyId: invitation.companyId,
-          role: invitation.role
-        };
-        
-        if (displayName) {
-          updateData.displayName = displayName;
-        }
-
-        const updatedUser = await userRepository.update(userProfile.id, updateData);
-        if (!updatedUser) {
-          throw new Error(`Falha ao associar usuário à empresa`);
-        }
-        userProfile = updatedUser;
-      } else {
-        // Trigger didn't create user, this shouldn't happen normally
-        // Return error asking user to complete signup first
-        return NextResponse.json({ 
-          error: 'Perfil de usuário não encontrado. Por favor, complete o cadastro primeiro.' 
-        }, { status: 400 });
-      }
-    }
-
-    // 4. Invalidate the invitation token using repository
-    const updatedInvitation = await invitationRepository.updateStatus(token, 'accepted');
-    if (!updatedInvitation) {
-      console.error('[API /invitations/accept] Failed to update invitation status');
+    if (!result) {
+      return NextResponse.json(
+        { success: false, code: 'INTERNAL_ERROR', error: 'Failed to accept invitation' },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       success: true,
+      code: result.code,
       message: 'Convite aceito com sucesso!',
-      user: userProfile,
-      redirect: '/dashboard'
-    }, { status: 200 });
-
+      result,
+      redirect: '/dashboard',
+    });
   } catch (error) {
-    console.error('Error accepting invitation:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Falha ao aceitar convite';
-    return NextResponse.json({
-      success: false,
-      error: errorMessage
-    }, { status: 500 });
+    console.error('Invitation acceptance failed', {
+      correlationId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return NextResponse.json(
+      { success: false, code: 'INTERNAL_ERROR', error: 'Failed to accept invitation' },
+      { status: 500 },
+    );
   }
 }

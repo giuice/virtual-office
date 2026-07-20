@@ -4,7 +4,7 @@ import { POST as uploadAvatar } from '@/app/api/users/avatar/route';
 import { POST as removeAvatar } from '@/app/api/users/avatar/remove/route';
 
 const AUTH_USER_ID = 'auth-user-1';
-const APP_USER_ID = 'app-user-1';
+const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
 const OLD_AVATAR_URL = 'https://project.supabase.co/storage/v1/object/public/user-uploads/avatars/old.png';
 const NEW_AVATAR_URL = 'https://project.supabase.co/storage/v1/object/public/user-uploads/avatars/new.png';
 
@@ -19,8 +19,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     requireAuthUser: vi.fn(),
-    avatarRepoUpdate: vi.fn(),
-    removeRepoUpdate: vi.fn(),
+    repoUpdate: vi.fn(),
     storageUpload: vi.fn(),
     storageRemove: vi.fn(),
     sharp: vi.fn(() => sharpPipeline),
@@ -33,18 +32,10 @@ vi.mock('sharp', () => ({
   default: mocks.sharp,
 }));
 
-vi.mock('@/repositories/getSupabaseRepositories', () => ({
-  getSupabaseRepositories: vi.fn(async () => ({
-    userRepository: {
-      update: (id: string, updates: Partial<User>) => mocks.avatarRepoUpdate(id, updates),
-    },
-  })),
-}));
-
 vi.mock('@/repositories/implementations/supabase', () => ({
   SupabaseUserRepository: function MockUserRepository() {
     return {
-      update: (id: string, updates: Partial<User>) => mocks.removeRepoUpdate(id, updates),
+      update: (id: string, updates: Partial<User>) => mocks.repoUpdate(id, updates),
     };
   },
 }));
@@ -111,7 +102,7 @@ describe('/api/users/avatar', () => {
       authUser: { id: AUTH_USER_ID },
       dbUser: makeUser(),
     });
-    mocks.avatarRepoUpdate.mockImplementation(async (id: string, updates: Partial<User>) => makeUser({ id, ...updates }));
+    mocks.repoUpdate.mockImplementation(async (id: string, updates: Partial<User>) => makeUser({ id, ...updates }));
     mocks.storageUpload.mockResolvedValue({ data: { path: 'avatars/new.png' }, error: null });
     mocks.storageRemove.mockResolvedValue({ error: null });
     mocks.sharpPipeline.metadata.mockResolvedValue({ width: 100, height: 100 });
@@ -119,7 +110,6 @@ describe('/api/users/avatar', () => {
     mocks.sharpPipeline.jpeg.mockReturnValue({ toBuffer: vi.fn(async () => new Uint8Array([1])) });
     mocks.sharpPipeline.png.mockReturnValue({ toBuffer: vi.fn(async () => new Uint8Array([1])) });
     mocks.sharpPipeline.webp.mockReturnValue({ toBuffer: vi.fn(async () => new Uint8Array([1])) });
-    mocks.removeRepoUpdate.mockResolvedValue(makeUser({ avatarUrl: '' }));
   });
 
   it('returns the auth helper error when the request is not authenticated', async () => {
@@ -162,7 +152,7 @@ describe('/api/users/avatar', () => {
     expect(mocks.storageUpload).toHaveBeenCalledOnce();
 
     const [path, , options] = mocks.storageUpload.mock.calls[0];
-    expect(path).toMatch(/^avatars\/avatar-app-user-1-\d+\.webp$/);
+    expect(path).toMatch(/^avatars\/avatar-11111111-1111-4111-8111-111111111111-\d+\.webp$/);
     expect(options).toMatchObject({
       contentType: 'image/webp',
       upsert: true,
@@ -173,15 +163,29 @@ describe('/api/users/avatar', () => {
     const response = await uploadAvatar(uploadRequest(new File(['avatar'], 'avatar.png', { type: 'image/png' })));
 
     expect(response.status).toBe(200);
-    expect(mocks.avatarRepoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: NEW_AVATAR_URL });
+    expect(mocks.repoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: NEW_AVATAR_URL });
     expect(mocks.storageRemove).toHaveBeenCalledWith(['avatars/old.png']);
+  });
+
+  it('removes the newly uploaded object when the profile update throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.repoUpdate.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const response = await uploadAvatar(
+      uploadRequest(new File(['avatar'], 'avatar.png', { type: 'image/png' }))
+    );
+
+    expect(response.status).toBe(500);
+    expect(mocks.storageRemove).toHaveBeenCalledWith([
+      expect.stringMatching(/^avatars\/avatar-11111111-1111-4111-8111-111111111111-\d+\.png$/),
+    ]);
   });
 
   it('awaits avatar removal update and removes the old object from storage', async () => {
     const response = await removeAvatar(removeRequest(APP_USER_ID));
 
     expect(response.status).toBe(200);
-    expect(mocks.removeRepoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: '' });
+    expect(mocks.repoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: null });
     expect(mocks.storageRemove).toHaveBeenCalledWith(['avatars/old.png']);
   });
 
@@ -189,14 +193,14 @@ describe('/api/users/avatar', () => {
     const response = await removeAvatar(removeRequest());
 
     expect(response.status).toBe(200);
-    expect(mocks.removeRepoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: '' });
+    expect(mocks.repoUpdate).toHaveBeenCalledWith(APP_USER_ID, { avatarUrl: null });
   });
 
   it('rejects avatar removal targeting another user', async () => {
-    const response = await removeAvatar(removeRequest('someone-else'));
+    const response = await removeAvatar(removeRequest('22222222-2222-4222-8222-222222222222'));
 
     expect(response.status).toBe(403);
-    expect(mocks.removeRepoUpdate).not.toHaveBeenCalled();
+    expect(mocks.repoUpdate).not.toHaveBeenCalled();
     expect(mocks.storageRemove).not.toHaveBeenCalled();
   });
 });

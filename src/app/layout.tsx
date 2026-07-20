@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/providers/theme-provider';
 import { VOThemeProvider } from '@/contexts/ThemeContext';
 import { QueryProvider } from '@/providers/query-provider';
 import { Toaster } from 'sonner';
-import { PresenceProvider } from '@/contexts/PresenceContext';
+import { PresenceRouteBoundary } from '@/components/presence/PresenceRouteBoundary';
 import { CallingProvider } from '@/contexts/CallingContext';
 import { CallNotifications } from '@/components/messaging/CallNotification';
 import { MessagingDrawer } from '@/components/messaging/MessagingDrawer';
@@ -35,7 +35,7 @@ export default function RootLayout({
                 <AmbientMesh />
                 <CompanyProvider>
                   <MessagingProvider> {/* Move MessagingProvider above PresenceProvider */}
-                    <PresenceProvider>
+                    <PresenceRouteBoundary>
                       <CallingProvider>
                       {children}
                       <CallNotifications />
@@ -43,7 +43,7 @@ export default function RootLayout({
                       <MessagingDrawer />
                       <Toaster richColors closeButton position="top-right" />
                       </CallingProvider>
-                    </PresenceProvider>
+                    </PresenceRouteBoundary>
                   </MessagingProvider>
                 </CompanyProvider>
               </VOThemeProvider>
