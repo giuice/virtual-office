@@ -6,14 +6,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
-import { floorPlanTokens } from './designTokens';
 // Import the AvatarUser type
 import { AvatarUser } from '@/lib/avatar-utils';
-// Temporarily disable stopPropagation to test menu
-const stopPropagationHandlers = {
-  // onClick: (e: React.MouseEvent) => e.stopPropagation(),
-} as const;
-
 const FALLBACK_USER_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 
 interface ModernUserAvatarProps {
@@ -55,9 +49,15 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
     // });
   }
 
-  // Temporarily disable stopPropagation to test menu
+  const handlePersonAction = (event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if ('key' in event && event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClick(user.id);
+  };
 
-  const avatarCore = <div className={cn("relative inline-block", isOverlapping && "ring-2 ring-background", className)} data-avatar-interactive {...stopPropagationHandlers} role={onClick ? 'button' : undefined} aria-label={onClick ? `User ${user.displayName}` : undefined}>
+  const avatarCore = <div className={cn("relative inline-block", isOverlapping && "ring-2 ring-background", className)} data-avatar-interactive data-user-id={user.id} onClick={onClick ? handlePersonAction : undefined} onKeyDown={onClick ? handlePersonAction : undefined} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} aria-label={onClick ? `User ${user.displayName}` : undefined}>
       <InteractiveUserAvatar user={{
       // Start with the most complete user data available
       ...(fullUserData || {}),
@@ -76,7 +76,7 @@ const ModernUserAvatar: React.FC<ModernUserAvatarProps> = ({
       role: fullUserData?.role || (user as any).role || 'member',
       lastActive: fullUserData?.lastActive || (user as any).lastActive || FALLBACK_USER_TIMESTAMP,
       createdAt: fullUserData?.createdAt || (user as any).createdAt || FALLBACK_USER_TIMESTAMP
-    }} size={size} display={{ status: showStatus, interactionMenu: true }} className={cn("transition-all duration-200 border border-border")} aria-label={`${user.displayName}'s avatar - click for options`} />
+    }} size={size} display={{ status: showStatus, interactionMenu: !onClick }} className={cn("transition-all duration-200 border border-border")} aria-label={onClick ? `${user.displayName}'s avatar` : `${user.displayName}'s avatar - click for options`} />
     </div>;
   return <TooltipProvider>
       <Tooltip>

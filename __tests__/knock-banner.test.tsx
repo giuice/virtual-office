@@ -20,6 +20,14 @@ vi.mock('lucide-react', () => ({
   ShieldX: () => <span aria-hidden="true">shield-x</span>,
   Clock: () => <span aria-hidden="true">clock</span>,
   Timer: () => <span aria-hidden="true">timer</span>,
+  Building: () => <span aria-hidden="true">building</span>,
+  Coffee: () => <span aria-hidden="true">coffee</span>,
+  Briefcase: () => <span aria-hidden="true">briefcase</span>,
+  Video: () => <span aria-hidden="true">video</span>,
+  Users: () => <span aria-hidden="true">users</span>,
+  Users2: () => <span aria-hidden="true">users-2</span>,
+  FlaskConical: () => <span aria-hidden="true">flask</span>,
+  LayoutGrid: () => <span aria-hidden="true">layout-grid</span>,
 }));
 
 vi.mock('@/components/floor-plan/modern/AvatarGroup', () => ({

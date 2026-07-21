@@ -4,8 +4,9 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 
 ## Estado corrente
 
-- **Fase corrente:** Fase 1 — Estrutura da página (em andamento)
+- **Fase corrente:** Fase 2 — O card (em andamento, WP2 delegado 2026-07-21)
 - **Fase 0:** ✅ APROVADA no UAT do Giuliano em 2026-07-21 ("aprovado!").
+- **Fase 1:** ✅ implementada, revisada e commitada pelo Giuliano ("Completada fase 1...").
 - **Banco/deploy:** nenhuma mudança online no banco em nenhuma fase (confirmado no plano §1); nada deployado.
 - **Bloqueio:** nenhum.
 
@@ -73,6 +74,49 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 - Incidente operacional: registro do plugin Codex ficou com job zumbi "running" (WP0 morto por Esc) bloqueando resume da thread; cancel automático falha no Git Bash (MSYS converte `/PID` em caminho — rodar cancel via PowerShell); patch manual do state.json/jobs/*.json marcando failed. Lição registrada.
 
 **Fase 1: implementada, revisada (presence-safety ✓, adversarial ✓ pós-fix), verificada. UAT: Giuliano viu e vai fazer o check-in (commit) da Fase 1; próxima sessão começa na Fase 2 (card).**
+
+## Fase 2 — O card
+
+### Decisões
+
+- **D2-1 (fonte do selo "LIVE" — BR-003):** não existe flag real de "reunião ao vivo" (`space.live` do protótipo é simulado; a métrica "ao vivo" do NowBoard conta espaços ocupados). O selo LIVE do card deriva de sinal real de áudio: algum ocupante presente em `speakingUserIds` ou igual a `presentingUserId` (vêm do AudioContext via ModernFloorPlan). Sem áudio ativo, o selo não aparece — truthful. FULL usa a regra real de capacidade (capacity ≤0/null = ilimitado, coerente com `isSpaceEnterable`/F2). Prioridade LIVE > FULL.
+- **D2-2 (interação do card):** o botão único do rodapé (Enter/Knock/Full/You're here) é a ação primária visível chamando os handlers existentes; o clique no corpo do card mantém o comportamento atual (mobile → bottom sheet; desktop → enter/knock). O padrão do protótipo "clique abre painel de detalhe" fica para a Fase 3, junto com o restyle do painel lateral. Sujeito a veto no UAT.
+- **D2-3 (idioma):** textos do card em inglês ("LIVE", "FULL", "YOU", "Enter"...), consistente com a UI existente e a Fase 1; o pt-BR do protótipo é presentacional.
+
+### Delegação
+
+- WP2 delegado ao Codex `gpt-5.6-sol` effort high. Prompt: `wp2-prompt.md` (scratchpad da sessão). Worker executa também o smoke Playwright e salva screenshots em `evidence/phase-2/` (economia de tokens do orquestrador).
+- **Incidente de lançamento (1ª tentativa, resolvido):** o 1º job (thread `019f860a-8cb2`) foi lançado via subagent com flag inexistente `--detached` (foi parar no texto do prompt) e sem `--write` (job read-only). O processo morreu ~2m16s depois, junto com o fim do subagent (mesma classe do incidente WP0); o registro ficou zumbi "running" e depois foi saneado sozinho quando o runtime compartilhado caiu. **Lições:** (1) flags corretos do companion: `task --background --write [--fresh|--resume] --model --effort` — `--detached` NÃO existe; (2) lançar o companion direto do Bash do orquestrador, nunca de dentro de um subagent (a árvore de processos morre com ele); (3) `task --help` não existe — vira um job com prompt "--help".
+- **Job efetivo:** `task-mrv1fqjo-zayav0` (2026-07-21 19:19Z), `--background --write --fresh`, `write: true` confirmado no registro, worker com processo próprio. Monitor armado no orquestrador para notificar estado terminal.
+- Fronteira BR-001 reforçada no prompt; `SpaceDetailPanel`/`BottomSheet`/`KnockBanner`/NowBoard fora de escopo (Fases 3/4); arquivos legados não são deletados (Fase 4).
+- skill `presence-safety` lida antes do WP; `presence-safety-reviewer` + revisão adversarial obrigatórios após o diff.
+- Nota: worker tropeçou de novo no quirk do sandbox Windows (PowerShell helper exit -1) e se recuperou via node_repl — mesmo padrão da Fase 3.5.
+
+### Evidência de verificação (Fase 2)
+
+- Worker Codex (job `task-mrv1fqjo-zayav0`, 39m) completou: card 2B implementado (ModernSpaceCard reescrito, SpaceCardFooter novo, AvatarGroup/ModernUserAvatar ajustes pontuais, tokens.css, `__tests__/modern-space-card.test.tsx` novo). Worker reportou: type-check ✓, lint 0 erros (513 warnings baseline), vitest 7 arquivos/124 testes ✓, `git diff --check` ✓. **Smoke Playwright bloqueado no sandbox do worker** (sem HTTPS até o Supabase Auth; reproduzido por 3 caminhos) — screenshots não gerados; validação visual fica com o orquestrador/UAT.
+- Limpeza pós-worker: dev server órfão (PID 5992) morto; `evidence/phase-2/.smoke-runtime/` removido (confirmado que `repo/` era diretório real, não junction). Processos `next dev` de 16:11 (anteriores ao job → do usuário) preservados.
+- **Bug achado pelo Giuliano no dev server (fix aplicado pelo orquestrador):** fotos dos avatares não apareciam no card — seletor CSS largo demais (`tokens.css` `.vo-avatar-item button[data-avatar-interactive] > div > span`) inflava também o dot de status para 32px, cobrindo a foto. Fix: restringido a `span:first-child` (root do Avatar). Aguardando confirmação visual do Giuliano.
+- **presence-safety-reviewer: PASSOU, zero blockers.** BR-001 intocada (git diff); props do knock byte-equivalentes; `handleClick` idêntico ao HEAD (verificado contra `git show HEAD:`); zero novos writers/timers/channels/storage; click-stop verificado com run real de Testing Library (20/20 testes); sparkline fabricado removido; LIVE/FULL derivados só de dado real; `data-space-id` etc. preservados (dependência do YouAreHereChip ok).
+  - Risco 1 (não-vivo): `spaceBeaconData` continua na interface mas é dropado — remover prop morta ou documentar (fix round).
+  - Risco 2 (inerte hoje): `onClickCapture` no ModernUserAvatar dispara no capture antes do stopPropagation do menu — se `onUserClick` for ligado no futuro, menu + ação de pessoa disparam juntos. `onUserClick` é undefined em todos os call sites atuais.
+  - Notas: cast desnecessário `capacity as number | null`; SpaceCardFooter agora renderiza em todo card (intencional, D2-2), condição de knock provadamente idêntica à do corpo do card.
+- Revisão adversarial Codex: **needs-attention — 4 findings medium, todos verificados pelo orquestrador antes do fix round**:
+  - **F1** SpaceCardFooter não considera `space.status`: sala pública locked/maintenance/reserved ganha "Enter" habilitado que falha no servidor (viola AC-004). Confirmado por leitura (footer não recebe status). Fix: derivar de `isSpaceEnterable`.
+  - **F2** `presentingUserId` nunca é passado em produção (ModernFloorPlan só passa speaking/muted; AudioContext não expõe presenter) — teste de presenting dá falsa confiança. Confirmado. Resolução: manter prop/derivação como contrato, relabel do teste; LIVE real hoje = só speakingUserIds. Ligar presenter no AudioContext é proibido (BR-001).
+  - **F3** A11y do footer: capacidade 11.5px `--vo-text-faint` ≈3.37:1 dark / 2.94:1 light (< 4.5:1 AA); botão min-height 30px sem override touch (< 44px). Fix com re-cômputo numérico (precedente D0-5).
+  - **F4** `knock-banner.test.tsx` QUEBRADA — **confirmado empiricamente** (`vitest run`: 1 suite failed no load): mock de lucide-react sem export `Briefcase` (entrou no grafo do card via SpaceTypeIndicator). Mecanismo diferente do alegado pela revisão (nome acessível), mas regressão real. Nome acessível do knock também deve voltar a "Knock" (🚪 decorativo aria-hidden). Nota de processo: o worker não pegou porque a lista de suítes focadas do WP2 não incluía knock-banner (erro do orquestrador ao escrever o WP) — fix round exige `npm test` completo.
+- **Bug avatar (achado do Giuliano):** confirmado como F0 informal — fix do orquestrador já aplicado (seletor `:first-child`), aguardando confirmação visual.
+- **Fix round delegado:** Codex resume da thread WP2, job `task-mrv5hy1j-2g5v1e` (`--background --write --resume`, write ✓, pid próprio ✓). Prompt: `wp2-fix-round.md` (scratchpad). Escopo: F1–F4 + R1/R2 (presence-safety) + N1 (cast) + suite completa `npm test`. Watcher armado no arquivo de estado do job.
+
+### Fix round — concluído (2026-07-21)
+
+- F1: footer recebe disponibilidade por status (`active|available` → Enter; `maintenance|locked|reserved|in_use` → "Unavailable" desabilitado, coerente com a regra do servidor); Knock preservado; testes table-driven 6 status × público/privado. F2: prop `presentingUserId` mantida como contrato, teste re-rotulado (LIVE em produção = só speakingUserIds). F3: capacidade → `--vo-text-dim` (6.82:1 dark / 5.35:1 light, recomputado numericamente); alvo touch ≥44px via pointer:coarse. F4: mock lucide completado, 🚪 decorativo `aria-hidden`, nome acessível "Knock". R1: `spaceBeaconData` removida. R2: `onClickCapture` removido — com `onClick` o avatar vira ação de pessoa (menu desativado); sem, só menu. N1: cast removido. Extra: overlap do AvatarGroup restaurado para -10px (teste legado); fix do avatar/status-dot (`span:first-child`) preservado.
+- Verificação do worker: type-check ✓; lint 0 erros (512 warnings baseline); suite completa **1.055/1.055 testes executados passam** (antes do fix: 3 arquivos falhavam, 1 teste falhava); presence-safety re-review PASS; Supabase/RLS re-review PASS; `presence:gate` (script) ✓.
+- Re-verificação independente do orquestrador: knock-banner + modern-space-card = 49/49 ✓; `npm test` exit 1 vem SÓ de `__tests__/guards/presence-movement-gate.test.mjs` que falha no LOAD (parse de shebang no rolldown) — arquivo e script **intocados pelo diff** (git diff vazio), pré-existente neste ambiente. Follow-up opcional fora do escopo da fase (precisa autorização: é o guard de presença — não enfraquecer).
+- Pendências para o UAT do Giuliano: validação visual dark/light × comfortable/compact (screenshots nunca gerados — sandbox do worker sem HTTPS ao Supabase); confirmar fotos dos avatares (fix do status-dot); estados do botão único; selo LIVE com áudio ativo; AC-006 clique em avatar.
+
+**Fase 2: implementada, fix round aplicado, revisada (presence-safety ✓ 2×, adversarial ✓ pós-fix, RLS ✓), verificada por testes. Status: Pending user confirmation (UAT).**
 
 ### Decisão de processo (2026-07-21, vale para Fases 2–4)
 
