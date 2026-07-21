@@ -72,7 +72,11 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 - Re-smoke browser (1280×600): todos os checks anteriores PASS + compact sem sparkline PASS, avatares no compact PASS (5), rail com "Other" visível, free 7→8 (efeito do F2 correto), zero erros de console (409 do knock/pending filtrado como pré-existente conhecido).
 - Incidente operacional: registro do plugin Codex ficou com job zumbi "running" (WP0 morto por Esc) bloqueando resume da thread; cancel automático falha no Git Bash (MSYS converte `/PID` em caminho — rodar cancel via PowerShell); patch manual do state.json/jobs/*.json marcando failed. Lição registrada.
 
-**Fase 1: implementada, revisada (presence-safety ✓, adversarial ✓ pós-fix), verificada. AGUARDANDO UAT DO GIULIANO.**
+**Fase 1: implementada, revisada (presence-safety ✓, adversarial ✓ pós-fix), verificada. UAT: Giuliano viu e vai fazer o check-in (commit) da Fase 1; próxima sessão começa na Fase 2 (card).**
+
+### Decisão de processo (2026-07-21, vale para Fases 2–4)
+
+- **Economia de tokens do orquestrador** (pedido do Giuliano): Fable não roda mais Playwright/smoke/screenshots — o worker Codex executa o smoke dentro do WP e salva os screenshots (ex.: `spec-interview/spaces-visualization-redesign/evidence/` ou scratchpad); Fable revisa artefatos seletivamente ou repassa a verificação visual ao Giuliano. Registrado também no IMPLEMENTATION-PLAN.md §3 e na memória persistente.
 
 ### Erros / abordagens falhas (Fase 0)
 

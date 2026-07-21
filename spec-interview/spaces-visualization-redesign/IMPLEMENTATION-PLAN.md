@@ -53,6 +53,8 @@ Qualquer fase que toque arquivo adjacente a presença/knock exige skill `/presen
 
 Cada fase termina com: `npm run type-check` + `npm run lint` + Vitest focado + smoke Playwright 1280×600 (dark/light) + **UAT manual do Giuliano** (checklist §15 do SPEC). Nenhuma fase é "done" sem o UAT — status fica *Pending user confirmation*. Delegação: Sol high mínimo + revisão adversarial (política do repo).
 
+**Economia de tokens do orquestrador (decisão 2026-07-21, pós-Fase 1):** o orquestrador (Fable) NÃO executa tarefas braçais — smoke Playwright, screenshots e suítes longas são executados pelo **worker** (incluir no prompt do WP: rodar o smoke e salvar screenshots em pasta conhecida) ou verificados pelo próprio Giuliano. O orquestrador só: escreve o WP, revisa o diff/artefatos seletivamente (1 screenshot decisivo, não todos), confirma findings no código com leituras pontuais, e roda no máximo verificações baratas (type-check/vitest) quando o worker não puder.
+
 ### Fase 0 — Tokens e fundação visual (risco baixo)
 Portar a paleta 2B (dark Neon Cyberpunk + light) para os design tokens (`tokens.css`/`designTokens.ts`): superfícies, linhas, cyan/mag, estados ok/warn/err/busy, glows. Fontes Manrope + DM Sans via `next/font` (não Google Fonts por `@import` — sem dependência de rede em runtime). Nada de comportamento muda; a página atual apenas re-tema.
 _Verificação: AC-013 parcial (nenhum elemento ilegível nos dois temas)._
