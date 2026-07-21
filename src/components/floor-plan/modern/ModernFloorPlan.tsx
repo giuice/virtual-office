@@ -1,17 +1,19 @@
 // src/components/floor-plan/modern/ModernFloorPlan.tsx
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { Neighborhood, Space } from '@/types/database';
+import { Neighborhood, Space, UserPresenceData } from '@/types/database';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePresence } from '@/contexts/PresenceContext';
 import { useAudio } from '@/contexts/AudioContext';
 import ModernSpaceCard from './ModernSpaceCard';
 import ModernFloorPlanGrid from './ModernFloorPlanGrid';
+import { NeighborhoodIndexRail } from './NeighborhoodIndexRail';
 import { floorPlanTokens } from './designTokens';
 import { cn } from '@/lib/utils';
 import { useModernFloorPlanKnock } from './useModernFloorPlanKnock';
 
 // Perspective types matching UX spec
 export type FloorPlanPerspective = 'orbit' | 'analyst' | 'cinema';
+export type FloorPlanDensity = 'comfortable' | 'compact';
 
 interface ModernFloorPlanProps {
   spaces: Space[];
@@ -24,35 +26,42 @@ interface ModernFloorPlanProps {
   highlightedSpaceId?: string | null;
   isEditable?: boolean;
   onOpenChat?: (space: Space) => void;
-  /** @deprecated Use perspective instead */
-  layout?: 'default' | 'compact' | 'spaced';
   className?: string;
-  /** @deprecated Use perspective instead */
-  compactCards?: boolean;
-  /** Current perspective mode: orbit (default), analyst (dense), cinema (large) */
-  perspective?: FloorPlanPerspective;
+  density?: FloorPlanDensity;
   /** Neighborhoods for grouping spaces (Story 3.9) */
   neighborhoods?: Neighborhood[];
   /** Whether to enable neighborhood grouping (Story 3.9) */
   enableNeighborhoodGrouping?: boolean;
+  collapsedNeighborhoodIds?: ReadonlySet<string>;
+  onToggleNeighborhood?: (neighborhoodId: string) => void;
+  onExpandNeighborhood?: (neighborhoodId: string) => void;
+  onShowAll?: () => void;
+  isShowingAll?: boolean;
   /** Whether the current user is an admin */
   isAdmin?: boolean;
 }
 
-const perspectiveGridClasses: Record<FloorPlanPerspective, string> = {
-  orbit: 'grid gap-6',
-  analyst: 'grid gap-4',
-  cinema: 'grid gap-6',
-};
-
-const perspectiveGridStyles: Record<FloorPlanPerspective, React.CSSProperties> = {
-  orbit: { gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' },
-  analyst: { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' },
-  cinema: { gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))' },
-};
-
 const EMPTY_SPACES: Space[] = [];
 const EMPTY_NEIGHBORHOODS: Neighborhood[] = [];
+const EMPTY_COLLAPSED_NEIGHBORHOODS = new Set<string>();
+const NOOP = () => undefined;
+
+export function isCurrentUserAloneOnline(
+  users: UserPresenceData[] | undefined,
+  currentUserId: string | undefined
+) {
+  if (!users || !currentUserId) {
+    return false;
+  }
+
+  const currentUserIsConnected = users.some(
+    (user) => user.id === currentUserId && user.isConnected === true
+  );
+  const hasConnectedCoworker = users.some(
+    (user) => user.id !== currentUserId && user.isConnected === true
+  );
+  return currentUserIsConnected && !hasConnectedCoworker;
+}
 
 const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   spaces = EMPTY_SPACES,
@@ -63,12 +72,15 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
   onEditSpace,
   highlightedSpaceId = null,
   onOpenChat,
-  layout = 'default',
   className = '',
-  compactCards = false,
-  perspective = 'orbit',
+  density = 'comfortable',
   neighborhoods = EMPTY_NEIGHBORHOODS,
   enableNeighborhoodGrouping = true,
+  collapsedNeighborhoodIds = EMPTY_COLLAPSED_NEIGHBORHOODS,
+  onToggleNeighborhood = NOOP,
+  onExpandNeighborhood = NOOP,
+  onShowAll = NOOP,
+  isShowingAll = true,
   isAdmin = false,
 }) => {
   const { currentUserProfile } = useCompany();
@@ -133,8 +145,11 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     });
   }, [spaceNamesById, spaces.length, users?.length, usersInSpaces]);
 
-  const gridLayoutClass = perspectiveGridClasses[perspective] || floorPlanTokens.floorPlanLayout.grid[layout];
-  const gridLayoutStyle = perspectiveGridStyles[perspective];
+  const currentUserPresence = users?.find((user) => user.id === currentUserProfile?.id);
+  const currentSpaceId = currentUserPresence?.isOccupyingCurrentSpace
+    ? currentUserPresence.currentSpaceId ?? undefined
+    : undefined;
+  const isOnlyPersonOnline = isCurrentUserAloneOnline(users, currentUserProfile?.id);
 
   const currentSpeakingIds = useMemo(() => {
     const speakingIds: string[] = [];
@@ -183,10 +198,10 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
           highlighted: highlightedSpaceId === space.id,
           userInSpace,
           admin: isAdmin,
-          compact: compactCards || perspective === 'analyst',
+          compact: density === 'compact',
           directEnter: canDirectEnter,
         }}
-        variant={perspective}
+        variant="orbit"
         speakingUserIds={currentSpeakingIds}
         mutedUserIds={mutedUserIdsList}
         pendingKnockRequest={
@@ -203,7 +218,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
       />
     );
   }, [
-    compactCards,
     currentSpeakingIds,
     currentUserProfile?.id,
     getCooldownRemaining,
@@ -225,7 +239,7 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
     onUserClick,
     pendingKnockRequests,
     respondingKnockRequestIds,
-    perspective,
+    density,
     timeoutSpaceId,
     usersInSpaces,
   ]);
@@ -254,13 +268,32 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
         </div>
       )}
 
+      <NeighborhoodIndexRail
+        neighborhoods={neighborhoods}
+        spaces={spaces}
+        usersInSpaces={usersInSpaces}
+        currentSpaceId={currentSpaceId}
+        enableNeighborhoodGrouping={enableNeighborhoodGrouping}
+        collapsedNeighborhoodIds={collapsedNeighborhoodIds}
+        isShowingAll={isShowingAll}
+        onShowAll={onShowAll}
+        onExpandNeighborhood={onExpandNeighborhood}
+      />
+
+      {isOnlyPersonOnline ? (
+        <div className="vo-empty-office">
+          <h2 className="font-display">Good morning! The office is still quiet ✨</h2>
+          <p>You&apos;re the first one here. Pick a space so teammates can find you.</p>
+        </div>
+      ) : null}
+
       <ModernFloorPlanGrid
         spaces={spaces}
         neighborhoods={neighborhoods}
+        usersInSpaces={usersInSpaces}
         enableNeighborhoodGrouping={enableNeighborhoodGrouping}
-        perspective={perspective}
-        gridLayoutClass={gridLayoutClass}
-        gridLayoutStyle={gridLayoutStyle}
+        collapsedNeighborhoodIds={collapsedNeighborhoodIds}
+        onToggleNeighborhood={onToggleNeighborhood}
         renderSpaceCard={renderSpaceCard}
       />
 

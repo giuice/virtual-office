@@ -7,8 +7,9 @@ import { useVOTheme } from '@/hooks/useVOTheme';
 /**
  * Ambient mesh gradient background component.
  * Renders a decorative animated gradient background for themes that support it.
- * Automatically hidden for themes without mesh (Obsidian, Paper).
- * 
+ * Only the dark palette (Neon, Obsidian) has a mesh; light themes (Zen, Paper)
+ * define --vo-mesh-gradient: none.
+ *
  * Uses mounted state to prevent hydration mismatch since theme resolution
  * happens client-side via next-themes.
  */
@@ -26,7 +27,7 @@ export function AmbientMesh() {
   }
 
   // Only render for themes that use mesh gradient
-  if (theme === 'obsidian' || theme === 'paper') {
+  if (theme === 'zen' || theme === 'paper') {
     return null;
   }
 

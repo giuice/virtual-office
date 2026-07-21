@@ -1,95 +1,90 @@
-import React, { type ReactNode } from 'react';
-import { Neighborhood, Space } from '@/types/database';
+import type { ReactNode } from 'react';
+import type { Neighborhood, Space, UserPresenceData } from '@/types/database';
 import { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
+import { buildNeighborhoodSections } from './neighborhoodSections';
 
-interface ModernFloorPlanGridProps {
+export interface ModernFloorPlanGridProps {
   spaces: Space[];
   neighborhoods: Neighborhood[];
+  usersInSpaces: Map<string | null, UserPresenceData[]>;
   enableNeighborhoodGrouping: boolean;
-  perspective: 'orbit' | 'analyst' | 'cinema';
-  gridLayoutClass: string;
-  gridLayoutStyle: React.CSSProperties;
-  renderSpaceCard: (space: Space, index: number) => React.ReactNode;
+  collapsedNeighborhoodIds: ReadonlySet<string>;
+  onToggleNeighborhood: (neighborhoodId: string) => void;
+  renderSpaceCard: (space: Space, index: number) => ReactNode;
   emptyState?: ReactNode;
 }
 
 const DEFAULT_EMPTY_STATE = (
-  <div className="col-span-full rounded-lg border border-dashed border-muted-foreground/50 p-8 text-center">
-    <p className="text-muted-foreground">No spaces available</p>
+  <div className="vo-neighborhood-empty">
+    <p>No spaces available</p>
   </div>
 );
 
-export const ModernFloorPlanGrid: React.FC<ModernFloorPlanGridProps> = ({
+function peopleInSpaces(
+  spaces: Space[],
+  usersInSpaces: Map<string | null, UserPresenceData[]>
+) {
+  return spaces.reduce(
+    (total, space) => total + (usersInSpaces.get(space.id)?.length ?? 0),
+    0
+  );
+}
+
+export function ModernFloorPlanGrid({
   spaces,
   neighborhoods,
+  usersInSpaces,
   enableNeighborhoodGrouping,
-  perspective,
-  gridLayoutClass,
-  gridLayoutStyle,
+  collapsedNeighborhoodIds,
+  onToggleNeighborhood,
   renderSpaceCard,
   emptyState,
-}) => {
+}: ModernFloorPlanGridProps) {
   const shouldGroup = enableNeighborhoodGrouping && neighborhoods.length > 0;
   const resolvedEmptyState = emptyState ?? DEFAULT_EMPTY_STATE;
 
   if (!shouldGroup) {
     return (
-      <div className={gridLayoutClass} style={gridLayoutStyle}>
+      <div className="vo-floor-plan-grid">
         {spaces.map(renderSpaceCard)}
-
         {spaces.length === 0 ? resolvedEmptyState : null}
       </div>
     );
   }
 
-  const grouped = new Map<string, Space[]>();
-  const ungrouped: Space[] = [];
-
-  neighborhoods.forEach((neighborhood) => {
-    grouped.set(neighborhood.id, []);
-  });
-
-  spaces.forEach((space) => {
-    if (space.neighborhoodId && grouped.has(space.neighborhoodId)) {
-      grouped.get(space.neighborhoodId)!.push(space);
-    } else {
-      ungrouped.push(space);
-    }
-  });
+  const sections = buildNeighborhoodSections(spaces, neighborhoods);
 
   return (
     <div className="space-y-6">
-      {neighborhoods.map((neighborhood) => {
-        const sectionSpaces = grouped.get(neighborhood.id) || [];
-        if (sectionSpaces.length === 0) {
-          return null;
-        }
-
-        return (
-          <NeighborhoodSection
-            key={neighborhood.id}
-            neighborhood={neighborhood}
-            spaces={sectionSpaces}
-            variant={perspective}
-          >
-            <div className={gridLayoutClass} style={gridLayoutStyle}>
-              {sectionSpaces.map(renderSpaceCard)}
+      {sections.map((section) => {
+        const sharedProps = {
+          spaces: section.spaces,
+          index: section.index,
+          peopleCount: peopleInSpaces(section.spaces, usersInSpaces),
+          capacity: section.spaces.reduce((total, space) => total + space.capacity, 0),
+          isCollapsed: collapsedNeighborhoodIds.has(section.id),
+          onToggleCollapsed: () => onToggleNeighborhood(section.id),
+          children: (
+            <div className="vo-floor-plan-grid">
+              {section.spaces.map(renderSpaceCard)}
             </div>
-          </NeighborhoodSection>
+          ),
+        };
+
+        return section.neighborhood ? (
+          <NeighborhoodSection
+            key={section.id}
+            neighborhood={section.neighborhood}
+            {...sharedProps}
+          />
+        ) : (
+          <UngroupedSection key={section.id} {...sharedProps} />
         );
       })}
-
-      {ungrouped.length > 0 && (
-        <UngroupedSection spaces={ungrouped} variant={perspective}>
-          <div className={gridLayoutClass} style={gridLayoutStyle}>
-            {ungrouped.map(renderSpaceCard)}
-          </div>
-        </UngroupedSection>
-      )}
 
       {spaces.length === 0 ? resolvedEmptyState : null}
     </div>
   );
-};
+}
 
 export default ModernFloorPlanGrid;

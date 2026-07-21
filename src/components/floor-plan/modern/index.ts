@@ -2,7 +2,7 @@
 // Export all modern floor plan components
 
 export { default as ModernFloorPlan } from './ModernFloorPlan';
-export type { FloorPlanPerspective } from './ModernFloorPlan';
+export type { FloorPlanDensity, FloorPlanPerspective } from './ModernFloorPlan';
 export { default as ModernSpaceCard } from './ModernSpaceCard';
 export type { SpaceCardVariant } from './ModernSpaceCard';
 export { default as ModernUserAvatar } from './ModernUserAvatar';
@@ -16,9 +16,14 @@ export { default as SpaceContextMenu } from './SpaceContextMenu';
 // Neighborhood components (Story 3.9)
 export { NeighborhoodSection, UngroupedSection } from './NeighborhoodSection';
 export { NeighborhoodFilters } from './NeighborhoodFilters';
+export { NeighborhoodIndexRail } from './NeighborhoodIndexRail';
+export type { NeighborhoodIndexRailProps } from './NeighborhoodIndexRail';
+export { YouAreHereChip } from './YouAreHereChip';
+export type { YouAreHereChipProps } from './YouAreHereChip';
 
 // NowBoard components (Story 3.10)
 export { NowBoard } from './NowBoard';
+export { isSpaceEnterable } from './NowBoard';
 export { NowBoardMetrics } from './NowBoardMetrics';
 export { BeaconQueue } from './BeaconQueue';
 export { SpaceSearch } from './SpaceSearch';

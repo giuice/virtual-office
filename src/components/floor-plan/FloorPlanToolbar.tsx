@@ -2,18 +2,15 @@
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy, MessageSquare, Plus, Settings, FolderOpen, Grid2X2, LayoutGrid, Monitor as MonitorIcon } from 'lucide-react';
+import { Copy, MessageSquare, Plus, Settings, FolderOpen } from 'lucide-react';
 import { SpaceAudioControls } from './SpaceAudioControls';
 import type { Space } from '@/types/database';
-import type { FloorPlanPerspective } from './modern/ModernFloorPlan';
 
 interface FloorPlanToolbarProps {
   filterType: string;
-  perspective: FloorPlanPerspective;
   selectedSpace: Space | null;
   isAdmin: boolean;
   onFilterTypeChange: (value: string) => void;
-  onPerspectiveChange: (value: FloorPlanPerspective) => void;
   onOpenRoomManagement: () => void;
   onOpenTemplateDialog: () => void;
   onCreateRoom: () => void;
@@ -23,11 +20,9 @@ interface FloorPlanToolbarProps {
 
 export function FloorPlanToolbar({
   filterType,
-  perspective,
   selectedSpace,
   isAdmin,
   onFilterTypeChange,
-  onPerspectiveChange,
   onOpenRoomManagement,
   onOpenTemplateDialog,
   onCreateRoom,
@@ -66,25 +61,6 @@ export function FloorPlanToolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        <div
-          className="flex items-center gap-1 border rounded-lg p-1"
-          style={{
-            backgroundColor: 'var(--vo-glass-bg)',
-            borderColor: 'var(--vo-glass-border)',
-          }}
-        >
-          <span className="text-xs text-muted-foreground px-2 font-medium uppercase tracking-wide">View</span>
-          <Button variant={perspective === 'orbit' ? 'default' : 'ghost'} size="sm" onClick={() => onPerspectiveChange('orbit')} className="h-7 px-2" title="Orbit View - Standard layout">
-            <LayoutGrid className="size-4" />
-          </Button>
-          <Button variant={perspective === 'analyst' ? 'default' : 'ghost'} size="sm" onClick={() => onPerspectiveChange('analyst')} className="h-7 px-2" title="Analyst View - Dense layout with sparklines">
-            <Grid2X2 className="size-4" />
-          </Button>
-          <Button variant={perspective === 'cinema' ? 'default' : 'ghost'} size="sm" onClick={() => onPerspectiveChange('cinema')} className="h-7 px-2" title="Cinema View - Large cards">
-            <MonitorIcon className="size-4" />
-          </Button>
-        </div>
-
         {isAdmin && (
           <Button variant="default" size="sm" className="flex items-center gap-2" onClick={onCreateRoom}>
             <Plus className="size-4" />

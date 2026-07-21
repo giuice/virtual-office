@@ -3,11 +3,10 @@
 'use client';
 
 import React from 'react';
+import { Grid2X2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Space, UserPresenceData, Neighborhood } from '@/types/database';
-import { BeaconInfo } from '@/hooks/useBeaconAggregator';
 import { NowBoardMetrics } from './NowBoardMetrics';
-import { BeaconQueue } from './BeaconQueue';
 import { NeighborhoodFilters } from './NeighborhoodFilters';
 import { SpaceSearch } from './SpaceSearch';
 
@@ -32,12 +31,19 @@ interface NowBoardProps {
   searchQuery: string;
   /** Search change handler */
   onSearchChange: (query: string) => void;
-  /** Aggregated beacon list */
-  beacons: BeaconInfo[];
-  /** Beacon click handler */
-  onBeaconClick: (spaceId: string) => void;
+  density: 'comfortable' | 'compact';
+  onDensityToggle: () => void;
   /** Additional CSS classes */
   className?: string;
+}
+
+type EnterableSpace = Pick<Space, 'status'> & { capacity: number | null };
+
+export function isSpaceEnterable(space: EnterableSpace, occupantCount: number) {
+  const hasEnterableStatus = space.status === 'active' || space.status === 'available';
+  const capacity = space.capacity;
+  const isUncapped = !capacity || capacity <= 0;
+  return hasEnterableStatus && (isUncapped || occupantCount < capacity);
 }
 
 /**
@@ -62,22 +68,20 @@ export const NowBoard: React.FC<NowBoardProps> = ({
   isShowingAll,
   searchQuery,
   onSearchChange,
-  beacons,
-  onBeaconClick,
+  density,
+  onDensityToggle,
   className,
 }) => {
   // Calculate metrics (AC2 - REUSE existing data)
-  const totalSpaces = spaces.length;
-  const onlineUsers = users?.length || 0;
+  const onlineUsers = users?.filter((user) => user.isConnected === true).length ?? 0;
   
   // Active meetings = spaces with at least one user
-  const activeMeetings = Array.from(usersInSpaces.entries())
-    .filter(([spaceId, spaceUsers]) => spaceId !== null && spaceUsers.length > 0)
-    .length;
-
-  // Beacon counts from aggregated data
-  const normalBeacons = beacons.filter(b => b.severity === 'normal').length;
-  const criticalBeacons = beacons.filter(b => b.severity === 'critical').length;
+  const activeSpaces = spaces.filter(
+    (space) => (usersInSpaces.get(space.id)?.length ?? 0) > 0
+  ).length;
+  const freeSpaces = spaces.filter((space) => (
+    isSpaceEnterable(space, usersInSpaces.get(space.id)?.length ?? 0)
+  )).length;
 
   const handleSearchClear = () => {
     onSearchChange('');
@@ -88,9 +92,9 @@ export const NowBoard: React.FC<NowBoardProps> = ({
       className={cn(
         'now-board',
         // Base layout
-        'flex flex-col lg:flex-row items-stretch lg:items-center gap-4 lg:gap-6',
+        'flex flex-col lg:flex-row items-stretch lg:items-center gap-3',
         // Padding
-        'p-4 lg:p-5',
+        'px-3 py-2',
         // Glass-morphism styling (AC7)
         'rounded-xl',
         'border',
@@ -109,25 +113,11 @@ export const NowBoard: React.FC<NowBoardProps> = ({
       {/* Left section: Metrics */}
       <div className="flex-shrink-0">
         <NowBoardMetrics
-          totalSpaces={totalSpaces}
           onlineUsers={onlineUsers}
-          activeMeetings={activeMeetings}
-          normalBeacons={normalBeacons}
-          criticalBeacons={criticalBeacons}
+          activeSpaces={activeSpaces}
+          freeSpaces={freeSpaces}
         />
       </div>
-
-      {/* Center section: Beacon Queue (if any beacons) */}
-      {beacons.length > 0 && (
-        <div className="flex-shrink-0 lg:border-l lg:border-r border-[var(--vo-border-subtle)] lg:px-4">
-          <BeaconQueue
-            beacons={beacons}
-            onBeaconClick={onBeaconClick}
-            maxVisible={3}
-            className="min-w-[180px] max-w-[280px]"
-          />
-        </div>
-      )}
 
       {/* Right section: Filters & Search */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:ml-auto">
@@ -147,9 +137,20 @@ export const NowBoard: React.FC<NowBoardProps> = ({
           value={searchQuery}
           onChange={onSearchChange}
           onClear={handleSearchClear}
-          placeholder="Search spaces..."
-          className="w-full sm:w-[200px]"
+          placeholder="Search spaces or people…"
+          className="w-full sm:w-[220px]"
         />
+
+        <button
+          type="button"
+          className="vo-density-toggle"
+          onClick={onDensityToggle}
+          aria-pressed={density === 'compact'}
+          aria-label={density === 'compact' ? 'Use comfortable density' : 'Use compact density'}
+          title="Toggle density"
+        >
+          <Grid2X2 className="size-4" aria-hidden="true" />
+        </button>
       </div>
     </section>
   );

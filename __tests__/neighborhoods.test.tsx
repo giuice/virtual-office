@@ -14,6 +14,7 @@ import { NeighborhoodFilters } from '@/components/floor-plan/modern/Neighborhood
 import { NeighborhoodSection, UngroupedSection } from '@/components/floor-plan/modern/NeighborhoodSection';
 import { NeighborhoodSelector } from '@/components/floor-plan/neighborhoods/NeighborhoodSelector';
 import { SpaceContextMenu } from '@/components/floor-plan/modern/SpaceContextMenu';
+import ModernFloorPlan, { isCurrentUserAloneOnline } from '@/components/floor-plan/modern/ModernFloorPlan';
 
 // Hooks
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
@@ -129,6 +130,67 @@ vi.mock('@/hooks/mutations/useNeighborhoodMutations', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   })),
+}));
+
+vi.mock('@/contexts/CompanyContext', () => ({
+  useCompany: () => ({
+    currentUserProfile: { id: 'current-user', role: 'member' },
+    companyUsers: [],
+  }),
+}));
+
+vi.mock('@/contexts/PresenceContext', () => ({
+  usePresence: () => ({
+    users: [{
+      id: 'current-user',
+      displayName: 'Current User',
+      currentSpaceId: null,
+      isConnected: true,
+      isOccupyingCurrentSpace: false,
+    }],
+    usersInSpaces: new Map([['s1', [{
+      id: 'occupant-user',
+      displayName: 'Ada Occupant',
+      currentSpaceId: 's1',
+      isConnected: true,
+      isOccupyingCurrentSpace: true,
+    }]]]),
+    isLoading: false,
+    updateLocation: vi.fn(),
+    beginManualIntent: vi.fn(),
+    releaseManualIntent: vi.fn(),
+    presenceSessionId: 'session-1',
+  }),
+}));
+
+vi.mock('@/contexts/AudioContext', () => ({
+  useAudio: () => ({ speakingUsers: new Map(), mutedUserIds: new Set() }),
+}));
+
+vi.mock('@/components/floor-plan/modern/useModernFloorPlanKnock', () => ({
+  useModernFloorPlanKnock: () => ({
+    error: null,
+    setError: vi.fn(),
+    pendingKnockRequests: new Map(),
+    respondingKnockRequestIds: new Set(),
+    timeoutSpaceId: null,
+    knockStatus: 'idle',
+    knockTargetSpaceId: null,
+    getCooldownRemaining: () => 0,
+    handleBannerApprove: vi.fn(),
+    handleBannerDeny: vi.fn(),
+    handleEnterSpace: vi.fn(),
+    handleLeaveSpace: vi.fn(),
+    handleKnock: vi.fn(),
+    hasSpaceAccess: () => true,
+    isUserInSpace: () => false,
+  }),
+}));
+
+vi.mock('@/components/floor-plan/modern/ModernUserAvatar', () => ({
+  default: ({ user }: { user: { displayName: string } }) => (
+    <span data-testid="compact-density-avatar">{user.displayName}</span>
+  ),
 }));
 
 // ============================================
@@ -386,19 +448,33 @@ describe('NeighborhoodFilters Component', () => {
 // ============================================
 
 describe('NeighborhoodSection Component', () => {
-  it('should render neighborhood header with name and count', () => {
+  const sectionProps = {
+    index: 1,
+    peopleCount: 2,
+    capacity: 10,
+    isCollapsed: false,
+    onToggleCollapsed: vi.fn(),
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('renders the numbered header, eyebrow, people stat, and occupancy', () => {
     render(
       <NeighborhoodSection
         neighborhood={mockNeighborhoods[0]}
         spaces={[mockSpaces[0]]}
-        variant="orbit"
+        {...sectionProps}
       >
         <div>Space cards here</div>
       </NeighborhoodSection>
     );
 
     expect(screen.getByText('Engineering')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('01')).toBeInTheDocument();
+    expect(screen.getByText('ENG / Engineering team spaces')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('people · 1 spaces')).toBeInTheDocument();
+    expect(screen.getByTitle('20% of capacity in use')).toBeInTheDocument();
   });
 
   it('should have accessible section with aria-labelledby', () => {
@@ -406,29 +482,49 @@ describe('NeighborhoodSection Component', () => {
       <NeighborhoodSection
         neighborhood={mockNeighborhoods[0]}
         spaces={[mockSpaces[0]]}
-        variant="orbit"
+        {...sectionProps}
       >
         <div>Space cards</div>
       </NeighborhoodSection>
     );
 
     const section = screen.getByRole('region');
-    expect(section).toHaveAttribute('aria-labelledby', `neighborhood-${mockNeighborhoods[0].id}`);
+    expect(section).toHaveAttribute('id', `nb-sec-${mockNeighborhoods[0].id}`);
+    expect(section).toHaveAttribute('aria-labelledby', `nb-heading-${mockNeighborhoods[0].id}`);
   });
 
-  it('should apply compact styling in analyst variant', () => {
-    const { container } = render(
+  it('exposes collapse state and calls the page callback', async () => {
+    const user = userEvent.setup();
+    const onToggleCollapsed = vi.fn();
+    const { rerender } = render(
       <NeighborhoodSection
         neighborhood={mockNeighborhoods[0]}
         spaces={[mockSpaces[0]]}
-        variant="analyst"
+        {...sectionProps}
+        onToggleCollapsed={onToggleCollapsed}
       >
         <div>Space cards</div>
       </NeighborhoodSection>
     );
 
-    const header = container.querySelector('.vo-neighborhood-header');
-    expect(header).toHaveClass('vo-neighborhood-header-compact');
+    const collapseButton = screen.getByRole('button', { name: 'Collapse Engineering' });
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    await user.click(collapseButton);
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <NeighborhoodSection
+        neighborhood={mockNeighborhoods[0]}
+        spaces={[mockSpaces[0]]}
+        {...sectionProps}
+        isCollapsed
+        onToggleCollapsed={onToggleCollapsed}
+      >
+        <div>Space cards</div>
+      </NeighborhoodSection>
+    );
+    expect(screen.getByRole('button', { name: 'Expand Engineering' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Space cards')).not.toBeInTheDocument();
   });
 });
 
@@ -438,24 +534,33 @@ describe('NeighborhoodSection Component', () => {
 
 describe('UngroupedSection Component', () => {
   it('should render "Other" section for ungrouped spaces', () => {
-    render(
+    const { container } = render(
       <UngroupedSection
         spaces={[mockSpaces[2]]}
-        variant="orbit"
+        index={3}
+        peopleCount={0}
+        capacity={20}
+        isCollapsed={false}
+        onToggleCollapsed={vi.fn()}
       >
         <div>Ungrouped space cards</div>
       </UngroupedSection>
     );
 
     expect(screen.getByText('Other')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('03')).toBeInTheDocument();
+    expect(container.querySelector('.vo-neighborhood-eyebrow')).not.toBeInTheDocument();
   });
 
   it('should not render when no ungrouped spaces exist', () => {
     const { container } = render(
       <UngroupedSection
         spaces={[]}
-        variant="orbit"
+        index={1}
+        peopleCount={0}
+        capacity={0}
+        isCollapsed={false}
+        onToggleCollapsed={vi.fn()}
       >
         <div>Should not show</div>
       </UngroupedSection>
@@ -541,6 +646,42 @@ describe('NeighborhoodSelector Component', () => {
 // ============================================
 
 describe('Neighborhood Integration', () => {
+  it('keeps avatars and omits the fabricated analyst sparkline in compact density', () => {
+    const { container } = render(
+      <ModernFloorPlan
+        spaces={[mockSpaces[0]]}
+        density="compact"
+        enableNeighborhoodGrouping={false}
+      />
+    );
+
+    expect(container.querySelector('.vo-avatar-constellation')).toBeInTheDocument();
+    expect(screen.getByTestId('compact-density-avatar')).toHaveTextContent('Ada Occupant');
+    expect(container.querySelector('.cursor-crosshair')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Activity:/)).not.toBeInTheDocument();
+  });
+
+  it('treats disconnected coworkers as offline for the quiet-office state', () => {
+    const currentUser = {
+      id: 'current-user',
+      displayName: 'Current User',
+      currentSpaceId: 's1',
+      isConnected: true,
+    };
+    const disconnectedCoworker = {
+      id: 'offline-user',
+      displayName: 'Offline User',
+      currentSpaceId: null,
+      isConnected: false,
+    };
+
+    expect(isCurrentUserAloneOnline([currentUser, disconnectedCoworker], currentUser.id)).toBe(true);
+    expect(isCurrentUserAloneOnline([
+      currentUser,
+      { ...disconnectedCoworker, isConnected: true },
+    ], currentUser.id)).toBe(false);
+  });
+
   it('should filter spaces based on active neighborhood filters', () => {
     // Simulate filtering logic
     const activeFilters = new Set(['n1']);

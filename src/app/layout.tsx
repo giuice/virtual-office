@@ -12,7 +12,22 @@ import { CallNotifications } from '@/components/messaging/CallNotification';
 import { MessagingDrawer } from '@/components/messaging/MessagingDrawer';
 import { MessagingTrigger } from '@/components/messaging/MessagingTrigger';
 import { AmbientMesh } from '@/components/ui/AmbientMesh';
+import { DM_Sans, Manrope } from 'next/font/google';
 import './globals.css';
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  variable: '--font-manrope',
+  display: 'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
 
 export default function RootLayout({
   children,
@@ -20,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${manrope.variable} ${dmSans.variable}`} suppressHydrationWarning>
       <body>
         <ThemeProvider
           attribute="data-theme"

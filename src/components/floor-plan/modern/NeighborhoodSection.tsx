@@ -1,129 +1,177 @@
-// src/components/floor-plan/modern/NeighborhoodSection.tsx
 'use client';
 
-import React from 'react';
-import { Space, Neighborhood } from '@/types/database';
-import type { FloorPlanPerspective } from './ModernFloorPlan';
+import type { CSSProperties, ReactNode } from 'react';
+import type { Neighborhood, Space } from '@/types/database';
 import { cn } from '@/lib/utils';
 
-interface NeighborhoodSectionProps {
-  /** The neighborhood this section represents */
+interface SectionHeaderProps {
+  headingId: string;
+  index: number;
+  name: string;
+  eyebrow?: string;
+  peopleCount: number;
+  spaceCount: number;
+  capacity: number;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+}
+
+function SectionHeader({
+  headingId,
+  index,
+  name,
+  eyebrow,
+  peopleCount,
+  spaceCount,
+  capacity,
+  isCollapsed,
+  onToggleCollapsed,
+}: SectionHeaderProps) {
+  const occupancyPercent = capacity > 0
+    ? Math.min(100, Math.round((peopleCount / capacity) * 100))
+    : 0;
+  const peopleLabel = peopleCount === 1 ? 'person' : 'people';
+
+  return (
+    <header className="vo-neighborhood-header">
+      <span className="vo-neighborhood-number" aria-hidden="true">
+        {String(index).padStart(2, '0')}
+      </span>
+      <div className="min-w-0">
+        {eyebrow ? <p className="vo-neighborhood-eyebrow">{eyebrow}</p> : null}
+        <h2 id={headingId} className="vo-neighborhood-name font-display">
+          {name}
+        </h2>
+      </div>
+      <p className="vo-neighborhood-stat">
+        <strong>{peopleCount}</strong>
+        <span>{peopleLabel} · {spaceCount} spaces</span>
+      </p>
+      <button
+        type="button"
+        className="vo-neighborhood-collapse"
+        onClick={onToggleCollapsed}
+        aria-expanded={!isCollapsed}
+        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${name}`}
+      >
+        <span aria-hidden="true">{isCollapsed ? '▸' : '▾'}</span>
+      </button>
+      <div
+        className="vo-neighborhood-occupancy"
+        title={`${occupancyPercent}% of capacity in use`}
+        aria-hidden="true"
+      >
+        <span style={{ width: `${occupancyPercent}%` }} />
+      </div>
+    </header>
+  );
+}
+
+export interface NeighborhoodSectionProps {
   neighborhood: Neighborhood;
-  /** Spaces in this neighborhood */
   spaces: Space[];
-  /** Current floor plan perspective */
-  variant: FloorPlanPerspective;
-  /** Children to render (space cards) */
-  children: React.ReactNode;
-  /** Optional additional class names */
+  index: number;
+  peopleCount: number;
+  capacity: number;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+  children: ReactNode;
   className?: string;
 }
 
-/**
- * NeighborhoodSection wraps a group of space cards with a styled header.
- * Adapts header size based on the current perspective (orbit/analyst/cinema).
- * 
- * Story 3.9 - AC3: Visual Neighborhood Grouping in Grid
- */
-export const NeighborhoodSection: React.FC<NeighborhoodSectionProps> = ({
+export function NeighborhoodSection({
   neighborhood,
   spaces,
-  variant,
+  index,
+  peopleCount,
+  capacity,
+  isCollapsed,
+  onToggleCollapsed,
   children,
   className,
-}) => {
-  const isCompact = variant === 'analyst';
-  const headingId = `neighborhood-${neighborhood.id}`;
+}: NeighborhoodSectionProps) {
+  const headingId = `nb-heading-${neighborhood.id}`;
+  const code = neighborhood.name.slice(0, 3).toUpperCase();
+  const description = neighborhood.description?.trim();
+  const eyebrow = description ? `${code} / ${description}` : code;
+  const colorStyle = {
+    '--nbc': `var(${neighborhood.color})`,
+    '--neighborhood-color': `var(${neighborhood.color})`,
+  } as CSSProperties;
 
   return (
     <section
+      id={`nb-sec-${neighborhood.id}`}
       className={cn('vo-neighborhood-section', className)}
       aria-labelledby={headingId}
-      style={{
-        '--neighborhood-color': `var(${neighborhood.color})`,
-      } as React.CSSProperties}
+      style={colorStyle}
     >
-      {/* Section Header */}
-      <header
-        className={cn(
-          'vo-neighborhood-header',
-          isCompact && 'vo-neighborhood-header-compact'
-        )}
-        role="heading"
-        aria-level={2}
-      >
-        <span className="vo-neighborhood-color-dot" aria-hidden="true" />
-        <h2 id={headingId} className="vo-neighborhood-name">
-          {neighborhood.name}
-        </h2>
-        <span className="vo-neighborhood-count" aria-label={`${spaces.length} spaces`}>
-          {spaces.length}
-        </span>
-      </header>
-
-      {/* Space Cards Grid */}
-      {children}
+      <SectionHeader
+        headingId={headingId}
+        index={index}
+        name={neighborhood.name}
+        eyebrow={eyebrow}
+        peopleCount={peopleCount}
+        spaceCount={spaces.length}
+        capacity={capacity}
+        isCollapsed={isCollapsed}
+        onToggleCollapsed={onToggleCollapsed}
+      />
+      {isCollapsed ? null : children}
     </section>
   );
-};
+}
 
-/**
- * UngroupedSection for spaces without a neighborhood assignment.
- * Uses "Other" as the section name per AC3.
- */
-interface UngroupedSectionProps {
-  /** Ungrouped spaces */
+export interface UngroupedSectionProps {
   spaces: Space[];
-  /** Current floor plan perspective */
-  variant: FloorPlanPerspective;
-  /** Children to render (space cards) */
-  children: React.ReactNode;
-  /** Optional additional class names */
+  index: number;
+  peopleCount: number;
+  capacity: number;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+  children: ReactNode;
   className?: string;
 }
 
-export const UngroupedSection: React.FC<UngroupedSectionProps> = ({
+export function UngroupedSection({
   spaces,
-  variant,
+  index,
+  peopleCount,
+  capacity,
+  isCollapsed,
+  onToggleCollapsed,
   children,
   className,
-}) => {
-  const isCompact = variant === 'analyst';
-
+}: UngroupedSectionProps) {
   if (spaces.length === 0) {
     return null;
   }
 
+  const colorStyle = {
+    '--nbc': 'var(--vo-text-dim)',
+    '--neighborhood-color': 'var(--vo-text-dim)',
+  } as CSSProperties;
+
   return (
     <section
+      id="nb-sec-ungrouped"
       className={cn('vo-neighborhood-section', className)}
-      aria-labelledby="ungrouped-spaces"
+      aria-labelledby="nb-heading-ungrouped"
+      style={colorStyle}
     >
-      {/* Section Header */}
-      <header
-        className={cn(
-          'vo-neighborhood-header',
-          isCompact && 'vo-neighborhood-header-compact'
-        )}
-        style={{
-          '--neighborhood-color': 'var(--vo-text-muted)',
-        } as React.CSSProperties}
-        role="heading"
-        aria-level={2}
-      >
-        <span className="vo-neighborhood-color-dot" aria-hidden="true" />
-        <h2 id="ungrouped-spaces" className="vo-neighborhood-name">
-          Other
-        </h2>
-        <span className="vo-neighborhood-count" aria-label={`${spaces.length} spaces`}>
-          {spaces.length}
-        </span>
-      </header>
-
-      {/* Space Cards Grid */}
-      {children}
+      <SectionHeader
+        headingId="nb-heading-ungrouped"
+        index={index}
+        name="Other"
+        peopleCount={peopleCount}
+        spaceCount={spaces.length}
+        capacity={capacity}
+        isCollapsed={isCollapsed}
+        onToggleCollapsed={onToggleCollapsed}
+      />
+      {isCollapsed ? null : children}
     </section>
   );
-};
+}
 
 export default NeighborhoodSection;

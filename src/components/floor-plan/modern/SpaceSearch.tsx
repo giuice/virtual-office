@@ -77,7 +77,7 @@ export const SpaceSearch: React.FC<SpaceSearchProps> = ({
         onChange={updateSearchValue}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        aria-label="Search spaces"
+        aria-label="Search spaces or people"
         className={cn(
           'w-full h-9 pl-9 pr-9',
           'rounded-lg border',
