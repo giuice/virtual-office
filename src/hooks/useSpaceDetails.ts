@@ -3,8 +3,16 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { ActivityLogEntry } from '@/components/floor-plan/modern/ActivityLogPreview';
 import { useReducerState } from '@/hooks/useReducerState';
+
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: Date;
+  author: string;
+  authorId: string;
+  summary: string;
+  type: 'decision' | 'action' | 'note' | 'blocker' | 'join' | 'leave';
+}
 
 /**
  * Story 3.11 - useSpaceDetails Hook

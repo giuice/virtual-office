@@ -154,10 +154,10 @@ So that large office layouts are easier to navigate and understand.
 
 ### Task 5: Grid Neighborhood Grouping UI (AC3, AC4)
 - [x] 5.1 Create `src/components/floor-plan/modern/NeighborhoodSection.tsx`:
-  - Props: `{ neighborhood: Neighborhood, spaces: Space[], variant: FloorPlanPerspective }`
+  - Props: `{ neighborhood, spaces, index, peopleCount, capacity, isCollapsed, onToggleCollapsed }`
   - Renders section header with name and color indicator
   - Contains child space cards
-  - Adapts header size based on variant (orbit/analyst/cinema)
+  - Shows occupancy and supports collapsing the section
 - [x] 5.2 Create `src/hooks/useGroupedSpaces.ts`:
   - Groups spaces by neighborhood_id
   - Returns `{ grouped: Map<string, Space[]>, ungrouped: Space[], neighborhoods: Neighborhood[] }`
@@ -169,16 +169,16 @@ So that large office layouts are easier to navigate and understand.
     // Before: spaces.map(space => <ModernSpaceCard ... />)
     // After: grouped sections + ungrouped section
     ```
-  - Pass `perspective` prop to NeighborhoodSection for variant styling
+  - Pass section index, occupancy totals, and collapse state to NeighborhoodSection
   - Respect existing `filteredSpaces` from parent (already filtered by type/search)
 - [x] 5.4 Add neighborhood section styling to `tokens.css`:
   - `--vo-neighborhood-border-width: 2px`
   - `--vo-neighborhood-header-height: 40px`
-  - `--vo-neighborhood-header-height-compact: 28px` (for analyst view)
+  - `--vo-neighborhood-header-height-compact: 28px` (for compact density)
   - Section header gradient using neighborhood color
-- [x] 5.5 Ensure grouping works in all layout modes:
-  - Orbit: Full sections with headers (40px)
-  - Analyst: Compact headers (28px), same grouping
+- [x] 5.5 Ensure grouping works in both density modes:
+  - Comfortable: Full sections with headers (40px)
+  - Compact: Compact headers (28px), same grouping
   - Cinema: Large section divisions with prominent headers
 - [x] 5.6 Export `NeighborhoodSection` from `src/components/floor-plan/modern/index.ts`
 
@@ -209,7 +209,7 @@ So that large office layouts are easier to navigate and understand.
   - Returns `filterSpaces(spaces: Space[]): Space[]` utility
 - [x] 7.3 **MODIFY** `src/components/floor-plan/floor-plan.tsx`:
   - Import `NeighborhoodFilters` and `useNeighborhoodFilters`
-  - Add NeighborhoodFilters component in controls bar (after perspective switcher)
+  - Add NeighborhoodFilters component in the controls bar alongside density controls
   - Connect filter state to `filteredSpaces` computation:
     ```tsx
     // Existing: filterType, searchQuery

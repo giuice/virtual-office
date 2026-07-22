@@ -1,38 +1,25 @@
 // src/components/floor-plan/modern/SpaceDetailPanel.tsx
-// Story 3.11: Space Detail Hover Panel - Main container component
+// Space detail surface shared by the desktop panel and mobile bottom sheet.
 'use client';
 
 import React from 'react';
+import { DoorClosed, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Space, UserPresenceData } from '@/types/database';
 import { ParticipantRoster } from './ParticipantRoster';
-import { AgendaPhaseDisplay } from './AgendaPhaseDisplay';
-import { ActivityLogPreview, type ActivityLogEntry } from './ActivityLogPreview';
-import { TranscriptSnippet } from './TranscriptSnippet';
 import { SpaceActionButtons } from './SpaceActionButtons';
 import { CapacityIndicator } from './StatusIndicators';
 import type { KnockStatus } from '@/hooks/useKnock';
+import { SpaceAudioControls } from '../SpaceAudioControls';
+import { SpaceTypeIndicator } from './SpaceTypeIndicator';
+import { isSpaceStatusEnterable } from './NowBoard';
 
 /**
- * Story 3.11 - AC1: Hover Reveals Expanded Details
- * Story 3.11 - AC9: Theme-Aware Styling with glass-morphism
- * Story 3.12 - AC6: Capacity Display in SpaceDetailPanel
+ * Real-data-only detail contract: space metadata, roster, audio, and actions.
  */
 export interface SpaceDetailPanelProps {
   space: Space;
   usersInSpace: UserPresenceData[];
-  agendaPhase?: {
-    current: number;
-    total: number;
-    name: string;
-    description?: string;
-  };
-  activityLog?: ActivityLogEntry[];
-  transcript?: {
-    text: string;
-    speaker: string;
-    timestamp: Date;
-  };
   state: {
     userInSpace: boolean;
     privateSpace?: boolean;
@@ -40,8 +27,6 @@ export interface SpaceDetailPanelProps {
     full?: boolean;
     /** Whether direct join/enter is currently allowed */
     canDirectEnter?: boolean;
-    /** Loading state while fetching details */
-    loading?: boolean;
   };
   /** Story 3.16: Current knock status for this space */
   knockStatus?: KnockStatus;
@@ -52,7 +37,6 @@ export interface SpaceDetailPanelProps {
   onKnock?: () => void;
   onUserClick?: (userId: string) => void;
   onClose?: () => void;
-  onViewAllActivity?: () => void;
   /** Speaking user IDs for status display */
   speakingUserIds?: string[];
   /** Presenting user ID for status display */
@@ -63,24 +47,11 @@ export interface SpaceDetailPanelProps {
 }
 
 /**
- * SpaceDetailPanel - Expanded details overlay for space cards
- * 
- * Features:
- * - Full participant roster (AC2)
- * - Agenda phase display (AC3)
- * - Activity log preview (AC4)
- * - Transcript snippet (AC5)
- * - Action buttons (AC6)
- * - Click-stop protocol compliance (AC7)
- * - Glass-morphism styling (AC9)
- * - 200ms expand animation (AC1)
+ * SpaceDetailPanel - Expanded real-data details for a space.
  */
 export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   space,
   usersInSpace,
-  agendaPhase,
-  activityLog,
-  transcript,
   state,
   knockStatus = 'idle',
   knockCooldownRemaining = 0,
@@ -89,7 +60,6 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
   onKnock,
   onUserClick,
   onClose,
-  onViewAllActivity,
   speakingUserIds,
   presentingUserId,
   mutedUserIds,
@@ -100,22 +70,19 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
     privateSpace = false,
     full = false,
     canDirectEnter = true,
-    loading = false,
   } = state;
+  const isDirectEntryAvailable = isSpaceStatusEnterable(space.status);
+  const formattedType = space.type
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
   return (
     <section
       className={cn(
         'space-detail-panel',
-        // Base layout
-        'flex flex-col gap-3',
-        // Padding
-        'p-4',
-        // Glass-morphism styling (AC9)
-        'rounded-xl',
-        'border',
-        // Animation (AC1)
-        'animate-in fade-in-0 zoom-in-95 duration-200',
+        'flex h-full flex-col overflow-hidden border-l',
+        'animate-in slide-in-from-right-full duration-200 motion-reduce:animate-none',
         className
       )}
       style={{
@@ -129,112 +96,90 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
       data-avatar-interactive="true"
       aria-label={`Details for ${space.name}`}
     >
-      {/* Loading state */}
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin size-6 border-2 border-current border-t-transparent rounded-full" />
-        </div>
-      ) : (
-        <>
-          {/* Space name header */}
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-foreground truncate">
-              {space.name}
-            </h4>
-            {onClose && (
-              <button type="button"
-                onClick={onClose}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                aria-label="Close panel"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            )}
+      <header className="border-b border-[var(--vo-line-soft)] px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 flex-none place-items-center rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)]" aria-hidden="true">
+            <SpaceTypeIndicator type={space.type} showLabel={false} size="md" />
           </div>
-
-          {/* Story 3.12 - AC6: Capacity Display */}
-          {space.capacity > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <CapacityIndicator
-                current={usersInSpace.length}
-                capacity={space.capacity}
-                size="md"
-              />
-              {full && (
-                <span className="text-xs text-destructive font-medium">
-                  At capacity
-                </span>
-              )}
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-display text-base font-bold text-foreground">{space.name}</h3>
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{formattedType}</span>
+              <span aria-hidden="true">·</span>
+              <span className="capitalize">{space.status.replace('_', ' ')}</span>
+              {privateSpace ? <DoorClosed className="size-3.5 text-[var(--vo-warn)]" aria-label="Private space" /> : null}
+            </p>
+          </div>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid size-9 flex-none place-items-center rounded-lg border border-[var(--vo-line)] text-muted-foreground transition-colors hover:border-[var(--vo-err)] hover:text-[var(--vo-err)]"
+              aria-label="Close panel"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] px-3 py-2 text-sm">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Users className="size-4" aria-hidden="true" />
+            {usersInSpace.length} {usersInSpace.length === 1 ? 'participant' : 'participants'}
+          </span>
+          {space.capacity > 0 ? (
+            <div className="flex items-center gap-2">
+              <CapacityIndicator current={usersInSpace.length} capacity={space.capacity} size="md" />
+              {full ? <span className="text-xs font-medium text-destructive">At capacity</span> : null}
             </div>
-          )}
+          ) : <span className="text-xs text-muted-foreground">Unlimited</span>}
+        </div>
+      </header>
 
-          {/* AC2: Full Participant Roster */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+        {userInSpace ? (
+          <div aria-labelledby={`space-audio-${space.id}`}>
+            <h4 id={`space-audio-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              Audio
+            </h4>
+            <div className="flex items-center justify-between rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] p-2.5" data-testid="space-detail-audio">
+              <p className="text-xs text-muted-foreground">Space audio controls</p>
+              <SpaceAudioControls />
+            </div>
+          </div>
+        ) : null}
+
+        <div className="min-h-0" aria-labelledby={`space-roster-${space.id}`}>
+          <h4 id={`space-roster-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            People
+          </h4>
           <ParticipantRoster
             users={usersInSpace}
             onUserClick={onUserClick}
             speakingUserIds={speakingUserIds}
             presentingUserId={presentingUserId}
             mutedUserIds={mutedUserIds}
-            maxHeight={160}
+            maxHeight={320}
           />
+        </div>
+      </div>
 
-          {/* AC3: Agenda Phase Display */}
-          {agendaPhase && (
-            <AgendaPhaseDisplay
-              currentPhase={agendaPhase.current}
-              totalPhases={agendaPhase.total}
-              phaseName={agendaPhase.name}
-              phaseDescription={agendaPhase.description}
-            />
-          )}
-
-          {/* AC4: Activity Log Preview */}
-          {activityLog && activityLog.length > 0 && (
-            <ActivityLogPreview
-              entries={activityLog}
-              maxEntries={3}
-              onViewAll={onViewAllActivity}
-            />
-          )}
-
-          {/* AC5: Transcript Snippet */}
-          {transcript && (
-            <TranscriptSnippet
-              text={transcript.text}
-              speaker={transcript.speaker}
-              timestamp={transcript.timestamp}
-            />
-          )}
-
-          {/* AC6: Action Buttons */}
-          <SpaceActionButtons
-            state={{
-              userInSpace,
-              privateSpace,
-              hasOccupants: usersInSpace.length > 0,
-              full,
-              canDirectEnter,
-            }}
-            onJoin={onJoin}
-            onLeave={onLeave}
-            onKnock={onKnock}
-            knockStatus={knockStatus}
-            knockCooldownRemaining={knockCooldownRemaining}
-          />
-        </>
-      )}
+      <footer className="border-t border-[var(--vo-line-soft)] px-4 py-3">
+        <SpaceActionButtons
+          state={{
+            userInSpace,
+            privateSpace,
+            hasOccupants: usersInSpace.length > 0,
+            full,
+            canDirectEnter,
+            isDirectEntryAvailable,
+          }}
+          onJoin={onJoin}
+          onLeave={onLeave}
+          onKnock={onKnock}
+          knockStatus={knockStatus}
+          knockCooldownRemaining={knockCooldownRemaining}
+        />
+      </footer>
     </section>
   );
 };

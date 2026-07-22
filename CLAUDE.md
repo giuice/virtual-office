@@ -209,6 +209,26 @@ Common commands:
 - npm run build
 - npm test
 
+## Codex delegation (long-running worker jobs)
+
+Launching background Codex jobs via the codex-companion script has burned two
+work packages already. Non-negotiable mechanics:
+
+- Long-lived jobs are `task --background --write [--fresh|--resume]
+  --model <model> --effort <effort> "<prompt>"`. There is NO `--detached` flag
+  (it silently becomes prompt text) and no `task --help` (it becomes a job with
+  prompt "--help"). Without `--write` the job is read-only and cannot edit files.
+- Launch the companion directly from the orchestrator's own shell, never from
+  inside a subagent: the subagent's process tree dies when it finishes and kills
+  the job with it.
+- Immediately after launch, verify `status <job-id> --json` shows
+  `"write": true`, its own `pid`, and `"status": "running"`; then wait for a
+  terminal state via a background watcher instead of polling in the foreground.
+- A job record can go stale ("running" with a dead pid). Verify the pid before
+  trusting status. Cancel zombie jobs from PowerShell, not Git Bash (MSYS
+  mangles `/PID` into a path).
+- Delegation floor: Sol at effort high minimum; no silent downgrade.
+
 ## Git and files
 
 - Preserve unrelated user changes in a dirty worktree.

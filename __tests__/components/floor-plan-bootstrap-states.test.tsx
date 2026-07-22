@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompanyBootstrapError } from '@/contexts/CompanyContext';
-import type { Space } from '@/types/database';
+import type { Space, UserPresenceData } from '@/types/database';
 import { FloorPlan } from '@/components/floor-plan/floor-plan';
 import { ModernFloorPlanGrid } from '@/components/floor-plan/modern/ModernFloorPlanGrid';
 
@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
     refreshCompanyData: vi.fn(async () => undefined),
   },
   presenceState: {
-    users: [] as [] | undefined,
-    usersInSpaces: new Map(),
+    users: [] as UserPresenceData[] | undefined,
+    usersInSpaces: new Map<string | null, UserPresenceData[]>(),
     error: null as unknown,
     retryPresence: vi.fn(),
     realtimeConnectionStatus: 'subscribed',
@@ -76,10 +76,6 @@ vi.mock('@/hooks/useNeighborhoodFilters', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useBeaconAggregator', () => ({
-  useBeaconAggregator: () => ({ activeBeacons: [] }),
-}));
-
 vi.mock('@/hooks/mutations/useSpaceMutations', () => ({
   useDeleteSpace: () => ({ mutate: vi.fn() }),
 }));
@@ -98,11 +94,17 @@ vi.mock('@/contexts/AudioContext', () => ({
 
 vi.mock('@/components/floor-plan/modern/ModernFloorPlan', () => ({
   default: ({ spaces }: { spaces: Space[] }) => (
-    <div data-testid="modern-floor-plan">spaces:{spaces.length}</div>
+    <div data-testid="modern-floor-plan">
+      spaces:{spaces.length}:{spaces.map((item) => item.name).join(',')}
+    </div>
   ),
 }));
 
-vi.mock('@/components/floor-plan/modern/NowBoard', () => ({ NowBoard: () => null }));
+vi.mock('@/components/floor-plan/modern/NowBoard', () => ({
+  NowBoard: ({ onSearchChange }: { onSearchChange: (query: string) => void }) => (
+    <button type="button" onClick={() => onSearchChange('carla')}>Search Carla</button>
+  ),
+}));
 vi.mock('@/components/floor-plan/FloorPlanToolbar', () => ({ FloorPlanToolbar: () => null }));
 vi.mock('@/components/floor-plan/space-debug-panel', () => ({ SpaceDebugPanel: () => null }));
 vi.mock('@/components/floor-plan/room-dialog/index', () => ({ RoomDialog: () => null }));
@@ -131,12 +133,26 @@ describe('FloorPlan bootstrap states', () => {
     mocks.companyState.isLoading = false;
     mocks.companyState.refreshCompanyData.mockClear();
     mocks.presenceState.users = [];
+    mocks.presenceState.usersInSpaces = new Map();
     mocks.presenceState.error = null;
+    mocks.presenceState.realtimeConnectionStatus = 'subscribed';
     mocks.presenceState.retryPresence.mockClear();
     mocks.routerPush.mockClear();
   });
 
   afterEach(() => cleanup());
+
+  it('renders the final layout skeleton without collapsing the floor-plan footprint', () => {
+    mocks.companyState.isLoading = true;
+
+    render(<FloorPlan />);
+
+    expect(screen.getByTestId('floor-plan-skeleton')).toHaveAccessibleName('Preparing your floor plan');
+    expect(screen.getByTestId('floor-plan-skeleton-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('floor-plan-skeleton-neighborhood')).toBeInTheDocument();
+    expect(screen.getByTestId('floor-plan-skeleton-grid').children).toHaveLength(8);
+    expect(screen.getByTestId('floor-plan-skeleton-grid').parentElement).toHaveClass('min-h-[600px]');
+  });
 
   it('shows a sign-in action when the session is unauthenticated', async () => {
     mocks.companyState.bootstrapError = {
@@ -197,6 +213,40 @@ describe('FloorPlan bootstrap states', () => {
     expect(screen.getByTestId('modern-floor-plan')).toHaveTextContent('spaces:1');
   });
 
+  it('shows stale presence only while realtime is degraded', () => {
+    mocks.companyState.spaces = [space];
+    mocks.presenceState.realtimeConnectionStatus = 'degraded';
+    const { rerender } = render(<FloorPlan />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Reconnecting — presence may be out of date');
+
+    mocks.presenceState.realtimeConnectionStatus = 'connecting';
+    rerender(<FloorPlan />);
+    expect(screen.queryByText('Reconnecting — presence may be out of date')).not.toBeInTheDocument();
+
+    mocks.presenceState.realtimeConnectionStatus = 'subscribed';
+    rerender(<FloorPlan />);
+    expect(screen.queryByText('Reconnecting — presence may be out of date')).not.toBeInTheDocument();
+  });
+
+  it('matches a space when search finds a current occupant name', async () => {
+    const secondSpace = { ...space, id: 'space-2', name: 'Lounge' };
+    const carla: UserPresenceData = {
+      id: 'user-carla',
+      displayName: 'Carla Mendes',
+      currentSpaceId: secondSpace.id,
+      status: 'online',
+    };
+    mocks.companyState.spaces = [space, secondSpace];
+    mocks.presenceState.users = [carla];
+    mocks.presenceState.usersInSpaces = new Map([[secondSpace.id, [carla]]]);
+
+    render(<FloorPlan />);
+    expect(screen.getByTestId('modern-floor-plan')).toHaveTextContent('spaces:2:Studio,Lounge');
+    await userEvent.click(screen.getByRole('button', { name: 'Search Carla' }));
+    expect(screen.getByTestId('modern-floor-plan')).toHaveTextContent('spaces:1:Lounge');
+  });
+
   it('blocks an empty-avatar floor plan when the initial Presence snapshot fails', async () => {
     mocks.companyState.spaces = [space];
     mocks.presenceState.users = undefined;
@@ -215,10 +265,10 @@ describe('FloorPlan bootstrap states', () => {
       <ModernFloorPlanGrid
         spaces={[]}
         neighborhoods={[]}
+        usersInSpaces={new Map()}
         enableNeighborhoodGrouping={false}
-        perspective="orbit"
-        gridLayoutClass="grid"
-        gridLayoutStyle={{}}
+        collapsedNeighborhoodIds={new Set()}
+        onToggleNeighborhood={vi.fn()}
         renderSpaceCard={() => null}
         emptyState={<p>Build your first space</p>}
       />

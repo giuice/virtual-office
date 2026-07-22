@@ -3,10 +3,10 @@
 
 import { useReducerState } from '@/hooks/useReducerState';
 import { useEffect, useCallback } from 'react';
-import { Space, User, RoomTemplate } from '@/types/database';
+import { Space, RoomTemplate } from '@/types/database';
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RoomDialog } from './room-dialog/index';
 import { RoomManagement } from './room-management';
@@ -14,34 +14,89 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteSpace } from '@/hooks/mutations/useSpaceMutations';
 import { useToast } from '@/components/ui/use-toast';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { debugLogger } from '@/utils/debug-logger'; // Import debugLogger
-import { SpaceDebugPanel } from './space-debug-panel'; // Import debug panel
+import { useRouter } from 'next/navigation';
+import { debugLogger } from '@/utils/debug-logger';
+import { SpaceDebugPanel } from './space-debug-panel';
 import { usePresence } from '@/contexts/PresenceContext';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { ConversationType } from '@/types/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Import the RoomTemplates component
 import { RoomTemplates } from './room-templates';
-import ModernFloorPlan, { type FloorPlanPerspective } from './modern/ModernFloorPlan';
+import ModernFloorPlan, { type FloorPlanDensity } from './modern/ModernFloorPlan';
 import { NowBoard } from './modern/NowBoard';
+import { YouAreHereChip } from './modern/YouAreHereChip';
 import { NeighborhoodManager } from './neighborhoods/NeighborhoodManager';
 import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
-import { useBeaconAggregator } from '@/hooks/useBeaconAggregator';
 import { AudioProvider } from '@/contexts/AudioContext';
 import { FloorPlanToolbar } from './FloorPlanToolbar';
-const handleDuplicateRoom = (room: Space) => {
+const handleDuplicateRoom = (_room: Space) => {
   console.warn("handleDuplicateRoom needs API integration");
 };
-export function FloorPlan() {
-  // === ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURN (Rules of Hooks) ===
 
-  // Context hooks
+function FloorPlanSkeleton() {
+  return (
+    <div className="w-full space-y-4" data-testid="floor-plan-skeleton" aria-label="Preparing your floor plan">
+      <div className="flex min-h-[50px] items-center gap-3 rounded-xl border border-[var(--vo-line)] bg-[var(--vo-surface)] px-3 py-2">
+        <Skeleton className="h-7 w-28 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="ml-auto hidden h-8 w-52 rounded-lg sm:block" />
+      </div>
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-32 rounded-lg" />
+          <Skeleton className="h-9 w-40 rounded-lg" />
+        </div>
+        <Skeleton className="h-9 w-28 rounded-lg" />
+      </div>
+      <div className="min-h-[600px] rounded-xl border border-[var(--vo-line)] bg-[var(--vo-surface)] p-4">
+        <div className="mb-4 flex gap-2" data-testid="floor-plan-skeleton-rail">
+          {Array.from({ length: 3 }, (_, index) => (
+            <Skeleton key={index} className="h-8 w-32 rounded-lg" />
+          ))}
+        </div>
+        <div className="mb-3 grid grid-cols-[32px_minmax(0,1fr)_auto] items-end gap-3 border-b border-[var(--vo-line)] pb-3" data-testid="floor-plan-skeleton-neighborhood">
+          <Skeleton className="size-8 rounded-lg" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-28" />
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(258px,1fr))] gap-3" data-testid="floor-plan-skeleton-grid">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="min-h-[168px] space-y-3 rounded-[14px] border border-[var(--vo-line)] bg-[var(--vo-card-solid)] p-3.5">
+              <div className="flex gap-2">
+                <Skeleton className="size-8 rounded-lg" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-3/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+              </div>
+              <Skeleton className="h-3 w-2/3" />
+              <div className="flex -space-x-2">
+                <Skeleton className="size-8 rounded-full" />
+                <Skeleton className="size-8 rounded-full" />
+                <Skeleton className="size-8 rounded-full" />
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-8 w-20 rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <span className="sr-only" aria-live="polite">Preparing your floor plan…</span>
+    </div>
+  );
+}
+
+export function FloorPlan() {
   const {
     spaces,
-    companyUsers,
     isLoading: isCompanyLoading,
     currentUserProfile,
     bootstrapError,
@@ -66,9 +121,7 @@ export function FloorPlan() {
     isAuthReady
   } = useAuth();
 
-  // State hooks
   const [selectedSpace, setSelectedSpace] = useReducerState<Space | null>(null);
-  const [hoveredUser, setHoveredUser] = useReducerState<User | null>(null);
   const [isRoomDialogOpen, setIsRoomDialogOpen] = useReducerState<boolean>(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useReducerState<boolean>(false);
   const [isRoomManagementOpen, setIsRoomManagementOpen] = useReducerState<boolean>(false);
@@ -78,26 +131,25 @@ export function FloorPlan() {
   const [isEditingRoom, setIsEditingRoom] = useReducerState<boolean>(false);
   const [showDebugPanel, setShowDebugPanel] = useReducerState<boolean>(false);
   const [highlightedSpaceId, setHighlightedSpaceId] = useReducerState<string | null>(null);
-  const [useModernUI, setUseModernUI] = useReducerState(false);
-  const [perspective, setPerspective] = useReducerState<FloorPlanPerspective>('orbit');
+  const [density, setDensity] = useReducerState<FloorPlanDensity>('comfortable');
+  const [collapsedNeighborhoodIds, setCollapsedNeighborhoodIds] = useReducerState<Set<string>>(
+    () => new Set()
+  );
   const [isNeighborhoodManagerOpen, setIsNeighborhoodManagerOpen] = useReducerState(false);
-  // Custom hooks
   const {
     data: neighborhoods = []
   } = useNeighborhoods();
   const neighborhoodFilters = useNeighborhoodFilters(neighborhoods);
-  const beaconAggregation = useBeaconAggregator(spaces, usersInSpaces);
+  const showAllNeighborhoods = neighborhoodFilters.showAll;
   const deleteSpaceMutation = useDeleteSpace();
   const {
     toast
   } = useToast();
-  // Derived values needed by hooks below
   const currentUserPresence = users?.find(u => u.id === currentUserProfile?.id);
   const currentSpaceId = currentUserPresence?.isOccupyingCurrentSpace
     ? currentUserPresence.currentSpaceId ?? undefined
     : undefined;
 
-  // Effect: Log spaces for debugging
   useEffect(() => {
     debugLogger.log('FloorPlan', `Loaded ${spaces.length} spaces`, spaces);
     if (spaces.length > 0) {
@@ -157,14 +209,17 @@ export function FloorPlan() {
     }
   }, [activeConversation?.roomId, activeConversation?.type, getOrCreateRoomConversation, setActiveConversation, setActiveView, toast, setSelectedSpace, setHighlightedSpaceId]);
 
-  // Callback: Scroll to space when beacon is clicked (Story 3.10)
   const scrollToSpace = useCallback((spaceId: string) => {
     const element = document.querySelector(`[data-space-id="${spaceId}"]`);
     if (element) {
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
       element.scrollIntoView({
-        behavior: 'smooth',
+        behavior: reduceMotion ? 'auto' : 'smooth',
         block: 'center'
       });
+      element.classList.remove('vo-card-flash');
+      void (element as HTMLElement).offsetWidth;
+      element.classList.add('vo-card-flash');
       setHighlightedSpaceId(spaceId);
       const space = spaces.find(s => s.id === spaceId);
       if (space) {
@@ -172,6 +227,54 @@ export function FloorPlan() {
       }
     }
   }, [spaces, setHighlightedSpaceId, setSelectedSpace]);
+  const handleToggleNeighborhood = useCallback((neighborhoodId: string) => {
+    setCollapsedNeighborhoodIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(neighborhoodId)) {
+        next.delete(neighborhoodId);
+      } else {
+        next.add(neighborhoodId);
+      }
+      return next;
+    });
+  }, [setCollapsedNeighborhoodIds]);
+  const handleExpandNeighborhood = useCallback((neighborhoodId: string) => {
+    setCollapsedNeighborhoodIds((previous) => {
+      if (!previous.has(neighborhoodId)) {
+        return previous;
+      }
+      const next = new Set(previous);
+      next.delete(neighborhoodId);
+      return next;
+    });
+  }, [setCollapsedNeighborhoodIds]);
+  const handleLocateCurrentSpace = useCallback(() => {
+    if (!currentSpaceId) {
+      return;
+    }
+
+    const currentSpace = spaces.find((space) => space.id === currentSpaceId);
+    setFilterType('all');
+    setSearchQuery('');
+    showAllNeighborhoods();
+    if (currentSpace?.neighborhoodId) {
+      handleExpandNeighborhood(currentSpace.neighborhoodId);
+    } else {
+      handleExpandNeighborhood('ungrouped');
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => scrollToSpace(currentSpaceId));
+    });
+  }, [
+    currentSpaceId,
+    handleExpandNeighborhood,
+    showAllNeighborhoods,
+    scrollToSpace,
+    setFilterType,
+    setSearchQuery,
+    spaces,
+  ]);
   const handleSpaceLeave = useCallback(() => {
     setSelectedSpace(null);
     setHighlightedSpaceId(null);
@@ -179,12 +282,7 @@ export function FloorPlan() {
 
   // === EARLY RETURN — all hooks have been called above ===
   if (!isAuthReady || isCompanyLoading) {
-    return <div className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          Preparing your floor plan…
-        </p>
-      </div>;
+    return <FloorPlanSkeleton />;
   }
 
   if (bootstrapError && spaces.length === 0) {
@@ -241,9 +339,15 @@ export function FloorPlan() {
   const isAdmin = currentUserProfile?.role === 'admin';
 
   // Filter spaces from context based on type, search query, and neighborhood filters
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredSpaces = spaces.filter(space => {
     const matchesType = filterType === 'all' || space.type === filterType;
-    const matchesSearch = space.name.toLowerCase().includes(searchQuery.toLowerCase()) || (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = normalizedSearchQuery.length === 0
+      || space.name.toLowerCase().includes(normalizedSearchQuery)
+      || (space.description || '').toLowerCase().includes(normalizedSearchQuery)
+      || (usersInSpaces.get(space.id) ?? []).some((user) => (
+        user.displayName.toLowerCase().includes(normalizedSearchQuery)
+      ));
     return matchesType && matchesSearch;
   });
 
@@ -290,6 +394,7 @@ export function FloorPlan() {
   return <AudioProvider spaceId={currentSpaceId} userId={currentUserProfile?.id}>
       <div
         className="space-y-4 w-full"
+        data-density={density}
         data-presence-realtime-status={realtimeConnectionStatus}
       >
         {bootstrapError && bootstrapError.kind !== 'unauthenticated' ? <div
@@ -322,15 +427,34 @@ export function FloorPlan() {
         {showDebugPanel && <SpaceDebugPanel spaces={spaces} onHighlightSpace={space => setHighlightedSpaceId(space.id)} onHidePanel={() => setShowDebugPanel(false)} />}
 
         {/* NowBoard - Office Pulse Summary (Story 3.10) */}
-        <NowBoard spaces={spaces} users={users} usersInSpaces={usersInSpaces} neighborhoods={neighborhoods} activeFilters={neighborhoodFilters.activeFilters} onFilterToggle={neighborhoodFilters.toggleFilter} onShowAll={neighborhoodFilters.showAll} isShowingAll={neighborhoodFilters.isShowingAll} searchQuery={searchQuery} onSearchChange={setSearchQuery} beacons={beaconAggregation.activeBeacons} onBeaconClick={scrollToSpace} />
+        <NowBoard
+          spaces={spaces}
+          users={users}
+          usersInSpaces={usersInSpaces}
+          neighborhoods={neighborhoods}
+          activeFilters={neighborhoodFilters.activeFilters}
+          onFilterToggle={neighborhoodFilters.toggleFilter}
+          onShowAll={showAllNeighborhoods}
+          isShowingAll={neighborhoodFilters.isShowingAll}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          density={density}
+          onDensityToggle={() => setDensity((current) => (
+            current === 'comfortable' ? 'compact' : 'comfortable'
+          ))}
+        />
+
+        {realtimeConnectionStatus === 'degraded' ? (
+          <div className="vo-stale-banner" role="status">
+            Reconnecting — presence may be out of date
+          </div>
+        ) : null}
 
         <FloorPlanToolbar
           filterType={filterType}
-          perspective={perspective}
           selectedSpace={selectedSpace}
           isAdmin={isAdmin}
           onFilterTypeChange={setFilterType}
-          onPerspectiveChange={setPerspective}
           onOpenRoomManagement={() => setIsRoomManagementOpen(true)}
           onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
           onCreateRoom={() => setIsRoomDialogOpen(true)}
@@ -344,10 +468,31 @@ export function FloorPlan() {
         {/* Main Floor Plan Card */}
         <Card className="w-full">
           <div className="p-4 min-h-[600px]"> {/* Added min-height */}
-            {isCompanyLoading ? <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-          : <ModernFloorPlan spaces={neighborhoodFilteredSpaces || []} neighborhoods={neighborhoods} enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0} onSpaceSelect={handleSpaceSelect} onSpaceLeave={handleSpaceLeave} onOpenChat={space => void handleOpenChat(space)} onSpaceDoubleClick={space => void handleOpenChat(space)} onEditSpace={isAdmin ? handleEditSpace : undefined} highlightedSpaceId={highlightedSpaceId} perspective={perspective} isAdmin={isAdmin} />}
+            <ModernFloorPlan
+              spaces={neighborhoodFilteredSpaces || []}
+              neighborhoods={neighborhoods}
+              enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
+              collapsedNeighborhoodIds={collapsedNeighborhoodIds}
+              onToggleNeighborhood={handleToggleNeighborhood}
+              onExpandNeighborhood={handleExpandNeighborhood}
+              onShowAll={showAllNeighborhoods}
+              isShowingAll={neighborhoodFilters.isShowingAll}
+              onSpaceSelect={handleSpaceSelect}
+              onSpaceLeave={handleSpaceLeave}
+              onOpenChat={space => void handleOpenChat(space)}
+              onSpaceDoubleClick={space => void handleOpenChat(space)}
+              onEditSpace={isAdmin ? handleEditSpace : undefined}
+              highlightedSpaceId={highlightedSpaceId}
+              density={density}
+              isAdmin={isAdmin}
+            />
           </div>
         </Card>
+
+        <YouAreHereChip
+          spaceName={spaces.find((space) => space.id === currentSpaceId)?.name}
+          onLocate={handleLocateCurrentSpace}
+        />
 
         {/* Room Dialog for Creating/Editing - Needs update to handle global Space */}
         <RoomDialog room={isEditingRoom ? selectedSpace : null} // Pass global Space or null
@@ -383,7 +528,7 @@ export function FloorPlan() {
         {/* Template Selection Dialog */}
         <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <RoomTemplates onSelectTemplate={template => {
+            <RoomTemplates onSelectTemplate={_template => {
             setIsTemplateDialogOpen(false);
           }} onSaveTemplate={template => {
             setUserTemplates(prev => [...prev, template]);

@@ -165,10 +165,15 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({
   if (needsScroll) {
     return (
       <div className={className}>
-        <div className="text-[10px] text-muted-foreground mb-1.5">
+        <div className="mb-1.5 text-xs text-muted-foreground">
           Participants ({users.length})
         </div>
-        <ScrollArea style={{ maxHeight }} className="pr-2">
+        <ScrollArea
+          style={{ height: maxHeight, maxHeight }}
+          className="overflow-hidden pr-2"
+          data-testid="participant-roster-scroll"
+          data-scrollable="true"
+        >
           {content}
         </ScrollArea>
       </div>
@@ -177,7 +182,7 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({
 
   return (
     <div className={className}>
-      <div className="text-[10px] text-muted-foreground mb-1.5">
+      <div className="mb-1.5 text-xs text-muted-foreground">
         Participants ({users.length})
       </div>
       {content}
