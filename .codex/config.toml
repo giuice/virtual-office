@@ -7,3 +7,9 @@ personality = "pragmatic"
 plan_mode_reasoning_effort = "xhigh"
 [features]
 codex_hooks = true
+
+# GSD Agent Configuration — managed by gsd-core installer
+
+[agents]
+max_depth = 1
+

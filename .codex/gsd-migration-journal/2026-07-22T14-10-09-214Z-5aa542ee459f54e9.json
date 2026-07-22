@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "appliedAt": "2026-07-22T14:10:09.214Z",
+  "appliedMigrationIds": [
+    "2026-05-11-first-time-baseline-scan"
+  ],
+  "actions": [
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-code-fixer.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "24c558bd4ee25380f466868068e598b0a45e8682060802f221ec66cbf5bc4a11",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-code-reviewer.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "a81916cf94b8b1fd0c38ca7ed1f84d9982ec2acc8eb24b1c1cdc049cdf0b15c1",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-executor.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "821207ff6beb0195deba79a57635d46ffd8881a48fc29a45a3ea00cf444a9770",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-phase-researcher.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "a1fb9d878e223dddb228952309e34e50d9887504a70eea4f8a1df59fa64d5f19",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-plan-checker.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "137ef3316f881491b6574bdc5515efcda3bc3d5043e3e74dbcec57045bf68444",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "record-baseline",
+      "relPath": "agents/gsd-planner.toml",
+      "reason": "known installer-generated agent included in first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "adf1ff74ae3bb3e9b622f7cccdebac59248508948dd339dbbd6612f43c7e3761",
+      "status": "recorded"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "baseline-preserve-user",
+      "relPath": "agents/presence-safety-reviewer.toml",
+      "reason": "known user-owned artifact preserved by first-time migration baseline",
+      "classification": "user-owned",
+      "originalHash": null,
+      "currentHash": null,
+      "status": "preserved"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "baseline-preserve-user",
+      "relPath": "agents/supabase-rls-reviewer.toml",
+      "reason": "known user-owned artifact preserved by first-time migration baseline",
+      "classification": "user-owned",
+      "originalHash": null,
+      "currentHash": null,
+      "status": "preserved"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "baseline-preserve-user",
+      "relPath": "config.toml",
+      "reason": "unknown install-surface file preserved by first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "e7ee03ffefe602583d44fdefe298461a13bc6d1dbdce4730c99008bc671dfe16",
+      "status": "preserved"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "baseline-preserve-user",
+      "relPath": "hooks.json",
+      "reason": "unknown install-surface file preserved by first-time migration baseline",
+      "classification": "unknown",
+      "originalHash": null,
+      "currentHash": "1137b944d734fb75b27016af8fec989588d53475b0747d3fdbb74120111af736",
+      "status": "preserved"
+    },
+    {
+      "migrationId": "2026-05-11-first-time-baseline-scan",
+      "migrationChecksum": "sha256:4ec58d35b30dbf39cc56e3972146086d8d31861ecd800cf0b37a7aa94fe74c2a",
+      "type": "baseline-preserve-user",
+      "relPath": "skills/presence-safety/SKILL.md",
+      "reason": "known user-owned artifact preserved by first-time migration baseline",
+      "classification": "user-owned",
+      "originalHash": null,
+      "currentHash": null,
+      "status": "preserved"
+    }
+  ]
+}

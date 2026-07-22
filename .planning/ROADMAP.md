@@ -12,7 +12,7 @@ This roadmap takes a brownfield Virtual Office application from its current ~35%
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt
+- [x] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt (completed 2026-05-17)
 - [x] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection (completed 2026-05-13)
 - [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
 - [ ] **Phase 3: Video and Screen Sharing** - WebRTC video calls, screen sharing, whiteboard, recording, backgrounds, and PiP
@@ -32,11 +32,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Floor plan space cards render at sizes matching the v3 design spec (`docs/ux-space-grid-v3.html`)
   3. Knock to Enter channel timeout does not cause stale state or broken UI
   4. Only EnhancedAvatarV2 and UploadableAvatar are used across the codebase -- no references to deprecated avatar components
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 01-01-PLAN.md — Avatar cleanup + floor plan grid sizing (STAB-04, STAB-01)
-- [ ] 01-02-PLAN.md — Knock sound fix + auth flow fixes (STAB-03, STAB-02)
+- [x] 01-01-PLAN.md — Avatar cleanup + floor plan grid sizing (STAB-04, STAB-01)
+- [x] 01-02-PLAN.md — Knock sound fix + auth flow fixes (STAB-03, STAB-02)
 
 ### Phase 2: Floor Plan Completion
 **Goal**: Users experience a complete spatial floor plan with access control, automatic presence cleanup, and smart space assignment
@@ -168,7 +168,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Stabilization | 0/2 | Planned | - |
+| 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
 | 3. Video and Screen Sharing | 0/5 | Not started | - |
@@ -179,4 +179,4 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-03-23*
+*Last updated: 2026-07-22*
