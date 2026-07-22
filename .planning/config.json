@@ -4,7 +4,6 @@
   "commit_docs": true,
   "model_profile": "quality",
   "response_language": "Brazilian Portuguese",
-  "documentation_language": "English",
   "workflow": {
     "research": true,
     "plan_check": true,
