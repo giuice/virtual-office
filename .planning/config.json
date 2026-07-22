@@ -12,5 +12,12 @@
     "nyquist_validation": true,
     "ai_integration_phase": true
   },
+  "agent_skills": {
+    "gsd-phase-researcher": "presence-safety",
+    "gsd-planner": "presence-safety",
+    "gsd-executor": "presence-safety",
+    "gsd-verifier": "presence-safety",
+    "gsd-code-reviewer": "presence-safety"
+  },
   "granularity": "standard"
 }
