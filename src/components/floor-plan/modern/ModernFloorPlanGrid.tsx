@@ -15,8 +15,10 @@ export interface ModernFloorPlanGridProps {
 }
 
 const DEFAULT_EMPTY_STATE = (
-  <div className="vo-neighborhood-empty">
-    <p>No spaces available</p>
+  <div className="vo-neighborhood-empty" role="status">
+    <span className="vo-neighborhood-empty-icon" aria-hidden="true">✨</span>
+    <h2>No spaces here yet</h2>
+    <p>Try another neighborhood or clear your search to explore the office.</p>
   </div>
 );
 

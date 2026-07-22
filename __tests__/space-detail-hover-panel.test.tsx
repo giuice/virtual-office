@@ -2,41 +2,23 @@
 // Story 3.11: Unit and Integration Tests for Space Detail Hover Panel
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Components under test
 import { SpaceDetailPanel } from '@/components/floor-plan/modern/SpaceDetailPanel';
+import { SpaceDetailBottomSheet } from '@/components/floor-plan/modern/SpaceDetailBottomSheet';
 import { ParticipantRoster } from '@/components/floor-plan/modern/ParticipantRoster';
 import { AgendaPhaseDisplay } from '@/components/floor-plan/modern/AgendaPhaseDisplay';
 import { ActivityLogPreview, ActivityLogEntry } from '@/components/floor-plan/modern/ActivityLogPreview';
 import { TranscriptSnippet } from '@/components/floor-plan/modern/TranscriptSnippet';
 import { SpaceActionButtons } from '@/components/floor-plan/modern/SpaceActionButtons';
 import ModernSpaceCard from '@/components/floor-plan/modern/ModernSpaceCard';
+import { KnockBannerHost } from '@/components/floor-plan/modern/KnockBanner';
 
 // Types
-import { Space, UserPresenceData, SpaceType } from '@/types/database';
-
-// Mock useSpaceDetails hook
-vi.mock('@/hooks/useSpaceDetails', () => ({
-  useSpaceDetails: vi.fn(() => ({
-    agenda: null,
-    activityLog: [],
-    transcript: null,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  })),
-  default: vi.fn(() => ({
-    agenda: null,
-    activityLog: [],
-    transcript: null,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  })),
-}));
+import { Space, UserPresenceData, SpaceStatus, SpaceType } from '@/types/database';
 
 // Mock useAttentionBeacon hook
 vi.mock('@/hooks/useAttentionBeacon', () => ({
@@ -58,11 +40,15 @@ vi.mock('@/components/floor-plan/modern/ModernUserAvatar', () => ({
 
 // Mock scroll-area component
 vi.mock('@/components/ui/scroll-area', () => ({
-  ScrollArea: ({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) => (
-    <div className={className} style={style} data-testid="scroll-area">
+  ScrollArea: ({ children, className, style, ...props }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) => (
+    <div className={className} style={style} data-testid="scroll-area" {...props}>
       {children}
     </div>
   ),
+}));
+
+vi.mock('@/components/floor-plan/SpaceAudioControls', () => ({
+  SpaceAudioControls: () => <button type="button" aria-label="Mock space audio">Audio</button>,
 }));
 
 // ============================================
@@ -117,18 +103,11 @@ describe('SpaceDetailPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders all sub-components when data is provided (AC1)', () => {
-    const agenda = { current: 2, total: 4, name: 'Discussion', description: 'Main topic' };
-    const activityLog = createMockActivityLog(3);
-    const transcript = { text: 'Hello world', speaker: 'Speaker1', timestamp: new Date() };
-
+  it('renders only real space data and omits legacy detail sections', () => {
     render(
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={mockUsers}
-        agendaPhase={agenda}
-        activityLog={activityLog}
-        transcript={transcript}
         state={{ userInSpace: false }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
@@ -141,15 +120,9 @@ describe('SpaceDetailPanel', () => {
     // Check participants section header
     expect(screen.getByText(/Participants \(2\)/i)).toBeInTheDocument();
     
-    // Check agenda section
-    expect(screen.getByText('Discussion')).toBeInTheDocument();
-    expect(screen.getByText('Phase 2 of 4')).toBeInTheDocument();
-    
-    // Check activity log
-    expect(screen.getByText('Activity Log')).toBeInTheDocument();
-    
-    // Check transcript
-    expect(screen.getByText(/Hello world/)).toBeInTheDocument();
+    expect(screen.queryByText(/agenda/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/activity log/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/transcript/i)).not.toBeInTheDocument();
     
     // Check Join button
     expect(screen.getByRole('button', { name: /join/i })).toBeInTheDocument();
@@ -197,19 +170,71 @@ describe('SpaceDetailPanel', () => {
     expect(parentClickHandler).not.toHaveBeenCalled();
   });
 
-  it('shows loading state when isLoading is true', () => {
-    render(
+  it('renders audio controls if and only if the viewer is in the space', () => {
+    const { rerender } = render(
       <SpaceDetailPanel
         space={mockSpace}
         usersInSpace={mockUsers}
-        state={{ userInSpace: false, loading: true }}
+        state={{ userInSpace: false }}
         onJoin={mockOnJoin}
         onLeave={mockOnLeave}
       />
     );
 
-    // Should not show content when loading
-    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-detail-audio')).not.toBeInTheDocument();
+    rerender(
+      <SpaceDetailPanel
+        space={mockSpace}
+        usersInSpace={mockUsers}
+        state={{ userInSpace: true }}
+        onJoin={mockOnJoin}
+        onLeave={mockOnLeave}
+      />
+    );
+    expect(screen.getByTestId('space-detail-audio')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mock space audio' })).toBeInTheDocument();
+  });
+
+  it('lists all 35 participants inside a scrollable roster', () => {
+    const users = Array.from({ length: 35 }, (_, index) => (
+      createMockUser(`user-${index}`, `Participant ${index + 1}`)
+    ));
+    render(
+      <SpaceDetailPanel
+        space={createMockSpace({ capacity: 50 })}
+        usersInSpace={users}
+        state={{ userInSpace: false }}
+        onJoin={mockOnJoin}
+        onLeave={mockOnLeave}
+      />
+    );
+
+    expect(screen.getByText('Participant 1')).toBeInTheDocument();
+    expect(screen.getByText('Participant 35')).toBeInTheDocument();
+    expect(screen.getByTestId('participant-roster-scroll')).toHaveAttribute('data-scrollable', 'true');
+    expect(screen.getByTestId('participant-roster-scroll')).toHaveStyle({ height: '320px' });
+  });
+
+  it.each([
+    ['active', true],
+    ['available', true],
+    ['maintenance', false],
+    ['locked', false],
+    ['reserved', false],
+    ['in_use', false],
+  ] satisfies Array<[SpaceStatus, boolean]>)('uses the shared entry availability for %s', (status, enterable) => {
+    render(
+      <SpaceDetailPanel
+        space={createMockSpace({ status })}
+        usersInSpace={[]}
+        state={{ userInSpace: false, canDirectEnter: true }}
+        onJoin={mockOnJoin}
+        onLeave={mockOnLeave}
+      />
+    );
+
+    if (enterable) expect(screen.getByRole('button', { name: /join this space/i })).toBeEnabled();
+    else expect(screen.getByRole('button', { name: 'Unavailable' })).toBeDisabled();
   });
 
   it('applies glass-morphism styles (AC9)', () => {
@@ -302,6 +327,114 @@ describe('ParticipantRoster', () => {
     await userEvent.click(aliceRow);
     
     expect(onUserClick).toHaveBeenCalledWith('1');
+  });
+});
+
+describe('SpaceDetailBottomSheet', () => {
+  it('reuses the real-data panel with full roster and in-space audio', () => {
+    const users = Array.from({ length: 35 }, (_, index) => (
+      createMockUser(`sheet-user-${index}`, `Sheet Participant ${index + 1}`)
+    ));
+
+    render(
+      <SpaceDetailBottomSheet
+        open
+        onOpenChange={vi.fn()}
+        space={createMockSpace({ capacity: 50 })}
+        usersInSpace={users}
+        state={{ userInSpace: true, canDirectEnter: true }}
+        onJoin={vi.fn()}
+        onLeave={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Sheet Participant 1')).toBeInTheDocument();
+    expect(screen.getByText('Sheet Participant 35')).toBeInTheDocument();
+    expect(screen.getByTestId('participant-roster-scroll')).toHaveAttribute('data-scrollable', 'true');
+    expect(screen.getByTestId('space-detail-audio')).toBeInTheDocument();
+    expect(screen.queryByText(/agenda/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/activity log/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/transcript/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the global Knock banner operable while the sheet is open', async () => {
+    const onApprove = vi.fn();
+    const request = {
+      type: 'KNOCK_REQUEST' as const,
+      requestId: 'sheet-knock-1',
+      spaceId: 'space-1',
+      requesterId: 'requester-1',
+      requesterName: 'Morgan',
+      timestamp: Date.now(),
+    };
+
+    render(
+      <>
+        <SpaceDetailBottomSheet
+          open
+          onOpenChange={vi.fn()}
+          space={createMockSpace()}
+          usersInSpace={[createMockUser('sheet-owner', 'Sheet Owner')]}
+          state={{ userInSpace: true }}
+          onJoin={vi.fn()}
+          onLeave={vi.fn()}
+        />
+        <KnockBannerHost
+          pendingKnockRequests={new Map([[request.requestId, request]])}
+          respondingKnockRequestIds={new Set()}
+          onApprove={onApprove}
+          onDeny={vi.fn()}
+        />
+      </>
+    );
+
+    const approve = screen.getByRole('button', { name: 'Let Morgan in' });
+    const backdrop = screen.getByTestId('space-detail-backdrop');
+    const bannerHost = screen.getByTestId('global-knock-banner-host');
+    expect(backdrop).toHaveClass('z-[49]');
+    expect(bannerHost).toHaveClass('z-[2147483647]');
+    expect(approve).not.toHaveAttribute('aria-hidden', 'true');
+    await userEvent.click(approve);
+    expect(onApprove).toHaveBeenCalledWith(request);
+  });
+
+  it('closes from the backdrop without activating background card actions', async () => {
+    const onEnterSpace = vi.fn();
+    const onKnock = vi.fn();
+    const onOtherSheetOpen = vi.fn();
+    const onOpenChange = vi.fn();
+
+    function BackdropHarness() {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <div onClick={onEnterSpace}>
+          <button type="button" onClick={onOtherSheetOpen}>Open another sheet</button>
+          <SpaceDetailBottomSheet
+            open={open}
+            onOpenChange={(nextOpen) => {
+              onOpenChange(nextOpen);
+              setOpen(nextOpen);
+            }}
+            space={createMockSpace()}
+            usersInSpace={[createMockUser('sheet-owner', 'Sheet Owner')]}
+            state={{ userInSpace: false, privateSpace: true }}
+            onJoin={onEnterSpace}
+            onLeave={vi.fn()}
+            onKnock={onKnock}
+          />
+        </div>
+      );
+    }
+
+    render(<BackdropHarness />);
+    await userEvent.click(screen.getByTestId('space-detail-backdrop'));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onEnterSpace).not.toHaveBeenCalled();
+    expect(onKnock).not.toHaveBeenCalled();
+    expect(onOtherSheetOpen).not.toHaveBeenCalled();
   });
 });
 
@@ -532,6 +665,26 @@ describe('SpaceActionButtons', () => {
     expect(screen.getByRole('button', { name: /knock/i })).toBeInTheDocument();
   });
 
+  it('preserves Knock when entry status is unavailable but a responder exists', () => {
+    render(
+      <SpaceActionButtons
+        state={{
+          userInSpace: false,
+          hasOccupants: true,
+          canDirectEnter: true,
+          isDirectEntryAvailable: false,
+        }}
+        onJoin={vi.fn()}
+        onLeave={vi.fn()}
+        onKnock={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Knock to request entry' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /join this space/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unavailable' })).not.toBeInTheDocument();
+  });
+
   it('calls onJoin when Join clicked', async () => {
     const onJoin = vi.fn();
     const onLeave = vi.fn();
@@ -591,7 +744,18 @@ describe('SpaceActionButtons', () => {
 // ModernSpaceCard with Hover Panel Tests (AC1, AC7)
 // ============================================
 
-describe('ModernSpaceCard with Hover Panel', () => {
+function ControlledModernSpaceCard(props: React.ComponentProps<typeof ModernSpaceCard>) {
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  return (
+    <ModernSpaceCard
+      {...props}
+      detailOpen={detailOpen}
+      onDetailOpenChange={setDetailOpen}
+    />
+  );
+}
+
+describe('ModernSpaceCard explicit detail panel', () => {
   const mockSpace = createMockSpace();
   const mockUsers = [createMockUser('1', 'Alice')];
   const mockOnEnterSpace = vi.fn();
@@ -602,50 +766,51 @@ describe('ModernSpaceCard with Hover Panel', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
   });
 
-  it('routes desktop card click to knock flow when onKnock is provided', () => {
+  it('opens desktop details from the card body instead of entering or knocking', () => {
     const mockOnKnock = vi.fn();
 
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
         onKnock={mockOnKnock}
-        state={{ userInSpace: false }}
+        state={{ userInSpace: false, detailPanel: true }}
       />
     );
 
     const card = screen.getByTestId('space-space-1');
     fireEvent.click(card);
 
-    expect(mockOnKnock).toHaveBeenCalledWith('space-1');
+    expect(screen.getByRole('region', { name: /details for/i })).toBeInTheDocument();
+    expect(mockOnKnock).not.toHaveBeenCalled();
     expect(mockOnEnterSpace).not.toHaveBeenCalled();
   });
 
-  it('defers opening chat until the enter coordinator confirms the transition', () => {
+  it('keeps direct entry on the footer action', () => {
     const mockOnOpenChat = vi.fn();
 
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
         onOpenChat={mockOnOpenChat}
-        state={{ userInSpace: false, directEnter: true }}
+        state={{ userInSpace: false, directEnter: true, detailPanel: true }}
       />
     );
 
-    fireEvent.click(screen.getByTestId('space-space-1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter' }));
 
     expect(mockOnEnterSpace).toHaveBeenCalledWith('space-1');
     expect(mockOnOpenChat).not.toHaveBeenCalled();
   });
 
-  it('shows aria-expanded attribute when panel visible (AC10)', async () => {
+  it('does not open the panel on hover after the former 300ms delay', () => {
     vi.useFakeTimers();
-    
+
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
@@ -654,29 +819,19 @@ describe('ModernSpaceCard with Hover Panel', () => {
     );
 
     const card = screen.getByTestId('space-space-1');
-    
-    // Initially not expanded
-    expect(card).toHaveAttribute('aria-expanded', 'false');
-    
-    // Hover to trigger panel
     fireEvent.mouseEnter(card);
-    
-    // Advance timer past the 300ms delay
     act(() => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(1_000);
     });
-    
-    // Should be expanded now
-    expect(card).toHaveAttribute('aria-expanded', 'true');
-    
+
+    expect(card).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: /details for/i })).not.toBeInTheDocument();
     vi.useRealTimers();
   });
 
-  it('keyboard focus shows panel (AC10)', async () => {
-    vi.useFakeTimers();
-    
+  it('focus alone stays closed while Enter and Space explicitly open the panel', () => {
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
@@ -685,21 +840,24 @@ describe('ModernSpaceCard with Hover Panel', () => {
     );
 
     const card = screen.getByTestId('space-space-1');
-    
-    // Focus the card
     fireEvent.focus(card);
-    
-    // Panel should show on focus (no delay for keyboard)
+    expect(card).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.keyDown(card, { key: 'Enter' });
     expect(card).toHaveAttribute('aria-expanded', 'true');
-    
-    vi.useRealTimers();
+
+    fireEvent.keyDown(card, { key: 'Escape' });
+    expect(card).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(card).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('Escape key closes panel (AC10)', async () => {
     vi.useFakeTimers();
     
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
@@ -709,8 +867,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
 
     const card = screen.getByTestId('space-space-1');
     
-    // Focus to show panel
-    fireEvent.focus(card);
+    fireEvent.keyDown(card, { key: 'Enter' });
     expect(card).toHaveAttribute('aria-expanded', 'true');
     
     // Press Escape
@@ -725,7 +882,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
     vi.useFakeTimers();
     
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
@@ -752,7 +909,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
     vi.useFakeTimers();
     
     render(
-      <ModernSpaceCard
+      <ControlledModernSpaceCard
         space={mockSpace}
         usersInSpace={mockUsers}
         onEnterSpace={mockOnEnterSpace}
@@ -762,8 +919,7 @@ describe('ModernSpaceCard with Hover Panel', () => {
 
     const card = screen.getByTestId('space-space-1');
     
-    // Show panel
-    fireEvent.focus(card);
+    fireEvent.click(card);
     
     // Find the panel region
     const panel = screen.getByRole('region', { name: /details for/i });

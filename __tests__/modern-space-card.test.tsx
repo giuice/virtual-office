@@ -1,17 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ModernSpaceCard from '@/components/floor-plan/modern/ModernSpaceCard';
 import type { Space, SpaceStatus, UserPresenceData } from '@/types/database';
-
-vi.mock('@/hooks/useSpaceDetails', () => ({
-  useSpaceDetails: () => ({
-    agenda: null,
-    activityLog: [],
-    transcript: null,
-    isLoading: false,
-  }),
-}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'auth-viewer' } }),
@@ -41,7 +33,9 @@ vi.mock('@/components/floor-plan/modern/SpaceDetailPanel', () => ({
 }));
 
 vi.mock('@/components/floor-plan/modern/SpaceDetailBottomSheet', () => ({
-  SpaceDetailBottomSheet: () => null,
+  SpaceDetailBottomSheet: ({ open }: { open: boolean }) => open
+    ? <div role="dialog" aria-label="Mobile details for test space" />
+    : null,
 }));
 
 function createSpace(overrides: Partial<Space> = {}): Space {
@@ -98,17 +92,24 @@ function renderCard({
   knockStatus?: 'idle' | 'knocking' | 'approved' | 'denied' | 'timeout' | 'cooldown';
   knockCooldownRemaining?: number;
 }) {
-  const result = render(
-    <ModernSpaceCard
-      space={space}
-      usersInSpace={users}
-      onEnterSpace={onEnterSpace}
-      onKnock={onKnock}
-      onUserClick={onUserClick}
-      state={state}
-      {...props}
-    />
-  );
+  function ControlledCard() {
+    const [detailOpen, setDetailOpen] = useState(false);
+    return (
+      <ModernSpaceCard
+        space={space}
+        usersInSpace={users}
+        onEnterSpace={onEnterSpace}
+        onKnock={onKnock}
+        onUserClick={onUserClick}
+        state={state}
+        detailOpen={detailOpen}
+        onDetailOpenChange={setDetailOpen}
+        {...props}
+      />
+    );
+  }
+
+  const result = render(<ControlledCard />);
   return { ...result, onEnterSpace };
 }
 
@@ -320,6 +321,47 @@ describe('ModernSpaceCard 2B', () => {
 
     await user.click(screen.getByTestId('space-space-1'));
     expect(onEnterSpace).toHaveBeenCalledWith('space-1');
+  });
+
+  it('opens the desktop detail panel from a body click without entering', async () => {
+    const user = userEvent.setup();
+    const onEnterSpace = vi.fn();
+    const onKnock = vi.fn();
+    renderCard({
+      users: [createUser(1)],
+      onEnterSpace,
+      onKnock,
+      state: { directEnter: false, detailPanel: true },
+    });
+
+    await user.click(screen.getByTestId('space-space-1'));
+    expect(screen.getByRole('region', { name: 'Details for test space' })).toBeInTheDocument();
+    expect(onEnterSpace).not.toHaveBeenCalled();
+    expect(onKnock).not.toHaveBeenCalled();
+  });
+
+  it('opens the mobile bottom sheet from a card tap', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 640, writable: true });
+    window.dispatchEvent(new Event('resize'));
+    const user = userEvent.setup();
+    const onEnterSpace = vi.fn();
+    renderCard({
+      onEnterSpace,
+      state: { directEnter: true, detailPanel: true },
+    });
+
+    await user.click(screen.getByTestId('space-space-1'));
+    expect(screen.getByRole('dialog', { name: 'Mobile details for test space' })).toBeInTheDocument();
+    expect(onEnterSpace).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy per-card Knock banner props out of the public interface', () => {
+    type CardProps = React.ComponentProps<typeof ModernSpaceCard>;
+    type RemovedProps = Extract<
+      keyof CardProps,
+      'pendingKnockRequest' | 'knockResponsePending' | 'onKnockApprove' | 'onKnockDeny'
+    >;
+    expectTypeOf<RemovedProps>().toEqualTypeOf<never>();
   });
 
   it('keeps the interaction menu as the only avatar action without onUserClick', async () => {

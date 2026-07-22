@@ -327,18 +327,27 @@ export async function resolvePresenceE2EEnvironment(): Promise<PresenceE2EEnviro
     return environment;
   }
 
+  // Resolved per role on access: a spec that never touches the external tenant
+  // must not require credentials it does not use. Each getter still throws the
+  // same actionable error the moment a spec does read that role.
   return {
-    admin: {
-      email: requiredEnvironment('AUTH_E2E_EMAIL'),
-      password: requiredEnvironment('AUTH_E2E_PASSWORD'),
+    get admin() {
+      return {
+        email: requiredEnvironment('AUTH_E2E_EMAIL'),
+        password: requiredEnvironment('AUTH_E2E_PASSWORD'),
+      };
     },
-    member: {
-      email: requiredEnvironment('AUTH_E2E_MEMBER_EMAIL'),
-      password: requiredEnvironment('AUTH_E2E_MEMBER_PASSWORD'),
+    get member() {
+      return {
+        email: requiredEnvironment('AUTH_E2E_MEMBER_EMAIL'),
+        password: requiredEnvironment('AUTH_E2E_MEMBER_PASSWORD'),
+      };
     },
-    external: {
-      email: requiredEnvironment('AUTH_E2E_EXTERNAL_EMAIL'),
-      password: requiredEnvironment('AUTH_E2E_EXTERNAL_PASSWORD'),
+    get external() {
+      return {
+        email: requiredEnvironment('AUTH_E2E_EXTERNAL_EMAIL'),
+        password: requiredEnvironment('AUTH_E2E_EXTERNAL_PASSWORD'),
+      };
     },
     localFixture: false,
   };

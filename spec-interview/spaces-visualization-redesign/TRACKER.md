@@ -4,9 +4,10 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 
 ## Estado corrente
 
-- **Fase corrente:** Fase 2 — O card (em andamento, WP2 delegado 2026-07-21)
+- **Fase corrente:** Fase 3 — Knock UI + painel de detalhe (WP3: prompt escrito 2026-07-21, aguardando lançamento pelo Giuliano)
 - **Fase 0:** ✅ APROVADA no UAT do Giuliano em 2026-07-21 ("aprovado!").
 - **Fase 1:** ✅ implementada, revisada e commitada pelo Giuliano ("Completada fase 1...").
+- **Fase 2:** ✅ UAT APROVADA e commitada pelo Giuliano em 2026-07-21.
 - **Banco/deploy:** nenhuma mudança online no banco em nenhuma fase (confirmado no plano §1); nada deployado.
 - **Bloqueio:** nenhum.
 
@@ -117,6 +118,61 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 - Pendências para o UAT do Giuliano: validação visual dark/light × comfortable/compact (screenshots nunca gerados — sandbox do worker sem HTTPS ao Supabase); confirmar fotos dos avatares (fix do status-dot); estados do botão único; selo LIVE com áudio ativo; AC-006 clique em avatar.
 
 **Fase 2: implementada, fix round aplicado, revisada (presence-safety ✓ 2×, adversarial ✓ pós-fix, RLS ✓), verificada por testes. Status: Pending user confirmation (UAT).**
+
+## Fase 3 — Knock UI + painel de detalhe
+
+### Decisões (registradas ao escrever o WP3, 2026-07-21)
+
+- **D3-1 (banner global):** `KnockBanner` sai do `ModernSpaceCard` (era renderizado dentro do card — a causa do bug de obstrução AC-005) e passa a renderizar UMA vez em `ModernFloorPlan` via portal para `document.body`, fixed topo-centro, z-index acima de tudo (toaster sonner, bottom sheet). Consome `pendingKnockRequests`/`handleBannerApprove`/`handleBannerDeny`/`respondingKnockRequestIds` do hook SEM mudança (BR-001). Timer de contagem regressiva presentacional derivado de `payload.timestamp + 30_000` (espelha o auto-expiry de 30s que o hook já faz em `useModernFloorPlanKnock.ts:141-153`). Props mortas do card (`pendingKnockRequest`, `knockResponsePending`, `onKnockApprove/Deny`) são removidas; `knockStatus`/cooldown ficam (footer usa).
+- **D3-2 (toasts):** `Toaster` do sonner em `src/app/layout.tsx` muda de `top-right` para `bottom-right` — canto oposto ao banner (plano §2). Mudança app-wide aceita.
+- **D3-3 (painel só com dado real):** `SpaceDetailPanel`/`BottomSheet` perdem Agenda/ActivityLog/Transcript da renderização (arquivos ficam até a Fase 4); `useSpaceDetails` deixa de ser consumido (endpoint `/api/spaces/{id}/details` não existe — 404 → sempre vazio). Sem seção de eventos: não existe fonte real hoje (FR-017 "where data exists").
+- **D3-4 (áudio no painel, AC-008):** reutilizar `SpaceAudioControls` dentro do painel/sheet quando `userInSpace`; instância do toolbar permanece; AudioContext intocado.
+- **D3-5 (clique do card, sujeito a VETO no UAT):** padrão do protótipo diferido pela D2-2 — no desktop, clique no corpo do card passa a ABRIR o painel de detalhe; entrar fica no botão do footer + context menu. Mobile inalterado (bottom sheet). Implementação isolada em `handleClick` para revert de uma linha se o Giuliano vetar.
+- **Teste AC-005:** spec Playwright novo em `__tests__/api/playwright/presence/` (projeto "presence", fixture local com admin+member+sala privada) — 2 contextos, banner no responder, `elementFromPoint` no centro de aprovar/recusar com toast ativo, feedback de approve/deny chegando ao solicitante. Sandbox do worker pode bloquear o run (sem HTTPS ao Supabase, lição da Fase 2) — nesse caso o spec fica pronto e o comando documentado para execução do orquestrador/Giuliano.
+
+### Delegação
+
+- WP3: prompt em `wp3-prompt.md` (scratchpad da sessão de 2026-07-21); lançamento pelo próprio Giuliano no Codex (Sol effort high mínimo, `task --background --write --fresh`). Nota pré-existente relevante: 409 intermitente em `/api/spaces/knock/pending` (anotado na Fase 1) — não é do WP3; `presence-movement-gate.test.mjs` com falha de load pré-existente segue intocado.
+- Pós-diff obrigatório: `presence-safety-reviewer` + revisão adversarial Codex; full `npm test` (lição F4).
+
+### Evidência de verificação (Fase 3)
+
+- Worker Codex completou WP3: banner global (portal body, topo-centro, z-max, countdown 250ms presentacional, stacking cronológico, fence de visibilidade por `isOccupyingCurrentSpace`), Toaster → bottom-right, painel/sheet só dado real + `SpaceAudioControls` quando `userInSpace` + predicado `isSpaceStatusEnterable` compartilhado, D3-5 (clique abre painel, `panelPinnedRef`), sheet `modal={false}` para o banner ficar operável, skeletons/empty finais. Worker: type-check ✓, lint 0 erros, full `npm test` 1.075 ✓ (só o load-failure pré-existente do movement-gate), 138 testes focados ✓, `git diff --check` ✓, 0 paths BR-001. Screenshots: painel dark/light 1280×600 e sheet dark/light 390×600 em `evidence/phase-3/`; banner/skeleton não capturados truthfully (uma sessão controlável só).
+- **AC-005 Playwright NÃO RODOU**: spec novo `knock-banner-obstruction.spec.ts` (2 contextos, toast real via deny cruzado, assert atômico toast-visível + elementFromPoint nos 2 botões, approve E deny) falhou no setup — faltam `AUTH_E2E_MEMBER_EMAIL/PASSWORD` (+ `AUTH_E2E_EXTERNAL_*`) no `.env.local` (só admin existe). Orquestrador confirmou que os seletores usados (`data-testid="space-…"`, `data-user-in-space`, "Knock Instead") existem no código.
+- **presence-safety-reviewer (orquestrador): PASSOU sem blockers.** BR-001 limpa (name-only + untracked scan); fence correto (ocupação autoritativa, não availability — invariante 3 ok; só filtra display, bookkeeping do hook intacto; regressão testada); roteamento por closure dos banners empilhados testado; higiene de effects ok; click-stop preservado; 1 Toaster único; testes fortalecidos. 2 riscos: (R1) sheet `modal={false}` sem overlay/focus-trap — tap na faixa visível pode fechar o sheet E disparar o card atrás (não provável em jsdom; precisa viewport real); (R2) AC-005 segue não-verificado. 2 notas: flicker cosmético do banner se ocupação piscar false; D3-5 embutido pendente de veto.
+- **Revisão adversarial Codex (2ª rodada; a 1ª foi inválida — helper PowerShell exit -1, Codex não leu o diff): needs-attention, 3 findings medium, todos confirmados pelo orquestrador no código:**
+  - **F1** Toasts bottom-right cobrem o `MessagingTrigger` (`fixed bottom-6 right-6 z-40 size-14` sob a pilha sonner z≈10⁹) — regressão da D3-2. Fix: offset do toaster ≥88px acima do trigger + assert elementFromPoint no spec.
+  - **F2** Painéis pinados múltiplos: cada card tem `showPanel` próprio e renderiza painel `fixed right-0 z-[80]` — clicar A depois B empilha, fechar B revela painel obsoleto de A. Fix: estado `openDetailSpaceId` içado ao ModernFloorPlan (1 painel por vez).
+  - **F3** Countdown zera com botões ativos: expiry do banco = `created+30s` (migration 20260719140658:1569), cleanup do hook = entrega+30s → com atraso de entrega o banner sobrevive à expiração real. Payload não tem `expiresAt` e é BR-001 — mitigação UI-only: desabilitar approve/deny em remainingMs ≤ 0 ("Expired"); sync exato exigiria escalação BR-001.
+  - Finding do orquestrador (junto ao F2): **D3-6** — remover hover/focus-reveal do painel desktop (300ms hover abrindo dock de altura inteira = flicker; redundante com D3-5). Sujeito a veto no UAT como o D3-5.
+### Fix round — concluído (2026-07-21)
+
+- Job `task-mrv9tczh-7101zl` completou em ~15min. **F1:** Toaster segue bottom-right com `offset={{bottom:88,right:24}}` + `mobileOffset` (livra o `MessagingTrigger`); assert de elementFromPoint no trigger adicionado ao spec do AC-005. **F2+D3-6:** `openDetailSpaceId` içado ao `ModernFloorPlan` (props `detailOpen`/`onDetailOpenChange`); um painel/sheet por vez; hover-reveal, focus-reveal e toda a maquinaria `hoverTimeoutRef`/`hideTimeoutRef`/`panelPinnedRef` removidas sem refs órfãos (confirmado por grep). **F3:** `controlsDisabled = responding || expired`; em `remainingMs ≤ 0` o banner mostra "Expired" e ambos os botões ficam `disabled` + `aria-disabled`. **F4:** backdrop explícito dentro do `DialogPortal` (`fixed inset-0`, z-[49], `pointer-events-auto`, stopPropagation, fecha no clique) + `onPointerDownOutside` prevenido no `DialogContent`; sheet segue `modal={false}` para o banner (z-[2147483647]) continuar operável.
+- Verificação do worker: type-check ✓, lint 0 erros (508 warnings baseline), full `npm test` 100 arquivos / 1.080 testes ✓ (só o load-failure pré-existente do `presence-movement-gate`), `git diff --check` ✓, 0 paths BR-001.
+- **Re-verificação independente do orquestrador:** type-check ✓; 6 suítes / **171 testes ✓** (knock-banner, knock-auto-join, modern-space-card, space-detail-hover-panel, neighborhoods, floor-plan-bootstrap-states). Testes novos de regressão dois-cards em `neighborhoods.test.tsx` (desktop e mobile: abrir B fecha A, fechar B não ressuscita A) — aditivos, nada enfraquecido.
+- **Fixture E2E (mudança do orquestrador, não do worker):** `local-fixture.ts` passou a resolver cada perfil por getter preguiçoso — o spec do knock exige só `AUTH_E2E_EMAIL/PASSWORD` + `AUTH_E2E_MEMBER_*`; o `external` (usuário de outra empresa, usado só pelo `operability-smoke` para isolamento multi-tenant) só é exigido quando um spec realmente o acessa. Desbloqueia o AC-005 sem criar conta de terceira empresa.
+- Ruído a decidir antes do commit: `playwright-report/index.html` (artefato gerado, rastreado) ficou sujo com 4 linhas de churn de bundle/line-ending vindas das tentativas de Playwright. Não faz parte da mudança.
+
+### Re-review presence-safety pós-fix (2026-07-21)
+
+- **BR-001 limpa** (name-only tracked + untracked): nenhum arquivo protegido no diff. **Sem blockers.**
+- **Correção de fato sobre o F3:** `payload.timestamp` É o `createdAt` do servidor (`useKnockSignaling.ts:155`), e o expiry real do banco é `expires_at = v_op + interval '30 seconds'` (`20260716175515_phase4_knock_delivery_and_retention.sql:263`) — a migration citada antes na Fase 3 estava errada. Logo o countdown **espelha fielmente** o TTL autoritativo; não há divergência client/servidor no caso comum.
+- **RISCO R3 (F3, decisão do Giuliano):** o disable client-side remove o caminho de retry. Antes, aprovar um knock já expirado falhava no servidor com `KNOCK_EXPIRED`/410 e toast visível (`useModernFloorPlanKnock.ts:201-205`). Agora, com skew de relógio ou entrega perto do limite (poll de 5s, realtime degradado), a UI pode travar um approve que o servidor **ainda aceitaria**, sem nenhum feedback. Troca uma falha rara e visível por um "não consigo responder" silencioso e irreversível. Invariante 1 do skill (o banco é a autoridade) sugere deixar os botões ativos até o 410 do servidor. Bounded aos 30s de borda — não bloqueia, mas precisa de decisão explícita.
+- **NOTA (F3):** banner expirado pode ficar visível até ~30s além da expiração real (cleanup do hook conta a partir da entrega, o display a partir da criação). Cosmético; o timeout sempre dispara e é limpo no unmount (`useModernFloorPlanKnock.ts:141-153,469-474`) — sem vazamento.
+- **RISCO R4 (F4, residual conhecido):** o backdrop bloqueia só ponteiro; com `modal={false}` o foco de teclado não é trapped — Tab sai do sheet para um card atrás do scrim e Enter dispara `handleClick`. Precisa aceite explícito ou fix (inert nos cards de fundo).
+- **Passou:** F2 fonte única (`openDetailSpaceId`, zero refs órfãos, testes de dois cards cobrem exatamente a regressão); teclado do card preservado (Enter/Space/Escape); `KnockBannerHost` montado 1× e roteamento do hook intacto; fence de visibilidade com regressão testada ("hides a pending banner immediately when the responder leaves its space"); z-index banner (2147483647) vs backdrop (49) disjuntos, banner clicável por cima; backdrop faz stopPropagation antes de fechar; F1 aritmética conferida (trigger ocupa 24–80px, offset 88px = folga de 8px); `local-fixture.ts` não enfraquece garantia nenhuma (mesmo erro acionável, só na leitura do perfil); nenhuma asserção enfraquecida, 171/171 ✓, `tsc` ✓.
+- **Não verificável no ambiente do reviewer:** o próprio spec do AC-005 (sem Chromium instalado; web-server subiu e desceu limpo). R3 e R4 também só se provam em browser real.
+
+- **Fix round delegado** (orquestrador, direto do shell): job `task-mrv9tczh-7101zl` (`--background --write --fresh`, Sol high, write ✓ pid ✓), prompt `wp3-fix-round.md` (scratchpad). Escopo: F1–F3 + F4 (backdrop explícito no sheet não-modal: engole tap, fecha sem agir; foco de teclado segue não-trapped = residual para UAT) + D3-6. Watcher Monitor armado com detecção de pid zumbi.
+
+### WP3 close-out — concluído (2026-07-22)
+
+- **R3 corrigido:** expiry segue visual (`Expired` + barra em zero), mas apenas `responding` desabilita Approve/Deny. O servidor volta a ser a autoridade final e o 410/`KNOCK_EXPIRED` existente fornece feedback. Teste fake-timer convertido sem perda de cobertura.
+- **Correção factual:** o handoff citava `20260716175515_phase4_knock_delivery_and_retention.sql:263`, mas essa migration não contém a linha. A definição autoritativa mais recente está em `20260719140658_presence_concurrency_contract.sql` (`expires_at = v_op + interval '30 seconds'`, `created_at = v_op`). A conclusão de que `payload.timestamp` espelha o TTL continua correta.
+- **R4 corrigido:** estado levantado agora guarda `{ spaceId, surface }`; apenas `surface === 'sheet'` deixa o container já existente do floor plan `inert`. Painel desktop permanece navegável e o `KnockBannerHost` fica fora da subárvore. Contrato unitário cobre atributo; Chromium real 390×844 cobriu 20 Tabs, close, Escape e backdrop.
+- **AC-005 verificado de verdade:** o primeiro run expôs defeito do fixture (fallback para sala privada vazia, barrado corretamente pelo precheck). Spec corrigido para duas salas públicas direct-entry sem enfraquecer toast real nem os asserts `elementFromPoint`. Resultado isolado: **1 passed (1.3m)**; cenário 55.3s. Prova R4 isolada: **1 passed (47.5s)**; cenário 22.7s. Screenshot: `evidence/phase-3/r4-mobile-sheet-focus-390x844.png`.
+- **Verificação final:** type-check ✓; lint 0 erros / 508 warnings; full `npm test` = 100 arquivos e 1.081 testes passando, apenas o load-failure conhecido do `presence-movement-gate.test.mjs`; `git diff --check` ✓; zero paths BR-001. `presence-safety-reviewer` pós-edit: zero blockers, riscos ou notas. Zero mudanças de banco/deploy; `playwright-report/index.html` preservado como estava.
+- Relatório: `evidence/phase-3/wp3-closeout-report.md`. **Status: Pending user confirmation** (UAT D3-5/D3-6).
 
 ### Decisão de processo (2026-07-21, vale para Fases 2–4)
 

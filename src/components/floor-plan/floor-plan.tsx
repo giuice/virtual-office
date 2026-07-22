@@ -6,7 +6,7 @@ import { useEffect, useCallback } from 'react';
 import { Space, RoomTemplate } from '@/types/database';
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RoomDialog } from './room-dialog/index';
 import { RoomManagement } from './room-management';
@@ -34,6 +34,66 @@ import { FloorPlanToolbar } from './FloorPlanToolbar';
 const handleDuplicateRoom = (_room: Space) => {
   console.warn("handleDuplicateRoom needs API integration");
 };
+
+function FloorPlanSkeleton() {
+  return (
+    <div className="w-full space-y-4" data-testid="floor-plan-skeleton" aria-label="Preparing your floor plan">
+      <div className="flex min-h-[50px] items-center gap-3 rounded-xl border border-[var(--vo-line)] bg-[var(--vo-surface)] px-3 py-2">
+        <Skeleton className="h-7 w-28 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="ml-auto hidden h-8 w-52 rounded-lg sm:block" />
+      </div>
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-32 rounded-lg" />
+          <Skeleton className="h-9 w-40 rounded-lg" />
+        </div>
+        <Skeleton className="h-9 w-28 rounded-lg" />
+      </div>
+      <div className="min-h-[600px] rounded-xl border border-[var(--vo-line)] bg-[var(--vo-surface)] p-4">
+        <div className="mb-4 flex gap-2" data-testid="floor-plan-skeleton-rail">
+          {Array.from({ length: 3 }, (_, index) => (
+            <Skeleton key={index} className="h-8 w-32 rounded-lg" />
+          ))}
+        </div>
+        <div className="mb-3 grid grid-cols-[32px_minmax(0,1fr)_auto] items-end gap-3 border-b border-[var(--vo-line)] pb-3" data-testid="floor-plan-skeleton-neighborhood">
+          <Skeleton className="size-8 rounded-lg" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-28" />
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(258px,1fr))] gap-3" data-testid="floor-plan-skeleton-grid">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="min-h-[168px] space-y-3 rounded-[14px] border border-[var(--vo-line)] bg-[var(--vo-card-solid)] p-3.5">
+              <div className="flex gap-2">
+                <Skeleton className="size-8 rounded-lg" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-3/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+              </div>
+              <Skeleton className="h-3 w-2/3" />
+              <div className="flex -space-x-2">
+                <Skeleton className="size-8 rounded-full" />
+                <Skeleton className="size-8 rounded-full" />
+                <Skeleton className="size-8 rounded-full" />
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-8 w-20 rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <span className="sr-only" aria-live="polite">Preparing your floor plan…</span>
+    </div>
+  );
+}
+
 export function FloorPlan() {
   const {
     spaces,
@@ -222,12 +282,7 @@ export function FloorPlan() {
 
   // === EARLY RETURN — all hooks have been called above ===
   if (!isAuthReady || isCompanyLoading) {
-    return <div className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          Preparing your floor plan…
-        </p>
-      </div>;
+    return <FloorPlanSkeleton />;
   }
 
   if (bootstrapError && spaces.length === 0) {
@@ -413,8 +468,7 @@ export function FloorPlan() {
         {/* Main Floor Plan Card */}
         <Card className="w-full">
           <div className="p-4 min-h-[600px]"> {/* Added min-height */}
-            {isCompanyLoading ? <Skeleton className="w-full h-[600px]" /> // Show skeleton while loading
-          : <ModernFloorPlan
+            <ModernFloorPlan
               spaces={neighborhoodFilteredSpaces || []}
               neighborhoods={neighborhoods}
               enableNeighborhoodGrouping={neighborhoodFilters.activeFilters.size === 0}
@@ -431,7 +485,7 @@ export function FloorPlan() {
               highlightedSpaceId={highlightedSpaceId}
               density={density}
               isAdmin={isAdmin}
-            />}
+            />
           </div>
         </Card>
 

@@ -1134,16 +1134,45 @@ html[data-theme="paper"] {
 
 .vo-neighborhood-empty {
   grid-column: 1 / -1;
-  padding: 22px;
+  display: grid;
+  min-height: 156px;
+  place-content: center;
+  gap: 5px;
+  padding: 28px 22px;
   border: 1px dashed var(--vo-line);
   border-radius: 14px;
+  background: linear-gradient(145deg, var(--vo-cyan-soft), transparent 58%);
   color: var(--vo-text-faint);
   font-size: 13px;
   text-align: center;
 }
 
+.vo-neighborhood-empty-icon,
+.vo-empty-office-icon {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 3px;
+  place-items: center;
+  border: 1px solid var(--vo-line);
+  border-radius: 50%;
+  background: var(--vo-bg-2);
+  color: var(--vo-cyan);
+}
+
+.vo-neighborhood-empty h2 {
+  color: var(--vo-text);
+  font-family: var(--font-display), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .vo-empty-office {
-  padding: 20px 20px 4px;
+  margin-bottom: 14px;
+  padding: 22px 20px;
+  border: 1px dashed var(--vo-line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--vo-mag-soft), transparent 58%);
   color: var(--vo-text-dim);
   text-align: center;
 }

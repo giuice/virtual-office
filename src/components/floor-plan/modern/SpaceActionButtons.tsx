@@ -32,6 +32,8 @@ export interface SpaceActionButtonsProps {
     full?: boolean;
     /** Whether user can directly enter/join right now */
     canDirectEnter?: boolean;
+    /** Whether the space status currently permits direct entry */
+    isDirectEntryAvailable?: boolean;
   };
   onJoin: () => void;
   onLeave: () => void;
@@ -56,9 +58,11 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
     hasOccupants = false,
     full = false,
     canDirectEnter = true,
+    isDirectEntryAvailable = true,
   } = state;
   const shouldShowKnock = Boolean(onKnock) && (!canDirectEnter || hasOccupants);
-  const shouldShowJoin = canDirectEnter;
+  const shouldShowJoin = canDirectEnter && isDirectEntryAvailable;
+  const shouldShowUnavailable = !shouldShowJoin && !shouldShowKnock;
   const isKnocking = knockStatus === 'knocking';
   const isCooldown = knockStatus === 'cooldown' && knockCooldownRemaining > 0;
   const isInlineCard = layout === 'inline-card';
@@ -113,6 +117,18 @@ export const SpaceActionButtons: React.FC<SpaceActionButtonsProps> = ({
               <LogIn className="size-4" />
               {full ? 'Full' : 'Join'}
             </button>}
+
+          {shouldShowUnavailable && <button
+            type="button"
+            className={cn(secondaryButton, 'flex-1')}
+            data-space-action="true"
+            disabled
+            aria-disabled="true"
+            aria-label="Unavailable"
+          >
+            <ShieldX className="size-4" />
+            Unavailable
+          </button>}
 
           {shouldShowKnock && <button type="button" onClick={handleKnockClick} onPointerDown={handleKnockPointerDown} className={cn(knockButton, shouldShowJoin ? 'flex-1' : 'flex-1')} data-space-action="true" disabled={isKnocking || isCooldown} aria-disabled={isKnocking || isCooldown} title={isKnocking ? 'Waiting for response' : isCooldown ? `Try again in ${knockCooldownRemaining}s` : privateSpace ? 'Knock to request entry' : 'Knock first (optional)'} aria-label={isKnocking ? 'Knock pending' : isCooldown ? `Knock cooldown active, ${knockCooldownRemaining} seconds remaining` : 'Knock to request entry'}>
               <DoorOpen className="size-4" />

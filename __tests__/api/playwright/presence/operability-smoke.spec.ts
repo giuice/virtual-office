@@ -142,7 +142,7 @@ async function moveThroughUi(page: Page, spaceId: string): Promise<void> {
     const request = response.request();
     return request.method() === 'POST' && new URL(response.url()).pathname === '/api/presence/location';
   }, { timeout: 30_000 });
-  await card.click();
+  await card.getByRole('button', { name: 'Enter' }).click();
   const response = await responsePromise;
   const responseBody = await response.text();
   expect(response.ok(), `location transition failed (${response.status()}): ${responseBody}`).toBe(true);

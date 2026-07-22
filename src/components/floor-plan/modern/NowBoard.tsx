@@ -39,8 +39,12 @@ interface NowBoardProps {
 
 type EnterableSpace = Pick<Space, 'status'> & { capacity: number | null };
 
+export function isSpaceStatusEnterable(status: Space['status']) {
+  return status === 'active' || status === 'available';
+}
+
 export function isSpaceEnterable(space: EnterableSpace, occupantCount: number) {
-  const hasEnterableStatus = space.status === 'active' || space.status === 'available';
+  const hasEnterableStatus = isSpaceStatusEnterable(space.status);
   const capacity = space.capacity;
   const isUncapped = !capacity || capacity <= 0;
   return hasEnterableStatus && (isUncapped || occupantCount < capacity);

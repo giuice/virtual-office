@@ -142,6 +142,18 @@ describe('FloorPlan bootstrap states', () => {
 
   afterEach(() => cleanup());
 
+  it('renders the final layout skeleton without collapsing the floor-plan footprint', () => {
+    mocks.companyState.isLoading = true;
+
+    render(<FloorPlan />);
+
+    expect(screen.getByTestId('floor-plan-skeleton')).toHaveAccessibleName('Preparing your floor plan');
+    expect(screen.getByTestId('floor-plan-skeleton-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('floor-plan-skeleton-neighborhood')).toBeInTheDocument();
+    expect(screen.getByTestId('floor-plan-skeleton-grid').children).toHaveLength(8);
+    expect(screen.getByTestId('floor-plan-skeleton-grid').parentElement).toHaveClass('min-h-[600px]');
+  });
+
   it('shows a sign-in action when the session is unauthenticated', async () => {
     mocks.companyState.bootstrapError = {
       kind: 'unauthenticated',

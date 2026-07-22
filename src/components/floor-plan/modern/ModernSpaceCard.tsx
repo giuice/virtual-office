@@ -3,27 +3,24 @@ import React, {
   useCallback,
   useEffect,
   useRef,
-  useState,
   useSyncExternalStore,
-} from 'react';
-import type { Space, UserPresenceData } from '@/types/database';
-import type { KnockRequestPayload } from '@/hooks/realtime/useKnockSignaling';
-import type { KnockStatus } from '@/hooks/useKnock';
-import { cn } from '@/lib/utils';
-import { useSpaceDetails } from '@/hooks/useSpaceDetails';
-import AvatarGroup from './AvatarGroup';
-import { KnockBanner } from './KnockBanner';
-import { SpaceCardFooter } from './SpaceCardFooter';
-import SpaceContextMenu from './SpaceContextMenu';
-import { SpaceDetailBottomSheet } from './SpaceDetailBottomSheet';
-import { SpaceDetailPanel } from './SpaceDetailPanel';
-import { SpaceTypeIndicator } from './SpaceTypeIndicator';
+} from "react";
+import type { Space, UserPresenceData } from "@/types/database";
+import type { KnockStatus } from "@/hooks/useKnock";
+import { cn } from "@/lib/utils";
+import AvatarGroup from "./AvatarGroup";
+import { SpaceCardFooter } from "./SpaceCardFooter";
+import SpaceContextMenu from "./SpaceContextMenu";
+import { SpaceDetailBottomSheet } from "./SpaceDetailBottomSheet";
+import { SpaceDetailPanel } from "./SpaceDetailPanel";
+import { SpaceTypeIndicator } from "./SpaceTypeIndicator";
+import { isSpaceStatusEnterable } from "./NowBoard";
 
 const EMPTY_USER_IDS: string[] = [];
 
 function subscribeToViewportResize(onStoreChange: () => void) {
-  window.addEventListener('resize', onStoreChange);
-  return () => window.removeEventListener('resize', onStoreChange);
+  window.addEventListener("resize", onStoreChange);
+  return () => window.removeEventListener("resize", onStoreChange);
 }
 
 function getIsMobileSnapshot() {
@@ -34,19 +31,11 @@ function getServerIsMobileSnapshot() {
   return false;
 }
 
-function clearSpaceCardTimeouts(
-  hoverTimeoutRef: React.RefObject<NodeJS.Timeout | null>,
-  hideTimeoutRef: React.RefObject<NodeJS.Timeout | null>
-) {
-  if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-  if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-}
-
-function formatSpaceType(type: Space['type']) {
+function formatSpaceType(type: Space["type"]) {
   return type
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 }
 
 function getActivityText({
@@ -60,16 +49,19 @@ function getActivityText({
   isUserInSpace: boolean;
   users: UserPresenceData[];
 }) {
-  if (isLive) return 'Live meeting';
-  if (users.length === 0) return 'Empty — available';
-  if (isFull) return 'Full';
+  if (isLive) return "Live meeting";
+  if (users.length === 0) return "Empty — available";
+  if (isFull) return "Full";
   if (users.length === 1) {
-    return isUserInSpace ? "You're here" : `${users[0].displayName.split(' ')[0]} is here`;
+    return isUserInSpace
+      ? "You're here"
+      : `${users[0].displayName.split(" ")[0]} is here`;
   }
   return `${users.length} people here`;
 }
 
-export type SpaceCardVariant = 'orbit' | 'analyst' | 'cinema';
+export type SpaceCardVariant = "orbit" | "analyst" | "cinema";
+export type DetailSurface = "panel" | "sheet";
 
 interface ModernSpaceCardProps {
   space: Space;
@@ -94,12 +86,10 @@ interface ModernSpaceCardProps {
   mutedUserIds?: string[];
   onLeaveSpace?: (spaceId: string) => void;
   onKnock?: (spaceId: string) => void;
-  pendingKnockRequest?: KnockRequestPayload | null;
-  knockResponsePending?: boolean;
-  onKnockApprove?: (request: KnockRequestPayload) => void;
-  onKnockDeny?: (request: KnockRequestPayload) => void;
   knockStatus?: KnockStatus;
   knockCooldownRemaining?: number;
+  detailOpen?: boolean;
+  onDetailOpenChange?: (open: boolean, surface: DetailSurface) => void;
 }
 
 const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
@@ -111,19 +101,17 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   onSpaceDoubleClick,
   onEditSpace,
   state,
-  className = '',
-  variant = 'orbit',
+  className = "",
+  variant = "orbit",
   speakingUserIds = EMPTY_USER_IDS,
   presentingUserId,
   mutedUserIds = EMPTY_USER_IDS,
   onLeaveSpace,
   onKnock,
-  pendingKnockRequest = null,
-  knockResponsePending = false,
-  onKnockApprove,
-  onKnockDeny,
   knockStatus,
   knockCooldownRemaining = 0,
+  detailOpen = false,
+  onDetailOpenChange,
 }) => {
   const {
     highlighted: isHighlighted = false,
@@ -134,76 +122,59 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     directEnter: canDirectEnter = false,
   } = state ?? {};
 
-  const [showPanel, setShowPanel] = useState(false);
-  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const isMobile = useSyncExternalStore(
     subscribeToViewportResize,
     getIsMobileSnapshot,
-    getServerIsMobileSnapshot
+    getServerIsMobileSnapshot,
   );
-  const suppressDetailPanel = variant === 'analyst';
-  const shouldFetchDetails = showPanel || bottomSheetOpen;
-  const {
-    agenda,
-    activityLog,
-    transcript,
-    isLoading: detailsLoading,
-  } = useSpaceDetails(shouldFetchDetails ? space.id : null);
+  const suppressDetailPanel = variant === "analyst";
+  const detailSurfaceOpen =
+    showDetailPanel && !suppressDetailPanel && detailOpen;
+  const detailSurface: DetailSurface = isMobile ? "sheet" : "panel";
+
+  useEffect(() => {
+    if (detailSurfaceOpen) {
+      onDetailOpenChange?.(true, detailSurface);
+    }
+  }, [detailSurface, detailSurfaceOpen, onDetailOpenChange]);
 
   const capacity = space.capacity;
   const isFull = capacity > 0 && usersInSpace.length >= capacity;
-  const isDirectEntryAvailable = space.status === 'active' || space.status === 'available';
+  const isDirectEntryAvailable = isSpaceStatusEnterable(space.status);
   const isPrivateSpace = space.accessControl?.isPublic === false;
-  const isLocked = isPrivateSpace || space.status === 'locked';
-  const exceptionalStatus = ['locked', 'maintenance', 'reserved'].includes(space.status)
+  const isLocked = isPrivateSpace || space.status === "locked";
+  const exceptionalStatus = ["locked", "maintenance", "reserved"].includes(
+    space.status,
+  )
     ? space.status.charAt(0).toUpperCase() + space.status.slice(1)
     : null;
   const isLive = usersInSpace.some(
-    (user) => speakingUserIds.includes(user.id) || user.id === presentingUserId
+    (user) => speakingUserIds.includes(user.id) || user.id === presentingUserId,
   );
-  const signal = isLive ? 'live' : isFull ? 'full' : null;
-  const activityText = getActivityText({ isLive, isFull, isUserInSpace, users: usersInSpace });
-
-  const handleMouseEnter = useCallback(() => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    if (showDetailPanel && !isMobile && !suppressDetailPanel) {
-      hoverTimeoutRef.current = setTimeout(() => setShowPanel(true), 300);
-    }
-  }, [showDetailPanel, isMobile, suppressDetailPanel]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    hideTimeoutRef.current = setTimeout(() => setShowPanel(false), 100);
-  }, []);
-
-  useEffect(() => {
-    return () => clearSpaceCardTimeouts(hoverTimeoutRef, hideTimeoutRef);
-  }, []);
+  const signal = isLive ? "live" : isFull ? "full" : null;
+  const activityText = getActivityText({
+    isLive,
+    isFull,
+    isUserInSpace,
+    users: usersInSpace,
+  });
 
   const handleClick = (event?: React.MouseEvent<HTMLDivElement>) => {
     if (event) {
       const target = event.target as HTMLElement;
       if (
-        target.closest('[data-avatar-interactive]') ||
-        target.closest('a, button:not([data-space-action])')
+        target.closest("[data-avatar-interactive]") ||
+        target.closest("a, button:not([data-space-action])")
       ) {
         event.stopPropagation();
         return;
       }
     }
 
-    if (isMobile && showDetailPanel && !suppressDetailPanel) {
-      setBottomSheetOpen(true);
+    if (showDetailPanel && !suppressDetailPanel) {
+      onDetailOpenChange?.(true, detailSurface);
       return;
     }
     if (!isUserInSpace && onKnock && !canDirectEnter) {
@@ -215,93 +186,82 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
 
   const handleJoin = useCallback(() => {
     onEnterSpace(space.id);
-    setShowPanel(false);
-    setBottomSheetOpen(false);
-  }, [onEnterSpace, space.id]);
+    onDetailOpenChange?.(false, detailSurface);
+  }, [detailSurface, onDetailOpenChange, onEnterSpace, space.id]);
 
   const handleLeave = useCallback(() => {
     onLeaveSpace?.(space.id);
-    setShowPanel(false);
-    setBottomSheetOpen(false);
-  }, [onLeaveSpace, space.id]);
+    onDetailOpenChange?.(false, detailSurface);
+  }, [detailSurface, onDetailOpenChange, onLeaveSpace, space.id]);
 
-  const revealDetailPanelOnFocus = useCallback(() => {
-    if (showDetailPanel && !isMobile && !suppressDetailPanel) setShowPanel(true);
-  }, [showDetailPanel, isMobile, suppressDetailPanel]);
+  const closeDetailPanel = useCallback(() => {
+    onDetailOpenChange?.(false, detailSurface);
+  }, [detailSurface, onDetailOpenChange]);
 
-  const hideDetailPanelOnBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    if (!cardRef.current?.contains(event.relatedTarget as Node)) setShowPanel(false);
-  }, []);
-
-  const ariaCapacity = capacity && capacity > 0
-    ? `${usersInSpace.length} of ${capacity} participants${isFull ? ', full' : ''}`
-    : `${usersInSpace.length} active`;
+  const ariaCapacity =
+    capacity && capacity > 0
+      ? `${usersInSpace.length} of ${capacity} participants${isFull ? ", full" : ""}`
+      : `${usersInSpace.length} active`;
 
   return (
-    <div
-      className="relative @container/space"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className="relative @container/space">
       <div
         ref={cardRef}
         className={cn(
-          'vo-space-card',
-          isLive && 'vo-space-card--live',
-          isFull && !isLive && 'vo-space-card--full',
-          isLocked && 'vo-space-card--locked',
-          isUserInSpace && 'vo-space-card--own',
-          signal && 'vo-space-card--has-signal',
-          isHighlighted && 'vo-space-card--selected',
-          className
+          "vo-space-card",
+          isLive && "vo-space-card--live",
+          isFull && !isLive && "vo-space-card--full",
+          isLocked && "vo-space-card--locked",
+          isUserInSpace && "vo-space-card--own",
+          signal && "vo-space-card--has-signal",
+          isHighlighted && "vo-space-card--selected",
+          className,
         )}
         data-testid={`space-${space.id}`}
-        data-selected={isHighlighted ? 'true' : 'false'}
-        data-user-in-space={isUserInSpace ? 'true' : 'false'}
+        data-selected={isHighlighted ? "true" : "false"}
+        data-user-in-space={isUserInSpace ? "true" : "false"}
         data-space-id={space.id}
-        data-compact={compact ? 'true' : 'false'}
-        aria-expanded={showPanel || bottomSheetOpen}
+        data-compact={compact ? "true" : "false"}
+        aria-expanded={detailSurfaceOpen}
         aria-label={`Space ${space.name}, ${formatSpaceType(space.type)}, ${ariaCapacity}`}
-        aria-current={isHighlighted ? 'true' : undefined}
+        aria-current={isHighlighted ? "true" : undefined}
         role="button"
         tabIndex={0}
         onPointerDownCapture={(event) => {
           const target = event.target as HTMLElement;
-          if (target.closest('[data-avatar-interactive]')) event.stopPropagation();
+          if (target.closest("[data-avatar-interactive]"))
+            event.stopPropagation();
         }}
         onClick={handleClick}
         onDoubleClick={() => onSpaceDoubleClick?.(space)}
-        onFocus={revealDetailPanelOnFocus}
-        onBlur={hideDetailPanelOnBlur}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
-          if (event.key === 'Enter' || event.key === ' ') {
+          if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             handleClick();
           }
-          if (event.key === 'Escape' && showPanel) setShowPanel(false);
+          if (event.key === "Escape" && detailSurfaceOpen) closeDetailPanel();
         }}
       >
-        {pendingKnockRequest && isUserInSpace ? (
-          <KnockBanner
-            requesterName={pendingKnockRequest.requesterName}
-            requesterAvatarUrl={pendingKnockRequest.requesterAvatarUrl}
-            responding={knockResponsePending}
-            onApprove={() => onKnockApprove?.(pendingKnockRequest)}
-            onDeny={() => onKnockDeny?.(pendingKnockRequest)}
-          />
-        ) : null}
-
         {signal ? (
-          <span className={cn('vo-space-card-signal', `vo-space-card-signal--${signal}`)} role="status">
-            {signal === 'live' ? 'LIVE' : 'FULL'}
+          <span
+            className={cn(
+              "vo-space-card-signal",
+              `vo-space-card-signal--${signal}`,
+            )}
+            role="status"
+          >
+            {signal === "live" ? "LIVE" : "FULL"}
           </span>
         ) : null}
 
         {isUserInSpace ? <span className="vo-space-card-you">YOU</span> : null}
 
         <div
-          className={cn('vo-space-card-menu', signal && 'vo-space-card-menu--with-signal')}
+          className={cn(
+            "vo-space-card-menu",
+            signal && "vo-space-card-menu--with-signal",
+          )}
           data-avatar-interactive="true"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -327,11 +287,20 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
           <div className="min-w-0">
             <div className="vo-space-card-name-row">
               <h3 className="vo-space-card-name font-display">{space.name}</h3>
-              {isPrivateSpace ? <span className="vo-space-card-lock" aria-label="Private space">🔒</span> : null}
+              {isPrivateSpace ? (
+                <span className="vo-space-card-lock" aria-label="Private space">
+                  🔒
+                </span>
+              ) : null}
             </div>
             <p className="vo-space-card-subtitle">
               {formatSpaceType(space.type)}
-              {exceptionalStatus ? <span className="vo-space-card-exception"> · {exceptionalStatus}</span> : null}
+              {exceptionalStatus ? (
+                <span className="vo-space-card-exception">
+                  {" "}
+                  · {exceptionalStatus}
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
@@ -364,23 +333,27 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
         />
       </div>
 
-      {showPanel && !isMobile && showDetailPanel ? (
+      {detailSurfaceOpen && !isMobile ? (
         <div
-          className="absolute left-0 right-0 top-full mt-2 z-50 min-w-[280px] max-w-[400px]"
+          className="fixed inset-y-0 right-0 z-[80] w-[min(380px,92vw)]"
           onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              closeDetailPanel();
+              cardRef.current?.focus();
+            }
+          }}
         >
           <SpaceDetailPanel
             space={space}
             usersInSpace={usersInSpace}
-            agendaPhase={agenda ?? undefined}
-            activityLog={activityLog}
-            transcript={transcript ?? undefined}
             state={{
               userInSpace: isUserInSpace,
               privateSpace: isPrivateSpace,
               full: isFull,
               canDirectEnter,
-              loading: detailsLoading,
             }}
             onJoin={handleJoin}
             onLeave={handleLeave}
@@ -388,7 +361,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
             knockStatus={knockStatus}
             knockCooldownRemaining={knockCooldownRemaining}
             onUserClick={onUserClick}
-            onClose={() => setShowPanel(false)}
+            onClose={closeDetailPanel}
             speakingUserIds={speakingUserIds}
             presentingUserId={presentingUserId}
             mutedUserIds={mutedUserIds}
@@ -398,19 +371,15 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
 
       {isMobile && showDetailPanel ? (
         <SpaceDetailBottomSheet
-          open={bottomSheetOpen}
-          onOpenChange={setBottomSheetOpen}
+          open={detailSurfaceOpen}
+          onOpenChange={(open) => onDetailOpenChange?.(open, "sheet")}
           space={space}
           usersInSpace={usersInSpace}
-          agendaPhase={agenda ?? undefined}
-          activityLog={activityLog}
-          transcript={transcript ?? undefined}
           state={{
             userInSpace: isUserInSpace,
             privateSpace: isPrivateSpace,
             full: isFull,
             canDirectEnter,
-            loading: detailsLoading,
           }}
           onJoin={handleJoin}
           onLeave={handleLeave}

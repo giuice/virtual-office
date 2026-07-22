@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
+  DialogPortal,
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Space, UserPresenceData } from '@/types/database';
 import { SpaceDetailPanel, SpaceDetailPanelProps } from './SpaceDetailPanel';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
@@ -20,7 +20,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
  * - Bottom sheet slides up from bottom of screen
  * - Close button and swipe-down to dismiss
  * - Same content as SpaceDetailPanel
- * - Uses Radix Dialog for accessibility and focus trap
+ * - Uses a non-modal Radix Dialog so the global Knock banner remains operable
  */
 export interface SpaceDetailBottomSheetProps extends Omit<SpaceDetailPanelProps, 'className'> {
   open: boolean;
@@ -32,9 +32,6 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   onOpenChange,
   space,
   usersInSpace,
-  agendaPhase,
-  activityLog,
-  transcript,
   state,
   knockStatus,
   knockCooldownRemaining,
@@ -42,7 +39,6 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   onLeave,
   onKnock,
   onUserClick,
-  onViewAllActivity,
   speakingUserIds,
   presentingUserId,
   mutedUserIds,
@@ -69,7 +65,19 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
   } : undefined;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogPortal>
+        <div
+          aria-hidden="true"
+          className="pointer-events-auto fixed inset-0 z-[49] bg-[var(--vo-bg)]/60 backdrop-blur-[2px]"
+          data-testid="space-detail-backdrop"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleClose();
+          }}
+        />
+      </DialogPortal>
       <DialogContent
         className={cn(
           // Override default positioning for bottom sheet
@@ -96,13 +104,14 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
         // AC8: Stop propagation to prevent card navigation
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
+        onPointerDownOutside={(event) => event.preventDefault()}
         data-avatar-interactive="true"
       >
         {/* Visually hidden title for accessibility */}
         <VisuallyHidden>
           <DialogTitle>Space Details: {space.name}</DialogTitle>
           <DialogDescription>
-            Detailed information about {space.name} including participants, agenda, and activity log.
+            Details for {space.name}, including its participant roster, audio, and available actions.
           </DialogDescription>
         </VisuallyHidden>
 
@@ -122,9 +131,6 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
           <SpaceDetailPanel
             space={space}
             usersInSpace={usersInSpace}
-            agendaPhase={agendaPhase}
-            activityLog={activityLog}
-            transcript={transcript}
             state={state}
             knockStatus={knockStatus}
             knockCooldownRemaining={knockCooldownRemaining}
@@ -133,11 +139,10 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
             onKnock={handleKnock}
             onUserClick={onUserClick}
             onClose={handleClose}
-            onViewAllActivity={onViewAllActivity}
             speakingUserIds={speakingUserIds}
             presentingUserId={presentingUserId}
             mutedUserIds={mutedUserIds}
-            className="rounded-none border-none shadow-none"
+            className="min-h-[min(72vh,560px)] rounded-none border-0 shadow-none"
           />
         </div>
       </DialogContent>

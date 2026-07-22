@@ -114,31 +114,16 @@ vi.mock('@/components/floor-plan/modern/ModernSpaceCard', () => ({
     onEnterSpace,
     onKnock,
     state,
-    pendingKnockRequest,
-    onKnockApprove,
-    onKnockDeny,
-    knockResponsePending,
   }: {
     space: Space;
     onEnterSpace: (spaceId: string) => void;
     onKnock?: (spaceId: string) => void;
     state?: { directEnter?: boolean };
-    pendingKnockRequest?: KnockRequestPayload | null;
-    onKnockApprove?: (payload: KnockRequestPayload) => void;
-    onKnockDeny?: (payload: KnockRequestPayload) => void;
-    knockResponsePending?: boolean;
   }) => (
     <div data-testid={`space-${space.id}`}>
       <div data-testid={`space-state-${space.id}`}>{`direct:${Boolean(state?.directEnter)} knock:${Boolean(onKnock)}`}</div>
       <button type="button" onClick={() => onEnterSpace(space.id)}>Enter {space.name}</button>
       <button type="button" onClick={() => onKnock?.(space.id)}>Knock {space.name}</button>
-      {pendingKnockRequest && (
-        <div role="alert">
-          Banner {pendingKnockRequest.requesterName}
-          <button type="button" disabled={knockResponsePending} onClick={() => onKnockApprove?.(pendingKnockRequest)}>Approve</button>
-          <button type="button" disabled={knockResponsePending} onClick={() => onKnockDeny?.(pendingKnockRequest)}>Deny</button>
-        </div>
-      )}
     </div>
   ),
 }));
@@ -221,6 +206,15 @@ function renderPlan() {
   );
 }
 
+function placeCurrentUserInResponderSpace() {
+  currentUserPresence.currentSpaceId = space.id;
+  currentUserPresence.isOccupyingCurrentSpace = true;
+  usersInSpaces.set(space.id, [
+    currentUserPresence,
+    { ...currentUserPresence, id: 'occupant-1', displayName: 'Morgan Occupant' },
+  ]);
+}
+
 describe('Knock Auto-Join Flow', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -239,6 +233,8 @@ describe('Knock Auto-Join Flow', () => {
     mocks.respondToKnock.mockResolvedValue(undefined);
     mocks.updateLocation.mockResolvedValue({ ok: true });
     currentUser.role = 'member';
+    currentUserPresence.currentSpaceId = null;
+    currentUserPresence.isOccupyingCurrentSpace = false;
     space.capacity = 4;
     space.accessControl = { isPublic: false };
     usersInSpaces.clear();
@@ -303,6 +299,7 @@ describe('Knock Auto-Join Flow', () => {
   });
 
   it('shows canonical knock banners when polling returns a request', async () => {
+    placeCurrentUserInResponderSpace();
     renderPlan();
 
     act(() => {
@@ -311,7 +308,31 @@ describe('Knock Auto-Join Flow', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Riley Knocker');
   });
 
+  it('hides a pending banner immediately when the responder leaves its space', () => {
+    placeCurrentUserInResponderSpace();
+    const { rerender } = renderPlan();
+
+    act(() => {
+      mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    currentUserPresence.currentSpaceId = null;
+    currentUserPresence.isOccupyingCurrentSpace = false;
+    rerender(
+      <ModernFloorPlan
+        spaces={[space]}
+        onSpaceSelect={mocks.onSpaceSelect}
+        enableNeighborhoodGrouping={false}
+      />
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mocks.respondToKnock).not.toHaveBeenCalled();
+  });
+
   it('serializes rapid responder decisions for the same request', async () => {
+    placeCurrentUserInResponderSpace();
     const response = deferred<void>();
     mocks.respondToKnock.mockReturnValue(response.promise);
     renderPlan();
@@ -319,13 +340,13 @@ describe('Knock Auto-Join Flow', () => {
     act(() => {
       mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
     });
-    const approve = screen.getByRole('button', { name: 'Approve' });
+    const approve = screen.getByRole('button', { name: 'Let Riley Knocker in' });
     fireEvent.click(approve);
     fireEvent.click(approve);
 
     expect(mocks.respondToKnock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Deny' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Let Riley Knocker in' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Deny Riley Knocker' })).toBeDisabled();
 
     await act(async () => response.resolve());
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
@@ -334,13 +355,14 @@ describe('Knock Auto-Join Flow', () => {
   it.each(['resolve', 'reject'] as const)(
     'does not update responder UI when a pending decision %s after unmount',
     async (settlement) => {
+      placeCurrentUserInResponderSpace();
       const response = deferred<void>();
       mocks.respondToKnock.mockReturnValue(response.promise);
       const { unmount } = renderPlan();
       act(() => {
         mocks.capturedSignalingOptions?.onKnockRequest(mockKnockRequest);
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Let Riley Knocker in' }));
       unmount();
 
       await act(async () => {

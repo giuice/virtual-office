@@ -56,7 +56,13 @@ export default function RootLayout({
                       <CallNotifications />
                       <MessagingTrigger />
                       <MessagingDrawer />
-                      <Toaster richColors closeButton position="top-right" />
+                      <Toaster
+                        richColors
+                        closeButton
+                        position="bottom-right"
+                        offset={{ bottom: 88, right: 24 }}
+                        mobileOffset={{ bottom: 88, right: 24 }}
+                      />
                       </CallingProvider>
                     </PresenceRouteBoundary>
                   </MessagingProvider>
