@@ -175,7 +175,7 @@ export interface UpdateNeighborhoodData {
     <artifact type="component" action="create">
       <path>src/components/floor-plan/modern/NeighborhoodSection.tsx</path>
       <description>Section wrapper with header and color indicator for grouped spaces</description>
-      <props>neighborhood: Neighborhood, spaces: Space[], variant: FloorPlanPerspective</props>
+      <props>neighborhood: Neighborhood, spaces: Space[], index: number, peopleCount: number, capacity: number, isCollapsed: boolean</props>
     </artifact>
     <artifact type="component" action="create">
       <path>src/components/floor-plan/modern/NeighborhoodFilters.tsx</path>
@@ -315,11 +315,6 @@ export interface UpdateNeighborhoodData {
     <!-- Existing Type: SpaceType -->
     <type name="SpaceType" path="src/types/database.ts">
       <definition>'workspace' | 'conference' | 'social' | 'breakout' | 'private_office' | 'open_space' | 'lounge' | 'lab'</definition>
-    </type>
-
-    <!-- Existing Type: FloorPlanPerspective -->
-    <type name="FloorPlanPerspective" path="src/components/floor-plan/modern/ModernFloorPlan.tsx">
-      <definition>'orbit' | 'analyst' | 'cinema'</definition>
     </type>
 
     <!-- Existing Hook Pattern: useSpaces -->

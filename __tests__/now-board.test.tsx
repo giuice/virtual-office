@@ -2,13 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  BeaconQueue,
   isSpaceEnterable,
   NowBoard,
   NowBoardMetrics,
   SpaceSearch,
 } from '@/components/floor-plan/modern';
-import type { BeaconInfo } from '@/hooks/useBeaconAggregator';
 import type { Neighborhood, Space, SpaceStatus, UserPresenceData } from '@/types/database';
 
 function createMockSpace(overrides: Partial<Space> = {}): Space {
@@ -34,19 +32,6 @@ function createMockNeighborhood(overrides: Partial<Neighborhood> = {}): Neighbor
     color: '--vo-neighborhood-1',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    ...overrides,
-  };
-}
-
-function createMockBeacon(overrides: Partial<BeaconInfo> = {}): BeaconInfo {
-  return {
-    spaceId: 'space-1',
-    spaceName: 'Test Space',
-    severity: 'normal',
-    reason: 'High occupancy',
-    spaceType: 'workspace',
-    userCount: 8,
-    capacity: 10,
     ...overrides,
   };
 }
@@ -159,27 +144,6 @@ describe('NowBoardMetrics', () => {
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
-  });
-});
-
-describe('BeaconQueue', () => {
-  const onBeaconClick = vi.fn();
-
-  beforeEach(() => vi.clearAllMocks());
-
-  it('keeps the dormant component behavior intact', async () => {
-    const user = userEvent.setup();
-    const beacons = [createMockBeacon({ spaceId: 'space-123', spaceName: 'Clickable Space' })];
-    render(<BeaconQueue beacons={beacons} onBeaconClick={onBeaconClick} />);
-
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
-    await user.click(screen.getByRole('button', { name: /Clickable Space/i }));
-    expect(onBeaconClick).toHaveBeenCalledWith('space-123');
-  });
-
-  it('renders nothing when empty', () => {
-    const { container } = render(<BeaconQueue beacons={[]} onBeaconClick={onBeaconClick} />);
-    expect(container.firstChild).toBeNull();
   });
 });
 

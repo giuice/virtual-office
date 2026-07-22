@@ -4,12 +4,14 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 
 ## Estado corrente
 
-- **Fase corrente:** Fase 3 — Knock UI + painel de detalhe (WP3: prompt escrito 2026-07-21, aguardando lançamento pelo Giuliano)
+- **Fase corrente:** Fases 0–4 concluídas e aprovadas no UAT final pelo Giuliano em 2026-07-22.
 - **Fase 0:** ✅ APROVADA no UAT do Giuliano em 2026-07-21 ("aprovado!").
 - **Fase 1:** ✅ implementada, revisada e commitada pelo Giuliano ("Completada fase 1...").
 - **Fase 2:** ✅ UAT APROVADA e commitada pelo Giuliano em 2026-07-21.
+- **Fase 3:** ✅ aplicada e aprovada no UAT antes do início da Fase 4.
+- **Fase 4:** ✅ implementada, verificada e aprovada no UAT final pelo Giuliano em 2026-07-22.
 - **Banco/deploy:** nenhuma mudança online no banco em nenhuma fase (confirmado no plano §1); nada deployado.
-- **Bloqueio:** nenhum.
+- **Bloqueio:** nenhum. Plano de redesign concluído no escopo aprovado.
 
 ## Fase 0 — Tokens e fundação visual
 
@@ -182,3 +184,39 @@ _Criado 2026-07-21 (Fase 0). Formato: entradas datadas por fase; ver IMPLEMENTAT
 
 - Job Codex do WP0 (`task-mruulcxu-9hqe60`) morreu na fase de verificação (Esc do usuário derrubou a árvore de processos do subagent; antes disso já tinha sofrido `spawn EINVAL` — quirk Windows conhecido). O diff já estava aplicado; verificação foi re-executada pelo orquestrador.
 - Nota Fase 4: `VO_THEME_METADATA`/ThemeSwitcher ainda anunciam 4 temas com previews da paleta antiga — inconsistência cosmética consciente até o colapso oficial dos temas (D0-1).
+
+## Fase 4 — limpeza (2026-07-22)
+
+### Itens removidos
+
+- Componentes de UI sem consumidor de produção: `AttentionBeacon.tsx` (79 linhas), `AgendaPhaseDisplay.tsx` (94), `ActivityLogPreview.tsx` (175), `TranscriptSnippet.tsx` (86) e `BeaconQueue.tsx` (212) — **646 linhas de produção** removidas, junto aos exports do barrel.
+- Testes exclusivamente legados: `attention-beacon.test.tsx` (155 linhas), bloco `BeaconQueue` de `now-board.test.tsx` (36), blocos Agenda/Activity/Transcript e o caso `analyst` de `space-detail-hover-panel.test.tsx` (236), e mocks órfãos de beacon em `knock-banner.test.tsx` (8) — **435 linhas de teste** removidas. Cobertura viva de NowBoard slim, métricas, filtros, busca, painel, sheet, roster, ações e Knock foi preservada.
+- Eixo morto de perspectives removido: os dois aliases legados de layout, prop `variant`, `variant="orbit"` hardcoded, ramo `analyst` e referências documentais obsoletas. `detailPanel` continua com o comportamento de produção anterior, pois o único valor passado era `orbit` e a variável de supressão era sempre falsa.
+
+### Itens conscientemente mantidos
+
+- `useAttentionBeacon.ts`, `useBeaconAggregator.ts` e seus dois testes ficaram dormentes para o futuro dashboard admin, conforme decisão do WP4.
+- `NowBoardMetrics` permanece porque `NowBoard.tsx` ainda o renderiza e `now-board.test.tsx` continua cobrindo as três métricas.
+- `useSpaceDetails.ts` **não foi removido**: a verificação encontrou a rota real `src/app/api/spaces/[id]/details/route.ts`, que o build também listou. A afirmação D3-3 de que a rota não existia estava desatualizada. Somente o tipo runtime-neutral `ActivityLogEntry` foi movido para o próprio hook para desacoplá-lo do componente visual apagado; hook, mock e rota mantêm comportamento.
+- D0-1 ficou fora de escopo: `VO_THEME_METADATA`, `ThemeContext`, `useVOTheme` e `ThemeSwitcher` ainda expõem quatro nomes sobre duas paletas. Estimativa para decidir a compatibilidade das preferências persistidas, colapsar o contrato, atualizar testes e executar UAT: **4–8 horas**.
+- R4 não é risco residual desta fase: foi corrigido e comprovado no close-out da Fase 3 (background `inert` no sheet mobile + browser real 390×844).
+
+### Evidência de verificação
+
+- `npm.cmd run type-check`: passou.
+- `npm.cmd run lint`: 0 erros / 504 warnings (baseline 508; −4).
+- Focado: 4 arquivos / 116 testes passaram (`now-board`, `knock-banner`, `space-detail-hover-panel`, `modern-space-card`).
+- `npm.cmd test`: 99 arquivos / 1.047 testes passaram; permaneceu somente o load-failure conhecido de `presence-movement-gate.test.mjs`. A diferença para 100/1.081 é exatamente a remoção intencional de 1 arquivo e 34 testes legados.
+- `npm.cmd run build`: passou; build de produção gerou 47 páginas e confirmou `/api/spaces/[id]/details`.
+- Smoke autenticado Chromium: login, floor-plan, snapshot, auto-colocação, fim do loading e disconnect concluíram. Capturas dark/light em 1280×600 e 390×844 estão em `evidence/phase-4/`. Limitação honesta: o processo Playwright ficou pendurado no teardown do Windows e o comando foi encerrado pelo timeout externo, apesar do corpo do teste e do disconnect terem terminado.
+- `npm.cmd run presence:gate`: passou (transporte atômico e fronteiras de writer preservados).
+- `git diff --check`: limpo; `rg` encontrou zero imports/exports quebrados dos componentes apagados, zero aliases de perspective e zero suppressions/`any` novos.
+- BR-001: zero caminhos protegidos em `git diff --name-only`; nenhum arquivo de presence/realtime/context/Knock protegido ou teste de presence foi editado.
+- Diff tracked final: 16 arquivos, 61 inserções e 1.119 deleções; majoritariamente remoção. Screenshots e relatório são evidência nova ainda não rastreada.
+
+### Bloqueios e próximo gate
+
+- Nenhum bloqueio de implementação, banco ou deploy. UAT final aprovado pelo Giuliano em 2026-07-22.
+- O runner Playwright precisa de investigação separada se for exigido exit code verde no Windows; os screenshots e logs não foram apresentados como prova de teardown bem-sucedido.
+
+**Status: Complete — user confirmed**

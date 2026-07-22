@@ -236,9 +236,16 @@ export class SupabaseConversationRepository implements IConversationRepository {
   ): Promise<Conversation> {
     try {
       console.log('Repository creating conversation with data:', JSON.stringify(conversationData, null, 2));
+
+      // Do not use INSERT ... RETURNING here. The conversation SELECT policy
+      // depends on conversation_members, which is populated by an AFTER INSERT
+      // trigger. PostgreSQL evaluates the SELECT policy required by RETURNING
+      // before that membership can authorize the returned row.
+      const conversationId = globalThis.crypto.randomUUID();
       
       // Map Conversation type (camelCase) to DB schema (snake_case)
       const dbData = {
+        id: conversationId,
         type: conversationData.type,
         participants: Array.isArray(conversationData.participants) ? conversationData.participants : [],
         name: conversationData.name || null,
@@ -252,25 +259,25 @@ export class SupabaseConversationRepository implements IConversationRepository {
         participants_fingerprint: conversationData.participantsFingerprint || null,
       };
 
-      const { data, error } = await this.supabaseClient
+      const { error } = await this.supabaseClient
         .from(this.TABLE_NAME)
-        .insert(dbData)
-        .select('*')
-        .single();
+        .insert(dbData);
 
       if (error) {
         console.error('Supabase error creating conversation:', error);
-        throw new Error(`Database error: ${error.message}`);
+        throw error;
       }
 
-      if (!data) {
-        throw new Error('Failed to retrieve created conversation data');
+      // The INSERT statement (including its AFTER trigger) has completed, so
+      // the authenticated user can now read the conversation through RLS.
+      const createdConversation = await this.findById(conversationId);
+      if (!createdConversation) {
+        throw new Error(`Failed to retrieve created conversation ${conversationId}`);
       }
       
-      console.log('Created conversation in database:', JSON.stringify(data, null, 2));
+      console.log('Created conversation in database:', JSON.stringify(createdConversation, null, 2));
       
-      // Map DB response back to Conversation type
-      return mapToCamelCase(data);
+      return createdConversation;
     } catch (error) {
       console.error('Repository error in create():', error);
       throw error;

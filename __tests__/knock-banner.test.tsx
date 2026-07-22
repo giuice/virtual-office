@@ -51,10 +51,6 @@ vi.mock("@/components/floor-plan/modern/FullBadge", () => ({
   FullBadge: () => <div>full</div>,
 }));
 
-vi.mock("@/components/floor-plan/modern/AttentionBeacon", () => ({
-  default: () => <div>beacon</div>,
-}));
-
 vi.mock("@/components/floor-plan/modern/SpaceContextMenu", () => ({
   default: () => null,
 }));
@@ -65,10 +61,6 @@ vi.mock("@/components/floor-plan/modern/SpaceDetailPanel", () => ({
 
 vi.mock("@/components/floor-plan/modern/SpaceDetailBottomSheet", () => ({
   SpaceDetailBottomSheet: () => null,
-}));
-
-vi.mock("@/hooks/useAttentionBeacon", () => ({
-  useAttentionBeacon: () => ({ active: false, severity: null, reason: null }),
 }));
 
 vi.mock("@/hooks/useSpaceDetails", () => ({

@@ -10,24 +10,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SpaceDetailPanel } from '@/components/floor-plan/modern/SpaceDetailPanel';
 import { SpaceDetailBottomSheet } from '@/components/floor-plan/modern/SpaceDetailBottomSheet';
 import { ParticipantRoster } from '@/components/floor-plan/modern/ParticipantRoster';
-import { AgendaPhaseDisplay } from '@/components/floor-plan/modern/AgendaPhaseDisplay';
-import { ActivityLogPreview, ActivityLogEntry } from '@/components/floor-plan/modern/ActivityLogPreview';
-import { TranscriptSnippet } from '@/components/floor-plan/modern/TranscriptSnippet';
 import { SpaceActionButtons } from '@/components/floor-plan/modern/SpaceActionButtons';
 import ModernSpaceCard from '@/components/floor-plan/modern/ModernSpaceCard';
 import { KnockBannerHost } from '@/components/floor-plan/modern/KnockBanner';
 
 // Types
 import { Space, UserPresenceData, SpaceStatus, SpaceType } from '@/types/database';
-
-// Mock useAttentionBeacon hook
-vi.mock('@/hooks/useAttentionBeacon', () => ({
-  useAttentionBeacon: vi.fn(() => ({
-    active: false,
-    severity: 'normal',
-    reason: null,
-  })),
-}));
 
 // Mock ModernUserAvatar to avoid CompanyContext dependency
 vi.mock('@/components/floor-plan/modern/ModernUserAvatar', () => ({
@@ -77,17 +65,6 @@ const createMockUser = (id: string, name: string): UserPresenceData => ({
   status: 'online',
   currentSpaceId: 'space-1',
 });
-
-const createMockActivityLog = (count: number): ActivityLogEntry[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `entry-${i}`,
-    timestamp: new Date(Date.now() - i * 60000), // 1 minute apart
-    author: `User ${i}`,
-    authorId: `user-${i}`,
-    summary: `Activity item ${i}`,
-    type: ['decision', 'action', 'note', 'blocker'][i % 4] as ActivityLogEntry['type'],
-  }));
-};
 
 // ============================================
 // SpaceDetailPanel Tests (AC1, AC9)
@@ -439,179 +416,6 @@ describe('SpaceDetailBottomSheet', () => {
 });
 
 // ============================================
-// AgendaPhaseDisplay Tests (AC3)
-// ============================================
-
-describe('AgendaPhaseDisplay', () => {
-  it('shows correct phase progress (AC3)', () => {
-    render(
-      <AgendaPhaseDisplay
-        currentPhase={2}
-        totalPhases={4}
-        phaseName="Discussion"
-      />
-    );
-
-    expect(screen.getByText('Phase 2 of 4')).toBeInTheDocument();
-    expect(screen.getByText('Discussion')).toBeInTheDocument();
-  });
-
-  it('shows description when provided (AC3)', () => {
-    render(
-      <AgendaPhaseDisplay
-        currentPhase={1}
-        totalPhases={3}
-        phaseName="Introduction"
-        phaseDescription="Welcome and overview"
-      />
-    );
-
-    expect(screen.getByText('Welcome and overview')).toBeInTheDocument();
-  });
-
-  it('renders progress bar with correct width', () => {
-    render(
-      <AgendaPhaseDisplay
-        currentPhase={2}
-        totalPhases={4}
-        phaseName="Test"
-      />
-    );
-
-    const progressBar = screen.getByRole('progressbar');
-    expect(progressBar).toHaveAttribute('value', '2');
-    expect(progressBar).toHaveAttribute('max', '4');
-  });
-
-  it('handles graceful absence - returns null for invalid data (AC3)', () => {
-    const { container } = render(
-      <AgendaPhaseDisplay
-        currentPhase={0}
-        totalPhases={0}
-        phaseName="Test"
-      />
-    );
-
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-// ============================================
-// ActivityLogPreview Tests (AC4)
-// ============================================
-
-describe('ActivityLogPreview', () => {
-  it('shows correct number of entries (default 5) (AC4)', () => {
-    const entries = createMockActivityLog(10);
-    
-    render(<ActivityLogPreview entries={entries} />);
-
-    // Should show max 5 entries
-    expect(screen.getByText('Activity item 0')).toBeInTheDocument();
-    expect(screen.getByText('Activity item 4')).toBeInTheDocument();
-    expect(screen.queryByText('Activity item 5')).not.toBeInTheDocument();
-  });
-
-  it('respects maxEntries prop (AC4)', () => {
-    const entries = createMockActivityLog(10);
-    
-    render(<ActivityLogPreview entries={entries} maxEntries={3} />);
-
-    expect(screen.getByText('Activity item 2')).toBeInTheDocument();
-    expect(screen.queryByText('Activity item 3')).not.toBeInTheDocument();
-  });
-
-  it('uses monospace font class (AC4)', () => {
-    const entries = createMockActivityLog(1);
-    
-    const { container } = render(<ActivityLogPreview entries={entries} />);
-
-    // Check for font-mono class
-    const monoElements = container.querySelectorAll('.font-mono');
-    expect(monoElements.length).toBeGreaterThan(0);
-  });
-
-  it('shows View All button when onViewAll provided', async () => {
-    const entries = createMockActivityLog(3);
-    const onViewAll = vi.fn();
-    
-    render(<ActivityLogPreview entries={entries} onViewAll={onViewAll} />);
-
-    const viewAllButton = screen.getByText('View All');
-    await userEvent.click(viewAllButton);
-    
-    expect(onViewAll).toHaveBeenCalled();
-  });
-
-  it('returns null when no entries', () => {
-    const { container } = render(<ActivityLogPreview entries={[]} />);
-    
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-// ============================================
-// TranscriptSnippet Tests (AC5)
-// ============================================
-
-describe('TranscriptSnippet', () => {
-  const transcriptTimestamp = new Date('2024-01-01T12:00:00.000Z');
-
-  it('shows speaker and text (AC5)', () => {
-    render(
-      <TranscriptSnippet
-        text="This is a test message that should be displayed"
-        speaker="Alice"
-        timestamp={transcriptTimestamp}
-      />
-    );
-
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText(/This is a test message/)).toBeInTheDocument();
-  });
-
-  it('applies line-clamp-3 for truncation (AC5)', () => {
-    const longText = 'This is a very long message. '.repeat(20);
-    
-    const { container } = render(
-      <TranscriptSnippet
-        text={longText}
-        speaker="Alice"
-        timestamp={transcriptTimestamp}
-      />
-    );
-
-    const textElement = container.querySelector('.line-clamp-3');
-    expect(textElement).toBeInTheDocument();
-  });
-
-  it('uses monospace font (AC5)', () => {
-    const { container } = render(
-      <TranscriptSnippet
-        text="Test message"
-        speaker="Alice"
-        timestamp={transcriptTimestamp}
-      />
-    );
-
-    const monoElement = container.querySelector('.font-mono');
-    expect(monoElement).toBeInTheDocument();
-  });
-
-  it('returns null when no text', () => {
-    const { container } = render(
-      <TranscriptSnippet
-        text=""
-        speaker="Alice"
-        timestamp={transcriptTimestamp}
-      />
-    );
-
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-// ============================================
 // SpaceActionButtons Tests (AC6)
 // ============================================
 
@@ -878,33 +682,6 @@ describe('ModernSpaceCard explicit detail panel', () => {
     vi.useRealTimers();
   });
 
-  it('panel does not show in analyst variant', async () => {
-    vi.useFakeTimers();
-    
-    render(
-      <ControlledModernSpaceCard
-        space={mockSpace}
-        usersInSpace={mockUsers}
-        onEnterSpace={mockOnEnterSpace}
-        state={{ detailPanel: true }}
-        variant="analyst"
-      />
-    );
-
-    const card = screen.getByTestId('space-space-1');
-    
-    // Hover
-    fireEvent.mouseEnter(card);
-    act(() => {
-      vi.advanceTimersByTime(350);
-    });
-    
-    // Should not show panel in analyst mode
-    expect(card).toHaveAttribute('aria-expanded', 'false');
-    
-    vi.useRealTimers();
-  });
-
   it('clicks inside panel do not trigger card navigation (AC7)', async () => {
     vi.useFakeTimers();
     
@@ -1008,19 +785,6 @@ describe('Accessibility (AC10)', () => {
     fireEvent.keyDown(item, { key: 'Enter' });
     
     expect(onUserClick).toHaveBeenCalledWith('1');
-  });
-
-  it('AgendaPhaseDisplay has proper aria attributes', () => {
-    render(
-      <AgendaPhaseDisplay
-        currentPhase={2}
-        totalPhases={4}
-        phaseName="Discussion"
-      />
-    );
-
-    const status = screen.getByRole('status');
-    expect(status).toHaveAttribute('aria-label', 'Meeting phase: Discussion, 2 of 4');
   });
 
   it('SpaceActionButtons have proper aria-labels', () => {

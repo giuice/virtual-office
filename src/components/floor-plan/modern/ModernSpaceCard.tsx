@@ -60,7 +60,6 @@ function getActivityText({
   return `${users.length} people here`;
 }
 
-export type SpaceCardVariant = "orbit" | "analyst" | "cinema";
 export type DetailSurface = "panel" | "sheet";
 
 interface ModernSpaceCardProps {
@@ -80,7 +79,6 @@ interface ModernSpaceCardProps {
     directEnter?: boolean;
   };
   className?: string;
-  variant?: SpaceCardVariant;
   speakingUserIds?: string[];
   presentingUserId?: string;
   mutedUserIds?: string[];
@@ -102,7 +100,6 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
   onEditSpace,
   state,
   className = "",
-  variant = "orbit",
   speakingUserIds = EMPTY_USER_IDS,
   presentingUserId,
   mutedUserIds = EMPTY_USER_IDS,
@@ -129,9 +126,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
     getIsMobileSnapshot,
     getServerIsMobileSnapshot,
   );
-  const suppressDetailPanel = variant === "analyst";
-  const detailSurfaceOpen =
-    showDetailPanel && !suppressDetailPanel && detailOpen;
+  const detailSurfaceOpen = showDetailPanel && detailOpen;
   const detailSurface: DetailSurface = isMobile ? "sheet" : "panel";
 
   useEffect(() => {
@@ -173,7 +168,7 @@ const ModernSpaceCard: React.FC<ModernSpaceCardProps> = ({
       }
     }
 
-    if (showDetailPanel && !suppressDetailPanel) {
+    if (showDetailPanel) {
       onDetailOpenChange?.(true, detailSurface);
       return;
     }

@@ -13,8 +13,6 @@ import { cn } from "@/lib/utils";
 import { useModernFloorPlanKnock } from "./useModernFloorPlanKnock";
 import { KnockBannerHost } from "./KnockBanner";
 
-// Perspective types matching UX spec
-export type FloorPlanPerspective = "orbit" | "analyst" | "cinema";
 export type FloorPlanDensity = "comfortable" | "compact";
 
 interface ModernFloorPlanProps {
@@ -238,7 +236,6 @@ const ModernFloorPlan: React.FC<ModernFloorPlanProps> = ({
             compact: density === "compact",
             directEnter: canDirectEnter,
           }}
-          variant="orbit"
           speakingUserIds={currentSpeakingIds}
           mutedUserIds={mutedUserIdsList}
           detailOpen={openDetail?.spaceId === space.id}
