@@ -37,7 +37,7 @@ This guide documents common pitfalls and patterns in the Virtual Office messagin
                           │
 ┌─────────────────────────▼───────────────────────────────────────┐
 │                    Supabase Database                             │
-│  conversations │ messages │ conversation_preferences │ etc.      │
+│  conversations │ messages │ conversation_members │ etc.          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -186,7 +186,7 @@ async findByUser(userId: string) {
     .from('conversations')
     .select(`
       *,
-      conversation_preferences!left(
+      conversation_members!left(
         id, conversation_id, user_id,
         is_pinned, pinned_order, is_starred,
         is_archived, notifications_enabled,
@@ -276,9 +276,9 @@ const isPinned = Boolean(raw.isPinned ?? raw.is_pinned);
 
 | Feature | Level | Table | Shared? |
 |---------|-------|-------|---------|
-| Pin Conversation | Conversation | `conversation_preferences` | No (per-user) |
-| Star Conversation | Conversation | `conversation_preferences` | No (per-user) |
-| Archive Conversation | Conversation | `conversation_preferences` | No (per-user) |
+| Pin Conversation | Conversation | `conversation_members` | No (per-user) |
+| Star Conversation | Conversation | `conversation_members` | No (per-user) |
+| Archive Conversation | Conversation | `conversation_members` | No (per-user) |
 | Pin Message | Message | `pinned_messages` | Yes (all see it) |
 | Star Message | Message | `starred_messages` | No (per-user) |
 
@@ -360,5 +360,5 @@ When something isn't working:
 | Message item UI | `src/components/messaging/message-item.tsx` |
 | Conversation repository | `src/repositories/implementations/supabase/SupabaseConversationRepository.ts` |
 | Message repository | `src/repositories/implementations/supabase/SupabaseMessageRepository.ts` |
-| RLS migrations | `src/migrations/*.sql` |
+| RLS migrations | `supabase/migrations/*.sql` |
 | Types | `src/types/messaging.ts` |

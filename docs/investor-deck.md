@@ -52,7 +52,7 @@
 | **Target Audience** | **Professional Teams** | Everyone | Social / Events |
 
 **Our Moat:**
-1.  **Brownfield Architecture:** Built on robust, scalable tech (Next.js 15, Supabase) from Day 1.
+1.  **Brownfield Architecture:** Built on robust, scalable tech (Next.js 16, Supabase) from Day 1.
 2.  **"Unleashed" UX:** A design system specifically crafted for professional "flow" states (Orbit Gallery, Analyst Matrix).
 3.  **AI-First:** Meeting intelligence is not an afterthought; it's core to the data model.
 

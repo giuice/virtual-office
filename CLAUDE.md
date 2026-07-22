@@ -8,7 +8,7 @@ in skills; do not duplicate them here.
 Virtual Office is a digital workspace with floor plans, rooms, presence,
 messaging, and company management.
 
-- Next.js 15 App Router, React 19, TypeScript strict
+- Next.js 16 App Router, React 19, TypeScript strict
 - Supabase Postgres, Auth, Realtime, and RLS
 - TanStack Query, React Context, Tailwind, shadcn/ui, and Radix
 - Vitest, Testing Library, and Playwright
@@ -130,8 +130,10 @@ repository-wide rules.
 
 ## Supabase, authentication, and RLS
 
-- API routes and server code use createSupabaseServerClient from
-  src/lib/supabase/server-client.ts.
+- API routes and ordinary server modules use createSupabaseServerClient from
+  src/lib/supabase/server-client.ts. `src/proxy.ts` is the exception: it creates
+  the SSR client directly because it owns the proxy request/response cookie
+  adapter.
 - Client Components use createSupabaseBrowserClient from
   src/lib/supabase/browser-client.ts.
 - Server authorization uses auth.getUser(), which validates the JWT.
@@ -152,7 +154,10 @@ The users table has two distinct identifiers:
 
 Therefore:
 
-- RLS compares users.supabase_uid with auth.uid()::text.
+- RLS that starts from an Auth identity must map `auth.uid()` through
+  `users.supabase_uid` before comparing application foreign keys. The baseline
+  public-conversation policy still compares `space_members.user_id` directly to
+  `auth.uid()`; treat that as a known migration defect, not a pattern to copy.
 - API routes resolve the application user by supabase_uid.
 - Application foreign keys use users.id.
 - Comparing users.id directly with auth.uid() is incorrect.
@@ -161,7 +166,8 @@ Known schema traps:
 
 - profiles does not exist; use users.
 - messages links to rooms through conversations.room_id, not messages.room_id.
-- Roles are admin or member; do not invent new role values.
+- Company user roles are `admin` or `member`. `space_members.role` uses the
+  separate `member_role_type` enum, which also contains `director`.
 
 ## Code and architecture rules
 
@@ -171,8 +177,10 @@ Known schema traps:
   signatures.
 - Keep business logic in utilities/services, data access in repositories, and
   view concerns in components.
-- Query hooks live in src/hooks/queries, mutations in src/hooks/mutations, and
-  Realtime hooks in src/hooks/realtime.
+- Dedicated query hooks live in src/hooks/queries, dedicated mutations in
+  src/hooks/mutations, and feature hooks that combine concerns in src/hooks.
+- Dedicated Realtime hooks live in src/hooks/realtime; subsystem-owned Realtime
+  hooks may live directly in src/hooks.
 - Construct repositories with the server Supabase client in API routes.
 - Avoid giant files and condition growth; extract cohesive behavior, not thin
   wrappers.

@@ -3,14 +3,14 @@
 ## Authority hierarchy
 
 The authoritative snapshot is produced by one database operation at one server
-time. It returns the verified viewer identity, company scope, users, spaces,
-active session facts, placement/access revisions, and server time needed for
-pure derivation. Do not merge independent client queries into an authoritative
-snapshot; their read points can differ.
+time. It returns the verified viewer identity, company scope, server time,
+initial-placement state, and per-user profile, placement, connection, occupancy,
+and display-status fields. Do not merge independent client queries into an
+authoritative snapshot; their read points can differ.
 
 Authority, from strongest to weakest:
 
-1. Locked database rows and security-definer transition results.
+1. Locked database rows and security-invoker transition results.
 2. A validated server snapshot scoped to company ID plus app-user ID.
 3. Query-cache mirrors of that exact snapshot.
 4. Private Realtime invalidations that request a refetch.
@@ -38,9 +38,9 @@ transient disconnect, but it does not prove connection or access.
 
 A user is connected only when at least one lease:
 
-- belongs to the user, current company, and exact non-revoked auth session;
+- belongs to the user;
 - has not been retired and is unexpired at snapshot server time; and
-- carries the current user access revision.
+- has a user/auth-session pair that is not recorded as revoked.
 
 A user occupies a space only when connected and a qualifying lease also:
 
@@ -67,7 +67,7 @@ occupancy, capacity, or responder eligibility.
 ## Logs and time
 
 `space_presence_log` is historical/audit state updated inside atomic movement;
-it is not a lease or grace credential. A delayed reconciliation closes a log at
-the authoritative disconnect/expiry boundary it proves, not at arbitrary Cron
-execution time. Lease comparisons use snapshot/database time, never browser
-time.
+it is not a lease or grace credential. A delayed reconciliation closes open logs
+at its operation time after its five-minute qualifying-lease grace check; it does
+not backdate them to lease disconnect or expiry. Lease comparisons use
+snapshot/database time, never browser time.

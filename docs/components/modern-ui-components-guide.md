@@ -88,7 +88,7 @@ A comprehensive avatar system with upload capabilities, status indicators, and v
 
 | Component | File Path | Description |
 |-----------|-----------|-------------|
-| ProfileAvatar | `src/components/profile/ProfileAvatar.tsx` | Avatar component with upload features |
+| ProfileAvatar | `src/components/ui/enhanced-avatar-v2.tsx` | Avatar component with upload features |
 | EnhancedUserProfile | `src/components/profile/EnhancedUserProfile.tsx` | User profile with avatar upload |
 | UploadableAvatar | `src/components/profile/UploadableAvatar.tsx` | Advanced avatar with upload progress |
 | useImageUpload | `src/hooks/useImageUpload.ts` | Hook for image upload operations |

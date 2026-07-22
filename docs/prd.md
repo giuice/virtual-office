@@ -27,7 +27,7 @@
 - **4 of 10 Epics Complete:** Infrastructure, Authentication, Floor Plan system (basic), Real-time Messaging (foundation)
 - **3 Epics In Progress:** Floor Plan (UX polish), Messaging Timeline & Composer (4A), Meeting Notes System, Announcement System
 - **3 Epics Planned:** Messaging Resilience & Scale (4B), AI Communication Enhancements, Video/Screen Sharing, Admin Dashboard & Analytics
-- **Tech Stack:** Next.js 15, React 19, Supabase (PostgreSQL + Realtime), TypeScript, Repository Pattern
+- **Tech Stack:** Next.js 16, React 19, Supabase (PostgreSQL + Realtime), TypeScript, Repository Pattern
 
 **Market Positioning:**
 Virtual Office sits between generic chat tools (Slack/Teams - no spatial context) and gaming-focused platforms (Gather.town - weak enterprise features). Key differentiators: professional spatial UI, enterprise-grade messaging, AI meeting intelligence, compliance-ready presence audit.
@@ -209,7 +209,7 @@ Virtual Office sits between generic chat tools (Slack/Teams - no spatial context
 - **Keyboard navigation** - Full app navigable via keyboard (WCAG 2.1 AA compliance)
 
 **Design Constraints:**
-- **UI Library:** shadcn/ui (Radix UI primitives) + TailwindCSS 4.1.3
+- **UI Library:** shadcn/ui (Radix UI primitives) + TailwindCSS 4.2.1
 - **Canvas:** Konva.js for floor plan (60 FPS for 50+ spaces)
 - **Accessibility:** WCAG 2.1 Level AA (keyboard nav, screen readers, high contrast)
 - **Brownfield Integration:** Follow Repository Pattern, respect click-stop protocol (`data-avatar-interactive`)
@@ -219,7 +219,7 @@ Virtual Office sits between generic chat tools (Slack/Teams - no spatial context
 ## Epic List
 
 ### Epic 1: Core Infrastructure & Supabase Migration ✅ COMPLETE
-**Goal:** Establish Next.js 15 + Supabase foundation with Repository Pattern for data access
+**Goal:** Establish the Next.js 16 + Supabase foundation with Repository Pattern for data access
 **Stories:** ~8-10 stories
 **Status:** Complete - Production ready
 

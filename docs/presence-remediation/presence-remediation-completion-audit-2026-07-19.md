@@ -4,7 +4,7 @@ Status: Pending user confirmation
 
 ## Authority and scope
 
-The user-supplied `docs/presence-remediation/presence-safety-remediation-handoff.md` is tracked but empty. This audit therefore uses the last complete normative handoff, recovered from commit `c4fa624` at `docs/presence-safety-remediation-handoff-2026-07-09.md`, plus revision 3 of `phase-3.5-stabilization-plan.md`.
+When this audit was authored, `docs/presence-remediation/presence-safety-remediation-handoff.md` was tracked but empty, so the audit used the last complete normative handoff recovered from commit `c4fa624` in the [historical handoff](https://github.com/giuice/virtual-office/blob/c4fa624932fd1b8c6668bc935434901b942dad08/docs/presence-safety-remediation-handoff-2026-07-09.md), plus the [Phase 3.5 stabilization plan, revision 3](https://github.com/giuice/virtual-office/blob/c4fa624932fd1b8c6668bc935434901b942dad08/docs/presence-remediation/phase-3.5-stabilization-plan.md). The current handoff file is now populated and supersedes that empty-file condition.
 
 This is a completion audit, not a deployment claim. It distinguishes four states:
 

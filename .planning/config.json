@@ -2,7 +2,11 @@
   "mode": "interactive",
   "parallelization": true,
   "commit_docs": true,
-  "model_profile": "quality",
+  "model_profile": "balanced",
+  "model_overrides": {
+  "gsd-doc-writer": "sonnet",
+  "gsd-doc-verifier": "sonnet"
+  },
   "response_language": "Brazilian Portuguese",
   "workflow": {
     "research": true,

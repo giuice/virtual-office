@@ -1,7 +1,7 @@
 # Virtual Office — Reference (Tech, Rules, Structure)
 
 ## Product Context
-Virtual Office is a digital workspace with floor plans, rooms, presence, messaging, and company management. Built with Next.js 15.3.0, React 19.1.0, Supabase, and TypeScript.
+Virtual Office is a digital workspace with floor plans, rooms, presence, messaging, and company management. Built with Next.js 16.1.6, React 19.2.4, Supabase, and TypeScript.
 
 ## Immutable Rules
 - Do not guess. Verify. If unknown, say “I don’t know.”
@@ -11,14 +11,14 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - Completion is user-gated. Never state or imply "done", "fixed", or "resolved". Only the user can confirm completion. Until then mark **Status: Pending user confirmation**.
 
 ## Architecture Snapshot (single source)
-- Framework: Next.js 15.3.0 (App Router, Server Components, Route Handlers, Server Actions)
-- Runtime: React 19.1.0 / React DOM 19.1.0
-- Lang: TypeScript 5, strict mode
+- Framework: Next.js 16.1.6 (App Router, Server Components, Route Handlers, Server Actions)
+- Runtime: React 19.2.4 / React DOM 19.2.4
+- Lang: TypeScript 6, strict mode
 - Data: Supabase Postgres + Realtime, RLS enabled
-- Auth: Supabase Auth with SSR (@supabase/ssr v0.6.1)
-- UI: TailwindCSS 4.1.3, shadcn/ui, Radix
+- Auth: Supabase Auth with SSR (@supabase/ssr v0.12.0)
+- UI: TailwindCSS 4.2.1, shadcn/ui, Radix
 - State: TanStack Query v5 + React Context
-- Tests: Vitest 3, Playwright, Testing Library
+- Tests: Vitest 4, Playwright, Testing Library
 
 ## Supabase & RLS (critical)
 - Never use the browser Supabase client in API routes.
@@ -111,7 +111,7 @@ Virtual Office is a digital workspace with floor plans, rooms, presence, messagi
 - `src/providers/`: app-level providers  
 - `src/repositories/`: interfaces, implementations, factory  
 - `src/types/`: **canonical types**  
-- `migrations/`, `middleware.ts`, `__tests__/`
+- `migrations/`, `src/proxy.ts`, `__tests__/`
 
 **New files must live in the existing feature folders. Do not add new top-level directories.**
 

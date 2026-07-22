@@ -1,6 +1,6 @@
 # AGENTS.md
 
-All project rules, architecture, and conventions are maintained in a single source of truth:
+Repository-wide instructions are maintained in the following file; domain-specific rules live in the skills it references:
 
 @CLAUDE.md
 

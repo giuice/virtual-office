@@ -1,11 +1,11 @@
 # Virtual Office: Space Grid v3 Implementation Plan
 
-This document outlines the step-by-step plan to implement the "Reality Distortion" and "Tactile Glassmorphism" UX concepts from the `ux-space-grid-v3.html` prototype into the Next.js/Tailwind/shadcn architecture of Virtual Office.
+This document outlines the step-by-step plan to implement the "Reality Distortion" and "Tactile Glassmorphism" UX concepts from the `docs/ux-space-grid-v3.html` prototype into the Next.js/Tailwind/shadcn architecture of Virtual Office.
 
 ## 1. Create Reality Distortion Theme System
 **Goal:** Move away from hardcoded CSS variables in a single file and integrate these themes into Tailwind.
 
-*   **Action:** Update `tailwind.config.ts` (or `app/globals.css`) to define our new color palettes (Neon, Zen, Obsidian, Paper).
+*   **Action:** Update `tailwind.config.ts` (or `src/app/globals.css`) to define our new color palettes (Neon, Zen, Obsidian, Paper).
 *   **Action:** Use CSS variables mapped to Tailwind colors so we can easily switch themes by changing a `data-theme` attribute on the `<body>`.
 
 ## 2. Implement Tactile Glassmorphism Utilities
@@ -23,7 +23,7 @@ This document outlines the step-by-step plan to implement the "Reality Distortio
 ## 4. Upgrade Avatar Constellation Component
 **Goal:** Make the avatars expressive and handle the "speaking" state gracefully.
 
-*   **Action:** Update `UserAvatarPresence.tsx` (or the relevant avatar component).
+*   **Action:** Update `src/components/floor-plan/UserAvatarPresence.tsx` (or the relevant avatar component).
 *   **Action:** Add the `speaking-pulse` animation and the Z-axis translation on hover. Ensure it handles overflow (the `+4` badge) cleanly.
 
 ## 5. Refactor SpaceCard with Container Queries
