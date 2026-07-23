@@ -72,20 +72,70 @@ Plans:
 - [x] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
 
 ### Phase 3: Spatial Audio and Screen Sharing
+
 **Goal**: Users can reliably use the existing spatial audio and view one participant's shared screen on an integrated, expandable floor-plan stage, while preserving P2P WebRTC and Supabase Realtime signaling
 **Depends on**: Phase 2.1
 **Requirements**: VID-01, VID-02, VID-04
 **Optional**: Basic camera video may be included only if it does not delay or destabilize audio or screen sharing; it is not an acceptance criterion
 **Deferred**: Mandatory nine-participant video (VID-03), VID-05 through VID-10, and migration to LiveKit or another SFU belong to a future Advanced Collaboration phase
 **Success Criteria** (what must be TRUE):
+
   1. Entering a space connects the user to existing room-scoped P2P audio in listen-only mode; microphone activation remains explicit, with mute/unmute and speaker indication
   2. Existing Supabase Realtime signaling and STUN/TURN-backed P2P WebRTC are preserved and extended; changing spaces tears down prior media cleanly
   3. Exactly one participant can share a window, tab, or entire screen at a time, visible to occupants on an integrated stage that each viewer can expand or collapse
   4. Permission denial, cancellation, browser-ended sharing, presenter departure, and space changes restore a stable non-sharing layout without breaking room audio
-**Plans**: TBD
+
+**Plans**: 13 plans
 
 Plans:
-- [ ] TBD
+**Wave 1**
+
+- [ ] 03-08-PLAN.md — Local authoritative lease/RPC/private-topic migration and readback
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-09-PLAN.md — Pinned validation contracts and initial authenticated route boundaries
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-10-PLAN.md — Bounded production WebRTC display and private signaling foundations
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-01-PLAN.md — Production tracer: explicit capture-to-canonical integrated stage with bounded mock evidence
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-02-PLAN.md — Real local Postgres lease concurrency and private Realtime RLS proof
+- [ ] 03-03-PLAN.md — Adversarial perfect-negotiation, signaling, and scoped cleanup hardening
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 03-04-PLAN.md — Complete authenticated claim/renew/release/active HTTP lifecycle
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 03-11-PLAN.md — Idempotent provider capture/heartbeat/teardown lifecycle
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 03-05-PLAN.md — Approved responsive/accessibility UI-SPEC stage and floor-plan integration
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 03-06-PLAN.md — Tagged two-context Chromium UI/lifecycle automation
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 03-07-PLAN.md — Read-only Presence Safety and Supabase/RLS reviewer gates
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 03-12-PLAN.md — Complete unchanged-diff local/database/browser/build gates
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 03-13-PLAN.md — Real browser/TURN UAT and exact-target rollout decision
 
 ### Phase 4: Messaging Timeline
 **Goal**: Users have a rich messaging experience with read awareness, file sharing, voice notes, and message organization
@@ -168,7 +218,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Spatial Audio and Screen Sharing | 0/TBD | Not started | - |
+| 3. Spatial Audio and Screen Sharing | 0/13 | Planned | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |
@@ -176,4 +226,4 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-07-22*
+*Last updated: 2026-07-23*
