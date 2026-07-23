@@ -3,7 +3,10 @@ import { GET as getActiveScreenShare } from '@/app/api/spaces/[spaceId]/screen-s
 import { POST as claimScreenShare } from '@/app/api/spaces/[spaceId]/screen-share/claim/route';
 import { POST as releaseScreenShare } from '@/app/api/spaces/[spaceId]/screen-share/release/route';
 import {
+  screenShareActiveRpcResultSchema,
   screenShareClaimRequestSchema,
+  screenShareClaimRpcResultSchema,
+  screenSharePresenterNameSchema,
   screenSharePublicShareSchema,
   screenShareSignalingPayloadSchema,
 } from '@/lib/webrtc/screen-share-contract';
@@ -54,6 +57,17 @@ describe('screen-share contract boundaries', () => {
       companyId: COMPANY_ID,
     }).success).toBe(false);
     expect(screenShareClaimRequestSchema.safeParse({ shareId: SHARE_ID }).success).toBe(false);
+  });
+
+  it('uses PostgreSQL-compatible Unicode code-point presenter-name limits after trimming', () => {
+    const emoji = '😀';
+
+    expect(screenSharePresenterNameSchema.parse(`  ${emoji.repeat(51)}  `)).toBe(emoji.repeat(51));
+    expect(screenSharePresenterNameSchema.parse(emoji.repeat(100))).toBe(emoji.repeat(100));
+    expect(screenSharePresenterNameSchema.safeParse(emoji.repeat(101)).success).toBe(false);
+    expect(screenSharePresenterNameSchema.parse(`  ${'x'.repeat(100)}  `)).toBe('x'.repeat(100));
+    expect(screenSharePresenterNameSchema.safeParse('x'.repeat(101)).success).toBe(false);
+    expect(screenSharePresenterNameSchema.safeParse('  ').success).toBe(false);
   });
 
   it('keeps canonical public presentation data limited to safe fields', () => {
@@ -274,6 +288,30 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(JSON.stringify(body)).not.toContain('88888888');
     expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: claimRpc('😀'.repeat(100)) },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: activeRpc('😀'.repeat(100)) },
+  ])('returns a 100-code-point locked presenter name from the $name HTTP boundary', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(await json(response))).toContain('😀'.repeat(100));
+  });
+
+  it.each([
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: claimRpc('😀'.repeat(101)) },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: activeRpc('😀'.repeat(101)) },
+  ])('rejects a 101-code-point locked presenter name at the $name HTTP boundary', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toMatchObject({ success: false, code: 'DATABASE_CONTRACT_INCOMPATIBLE' });
   });
 
   it('maps presenter contention to the stable public 409 contract', async () => {
@@ -509,31 +547,37 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     {
       name: 'claim result with a mismatched share ID',
       invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
-      data: { ok: true, code: 'CLAIMED', shareId: TARGET_ID, expiresAt: EXPIRES_AT },
-    },
-    {
-      name: 'release result with an unknown success code',
-      invoke: () => releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
-      data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT },
+      data: { ...claimRpc(), shareId: TARGET_ID },
+      assertOperationSchema: (value: unknown) => expect(screenShareClaimRpcResultSchema.safeParse(value).success).toBe(true),
     },
     {
       name: 'active result for a mismatched space',
       invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)),
       data: {
-        ok: true,
-        code: 'ACTIVE_READ',
-        active: {
-          spaceId: TARGET_ID,
-          presenterUserId: PRESENTER_ID,
-          shareId: SHARE_ID,
-          expiresAt: EXPIRES_AT,
-        },
+        ...activeRpc(),
+        active: { ...activeRpc().active, spaceId: TARGET_ID },
       },
+      assertOperationSchema: (value: unknown) => expect(screenShareActiveRpcResultSchema.safeParse(value).success).toBe(true),
     },
-  ])('maps $name to the terminal sanitized compatibility contract', async ({ invoke, data }) => {
+  ])('reaches the $name invariant after a schema-valid RPC fixture', async ({ invoke, data, assertOperationSchema }) => {
+    assertOperationSchema(data);
     mocks.rpc.mockResolvedValueOnce({ data, error: null });
 
     const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+    });
+  });
+
+  it('maps a release result with an unknown success code to the terminal sanitized compatibility contract', async () => {
+    const data = { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT };
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
 
     expect(response.status).toBe(426);
     expect(await json(response)).toEqual({
