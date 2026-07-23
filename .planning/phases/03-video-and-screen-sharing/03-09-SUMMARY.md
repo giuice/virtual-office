@@ -90,9 +90,13 @@ status: complete
 - A static verified `companyId:null` remains pre-RPC `MEMBERSHIP_SCOPE_INVALID` (403) with zero RPC. If company/session membership changes after that verified snapshot, locked SQL may correctly produce terminal `SESSION_INVALID` (409); this correction does not claim that every membership race is pre-RPC or 403.
 - Strict decode failures, unknown result codes, and claim/active invariant mismatches use terminal sanitized `DATABASE_CONTRACT_INCOMPATIBLE` (426). Missing-function, signature/schema-cache, and insufficient-EXECUTE provider errors use the same sanitized contract; unknown provider failures remain generic sanitized `INTERNAL_ERROR` (500).
 - Local Postgres migration/catalog and concurrency regressions prove the SQL contract; mocked route tests prove only HTTP boundary behavior. Online database state and deployment remain unchanged.
+## Route Coverage Restoration (2026-07-23)
 
+- The first atomic-presenter regression rewrite accidentally replaced the accepted HTTP boundary matrix with 28 tests. The complete pre-rewrite route foundation was restored from `69695e1` (the last route-test revision after `d0491ee`, which does not contain this file), then every prior behavioral assertion was adapted to the locked RPC name and bounded-retry design.
+- Final focused coverage is 75 route tests and 76 route-plus-verified-session tests, exceeding the prior 55 focused-test baseline. This preserves or strengthens request/auth/provider-code/result-domain/sanitization/membership/impossible-code/profile/no-query coverage, plus new presenter-name decode and retry cases.
+- Intentional test-name changes convert only assertions coupled to deleted mechanics: `uses the verified display-name snapshot`, `returns an active share only as canonical public data`, pre-RPC profile rejection, final active reauthorization, and held enrichment races now assert locked-RPC name authority, one active RPC with no `users` query, and locked terminal profile/session/membership responses. All prior behavioral scenarios remain represented by equivalent or stronger assertions.
+- The affected Presence API selection passed 153 tests. TypeScript, focused route-test ESLint, Presence gate, and diff check passed. Whole-repository lint is not green due only to pre-existing `.claude/gsd-core` files that reference unavailable ESLint rules; no changed application or test file reports a lint error.
 
-## Task Commits
 
 1. **Task 1: Define pinned validated screen-share contracts**
    - `4d3ef67` — `test(03-09): add failing screen-share contract tests`
@@ -105,9 +109,9 @@ status: complete
 
 - `src/lib/presence/verified-session.ts` — verified identity retains the original Auth subject alongside the application identity and canonical display name.
 - `src/lib/webrtc/screen-share-contract.ts` — strict external contracts, per-operation RPC domains, canonical response filtering, and stable error mapping.
-- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — validated presenter profile and verified-subject claim boundary.
-- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary using the original verified subject.
-- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — final-reauthorized canonical active-share reconciliation.
+- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — verified-subject claim boundary that accepts only the locked RPC canonical presenter name.
+- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary using the original verified subject and strict bounded structural retry.
+- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — one-RPC canonical active-share response without service-role profile enrichment.
 - `__tests__/api/screen-share-routes.test.ts` and `__tests__/api/verified-presence-session.test.ts` — focused route and verified-identity regression coverage.
 - `package.json` and `package-lock.json` — direct, exact `zod@4.4.3` dependency and lockfile evidence.
 
@@ -128,9 +132,10 @@ status: complete
 Passed:
 
 - `npm ls zod --depth=0` — direct `zod@4.4.3` resolved.
-- `npm test -- __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts` — 55 focused tests passed, including invalid claimant profiles with zero mutation RPCs, no second route auth lookup, operation-specific result domains, membership races, and held-lookup final-reauthorization races.
+- `npm test -- --run __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts` — 76 focused tests passed (75 route + 1 verified-session), exceeding the prior 55-test matrix while retaining auth, sanitization, compatibility, membership, and no-query coverage.
+- `npm test -- --run __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts __tests__/api/presence-location-route.test.ts __tests__/api/presence-logout-route.test.ts __tests__/api/presence-sessions-route.test.ts __tests__/api/presence-snapshot-route.test.ts` — 153 affected route/Presence API tests passed.
 - `npm run type-check` — passed.
-- `npx eslint` over all touched TypeScript files — passed.
+- `npm exec -- eslint __tests__/api/screen-share-routes.test.ts` — passed. Whole-repository `npm run lint` is blocked by pre-existing `.claude/gsd-core` files referencing unavailable ESLint rules, unrelated to this correction.
 - `npm run presence:gate` — passed.
 - `git diff --check` — passed.
 
