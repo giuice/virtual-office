@@ -26,3 +26,11 @@
 - Evidence: focused mocked route suite passed 29/29, including table-driven coverage across all routes; TypeScript, focused ESLint, Presence movement gate, and diff check passed.
 - Database/deployment state: application code and tests were committed locally only. No schema, data, function, grant, RLS, online target, or deployment was changed or queried.
 - Next action: after merge, run the primary-checkout full test and build gates with its ignored local environment available.
+
+## 2026-07-23 — Final screen-share Presence Safety correction
+
+- Risk corrected: strict observed-RPC decode and invariant-shape failures in claim, release, and active now map to the same terminal sanitized `DATABASE_CONTRACT_INCOMPATIBLE` (426) contract as missing RPCs, incompatible signatures, and grant failures. Unknown provider/transport failures remain sanitized generic `INTERNAL_ERROR` (500); no response exposes raw RPC values, codes, hints, or details.
+- Race corrected: the verified Presence identity now carries the repository's canonical `displayName`. Claim uses that verified snapshot only after `CLAIMED`; it no longer performs a service-role presenter lookup before the observed RPC. The 03-08 RPC remains the sole authority for membership, company, space, lease, and session at commit.
+- Evidence: 42 focused route and verified-session tests passed, including malformed/unknown/mismatched RPC result coverage across routes, pre-RPC presenter-lookup absence, and terminal membership/compatibility contracts. TypeScript, focused ESLint, Presence gate, and diff check passed.
+- Database/deployment state: application code and tests were committed locally only. No migration, schema, data, function, grant, RLS, online target, or deployment was changed or queried.
+- Next action: after merge, run the primary-checkout full test and build gates with its ignored local environment available.
