@@ -16,16 +16,6 @@ interface ReleaseRouteContext {
   params: Promise<{ spaceId: string }>;
 }
 
-type VerifiedPresenceAuth = Extract<
-  Awaited<ReturnType<typeof requireVerifiedPresenceAuth>>,
-  { ok: true }
->;
-
-async function verifiedAuthSubject(auth: VerifiedPresenceAuth): Promise<string | null> {
-  const { data, error } = await auth.supabase.auth.getUser();
-  return error || !data.user ? null : data.user.id;
-}
-
 function internalError(correlationId: string): NextResponse {
   return NextResponse.json({
     success: false,
@@ -64,11 +54,8 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
       return NextResponse.json({ success: false, code, error }, { status });
     }
 
-    const authSubject = await verifiedAuthSubject(auth);
-    if (!authSubject) return internalError(correlationId);
-
     const { data, error } = await auth.admin.rpc('release_screen_share_observed', {
-      p_auth_subject: authSubject,
+      p_auth_subject: auth.identity.authSubject,
       p_auth_session_id: auth.identity.authSessionId,
       p_presence_session_id: parsedBody.data.presenceSessionId,
       p_space_id: parsedParams.data.spaceId,
