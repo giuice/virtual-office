@@ -18,7 +18,7 @@ tech-stack:
   patterns:
     - validate path, body, query, RPC result, and signaling payloads at each untrusted boundary
     - derive Auth subject, application user, canonical display name, company, and session fencing from verified server state
-    - authorize through observed lease RPCs before any service-role presenter enrichment
+    - validate the presenter profile before claim and final-reauthorize active enrichment before emitting presenter data
 key-files:
   created:
     - src/lib/webrtc/screen-share-contract.ts
@@ -33,8 +33,8 @@ key-files:
     - package-lock.json
 key-decisions:
   - Preserve the 03-08 RPC as lease authority; routes do not accept client-selected presenter or company fields.
-  - Revalidate the authenticated Auth subject before each privileged observed RPC while carrying the canonical presenter display name from the same verified application-user snapshot.
-  - Use the verified display-name snapshot only after a claim returns `CLAIMED`; no service-role presenter lookup precedes RPC authorization.
+  - Use the original verified Auth subject from the getUser-plus-claims boundary for observed RPCs; validate the claimant profile before mutation and final-reauthorize active enrichment.
+  - Validate the verified display name before claim, then expose its canonical parsed value only after `CLAIMED`; active enrichment is final-reauthorized.
   - Treat companyless verified identities and every strict RPC result incompatibility as terminal typed public errors before callers can retry generic failures.
 patterns-established:
   - Screen-share route results expose only canonical public fields and stable public error codes.
@@ -85,9 +85,11 @@ status: complete
 - Claim, release, and active now reject a verified no-company identity with terminal `MEMBERSHIP_SCOPE_INVALID` (403) before user lookups or RPC calls, including a stale membership-switch response.
 - A reusable strict RPC classifier maps missing-function, signature/schema-cache, and insufficient-EXECUTE codes (`PGRST202`, `PGRST203`, `42883`, `42501`) to terminal `DATABASE_CONTRACT_INCOMPATIBLE` (426) responses across all routes.
 - Strict decode failures, unknown result codes, and claim/active invariant mismatches now use that same terminal sanitized 426 response; unknown provider/transport failures remain generic sanitized `INTERNAL_ERROR` (500).
-- Claim carries the repository-derived canonical display name through `requireVerifiedPresenceAuth` and uses it only after `CLAIMED`; no service-role presenter lookup can race before the observed RPC authorization.
+- Claim validates and canonicalizes the verified display name before the mutating RPC, returning `PRESENTER_PROFILE_INVALID` (409) without raw profile data or an RPC call when invalid.
+- Active enrichment looks up the presenter only after its first authorized active read, then performs one final authorized active read before emitting data. Final denials/nulls win; changed ownership/share fails closed with sanitized `SERVICE_UNAVAILABLE` (503); only the final lease expiry is emitted.
+- Each observed RPC now decodes only its migration-defined result domain. Impossible cross-operation codes are terminal `DATABASE_CONTRACT_INCOMPATIBLE` (426), while observed `AUTH_INVALID` after verified profile resolution is `MEMBERSHIP_SCOPE_INVALID` (403).
 - The compatibility response has one sanitized public message; focused table-driven tests prove raw provider messages, hints, details, values, and codes are absent. Unknown provider failures remain sanitized `INTERNAL_ERROR`.
-- Final remediation commit: `fec6859` — `fix(03-09): harden screen-share RPC compatibility`.
+- Final application-boundary remediation commit: `69695e1` — `fix(03-09): harden screen-share authorization boundaries`.
 
 ## Task Commits
 
@@ -100,18 +102,18 @@ status: complete
 
 ## Files Created/Modified
 
-- `src/lib/presence/verified-session.ts` — verified application identity now includes the repository canonical display name.
-- `src/lib/webrtc/screen-share-contract.ts` — strict external contracts, canonical response filtering, and stable error mapping.
-- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — verified presenter lease claim boundary using the post-claim identity snapshot.
-- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary with terminal RPC-shape incompatibility handling.
-- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — authorized canonical active-share reconciliation read with terminal RPC-shape incompatibility handling.
+- `src/lib/presence/verified-session.ts` — verified identity retains the original Auth subject alongside the application identity and canonical display name.
+- `src/lib/webrtc/screen-share-contract.ts` — strict external contracts, per-operation RPC domains, canonical response filtering, and stable error mapping.
+- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — validated presenter profile and verified-subject claim boundary.
+- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary using the original verified subject.
+- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — final-reauthorized canonical active-share reconciliation.
 - `__tests__/api/screen-share-routes.test.ts` and `__tests__/api/verified-presence-session.test.ts` — focused route and verified-identity regression coverage.
 - `package.json` and `package-lock.json` — direct, exact `zod@4.4.3` dependency and lockfile evidence.
 
 ## Decisions Made
 
-- Used the already verified `requireVerifiedPresenceAuth` boundary and a fresh server `auth.getUser()` result as the RPC Auth subject; application IDs remain separate and are never substituted for Supabase UIDs.
-- Carried the canonical presenter name from the repository-resolved verified Presence identity and used it only after `CLAIMED`; the observed 03-08 RPC remains the authority for membership, company, space, session, and lease authorization.
+- Used the original server-verified Auth subject from the `getUser()` and matching claims boundary for every observed RPC; application IDs remain separate and are never substituted for Supabase UIDs.
+- Validated the claim profile before mutation and final-reauthorized active enrichment; the observed 03-08 RPC remains authority for membership, company, space, session, and lease authorization.
 
 ## Database and Deployment State
 
@@ -125,29 +127,27 @@ status: complete
 Passed:
 
 - `npm ls zod --depth=0` — direct `zod@4.4.3` resolved.
-- `npm test -- __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts` — 42 tests passed, including malformed/unknown/mismatched RPC-result sanitization across claim, release, and active, no pre-RPC presenter lookup, canonical display-name identity propagation, no-company membership handling, and table-driven provider compatibility errors.
+- `npm test -- __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts` — 55 focused tests passed, including invalid claimant profiles with zero mutation RPCs, no second route auth lookup, operation-specific result domains, membership races, and held-lookup final-reauthorization races.
 - `npm run type-check` — passed.
 - `npx eslint` over all touched TypeScript files — passed.
 - `npm run presence:gate` — passed.
 - `git diff --check` — passed.
 
-Build status (inconclusive):
+Primary-checkout verification is pending:
 
-- The isolated-worktree `npm run build` compiled the new screen-share routes and completed its TypeScript stage, but could not finish prerendering because ignored local Supabase environment values are not copied into isolated worktrees.
-- This is inconclusive verification evidence, not a product or deferred issue; no screen-share route failure was reported.
-- The orchestrator must rerun `npm run build` after merge in the primary checkout. No user action is required unless that primary-checkout rerun fails.
+- The orchestrator will add primary-checkout full-test and build evidence after merge. This worktree does not claim build evidence because ignored local environment values are unavailable here.
 
 ## Deviations from Plan
 
 ### Auto-fixed Issues
 
-**1. [Rule 2 - Missing critical functionality] Added safe canonical presenter-name enrichment after lease authorization.**
-- **Found during:** Task 2
-- **Issue:** The observed 03-08 active-share RPC returns presenter ID, share ID, and expiry but not the public `presenterName` required by the plan's canonical response.
-- **Fix:** After an authorized observed RPC, routes read only `display_name` for the returned/verified presenter scoped to the verified company, then filter the response through the canonical public schema.
-- **Files modified:** `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts`, `src/app/api/spaces/[spaceId]/screen-share/active/route.ts`, `src/lib/webrtc/screen-share-contract.ts`
-- **Verification:** Focused route tests verify canonical public output and absence of server session details.
-- **Committed in:** `7c6577e`
+**1. [Rule 2 - Correctness] Finalized safe presenter-profile handling and active enrichment.**
+- **Found during:** Adversarial application-boundary remediation.
+- **Issue:** Historical claim presenter lookup had been removed, but the claim profile still needed validation before mutation and active lookup data could be emitted from a stale authorization point.
+- **Fix:** Reused one trimmed presenter-name schema before claim; active now final-reauthorizes after lookup, uses only final lease fields, and fails closed on changes. It also decodes strict operation-specific RPC code domains and maps raced `AUTH_INVALID` to membership scope invalid.
+- **Files modified:** `src/lib/presence/verified-session.ts`, `src/lib/webrtc/screen-share-contract.ts`, and screen-share routes/tests.
+- **Verification:** Focused route tests hold lookup/reauthorization ordering and prove invalid names, denial, ownership change, and sanitized compatibility contracts.
+- **Committed in:** This remediation commit.
 
 **Total deviations:** 1 auto-fixed (Rule 2).
 
@@ -158,11 +158,11 @@ None.
 ## Next Phase Readiness
 
 - Screen-share clients can now use strict claim/release/active contracts and validate scoped Realtime signaling before WebRTC use.
-- Real local Postgres/RLS/concurrency proof remains owned by 03-08; browser media and private-channel delivery require their respective later integration tests.
+- Real local Postgres/RLS/concurrency proof remains Wave 5 ownership in 03-02; browser media and private-channel delivery require their respective later integration tests.
 
 ## Self-Check: PASSED
 
 - Confirmed all shared contract, route, and focused-test files exist.
 - Confirmed TDD RED/GREEN commits `4d3ef67`, `73c6682`, `910efb1`, and `7c6577e` exist.
-- Confirmed final Presence Safety remediation commit `fec6859` exists.
+- Confirmed final application-boundary remediation commit `69695e1` exists.
 - Confirmed task commits contain no tracked-file deletions.

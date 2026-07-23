@@ -34,3 +34,13 @@
 - Evidence: 42 focused route and verified-session tests passed, including malformed/unknown/mismatched RPC result coverage across routes, pre-RPC presenter-lookup absence, and terminal membership/compatibility contracts. TypeScript, focused ESLint, Presence gate, and diff check passed.
 - Database/deployment state: application code and tests were committed locally only. No migration, schema, data, function, grant, RLS, online target, or deployment was changed or queried.
 - Next action: after merge, run the primary-checkout full test and build gates with its ignored local environment available.
+
+## 2026-07-23 — Adversarial screen-share application-boundary correction
+
+- Findings corrected: the verified identity now retains the original validated Auth subject; claim/release/active pass it directly to observed RPCs without a second route `auth.getUser()` call. Claim validates and trims the stored presenter name before any mutation, returning sanitized `PRESENTER_PROFILE_INVALID` (409) with zero RPCs when it is missing/invalid.
+- Active correction: presenter lookup occurs only after the first authorized active read and is followed by exactly one final authorized active read. Final typed denial/null wins; changed presenter/share/space fails closed with bounded sanitized `SERVICE_UNAVAILABLE` (503); final lease expiry is canonical. Lookup infrastructure errors remain sanitized 500, and missing/invalid profile returns its terminal typed contract only after final authorization.
+- Contract correction: claim/release/active use their migration-defined strict error domains. Impossible cross-operation codes decode to `DATABASE_CONTRACT_INCOMPATIBLE` (426); observed `AUTH_INVALID` after verified app-profile resolution maps to `MEMBERSHIP_SCOPE_INVALID` (403). `RETRY_LOCK_SET` remains a typed 503 with no automatic route retry; Wave 5 decides real-Postgres simultaneous-claim behavior.
+- Evidence: 55 focused mocked route and verified-session tests plus TypeScript passed. These prove application branching and ordering only, not database concurrency/RLS.
+- Database/deployment state: application code and documentation changed locally only. No migration, local database, online target, schema, data, RLS, grant, environment, or deployment action occurred.
+- Wave 5 deferral: 03-02 owns two-connection real-Postgres races against membership/company removal, auth-session revocation, presenter departure, and private ACL/access-revision change; mocked evidence does not close that gate.
+- Next action: orchestrator adds primary-checkout full-test and build evidence after merge.
