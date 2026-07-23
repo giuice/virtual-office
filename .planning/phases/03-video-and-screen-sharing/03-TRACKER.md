@@ -73,3 +73,9 @@
 - Membership fact retained: static no-company verified identity is 403 with no RPC; a post-snapshot locked invalidation is `SESSION_INVALID` (409).
 - Evidence: focused route plus verified-session tests passed 81/81, affected Presence API tests passed 158/158, the local real-Postgres lease suite passed 9/9, and TypeScript, focused ESLint, Presence gate, and diff check passed.
 - Database/deployment state: code, tests, plans, summary, and tracker changed locally only. No SQL/migration edit, online database action, environment change, package change, or deployment occurred.
+
+## 2026-07-23 — Wave 5 dependency correction
+
+- Final Sol review found the 03-02 preconditions still named only the 03-08 lease/media migration even though its atomic presenter-name and lock-order tests require `20260723224547_screen_share_atomic_presenter_contract.sql` as well.
+- Corrected 03-02 to depend on 03-09, require/read both screen-share migrations, and verify both history entries exactly once. Both migrations are immutable inputs; 03-02 still creates no migration or production symbol.
+- Database/deployment state: documentation changed locally only. Local migration state was already read back; no SQL, online database, environment, or deployment action occurred.
