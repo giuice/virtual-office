@@ -100,7 +100,7 @@ Accent reservado para: botão **Share screen** quando disponível, foco visível
 |---------|----------|
 | `>= 1280px` | Stage expandido limitado a `960px` de largura e `540px` de altura; fica acima da grade, que conserva largura total abaixo. Cabeçalho em uma linha. |
 | `768–1279px` | Stage usa largura disponível do card, mantém 16:9 e altura máxima de `50vh`; cabeçalho pode quebrar em duas linhas, preservando ações. |
-| `< 768px` | Não criar padrão novo de bottom sheet ou gesto. Stage ocupa 100% da largura disponível, mínimo de `180px`, máximo de `44vh`; padding `12px`; rail de `52px`. Ações têm `44px` de alvo; **Share screen** pode ficar só com ícone, mas exige `aria-label="Share screen"` e tooltip. |
+| `< 768px` | Não criar padrão novo de bottom sheet ou gesto. Stage ocupa 100% da largura disponível, mínimo de `180px`, máximo de `44vh`; padding `16px`; rail de `52px`. Ações têm `44px` de alvo; **Share screen** pode ficar só com ícone, mas exige `aria-label="Share screen"` e tooltip. |
 
 Nunca permitir overflow horizontal da página. Nome/texto longo trunca no cabeçalho; mensagens de erro quebram por palavra dentro do card. A área do vídeo não pode criar scroll horizontal.
 
