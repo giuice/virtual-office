@@ -1,10 +1,11 @@
 ---
 phase: 03
 slug: video-and-screen-sharing
-status: draft
+status: approved
 shadcn_initialized: true
 preset: new-york / neutral / CSS variables
 created: 2026-07-22
+reviewed_at: 2026-07-22
 ---
 
 # Fase 03 — Contrato de design de UI
@@ -174,18 +175,25 @@ As mensagens específicas de permissão, cancelamento, conflito, fim pelo browse
 
 ## Considerações de UI
 
-Estados aplicáveis resolvidos: 8 cobertos, 2 backstop, 0 não resolvidos.
+> Cobertura gerada pelo UI-consideration probe após a aprovação das seis dimensões. A copy literal continua definida em **Contrato de copywriting** e nas tabelas de interação; estas linhas fixam o comportamento observável que o planner deve elevar a `must_haves.truths`.
+
+Estados aplicáveis resolvidos: 13 cobertos, 0 backstop, 0 não resolvidos.
 
 | Categoria | Elemento(s) | Status | Resolução / razão |
 |-----------|-------------|--------|-------------------|
-| empty | Stage de mídia | ✅ coberto | Sem lease ativo não existe card vazio; o status acessível informa **No one is sharing a screen** e o floor plan não perde área. |
-| loading | Controle de compartilhar e vídeo remoto | ✅ coberto | Picker/claim têm estados explícitos; conexão remota preserva retângulo 16:9 com skeleton e copy. |
-| error | Controle, stage e sinalização de estado | ✅ coberto | Permissão, cancelamento, sem display, conflito, captura/negociação, fim de browser, saída e troca de sala têm recuperação e copy determinados. |
-| populated | Stage de mídia | ✅ coberto | Exibe somente a track viva do apresentador canônico, selo LIVE, identidade e ações locais. |
-| partial | Estado de presenter/track | ✅ coberto | Lease sem track viva não mostra frame ou outro peer; mostra estado indisponível e restaura layout quando o lease termina. |
-| overflow | Cabeçalho, controles e mensagens | ✅ coberto | `min-w-0`, ellipsis de nomes, quebra de mensagens e ações que embrulham sem scroll horizontal. |
-| long-text | Nome de pessoa/sala, tooltips e alertas | 🧪 backstop | Teste visual/componente verifica ellipsis de metadata e quebra dentro do card para nome e mensagem longos. |
-| zero-one-many | Faixa secundária de participantes opcional | 🧪 backstop | Nenhuma grade de câmera é criada; se vídeo opcional existir no futuro, roster usa componentes existentes e não altera o stage de tela. |
+| long-text | E1 — controles de compartilhamento | ✅ coberto | Labels dos controles usam as strings fixas do contrato; abaixo de `768px`, **Share screen** pode virar ícone com `aria-label` e tooltip, sem criar overflow horizontal. |
+| empty | E2 — stage de mídia | ✅ coberto | Sem lease canônico ativo, stage e rail não são renderizados; o floor plan mantém toda a área e o controle referencia o empty state documentado. |
+| loading | E2 — stage de mídia | ✅ coberto | Enquanto a track remota conecta, o stage preserva o retângulo `16:9`, mostra `Skeleton` e usa o loading state documentado sem layout shift. |
+| error | E2 — stage de mídia | ✅ coberto | Falha ou track indisponível mostra o error state documentado, nunca um frame antigo ou mídia de outro peer, preserva o áudio e oferece o caminho de recuperação definido. |
+| populated | E2 — stage de mídia | ✅ coberto | O estado normal mostra somente a track viva do apresentador canônico em `16:9`, com identidade, status LIVE e ações permitidas ao viewer/presenter. |
+| loading | E3 — rail colapsado | ✅ coberto | Se o viewer colapsar durante a conexão, o rail mantém identidade e LIVE, mostra o status curto de conexão e não reserva uma segunda área de mídia. |
+| error | E3 — rail colapsado | ✅ coberto | Se a track ficar indisponível enquanto o lease permanece ativo, o rail mostra **Presentation unavailable** e a ação de expandir revela o error state e sua recuperação. |
+| overflow | E3 — rail colapsado | ✅ coberto | O rail usa `min-w-0`, ellipsis no nome e ações com alvo mínimo de `44px`; controles podem envolver linha sem causar scroll horizontal. |
+| long-text | E3 — rail colapsado | ✅ coberto | Nome longo trunca visualmente, preserva o nome acessível completo e não comprime os controles de expandir ou parar. |
+| overflow | E4 — status e alerts | ✅ coberto | Status e alerts quebram por palavra dentro do card, permanecem na largura disponível e nunca criam overflow horizontal. |
+| long-text | E4 — status e alerts | ✅ coberto | Mensagens extensas seguem o line-height de corpo, fazem wrap e mantêm problema mais próximo passo de recuperação legíveis. |
+| overflow | E5 — cabeçalho da apresentação | ✅ coberto | O cabeçalho usa `min-w-0`; metadata trunca e ações podem quebrar para uma segunda linha nos breakpoints definidos sem sobrepor o vídeo. |
+| long-text | E5 — cabeçalho da apresentação | ✅ coberto | Nome longo usa ellipsis em uma linha, mantém identidade completa no nome acessível e preserva LIVE, avatar e controles locais. |
 
 ---
 
@@ -210,11 +218,11 @@ Estados aplicáveis resolvidos: 8 cobertos, 2 backstop, 0 não resolvidos.
 
 ## Checker Sign-Off
 
-- [ ] Dimensão 1 Copywriting: PASS
-- [ ] Dimensão 2 Visuais: PASS
-- [ ] Dimensão 3 Cor: PASS
-- [ ] Dimensão 4 Tipografia: PASS
-- [ ] Dimensão 5 Espaçamento: PASS
-- [ ] Dimensão 6 Segurança de registry: PASS
+- [x] Dimensão 1 Copywriting: PASS
+- [x] Dimensão 2 Visuais: PASS
+- [x] Dimensão 3 Cor: PASS
+- [x] Dimensão 4 Tipografia: PASS
+- [x] Dimensão 5 Espaçamento: PASS
+- [x] Dimensão 6 Segurança de registry: PASS
 
-**Aprovação:** pendente
+**Aprovação:** approved 2026-07-22
