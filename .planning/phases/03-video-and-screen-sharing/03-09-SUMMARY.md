@@ -117,9 +117,11 @@ Passed:
 - Focused `npx eslint` over all touched TypeScript files — passed.
 - `git diff --check` — passed.
 
-Not completed:
+Build status (inconclusive):
 
-- `npm run build` compiled the application and completed its TypeScript stage, but failed while prerendering the unrelated existing `/debug/messaging-comparison` page because this worktree has no Supabase URL/API key environment values. This is recorded in `deferred-items.md` and `.planning/WINDOWS.md`; no screen-share route failure was reported.
+- The isolated-worktree `npm run build` compiled the new screen-share routes and completed its TypeScript stage, but could not finish prerendering because ignored local Supabase environment values are not copied into isolated worktrees.
+- This is inconclusive verification evidence, not a product or deferred issue; no screen-share route failure was reported.
+- The orchestrator must rerun `npm run build` after merge in the primary checkout. No user action is required unless that primary-checkout rerun fails.
 
 ## Deviations from Plan
 
