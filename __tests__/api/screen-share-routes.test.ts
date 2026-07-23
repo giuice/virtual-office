@@ -728,4 +728,62 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(JSON.stringify(body)).not.toContain('Presenter');
     expect(JSON.stringify(body)).not.toContain(SHARE_ID);
   });
+
+  it('uses only the locked claim RPC presenter name and retries one structural lock-set result', async () => {
+    mocks.rpc
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null })
+      .mockResolvedValueOnce({
+        data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT, presenterName: ' Locked presenter ' },
+        error: null,
+      });
+
+    const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      success: true,
+      share: { presenterName: 'Locked presenter' },
+    });
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('uses only the locked active RPC snapshot rather than querying users or enriching with a second RPC', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        code: 'ACTIVE_READ',
+        active: {
+          spaceId: SPACE_ID,
+          presenterUserId: TARGET_ID,
+          presenterName: ' Locked presenter ',
+          shareId: SHARE_ID,
+          expiresAt: EXPIRES_AT,
+        },
+      },
+      error: null,
+    });
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      success: true,
+      active: { presenterName: 'Locked presenter' },
+    });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it.each(routeOperations)('maps a second strict RETRY_LOCK_SET result to the public unavailable response for $name', async ({ invoke }) => {
+    mocks.rpc
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null })
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(503);
+    expect(await json(response)).toMatchObject({ success: false, code: 'SERVICE_UNAVAILABLE' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+  });
 });
