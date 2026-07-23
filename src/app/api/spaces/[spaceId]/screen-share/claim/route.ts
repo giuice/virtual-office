@@ -17,10 +17,6 @@ interface ClaimRouteContext {
   params: Promise<{ spaceId: string }>;
 }
 
-interface PresenterNameRow {
-  display_name: string;
-}
-
 type VerifiedPresenceAuth = Extract<
   Awaited<ReturnType<typeof requireVerifiedPresenceAuth>>,
   { ok: true }
@@ -29,17 +25,6 @@ type VerifiedPresenceAuth = Extract<
 async function verifiedAuthSubject(auth: VerifiedPresenceAuth): Promise<string | null> {
   const { data, error } = await auth.supabase.auth.getUser();
   return error || !data.user ? null : data.user.id;
-}
-
-async function presenterName(auth: VerifiedPresenceAuth): Promise<string | null> {
-  const { data, error } = await auth.admin
-    .from('users')
-    .select('display_name')
-    .eq('id', auth.identity.appUserId)
-    .eq('company_id', auth.identity.companyId)
-    .maybeSingle<PresenterNameRow>();
-
-  return error || !data ? null : data.display_name;
 }
 
 function internalError(correlationId: string): NextResponse {
@@ -81,10 +66,7 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
     }
 
     const authSubject = await verifiedAuthSubject(auth);
-    const name = await presenterName(auth);
-    if (!authSubject || !name) {
-      return internalError(correlationId);
-    }
+    if (!authSubject) return internalError(correlationId);
 
     const { data, error } = await auth.admin.rpc('claim_screen_share_observed', {
       p_auth_subject: authSubject,
@@ -103,14 +85,20 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
     }
 
     const parsedResult = screenShareClaimRpcResultSchema.safeParse(data);
-    if (!parsedResult.success) return internalError(correlationId);
+    if (!parsedResult.success) {
+      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
 
     if (!parsedResult.data.ok) {
       const { code, status, error: message } = screenShareErrorContract(parsedResult.data.code);
       return NextResponse.json({ success: false, code, error: message }, { status });
     }
 
-    if (parsedResult.data.shareId !== parsedBody.data.shareId) return internalError(correlationId);
+    if (parsedResult.data.shareId !== parsedBody.data.shareId) {
+      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
 
     const response = screenShareClaimResponseSchema.parse({
       success: true,
@@ -119,7 +107,7 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
         companyId: auth.identity.companyId,
         spaceId: parsedParams.data.spaceId,
         presenterUserId: auth.identity.appUserId,
-        presenterName: name,
+        presenterName: auth.identity.displayName,
         shareId: parsedResult.data.shareId,
         expiresAt: parsedResult.data.expiresAt,
       }),

@@ -17,8 +17,8 @@ tech-stack:
   added: [zod@4.4.3]
   patterns:
     - validate path, body, query, RPC result, and signaling payloads at each untrusted boundary
-    - derive Auth subject, application user, company, and session fencing from verified server state
-    - authorize through observed lease RPCs before narrowly enriching canonical presenter display data
+    - derive Auth subject, application user, canonical display name, company, and session fencing from verified server state
+    - authorize through observed lease RPCs before any service-role presenter enrichment
 key-files:
   created:
     - src/lib/webrtc/screen-share-contract.ts
@@ -26,14 +26,16 @@ key-files:
     - src/app/api/spaces/[spaceId]/screen-share/release/route.ts
     - src/app/api/spaces/[spaceId]/screen-share/active/route.ts
     - __tests__/api/screen-share-routes.test.ts
+    - __tests__/api/verified-presence-session.test.ts
   modified:
+    - src/lib/presence/verified-session.ts
     - package.json
     - package-lock.json
 key-decisions:
   - Preserve the 03-08 RPC as lease authority; routes do not accept client-selected presenter or company fields.
-  - Revalidate the authenticated Auth subject before each privileged observed RPC because the shared verified-Presence result exposes only the application ID and Auth session fence.
-  - Enrich canonical presenter names only after the authorized RPC and scope the lookup to the verified company.
-  - Treat companyless verified identities and known RPC contract incompatibilities as terminal typed public errors before callers can retry generic failures.
+  - Revalidate the authenticated Auth subject before each privileged observed RPC while carrying the canonical presenter display name from the same verified application-user snapshot.
+  - Use the verified display-name snapshot only after a claim returns `CLAIMED`; no service-role presenter lookup precedes RPC authorization.
+  - Treat companyless verified identities and every strict RPC result incompatibility as terminal typed public errors before callers can retry generic failures.
 patterns-established:
   - Screen-share route results expose only canonical public fields and stable public error codes.
 requirements-completed: [VID-01, VID-04]
@@ -76,14 +78,16 @@ status: complete
 - Added the exact direct production dependency `zod@4.4.3` with an audited lockfile integrity entry and no lifecycle install scripts.
 - Defined strict request, RPC, public-result, and scoped handshake/description/ICE/presenter signaling contracts that reject unknown authority fields.
 - Added independently authenticated claim, release, and active routes that pass the verified Auth subject, application-session fence, and validated Presence session IDs to the local 03-08 observed RPC contract.
-- Added 21 focused mocked HTTP-boundary tests for parsing, identity derivation, busy/stale outcomes, null/active reconciliation, and error sanitization. These tests do not claim RLS, concurrency, Realtime delivery, or P2P media proof.
+- Added focused mocked HTTP-boundary and verified-session coverage for parsing, identity derivation, display-name snapshot propagation, busy/stale outcomes, null/active reconciliation, RPC shape incompatibility, and error sanitization. These tests do not claim RLS, concurrency, Realtime delivery, or P2P media proof.
 
 ## Safety Remediation
 
 - Claim, release, and active now reject a verified no-company identity with terminal `MEMBERSHIP_SCOPE_INVALID` (403) before user lookups or RPC calls, including a stale membership-switch response.
 - A reusable strict RPC classifier maps missing-function, signature/schema-cache, and insufficient-EXECUTE codes (`PGRST202`, `PGRST203`, `42883`, `42501`) to terminal `DATABASE_CONTRACT_INCOMPATIBLE` (426) responses across all routes.
-- The compatibility response has one sanitized public message; focused table-driven tests prove raw provider messages, hints, details, and codes are absent. Unknown provider failures remain sanitized `INTERNAL_ERROR`.
-- Remediation commit: `1d160ba` — `fix(03-09): classify screen-share compatibility failures`.
+- Strict decode failures, unknown result codes, and claim/active invariant mismatches now use that same terminal sanitized 426 response; unknown provider/transport failures remain generic sanitized `INTERNAL_ERROR` (500).
+- Claim carries the repository-derived canonical display name through `requireVerifiedPresenceAuth` and uses it only after `CLAIMED`; no service-role presenter lookup can race before the observed RPC authorization.
+- The compatibility response has one sanitized public message; focused table-driven tests prove raw provider messages, hints, details, values, and codes are absent. Unknown provider failures remain sanitized `INTERNAL_ERROR`.
+- Final remediation commit: `fec6859` — `fix(03-09): harden screen-share RPC compatibility`.
 
 ## Task Commits
 
@@ -96,17 +100,18 @@ status: complete
 
 ## Files Created/Modified
 
+- `src/lib/presence/verified-session.ts` — verified application identity now includes the repository canonical display name.
 - `src/lib/webrtc/screen-share-contract.ts` — strict external contracts, canonical response filtering, and stable error mapping.
-- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — verified presenter lease claim boundary.
-- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary.
-- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — authorized canonical active-share reconciliation read.
-- `__tests__/api/screen-share-routes.test.ts` — focused mocked route-contract coverage.
+- `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` — verified presenter lease claim boundary using the post-claim identity snapshot.
+- `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` — exact-owner, idempotent release boundary with terminal RPC-shape incompatibility handling.
+- `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` — authorized canonical active-share reconciliation read with terminal RPC-shape incompatibility handling.
+- `__tests__/api/screen-share-routes.test.ts` and `__tests__/api/verified-presence-session.test.ts` — focused route and verified-identity regression coverage.
 - `package.json` and `package-lock.json` — direct, exact `zod@4.4.3` dependency and lockfile evidence.
 
 ## Decisions Made
 
 - Used the already verified `requireVerifiedPresenceAuth` boundary and a fresh server `auth.getUser()` result as the RPC Auth subject; application IDs remain separate and are never substituted for Supabase UIDs.
-- Kept lease authorization in the 03-08 observed RPC. The service-role user display-name lookup occurs only after that authorization and filters the verified company before producing the required public canonical response.
+- Carried the canonical presenter name from the repository-resolved verified Presence identity and used it only after `CLAIMED`; the observed 03-08 RPC remains the authority for membership, company, space, session, and lease authorization.
 
 ## Database and Deployment State
 
@@ -120,7 +125,7 @@ status: complete
 Passed:
 
 - `npm ls zod --depth=0` — direct `zod@4.4.3` resolved.
-- `npm test -- __tests__/api/screen-share-routes.test.ts` — 29 tests passed, including no-company/stale membership scope and table-driven RPC-contract incompatibility sanitization across claim, release, and active.
+- `npm test -- __tests__/api/screen-share-routes.test.ts __tests__/api/verified-presence-session.test.ts` — 42 tests passed, including malformed/unknown/mismatched RPC-result sanitization across claim, release, and active, no pre-RPC presenter lookup, canonical display-name identity propagation, no-company membership handling, and table-driven provider compatibility errors.
 - `npm run type-check` — passed.
 - `npx eslint` over all touched TypeScript files — passed.
 - `npm run presence:gate` — passed.
@@ -159,4 +164,5 @@ None.
 
 - Confirmed all shared contract, route, and focused-test files exist.
 - Confirmed TDD RED/GREEN commits `4d3ef67`, `73c6682`, `910efb1`, and `7c6577e` exist.
+- Confirmed final Presence Safety remediation commit `fec6859` exists.
 - Confirmed task commits contain no tracked-file deletions.
