@@ -58,22 +58,27 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **ANNC-05**: User receives desktop and email notifications for urgent announcements (Story 6.5)
 - [ ] **ANNC-06**: Admin can see read count, percentage, and unread user list per announcement (Story 6.6)
 
-### Video & Screen Sharing
+### Spatial Audio & Screen Sharing
 
-- [ ] **VID-01**: WebRTC signaling infrastructure established via Supabase Realtime with STUN/TURN (Story 8.1)
-- [ ] **VID-02**: User can start audio-only calls in a space with mute/unmute and speaker indicators (Story 8.2)
-- [ ] **VID-03**: User can enable video during calls with grid layout up to 9 participants and spotlight mode (Story 8.3)
-- [ ] **VID-04**: User can share their screen during calls with select window/tab/entire screen (Story 8.4)
-- [ ] **VID-05**: Team can use shared whiteboard for real-time brainstorming with drawing tools and PNG export (Story 8.5)
-- [ ] **VID-06**: Meeting organizer can record calls (audio + video + screen) saved to Supabase Storage (Story 8.6)
-- [ ] **VID-07**: User can blur background or use virtual backgrounds during video calls (Story 8.7)
-- [ ] **VID-08**: User can see connection quality indicators (green/yellow/red) with latency and packet loss details (Story 8.8)
-- [ ] **VID-09**: User can pop out call to picture-in-picture window for multitasking (Story 8.9)
-- [ ] **VID-10**: User can schedule calls via Google Calendar/Outlook integration with auto-reminders (Story 8.10)
+- [ ] **VID-01**: Existing peer-to-peer WebRTC media, Supabase Realtime signaling, and STUN/TURN configuration are preserved and extended for room-scoped audio and screen sharing (Story 8.1)
+- [ ] **VID-02**: User entering a space connects to room audio in listen-only mode and can explicitly enable, mute, or unmute their microphone with speaker indication (Story 8.2)
+- [ ] **VID-04**: One participant at a time can share a window, tab, or entire screen on an integrated floor-plan stage that each viewer can expand or collapse (Story 8.4)
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced Collaboration
+
+- **VID-03**: User can enable video during calls with a mandatory grid layout for up to 9 participants and spotlight mode (Story 8.3)
+- **VID-05**: Team can use shared whiteboard for real-time brainstorming with drawing tools and PNG export (Story 8.5)
+- **VID-06**: Meeting organizer can record calls (audio + video + screen) saved to Supabase Storage (Story 8.6)
+- **VID-07**: User can blur background or use virtual backgrounds during video calls (Story 8.7)
+- **VID-08**: User can see connection quality indicators (green/yellow/red) with latency and packet loss details (Story 8.8)
+- **VID-09**: User can pop out call to picture-in-picture window for multitasking (Story 8.9)
+- **VID-10**: User can schedule calls via Google Calendar/Outlook integration with auto-reminders (Story 8.10)
+
+LiveKit or another SFU may be evaluated with this future capability set; it is not a Phase 3 dependency. Basic camera video remains optional in Phase 3 only when it does not delay or destabilize spatial audio and screen sharing, and it is not an acceptance criterion.
 
 ### Floor Plan
 
@@ -121,7 +126,7 @@ Deferred to future release. Tracked but not in current roadmap.
 |---------|--------|
 | Mobile native apps (iOS/Android) | Web-only for now; mobile responsive in v2 |
 | SSO/SAML enterprise auth | Email/password + OAuth sufficient for v1 |
-| Calendar integrations | Deferred except basic in Epic 8B Story 8.10 |
+| Calendar integrations | Deferred to future Advanced Collaboration work (VID-10) |
 | Custom branding/white-labeling | Enterprise feature for future |
 | On-premise deployment | Cloud-only (Supabase hosted) |
 | End-to-end encryption | Standard Supabase encryption only |
@@ -145,14 +150,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | FLOR-04 | Phase 2 + 2.1 | Complete |
 | VID-01 | Phase 3 | Pending |
 | VID-02 | Phase 3 | Pending |
-| VID-03 | Phase 3 | Pending |
+| VID-03 | Future — Advanced Collaboration | Deferred |
 | VID-04 | Phase 3 | Pending |
-| VID-05 | Phase 3 | Pending |
-| VID-06 | Phase 3 | Pending |
-| VID-07 | Phase 3 | Pending |
-| VID-08 | Phase 3 | Pending |
-| VID-09 | Phase 3 | Pending |
-| VID-10 | Phase 3 | Pending |
+| VID-05 | Future — Advanced Collaboration | Deferred |
+| VID-06 | Future — Advanced Collaboration | Deferred |
+| VID-07 | Future — Advanced Collaboration | Deferred |
+| VID-08 | Future — Advanced Collaboration | Deferred |
+| VID-09 | Future — Advanced Collaboration | Deferred |
+| VID-10 | Future — Advanced Collaboration | Deferred |
 | MSG-01 | Phase 4 | Pending |
 | MSG-02 | Phase 4 | Pending |
 | MSG-03 | Phase 4 | Pending |
@@ -180,10 +185,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | ANNC-06 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 41 total
-- Mapped to phases: 41
+- v1 requirements: 36 total
+- Mapped to current roadmap phases: 36
 - Unmapped: 0
+- Deferred Advanced Collaboration requirements tracked in v2: 7
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after phase reorder*
+*Last updated: 2026-07-22 after Phase 3 scope reduction and Advanced Collaboration deferral*

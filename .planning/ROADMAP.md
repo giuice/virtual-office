@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap takes a brownfield Virtual Office application from its current ~35% completion state through full v1 delivery. The journey starts with stabilizing broken functionality (auth, floor plan sizing, avatar debt), then completes remaining floor plan features, immediately follows with video/screen sharing to leverage the spatial foundation, then rounds out messaging features and resilience, and finishes with meeting intelligence and company announcements. Each phase delivers a coherent, verifiable capability that builds on the previous.
+This roadmap takes a brownfield Virtual Office application from its current ~35% completion state through full v1 delivery. The journey starts with stabilizing broken functionality (auth, floor plan sizing, avatar debt), then completes remaining floor plan features, immediately follows with a reliable spatial-audio and screen-sharing demonstration that leverages the existing WebRTC foundation, then rounds out messaging features and resilience, and finishes with meeting intelligence and company announcements. Each phase delivers a coherent, verifiable capability that builds on the previous.
 
 ## Phases
 
@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt (completed 2026-05-17)
 - [x] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection (completed 2026-05-13)
 - [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
-- [ ] **Phase 3: Video and Screen Sharing** - WebRTC video calls, screen sharing, whiteboard, recording, backgrounds, and PiP
+- [ ] **Phase 3: Spatial Audio and Screen Sharing** - Demonstrate reliable existing spatial audio plus single-presenter screen sharing on an integrated floor-plan stage
 - [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
 - [ ] **Phase 5: Messaging Resilience** - Offline queue, reconnection, polling fallback, typing indicators, multi-device sync, analytics, notifications
 - [ ] **Phase 6: Meeting Notes** - Meeting note creation, action items, transcript upload, AI summaries, search, and notifications
@@ -71,24 +71,21 @@ Plans:
 Plans:
 - [x] 02.1-01-PLAN.md — Fix lastSpaceId persistence gap and UI/DB divergence for automatic placements (FLOR-04)
 
-### Phase 3: Video and Screen Sharing
-**Goal**: Users can hold video meetings with screen sharing, whiteboard collaboration, and recording within spaces
+### Phase 3: Spatial Audio and Screen Sharing
+**Goal**: Users can reliably use the existing spatial audio and view one participant's shared screen on an integrated, expandable floor-plan stage, while preserving P2P WebRTC and Supabase Realtime signaling
 **Depends on**: Phase 2.1
-**Requirements**: VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07, VID-08, VID-09, VID-10
+**Requirements**: VID-01, VID-02, VID-04
+**Optional**: Basic camera video may be included only if it does not delay or destabilize audio or screen sharing; it is not an acceptance criterion
+**Deferred**: Mandatory nine-participant video (VID-03), VID-05 through VID-10, and migration to LiveKit or another SFU belong to a future Advanced Collaboration phase
 **Success Criteria** (what must be TRUE):
-  1. User can start an audio-only call in a space and upgrade to video with grid layout supporting up to 9 participants
-  2. User can share their screen (window, tab, or entire screen) during a call, visible to all participants
-  3. Team can use a shared whiteboard with drawing tools during calls, with PNG export
-  4. Meeting organizer can record calls saved to Supabase Storage; users see connection quality indicators
-  5. User can blur background, use virtual backgrounds, and pop out calls to picture-in-picture for multitasking
+  1. Entering a space connects the user to existing room-scoped P2P audio in listen-only mode; microphone activation remains explicit, with mute/unmute and speaker indication
+  2. Existing Supabase Realtime signaling and STUN/TURN-backed P2P WebRTC are preserved and extended; changing spaces tears down prior media cleanly
+  3. Exactly one participant can share a window, tab, or entire screen at a time, visible to occupants on an integrated stage that each viewer can expand or collapse
+  4. Permission denial, cancellation, browser-ended sharing, presenter departure, and space changes restore a stable non-sharing layout without breaking room audio
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
-- [ ] 03-04: TBD
-- [ ] 03-05: TBD
+- [ ] TBD
 
 ### Phase 4: Messaging Timeline
 **Goal**: Users have a rich messaging experience with read awareness, file sharing, voice notes, and message organization
@@ -171,7 +168,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Video and Screen Sharing | 0/5 | Not started | - |
+| 3. Spatial Audio and Screen Sharing | 0/TBD | Not started | - |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |
