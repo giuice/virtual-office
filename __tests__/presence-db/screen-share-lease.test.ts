@@ -85,6 +85,95 @@ describe('presence-db screen-share lease authority', () => {
     return row.result;
   }
 
+  async function startObserved(
+    functionName: string,
+    occupant: Occupant,
+    shareId?: string,
+  ): Promise<{ client: Client; backendPid: number; result: Promise<Record<string, unknown>> }> {
+    const client = new Client({ connectionString: LOCAL_DB_URL });
+    try {
+      await client.connect();
+      await client.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
+      const backend = await client.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      const backendPid = backend.rows[0]?.pid;
+      if (!backendPid) throw new Error('Could not read observed RPC backend PID');
+
+      const params = shareId
+        ? [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId, shareId]
+        : [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId];
+      const placeholders = params.map((_, index) => `$${index + 1}`).join(', ');
+      const result = client.query<{ result: Record<string, unknown> }>(
+        `select public.${functionName}(${placeholders}) as result`,
+        params,
+      ).then(({ rows }) => {
+        const [row] = rows;
+        if (!row) throw new Error(`No result from ${functionName}`);
+        return row.result;
+      });
+
+      return { client, backendPid, result };
+    } catch (error) {
+      await client.end().catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function waitForObservedUserLock(waiterPid: number, lockerPid: number): Promise<void> {
+    const deadline = Date.now() + 2_000;
+    let lastState: Record<string, unknown> | undefined;
+
+    while (Date.now() < deadline) {
+      const [state] = await fixtures.sql<{
+        wait_event_type: string | null;
+        wait_event: string | null;
+        blocked_by_locker: boolean;
+        waits_for_locker_transaction: boolean;
+        locker_holds_users_write_lock: boolean;
+      }>(
+        `select activity.wait_event_type,
+                activity.wait_event,
+                pg_catalog.pg_blocking_pids($1) @> array[$2]::integer[] as blocked_by_locker,
+                exists (
+                  select 1
+                    from pg_catalog.pg_locks as waiting
+                    join pg_catalog.pg_locks as held
+                      on waiting.locktype = 'transactionid'
+                     and held.locktype = 'transactionid'
+                     and waiting.transactionid = held.transactionid
+                   where waiting.pid = $1
+                     and not waiting.granted
+                     and held.pid = $2
+                     and held.granted
+                ) as waits_for_locker_transaction,
+                exists (
+                  select 1
+                    from pg_catalog.pg_locks as held_user
+                   where held_user.pid = $2
+                     and held_user.relation = 'public.users'::pg_catalog.regclass
+                     and held_user.mode = 'RowExclusiveLock'
+                     and held_user.granted
+                ) as locker_holds_users_write_lock
+           from pg_catalog.pg_stat_activity as activity
+          where activity.pid = $1`,
+        [waiterPid, lockerPid],
+      );
+      lastState = state;
+      if (
+        state?.wait_event_type === 'Lock'
+        && state.blocked_by_locker
+        && state.waits_for_locker_transaction
+        && state.locker_holds_users_write_lock
+      ) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    throw new Error(
+      `Timed out waiting for observed RPC backend ${waiterPid} on users-row locker ${lockerPid}: ${JSON.stringify(lastState)}`,
+    );
+  }
+
   beforeAll(async () => {
     fixtures = await PresenceFixtures.connect(NS);
     const [company] = await fixtures.sql<{ id: string }>(
@@ -183,17 +272,24 @@ describe('presence-db screen-share lease authority', () => {
     await locker.connect();
     await locker.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
     try {
+      const lockerBackend = await locker.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      const lockerPid = lockerBackend.rows[0]?.pid;
+      if (!lockerPid) throw new Error('Could not read held-rename backend PID');
       await locker.query('begin');
       await locker.query(
         `update public.users set display_name = $1 where id = $2`,
         ['  ', presenter.user.appUserId],
       );
 
-      const claim = observed('claim_screen_share_observed', presenter, randomUUID());
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      await locker.query('commit');
+      const claim = await startObserved('claim_screen_share_observed', presenter, randomUUID());
+      try {
+        await waitForObservedUserLock(claim.backendPid, lockerPid);
+        await locker.query('commit');
 
-      expect(await claim).toEqual({ ok: false, code: 'PRESENTER_PROFILE_INVALID' });
+        expect(await claim.result).toEqual({ ok: false, code: 'PRESENTER_PROFILE_INVALID' });
+      } finally {
+        await claim.client.end();
+      }
       expect(await fixtures.sql(
         `select * from public.screen_share_leases
          where space_id = $1
@@ -208,7 +304,7 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
-  it('canonicalizes whitespace, accepts exactly one hundred characters, and rejects overflow before mutation', async () => {
+  it('canonicalizes whitespace and matches PostgreSQL Unicode code-point limits before mutation', async () => {
     const canonical = await createOccupant('canonical-name', '   Canonical presenter  ');
     const canonicalShareId = randomUUID();
     expect(await observed('claim_screen_share_observed', canonical, canonicalShareId)).toMatchObject({
@@ -230,6 +326,29 @@ describe('presence-db screen-share lease authority', () => {
     expect(await observed('claim_screen_share_observed', boundary, randomUUID())).toEqual({
       ok: false, code: 'PRESENTER_PROFILE_INVALID',
     });
+
+    const emoji = '😀';
+    const emojiBoundary = await createOccupant('emoji-boundary-name', `  ${emoji.repeat(100)}  `);
+    const emojiShareId = randomUUID();
+    expect(await observed('claim_screen_share_observed', emojiBoundary, emojiShareId)).toMatchObject({
+      ok: true, code: 'CLAIMED', presenterName: emoji.repeat(100),
+    });
+    expect(await observed('release_screen_share_observed', emojiBoundary, emojiShareId)).toMatchObject({
+      ok: true, code: 'RELEASED',
+    });
+
+    const emojiOverflow = await createOccupant('emoji-overflow-name', emoji.repeat(101));
+    expect(await observed('claim_screen_share_observed', emojiOverflow, randomUUID())).toEqual({
+      ok: false, code: 'PRESENTER_PROFILE_INVALID',
+    });
+    expect(await fixtures.sql(
+      `select * from public.screen_share_leases
+       where space_id = $1
+         and presenter_user_id = $2
+         and released_at is null
+         and expires_at > pg_catalog.clock_timestamp()`,
+      [spaceId, emojiOverflow.user.appUserId],
+    )).toHaveLength(0);
   });
 
   it('returns an active name from the same locked owner snapshot after a held rename commits', async () => {
@@ -241,18 +360,25 @@ describe('presence-db screen-share lease authority', () => {
     await locker.connect();
     await locker.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
     try {
+      const lockerBackend = await locker.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      const lockerPid = lockerBackend.rows[0]?.pid;
+      if (!lockerPid) throw new Error('Could not read held-rename backend PID');
       await locker.query('begin');
       await locker.query(`update public.users set display_name = 'After rename' where id = $1`, [presenter.user.appUserId]);
 
-      const active = observed('get_active_screen_share_observed', viewer);
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      await locker.query('commit');
+      const active = await startObserved('get_active_screen_share_observed', viewer);
+      try {
+        await waitForObservedUserLock(active.backendPid, lockerPid);
+        await locker.query('commit');
 
-      expect(await active).toMatchObject({
-        ok: true,
-        code: 'ACTIVE_READ',
-        active: { presenterUserId: presenter.user.appUserId, shareId, presenterName: 'After rename' },
-      });
+        expect(await active.result).toMatchObject({
+          ok: true,
+          code: 'ACTIVE_READ',
+          active: { presenterUserId: presenter.user.appUserId, shareId, presenterName: 'After rename' },
+        });
+      } finally {
+        await active.client.end();
+      }
     } finally {
       await locker.query('rollback').catch(() => undefined);
       await locker.end();

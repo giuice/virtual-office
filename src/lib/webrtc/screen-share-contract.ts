@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 const uuidSchema = z.string().uuid();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
-export const screenSharePresenterNameSchema = z.string().trim().min(1).max(100);
+export const screenSharePresenterNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((name) => Array.from(name).length <= 100, {
+    message: 'Presenter name must contain at most 100 Unicode code points.',
+  });
 
 export const screenShareSpaceParamsSchema = z.object({
   spaceId: uuidSchema,
