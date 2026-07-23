@@ -5,6 +5,7 @@ import { SupabaseUserRepository } from '@/repositories/implementations/supabase'
 
 export interface VerifiedPresenceIdentity {
   appUserId: string;
+  authSubject: string;
   companyId: string | null;
   authSessionId: string;
   displayName: string;
@@ -110,6 +111,7 @@ async function deriveVerifiedPresenceIdentity(): Promise<VerifiedPresenceAuthRes
     ok: true,
     identity: {
       appUserId: appUser.id,
+      authSubject: claims.sub,
       companyId: appUser.companyId,
       authSessionId: parsedSessionId.data,
       displayName: appUser.displayName,

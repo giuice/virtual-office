@@ -78,6 +78,7 @@ describe('requireVerifiedPresenceAuth', () => {
       ok: true,
       identity: {
         appUserId: APP_USER_ID,
+        authSubject: AUTH_USER_ID,
         companyId: COMPANY_ID,
         authSessionId: AUTH_SESSION_ID,
         displayName: 'Canonical Presenter',

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const uuidSchema = z.string().uuid();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
-const presenterNameSchema = z.string().trim().min(1).max(100);
+export const screenSharePresenterNameSchema = z.string().trim().min(1).max(100);
 
 export const screenShareSpaceParamsSchema = z.object({
   spaceId: uuidSchema,
@@ -26,30 +26,46 @@ export const screenSharePublicShareSchema = z.object({
   companyId: uuidSchema,
   spaceId: uuidSchema,
   presenterUserId: uuidSchema,
-  presenterName: presenterNameSchema,
+  presenterName: screenSharePresenterNameSchema,
   shareId: uuidSchema,
   expiresAt: isoDateTimeSchema,
 }).strict();
 
-const screenShareErrorCodeValues = [
+const screenShareCommonRpcErrorCodeValues = [
   'INVALID_REQUEST',
   'AUTH_INVALID',
   'SESSION_INVALID',
-  'SPACE_NOT_FOUND',
-  'CROSS_COMPANY_SPACE',
-  'SPACE_UNAVAILABLE',
-  'PRESENTER_BUSY',
-  'LEASE_NOT_FOUND',
-  'LEASE_NOT_OWNER',
-  'LEASE_STALE',
   'RETRY_LOCK_SET',
 ] as const;
 
-export const screenShareErrorCodeSchema = z.enum(screenShareErrorCodeValues);
+const screenShareClaimRpcErrorCodeValues = [
+  ...screenShareCommonRpcErrorCodeValues,
+  'PRESENTER_BUSY',
+] as const;
 
-const screenShareRpcErrorSchema = z.object({
+const screenShareReleaseRpcErrorCodeValues = [
+  ...screenShareCommonRpcErrorCodeValues,
+  'LEASE_NOT_FOUND',
+  'LEASE_NOT_OWNER',
+] as const;
+
+export const screenShareClaimRpcErrorCodeSchema = z.enum(screenShareClaimRpcErrorCodeValues);
+export const screenShareReleaseRpcErrorCodeSchema = z.enum(screenShareReleaseRpcErrorCodeValues);
+export const screenShareActiveRpcErrorCodeSchema = z.enum(screenShareCommonRpcErrorCodeValues);
+
+const screenShareClaimRpcErrorSchema = z.object({
   ok: z.literal(false),
-  code: screenShareErrorCodeSchema,
+  code: screenShareClaimRpcErrorCodeSchema,
+}).strict();
+
+const screenShareReleaseRpcErrorSchema = z.object({
+  ok: z.literal(false),
+  code: screenShareReleaseRpcErrorCodeSchema,
+}).strict();
+
+const screenShareActiveRpcErrorSchema = z.object({
+  ok: z.literal(false),
+  code: screenShareActiveRpcErrorCodeSchema,
 }).strict();
 
 const screenShareClaimRpcSuccessSchema = z.object({
@@ -78,17 +94,17 @@ const screenShareActiveRpcSuccessSchema = z.object({
 
 export const screenShareClaimRpcResultSchema = z.union([
   screenShareClaimRpcSuccessSchema,
-  screenShareRpcErrorSchema,
+  screenShareClaimRpcErrorSchema,
 ]);
 
 export const screenShareReleaseRpcResultSchema = z.union([
   screenShareReleaseRpcSuccessSchema,
-  screenShareRpcErrorSchema,
+  screenShareReleaseRpcErrorSchema,
 ]);
 
 export const screenShareActiveRpcResultSchema = z.union([
   screenShareActiveRpcSuccessSchema,
-  screenShareRpcErrorSchema,
+  screenShareActiveRpcErrorSchema,
 ]);
 
 export const screenSharePublicErrorCodeSchema = z.enum([
@@ -104,6 +120,7 @@ export const screenSharePublicErrorCodeSchema = z.enum([
   'LEASE_STALE',
   'SERVICE_UNAVAILABLE',
   'MEMBERSHIP_SCOPE_INVALID',
+  'PRESENTER_PROFILE_INVALID',
   'DATABASE_CONTRACT_INCOMPATIBLE',
   'INTERNAL_ERROR',
 ]);
@@ -174,7 +191,7 @@ export const screenSharePresenterHintPayloadSchema = z.object({
   type: z.literal('presenter-hint'),
   ...signalingScopeSchema,
   presenterUserId: uuidSchema,
-  presenterName: presenterNameSchema,
+  presenterName: screenSharePresenterNameSchema,
   expiresAt: isoDateTimeSchema,
 }).strict();
 
@@ -233,7 +250,11 @@ export interface ScreenShareErrorContract {
 
 const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorContract>> = {
   INVALID_REQUEST: { code: 'INVALID_REQUEST', status: 400, error: 'Invalid screen share request.' },
-  AUTH_INVALID: { code: 'UNAUTHORIZED', status: 401, error: 'Authentication required.' },
+  AUTH_INVALID: {
+    code: 'MEMBERSHIP_SCOPE_INVALID',
+    status: 403,
+    error: 'Your company membership changed. Refresh before using screen sharing.',
+  },
   SESSION_INVALID: { code: 'SESSION_INVALID', status: 409, error: 'Your presence session is no longer active.' },
   SPACE_NOT_FOUND: { code: 'SPACE_NOT_FOUND', status: 404, error: 'Space not found.' },
   CROSS_COMPANY_SPACE: { code: 'ACCESS_DENIED', status: 403, error: 'Screen sharing is not available in this space.' },
@@ -247,6 +268,11 @@ const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorCont
     code: 'MEMBERSHIP_SCOPE_INVALID',
     status: 403,
     error: 'Your company membership changed. Refresh before using screen sharing.',
+  },
+  PRESENTER_PROFILE_INVALID: {
+    code: 'PRESENTER_PROFILE_INVALID',
+    status: 409,
+    error: 'The presenter profile is unavailable for screen sharing.',
   },
   DATABASE_CONTRACT_INCOMPATIBLE: {
     code: 'DATABASE_CONTRACT_INCOMPATIBLE',

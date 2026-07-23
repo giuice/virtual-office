@@ -5,6 +5,7 @@ import {
   screenShareClaimResponseSchema,
   screenShareClaimRpcResultSchema,
   screenShareErrorContract,
+  screenSharePresenterNameSchema,
   screenShareRpcContractError,
   screenShareSpaceParamsSchema,
   toPublicScreenShare,
@@ -15,16 +16,6 @@ export const dynamic = 'force-dynamic';
 
 interface ClaimRouteContext {
   params: Promise<{ spaceId: string }>;
-}
-
-type VerifiedPresenceAuth = Extract<
-  Awaited<ReturnType<typeof requireVerifiedPresenceAuth>>,
-  { ok: true }
->;
-
-async function verifiedAuthSubject(auth: VerifiedPresenceAuth): Promise<string | null> {
-  const { data, error } = await auth.supabase.auth.getUser();
-  return error || !data.user ? null : data.user.id;
 }
 
 function internalError(correlationId: string): NextResponse {
@@ -65,11 +56,14 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
       return NextResponse.json({ success: false, code, error }, { status });
     }
 
-    const authSubject = await verifiedAuthSubject(auth);
-    if (!authSubject) return internalError(correlationId);
+    const parsedPresenterName = screenSharePresenterNameSchema.safeParse(auth.identity.displayName);
+    if (!parsedPresenterName.success) {
+      const { code, status, error } = screenShareErrorContract('PRESENTER_PROFILE_INVALID');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
 
     const { data, error } = await auth.admin.rpc('claim_screen_share_observed', {
-      p_auth_subject: authSubject,
+      p_auth_subject: auth.identity.authSubject,
       p_auth_session_id: auth.identity.authSessionId,
       p_presence_session_id: parsedBody.data.presenceSessionId,
       p_space_id: parsedParams.data.spaceId,
@@ -107,7 +101,7 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
         companyId: auth.identity.companyId,
         spaceId: parsedParams.data.spaceId,
         presenterUserId: auth.identity.appUserId,
-        presenterName: auth.identity.displayName,
+        presenterName: parsedPresenterName.data,
         shareId: parsedResult.data.shareId,
         expiresAt: parsedResult.data.expiresAt,
       }),
