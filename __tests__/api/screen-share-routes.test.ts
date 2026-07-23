@@ -157,6 +157,34 @@ async function json(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
 }
 
+const routeOperations = [
+  {
+    name: 'claim',
+    invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
+  },
+  {
+    name: 'release',
+    invoke: () => releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
+  },
+  {
+    name: 'active',
+    invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)),
+  },
+] as const;
+
+function noCompanyAuth() {
+  return {
+    ok: true as const,
+    identity: {
+      appUserId: PRESENTER_ID,
+      companyId: null,
+      authSessionId: '88888888-8888-4888-8888-888888888888',
+    },
+    admin: { rpc: mocks.rpc, from: mocks.from },
+    supabase: { auth: { getUser: mocks.getUser } },
+  };
+}
+
 describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -369,5 +397,63 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       },
     });
     expect(mocks.from).toHaveBeenCalledWith('users');
+  });
+
+  it.each(routeOperations)('rejects a no-company verified identity for $name without invoking the RPC', async ({ invoke }) => {
+    mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce(noCompanyAuth());
+
+    const response = await invoke();
+
+    expect(response.status).toBe(403);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'MEMBERSHIP_SCOPE_INVALID',
+      error: 'Your company membership changed. Refresh before using screen sharing.',
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('returns a terminal membership error for an active read that arrives after a membership-scope switch', async () => {
+    mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce(noCompanyAuth());
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(403);
+    expect(await json(response)).toMatchObject({
+      success: false,
+      code: 'MEMBERSHIP_SCOPE_INVALID',
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PGRST202', 'missing RPC in the PostgREST schema cache'],
+    ['PGRST203', 'incompatible RPC signature in the PostgREST schema cache'],
+    ['42883', 'missing PostgreSQL function'],
+    ['42501', 'missing EXECUTE grant'],
+  ] as const)('returns the same terminal sanitized compatibility error for %s across every route', async (providerCode, _scenario) => {
+    for (const { invoke } of routeOperations) {
+      mocks.rpc.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: providerCode,
+          message: 'raw provider message must never be exposed',
+          hint: 'raw provider hint must never be exposed',
+          details: 'raw provider details must never be exposed',
+        },
+      });
+
+      const response = await invoke();
+      const body = await json(response);
+
+      expect(response.status).toBe(426);
+      expect(body).toEqual({
+        success: false,
+        code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+        error: 'Screen sharing is unavailable until server compatibility is restored.',
+      });
+      expect(JSON.stringify(body)).not.toContain('raw provider');
+      expect(JSON.stringify(body)).not.toContain(providerCode);
+    }
   });
 });
