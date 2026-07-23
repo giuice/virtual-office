@@ -5,6 +5,7 @@ import {
   screenShareActiveResponseSchema,
   screenShareActiveRpcResultSchema,
   screenShareErrorContract,
+  screenShareRpcContractError,
   screenShareSpaceParamsSchema,
   toPublicScreenShare,
 } from '@/lib/webrtc/screen-share-contract';
@@ -88,8 +89,13 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
       }, { status: auth.status });
     }
 
+    if (!auth.identity.companyId) {
+      const { code, status, error } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
+
     const authSubject = await verifiedAuthSubject(auth);
-    if (!authSubject || !auth.identity.companyId) return internalError(correlationId);
+    if (!authSubject) return internalError(correlationId);
 
     const { data, error } = await auth.admin.rpc('get_active_screen_share_observed', {
       p_auth_subject: authSubject,
@@ -97,7 +103,14 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
       p_presence_session_id: parsedQuery.data.presenceSessionId,
       p_space_id: parsedParams.data.spaceId,
     });
-    if (error) return internalError(correlationId);
+    if (error) {
+      const compatibilityError = screenShareRpcContractError(error);
+      if (compatibilityError) {
+        const { code, status, error: message } = compatibilityError;
+        return NextResponse.json({ success: false, code, error: message }, { status });
+      }
+      return internalError(correlationId);
+    }
 
     const parsedResult = screenShareActiveRpcResultSchema.safeParse(data);
     if (!parsedResult.success) return internalError(correlationId);

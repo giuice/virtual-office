@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   screenShareErrorContract,
+  screenShareRpcContractError,
   screenShareReleaseRequestSchema,
   screenShareReleaseResponseSchema,
   screenShareReleaseRpcResultSchema,
@@ -58,6 +59,11 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
       }, { status: auth.status });
     }
 
+    if (!auth.identity.companyId) {
+      const { code, status, error } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
+
     const authSubject = await verifiedAuthSubject(auth);
     if (!authSubject) return internalError(correlationId);
 
@@ -68,7 +74,14 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
       p_space_id: parsedParams.data.spaceId,
       p_share_id: parsedBody.data.shareId,
     });
-    if (error) return internalError(correlationId);
+    if (error) {
+      const compatibilityError = screenShareRpcContractError(error);
+      if (compatibilityError) {
+        const { code, status, error: message } = compatibilityError;
+        return NextResponse.json({ success: false, code, error: message }, { status });
+      }
+      return internalError(correlationId);
+    }
 
     const parsedResult = screenShareReleaseRpcResultSchema.safeParse(data);
     if (!parsedResult.success) return internalError(correlationId);

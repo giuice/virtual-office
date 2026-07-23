@@ -103,6 +103,8 @@ export const screenSharePublicErrorCodeSchema = z.enum([
   'LEASE_NOT_OWNER',
   'LEASE_STALE',
   'SERVICE_UNAVAILABLE',
+  'MEMBERSHIP_SCOPE_INVALID',
+  'DATABASE_CONTRACT_INCOMPATIBLE',
   'INTERNAL_ERROR',
 ]);
 
@@ -241,7 +243,42 @@ const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorCont
   LEASE_NOT_OWNER: { code: 'LEASE_NOT_OWNER', status: 403, error: 'You do not own this screen share lease.' },
   LEASE_STALE: { code: 'LEASE_STALE', status: 409, error: 'This screen share lease is no longer active.' },
   RETRY_LOCK_SET: { code: 'SERVICE_UNAVAILABLE', status: 503, error: 'Screen sharing is temporarily unavailable.' },
+  MEMBERSHIP_SCOPE_INVALID: {
+    code: 'MEMBERSHIP_SCOPE_INVALID',
+    status: 403,
+    error: 'Your company membership changed. Refresh before using screen sharing.',
+  },
+  DATABASE_CONTRACT_INCOMPATIBLE: {
+    code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+    status: 426,
+    error: 'Screen sharing is unavailable until server compatibility is restored.',
+  },
 };
+
+const screenShareRpcContractErrorCodes = new Set([
+  'PGRST202',
+  'PGRST203',
+  '42883',
+  '42501',
+]);
+
+function errorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return null;
+  }
+
+  const { code } = error;
+  return typeof code === 'string' ? code : null;
+}
+
+export function screenShareRpcContractError(error: unknown): ScreenShareErrorContract | null {
+  const code = errorCode(error);
+  if (!code || !screenShareRpcContractErrorCodes.has(code)) {
+    return null;
+  }
+
+  return SCREEN_SHARE_ERROR_CONTRACTS.DATABASE_CONTRACT_INCOMPATIBLE;
+}
 
 export function screenShareErrorContract(code: string): ScreenShareErrorContract {
   return SCREEN_SHARE_ERROR_CONTRACTS[code] ?? {
