@@ -267,13 +267,14 @@ begin
       'spaceAccessRevision', v_space_access_revision
     ),
     'lease', case when v_lease_found then pg_catalog.jsonb_build_object(
+      'found', true,
       'presenterUserId', v_lease_owner_id, 'presenceSessionId', v_lease_presence_session_id,
       'authSessionId', v_lease_auth_session_id, 'shareId', v_lease_share_id,
       'locationVersion', v_lease_location_version, 'userAccessRevision', v_lease_user_access_revision,
       'spaceAccessRevision', v_lease_space_access_revision, 'expiresAt', v_lease_expires_at,
       'releasedAt', v_lease_released_at,
       'active', coalesce(v_lease_valid, false) and v_lease_released_at is null and v_lease_expires_at > v_now
-    ) else null end
+    ) else pg_catalog.jsonb_build_object('found', false) end
   );
 end;
 $$;
@@ -330,7 +331,7 @@ begin
   v_context := private.screen_share_context_observed(p_auth_subject, p_auth_session_id, p_presence_session_id, p_space_id);
   if not coalesce((v_context ->> 'ok')::boolean, false) then return v_context; end if;
   v_lease := v_context -> 'lease';
-  if v_lease is null then return pg_catalog.jsonb_build_object('ok', false, 'code', 'LEASE_NOT_FOUND'); end if;
+  if not coalesce((v_lease ->> 'found')::boolean, false) then return pg_catalog.jsonb_build_object('ok', false, 'code', 'LEASE_NOT_FOUND'); end if;
   v_exact_owner := (v_lease ->> 'presenterUserId')::uuid is not distinct from (v_context -> 'viewer' ->> 'id')::uuid
     and (v_lease ->> 'presenceSessionId')::uuid is not distinct from p_presence_session_id
     and (v_lease ->> 'authSessionId')::uuid is not distinct from p_auth_session_id
