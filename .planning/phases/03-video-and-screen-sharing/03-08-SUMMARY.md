@@ -8,142 +8,95 @@ requires:
   - phase: 02-presence-remediation
     provides: fenced Presence sessions, application-user identity mapping, and private Realtime policy patterns
 provides:
-  - Authoritative per-space screen-share lease table and observed RPC contract
-  - Exact private Realtime media policy catalog gate for broadcast and presence
-  - Local-only migration readback evidence for RLS, grants, functions, indexes, and policies
-affects: [video-and-screen-sharing, presence, realtime, database-rollout]
-
+  - Authoritative per-space screen-share lease contract with stored Presence revision fences
+  - Private Realtime media policy catalog and mapped-Auth-UID RLS regression proof
+  - Local-only migration replay/readback evidence
 tech-stack:
   added: []
   patterns:
-    - Security-definer presenter lease operations with fixed search paths and explicit grants
-    - Exact catalog equality plus policy-expression assertions for private Realtime authorization
-
+    - Deterministic user/company/space/session/lease lock order with bounded structural retry
+    - Scalar privilege-aligned database reads and exact-owner release idempotency
 key-files:
   created:
-    - supabase/migrations/20260723104902_screen_share_lease_and_media_realtime.sql
+    - __tests__/presence-db/screen-share-lease.test.ts
+    - .planning/phases/03-video-and-screen-sharing/03-TRACKER.md
   modified:
-    - __tests__/presence-db/phase6-realtime.test.ts
-
+    - supabase/migrations/20260723104902_screen_share_lease_and_media_realtime.sql
+    - .planning/phases/03-video-and-screen-sharing/03-08-SUMMARY.md
 key-decisions:
-  - "Keep one exact global Realtime policy catalog list: the four legacy policies plus the four required media policies."
-  - "Validate media policies by exact authenticated role, expected extension, and the private is_media_topic_authorized(realtime.topic()) path."
-
-patterns-established:
-  - "Private media topic policies must authorize through private.is_media_topic_authorized using the current Realtime topic."
-
+  - Keep lease ownership fenced to claim-time placement and access revisions.
+  - Treat an owner that cannot be revalidated under locks as released only in screen_share_leases.
+  - Allow release idempotency only for the exact stored owner/session/share tuple.
 requirements-completed: [VID-01, VID-04]
-coverage:
-  - id: D1
-    description: "Local screen-share lease and private media Realtime authorization contract"
-    requirement: VID-04
-    verification:
-      - kind: integration
-        ref: "npx supabase db push --local && npx supabase migration list --local && npm run test:presence:db -- __tests__/presence-db/phase6-realtime.test.ts"
-        status: pass
-    human_judgment: false
-  - id: D2
-    description: "Exact legacy-plus-media Realtime policy catalog assertion"
-    requirement: VID-01
-    verification:
-      - kind: integration
-        ref: "__tests__/presence-db/phase6-realtime.test.ts#installs only the exact private-channel policies expected by the remediation"
-        status: pass
-    human_judgment: false
-
-duration: 20min
-completed: 2026-07-23
+metrics:
+  remediation_commit: 4c640f9
+  focused_db_tests: 4
+  realtime_catalog_tests: 3
 status: complete
 ---
 
 # Phase 03 Plan 08: Screen-share authority contract Summary
 
-**Local Postgres presenter lease authority with exact authenticated private media Realtime policies for broadcast and presence.**
+**Local Postgres presenter lease authority now rejects stale ownership and proves private media RLS against mapped Auth identities.**
 
-## Performance
+## Remediation Accomplishments
 
-- **Duration:** 20 min
-- **Started:** 2026-07-23T12:56:00Z
-- **Completed:** 2026-07-23T13:16:01Z
-- **Tasks:** 1/1
-- **Files modified:** 2
-
-## Accomplishments
-
-- Added the local-first screen-share lease migration with FORCE RLS, narrow grants, fixed search paths, four observed RPCs, and private media-topic authorization.
-- Strengthened the global Realtime catalog assertion to require exactly the legacy policies and four media policies.
-- Added strict media-policy checks for the authenticated role, exact broadcast/presence extension, and `private.is_media_topic_authorized((select realtime.topic()))` authorization path.
-- Proved the migration and catalog gate on disposable local Supabase/Postgres only.
+- Replaced full-row reads with only granted columns and independent lookup flags, preventing `FOUND` from being overwritten by later lookups.
+- Added claim-time location/user-access/space-access fences and revalidates the stored owner, auth session, Presence session, placement, and access under deterministic locks before active/busy/renew decisions.
+- Invalid owner state atomically releases only its screen-share lease; it never changes movement, access, or Presence authority.
+- Made foreign release return `LEASE_NOT_OWNER`; only the exact stored owner/session/share tuple receives repeated-release success.
+- Added real local Postgres coverage for initial claim, empty active read, repeated owner release, foreign release denial, stale session/movement/revision invalidation, and mapped Auth UID media-topic RLS allow/deny.
 
 ## Task Commits
 
-1. **Task 1: Generate, apply locally, and read back the screen-share authority contract** - `e23a03e` (feat)
+1. `e23a03e` — initial screen-share authority contract.
+2. `4c640f9` — remediation migration and real-Postgres regressions.
 
 ## Files Created/Modified
 
-- `supabase/migrations/20260723104902_screen_share_lease_and_media_realtime.sql` - Authoritative presenter lease, media-topic helper, private Realtime policies, and catalog assertions.
-- `__tests__/presence-db/phase6-realtime.test.ts` - Exact eight-policy catalog assertion with strict Phase 8 media authorization checks.
-
-## Decisions Made
-
-- Preserved strict equality for the complete Realtime policy catalog rather than allowing loose containment.
-- Used the local catalog readback to derive an expression check that tolerates PostgreSQL whitespace formatting while requiring the exact private helper and `realtime.topic()` path.
-
-## Deviations from Plan
-
-### User-authorized scope extension
-
-- **Found during:** Task 1
-- **Change:** Extended `__tests__/presence-db/phase6-realtime.test.ts` beyond the plan's listed migration file.
-- **Reason:** The legacy exact-catalog gate otherwise rejected the four required media policies, masking a correct migration as a test failure.
-- **Implementation:** Required the exact sorted union of four legacy and four Phase 8 policies, while retaining all Phase 6 assertions and adding strict Phase 8 role, extension, helper, and topic-path checks.
-- **Verification:** The required local migration/list/test sequence passed.
-- **Committed in:** `e23a03e`
-
-### Auto-fixed Issues
-
-**1. [Rule 1 - Formatting] Normalized the changed TypeScript test with the repository formatter**
-- **Found during:** Task 1
-- **Issue:** Focused Prettier validation reported code-style differences after the assertion extension.
-- **Fix:** Ran Prettier on the changed test; no Phase 6 behavior or assertions were removed or weakened.
-- **Files modified:** `__tests__/presence-db/phase6-realtime.test.ts`
-- **Verification:** Focused Prettier check, ESLint, type-check, and database test passed.
-- **Committed in:** `e23a03e`
-
----
-
-**Total deviations:** 1 user-authorized scope extension and 1 auto-fixed formatting issue.
-**Impact on plan:** The strengthened gate is necessary to prove the exact intended policy surface; no production behavior, online database, or deployment scope was added.
+- `supabase/migrations/20260723104902_screen_share_lease_and_media_realtime.sql` — narrowed privilege-aligned reads, lock/revalidation helper, revision fences, exact release behavior, and catalog assertions.
+- `__tests__/presence-db/screen-share-lease.test.ts` — disposable real-Postgres lease and RLS regression coverage.
+- `__tests__/presence-db/phase6-realtime.test.ts` — retained exact eight-policy catalog assertion from the original plan implementation.
+- `.planning/phases/03-video-and-screen-sharing/03-TRACKER.md` — remediation state, evidence, and unresolved suite note.
 
 ## Database and Deployment State
 
-- **Written locally:** Migration and strengthened catalog test are committed locally.
-- **Applied/read back locally:** `20260723104902` is listed exactly once in the disposable local migration history; the required local DB test passed.
-- **Applied online:** No online database was changed.
-- **Application deployed:** No deployment occurred.
+- **Written locally:** remediation migration and regression test are committed in this worktree.
+- **Applied/read back locally:** authorized `npx supabase db reset --local --no-seed` replayed migration `20260723104902`; `db push --local` reported current and `migration list --local` listed it once.
+- **Applied online:** no online database was changed.
+- **Application deployed:** no deployment occurred.
 
 ## Verification
 
-Passed locally:
+Passed on disposable local Supabase/Postgres:
 
-- `npx supabase db push --local`
-- `npx supabase migration list --local`
-- `npm run test:presence:db -- __tests__/presence-db/phase6-realtime.test.ts` (3 tests passed)
-- `npx prettier --check __tests__/presence-db/phase6-realtime.test.ts`
-- `npx eslint __tests__/presence-db/phase6-realtime.test.ts`
+- `npx supabase db reset --local --no-seed`
+- `npx supabase db push --local && npx supabase migration list --local && npm run test:presence:db -- __tests__/presence-db/phase6-realtime.test.ts` — 3 tests passed.
+- `npm run test:presence:db -- __tests__/presence-db/screen-share-lease.test.ts` — 4 tests passed, zero skips.
+- `npm run presence:gate`
+- `npx eslint __tests__/presence-db/screen-share-lease.test.ts`
 - `npm run type-check`
 - `git diff --check`
+
+## Deviations from Plan
+
+### Auto-fixed Issues
+
+1. **[Rule 1 - Security/correctness] Hardened the already-created local migration after mandatory Presence and Supabase/RLS review.**
+   - Replaced wildcard record expansion, stale `FOUND` checks, and permissive foreign release behavior.
+   - Added revision fences and atomic invalid-owner release under the established lock order.
+   - Commit: `4c640f9`.
 
 ## Known Stubs
 
 None.
 
-## Next Phase Readiness
+## Deferred Issues
 
-The local database contract and exact policy catalog gate are ready for application wiring. Online migration and deployment remain deliberately unperformed and require a separately named target authorization.
+- `npm run test:presence:db` has one reproducible failure outside this migration and its new test: `__tests__/presence-db/presence-concurrency-contract.test.ts` expects the first current-hour observation to remain unhealthy but reads healthy. The full run completed with 118 passing tests and 1 failure; its focused rerun also failed. This remediation did not modify that contract, so it requires a separately scoped investigation.
 
 ## Self-Check: PASSED
 
-- Found migration: `supabase/migrations/20260723104902_screen_share_lease_and_media_realtime.sql`
-- Found strengthened catalog test: `__tests__/presence-db/phase6-realtime.test.ts`
-- Found task commit: `e23a03e`
+- Found remediation migration and focused regression test.
+- Found remediation commit `4c640f9`.
+- Confirmed no tracked files were deleted by the remediation commit.
