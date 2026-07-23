@@ -102,6 +102,7 @@ None.
 
 ## Deferred Issues
 
+- Local `supabase db advisors --local --type security --fail-on error` completed with no errors but reported five existing mutable-search-path warnings in functions outside this scoped correction (`increment_unread_counts`, `is_platform_admin`, `set_participants_fingerprint`, `update_neighborhoods_updated_at`, and `update_space_agendas_updated_at`).
 - `npm run test:presence:db` has one reproducible failure outside this migration and its new test: `__tests__/presence-db/presence-concurrency-contract.test.ts` expects the first current-hour observation to remain unhealthy but reads healthy. The full run completed with 118 passing tests and 1 failure; its focused rerun also failed. This remediation did not modify that contract, so it requires a separately scoped investigation.
 
 ## Self-Check: PASSED
