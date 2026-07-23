@@ -94,6 +94,7 @@ export const screenShareActiveRpcResultSchema = z.union([
 export const screenSharePublicErrorCodeSchema = z.enum([
   'INVALID_REQUEST',
   'UNAUTHORIZED',
+  'ACCESS_DENIED',
   'SESSION_INVALID',
   'SPACE_NOT_FOUND',
   'SPACE_UNAVAILABLE',
@@ -219,5 +220,33 @@ export function toPublicScreenShare(share: ScreenSharePublicShare): ScreenShareP
     presenterName: share.presenterName,
     shareId: share.shareId,
     expiresAt: share.expiresAt,
+  };
+}
+
+export interface ScreenShareErrorContract {
+  code: z.infer<typeof screenSharePublicErrorCodeSchema>;
+  status: number;
+  error: string;
+}
+
+const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorContract>> = {
+  INVALID_REQUEST: { code: 'INVALID_REQUEST', status: 400, error: 'Invalid screen share request.' },
+  AUTH_INVALID: { code: 'UNAUTHORIZED', status: 401, error: 'Authentication required.' },
+  SESSION_INVALID: { code: 'SESSION_INVALID', status: 409, error: 'Your presence session is no longer active.' },
+  SPACE_NOT_FOUND: { code: 'SPACE_NOT_FOUND', status: 404, error: 'Space not found.' },
+  CROSS_COMPANY_SPACE: { code: 'ACCESS_DENIED', status: 403, error: 'Screen sharing is not available in this space.' },
+  SPACE_UNAVAILABLE: { code: 'SPACE_UNAVAILABLE', status: 409, error: 'Screen sharing is not available in this space.' },
+  PRESENTER_BUSY: { code: 'PRESENTER_BUSY', status: 409, error: 'Another participant is already sharing this space.' },
+  LEASE_NOT_FOUND: { code: 'LEASE_NOT_FOUND', status: 404, error: 'The screen share lease was not found.' },
+  LEASE_NOT_OWNER: { code: 'LEASE_NOT_OWNER', status: 403, error: 'You do not own this screen share lease.' },
+  LEASE_STALE: { code: 'LEASE_STALE', status: 409, error: 'This screen share lease is no longer active.' },
+  RETRY_LOCK_SET: { code: 'SERVICE_UNAVAILABLE', status: 503, error: 'Screen sharing is temporarily unavailable.' },
+};
+
+export function screenShareErrorContract(code: string): ScreenShareErrorContract {
+  return SCREEN_SHARE_ERROR_CONTRACTS[code] ?? {
+    code: 'INTERNAL_ERROR',
+    status: 500,
+    error: 'Screen share operation failed.',
   };
 }

@@ -305,4 +305,69 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(JSON.stringify(await json(malformedResponse))).not.toContain('server-secret');
     expect(JSON.stringify(await json(failedResponse))).not.toContain('private SQL failure');
   });
+
+  it('requires independently verified auth for release and active reads', async () => {
+    mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      code: 'UNAUTHORIZED',
+      error: 'Authentication required',
+    });
+    const releaseResponse = await releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      code: 'UNAUTHORIZED',
+      error: 'Authentication required',
+    });
+    const activeResponse = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+
+    expect(releaseResponse.status).toBe(401);
+    expect(activeResponse.status).toBe(401);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed active query data without invoking the RPC', async () => {
+    const response = await getActiveScreenShare(
+      new Request(`http://test.local/api/spaces/${SPACE_ID}/screen-share/active?presenceSessionId=${PRESENCE_SESSION_ID}&companyId=${COMPANY_ID}`),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('returns an active share only as canonical public data', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        code: 'ACTIVE_READ',
+        active: {
+          spaceId: SPACE_ID,
+          presenterUserId: TARGET_ID,
+          shareId: SHARE_ID,
+          expiresAt: EXPIRES_AT,
+        },
+      },
+      error: null,
+    });
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toEqual({
+      success: true,
+      code: 'ACTIVE_READ',
+      active: {
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        presenterUserId: TARGET_ID,
+        presenterName: 'Presenter',
+        shareId: SHARE_ID,
+        expiresAt: EXPIRES_AT,
+      },
+    });
+    expect(mocks.from).toHaveBeenCalledWith('users');
+  });
 });
