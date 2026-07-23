@@ -4,8 +4,8 @@
   "commit_docs": true,
   "model_profile": "balanced",
   "model_overrides": {
-  "gsd-doc-writer": "sonnet",
-  "gsd-doc-verifier": "sonnet"
+    "gsd-doc-writer": "sonnet",
+    "gsd-doc-verifier": "sonnet"
   },
   "response_language": "Brazilian Portuguese",
   "workflow": {

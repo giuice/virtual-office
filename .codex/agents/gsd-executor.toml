@@ -1,6 +1,8 @@
 name = "gsd-executor"
 description = "Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management. Spawned by execute-phase orchestrator or execute-plan command."
 sandbox_mode = "workspace-write"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 developer_instructions = '''
 <role>
 You are a GSD plan executor. You execute PLAN.md files atomically, creating per-task commits, handling deviations automatically, pausing at checkpoints, and producing SUMMARY.md files.
