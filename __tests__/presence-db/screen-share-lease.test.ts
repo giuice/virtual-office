@@ -108,6 +108,12 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
+  it('returns the documented empty-release result for a valid occupant with no lease', async () => {
+    expect(await observed('release_screen_share_observed', owner, randomUUID())).toEqual({
+      ok: false, code: 'LEASE_NOT_FOUND',
+    });
+  });
+
   it('claims an initially empty lease and reads no active presenter before the claim', async () => {
     expect(await observed('get_active_screen_share_observed', owner)).toMatchObject({
       ok: true, code: 'ACTIVE_READ', active: null,
@@ -126,13 +132,13 @@ describe('presence-db screen-share lease authority', () => {
   it('permits only the exact owner release and preserves repeated-release idempotency', async () => {
     const active = await observed('get_active_screen_share_observed', owner);
     const shareId = (active.active as { shareId: string }).shareId;
-    expect(await observed('release_screen_share_observed', viewer, shareId)).toMatchObject({
+    expect(await observed('release_screen_share_observed', viewer, shareId)).toEqual({
       ok: false, code: 'LEASE_NOT_OWNER',
     });
-    expect(await observed('release_screen_share_observed', owner, shareId)).toMatchObject({
+    expect(await observed('release_screen_share_observed', owner, shareId)).toEqual({
       ok: true, code: 'RELEASED', alreadyReleased: false,
     });
-    expect(await observed('release_screen_share_observed', owner, shareId)).toMatchObject({
+    expect(await observed('release_screen_share_observed', owner, shareId)).toEqual({
       ok: true, code: 'RELEASED', alreadyReleased: true,
     });
   });
