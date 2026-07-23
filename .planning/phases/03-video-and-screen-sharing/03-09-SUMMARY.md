@@ -17,8 +17,9 @@ tech-stack:
   added: [zod@4.4.3]
   patterns:
     - validate path, body, query, RPC result, and signaling payloads at each untrusted boundary
-    - derive Auth subject, application user, canonical display name, company, and session fencing from verified server state
-    - validate the presenter profile before claim and final-reauthorize active enrichment before emitting presenter data
+    - derive Auth subject, application user, company, and session fencing from verified server state
+    - make the locked observed RPC the sole presenter-name authority for claim and active responses
+    - retry only one exact strict RETRY_LOCK_SET result in a fresh PostgREST transaction
 key-files:
   created:
     - src/lib/webrtc/screen-share-contract.ts
@@ -32,10 +33,10 @@ key-files:
     - package.json
     - package-lock.json
 key-decisions:
-  - Preserve the 03-08 RPC as lease authority; routes do not accept client-selected presenter or company fields.
-  - Use the original verified Auth subject from the getUser-plus-claims boundary for observed RPCs; validate the claimant profile before mutation and final-reauthorize active enrichment.
-  - Validate the verified display name before claim, then expose its canonical parsed value only after `CLAIMED`; active enrichment is final-reauthorized.
-  - Treat companyless verified identities and every strict RPC result incompatibility as terminal typed public errors before callers can retry generic failures.
+  - Preserve observed RPCs as the lease and locked presenter-name authority; routes do not accept client-selected presenter or company fields.
+  - Use the original verified Auth subject from the getUser-plus-claims boundary for observed RPCs; static companyId:null is pre-RPC MEMBERSHIP_SCOPE_INVALID (403), while a later locked membership/session change may return SESSION_INVALID (409).
+  - Decode canonical presenterName only from claim/active RPC success and make malformed, missing, invalid, or extra fields terminal compatibility errors.
+  - Retry exactly one fully strict RETRY_LOCK_SET structural result; provider errors and malformed payloads are never retried.
 patterns-established:
   - Screen-share route results expose only canonical public fields and stable public error codes.
 requirements-completed: [VID-01, VID-04]
@@ -80,16 +81,16 @@ status: complete
 - Added independently authenticated claim, release, and active routes that pass the verified Auth subject, application-session fence, and validated Presence session IDs to the local 03-08 observed RPC contract.
 - Added focused mocked HTTP-boundary and verified-session coverage for parsing, identity derivation, display-name snapshot propagation, busy/stale outcomes, null/active reconciliation, RPC shape incompatibility, and error sanitization. These tests do not claim RLS, concurrency, Realtime delivery, or P2P media proof.
 
-## Safety Remediation
+## Contract Correction (2026-07-23)
 
-- Claim, release, and active now reject a verified no-company identity with terminal `MEMBERSHIP_SCOPE_INVALID` (403) before user lookups or RPC calls, including a stale membership-switch response.
-- A reusable strict RPC classifier maps missing-function, signature/schema-cache, and insufficient-EXECUTE codes (`PGRST202`, `PGRST203`, `42883`, `42501`) to terminal `DATABASE_CONTRACT_INCOMPATIBLE` (426) responses across all routes.
-- Strict decode failures, unknown result codes, and claim/active invariant mismatches now use that same terminal sanitized 426 response; unknown provider/transport failures remain generic sanitized `INTERNAL_ERROR` (500).
-- Claim validates and canonicalizes the verified display name before the mutating RPC, returning `PRESENTER_PROFILE_INVALID` (409) without raw profile data or an RPC call when invalid.
-- Active enrichment looks up the presenter only after its first authorized active read, then performs one final authorized active read before emitting data. Final denials/nulls win; changed ownership/share fails closed with sanitized `SERVICE_UNAVAILABLE` (503); only the final lease expiry is emitted.
-- Each observed RPC now decodes only its migration-defined result domain. Impossible cross-operation codes are terminal `DATABASE_CONTRACT_INCOMPATIBLE` (426), while observed `AUTH_INVALID` after verified profile resolution is `MEMBERSHIP_SCOPE_INVALID` (403).
-- The compatibility response has one sanitized public message; focused table-driven tests prove raw provider messages, hints, details, values, and codes are absent. Unknown provider failures remain sanitized `INTERNAL_ERROR`.
-- Final application-boundary remediation commit: `69695e1` — `fix(03-09): harden screen-share authorization boundaries`.
+- The prior application-only correction was insufficient: validated identity `displayName` was an unlocked pre-RPC snapshot, and active used a service-role `users` lookup plus a second active RPC. The new local migration makes the locked observed RPC the sole authority for canonical presenter names.
+- Claim locks and canonicalizes the current presenter name before any lease mutation; invalid names return only sanitized `PRESENTER_PROFILE_INVALID` (409), without a raw name or lease insert/update. Active returns the locked owner's canonical name in its one RPC result; routes never query `users` for presenter enrichment.
+- The name invariant matches `String.prototype.trim()` whitespace (including the explicit Unicode code points) and validates 1–100 Unicode code points after canonicalization. The database rejects invalid values rather than truncating them.
+- Claim, release, and active retry at most once only when the fully strict result is exactly `{ok:false,code:'RETRY_LOCK_SET'}`. A second structural result maps to sanitized `SERVICE_UNAVAILABLE` (503); malformed payloads and provider errors do not retry.
+- A static verified `companyId:null` remains pre-RPC `MEMBERSHIP_SCOPE_INVALID` (403) with zero RPC. If company/session membership changes after that verified snapshot, locked SQL may correctly produce terminal `SESSION_INVALID` (409); this correction does not claim that every membership race is pre-RPC or 403.
+- Strict decode failures, unknown result codes, and claim/active invariant mismatches use terminal sanitized `DATABASE_CONTRACT_INCOMPATIBLE` (426). Missing-function, signature/schema-cache, and insufficient-EXECUTE provider errors use the same sanitized contract; unknown provider failures remain generic sanitized `INTERNAL_ERROR` (500).
+- Local Postgres migration/catalog and concurrency regressions prove the SQL contract; mocked route tests prove only HTTP boundary behavior. Online database state and deployment remain unchanged.
+
 
 ## Task Commits
 
