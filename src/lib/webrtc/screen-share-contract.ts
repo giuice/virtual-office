@@ -36,6 +36,7 @@ const screenShareCommonRpcErrorCodeValues = [
   'AUTH_INVALID',
   'SESSION_INVALID',
   'RETRY_LOCK_SET',
+  'PRESENTER_PROFILE_INVALID',
 ] as const;
 
 const screenShareClaimRpcErrorCodeValues = [
@@ -44,7 +45,10 @@ const screenShareClaimRpcErrorCodeValues = [
 ] as const;
 
 const screenShareReleaseRpcErrorCodeValues = [
-  ...screenShareCommonRpcErrorCodeValues,
+  'INVALID_REQUEST',
+  'AUTH_INVALID',
+  'SESSION_INVALID',
+  'RETRY_LOCK_SET',
   'LEASE_NOT_FOUND',
   'LEASE_NOT_OWNER',
 ] as const;
@@ -73,6 +77,7 @@ const screenShareClaimRpcSuccessSchema = z.object({
   code: z.literal('CLAIMED'),
   shareId: uuidSchema,
   expiresAt: isoDateTimeSchema,
+  presenterName: screenSharePresenterNameSchema,
 }).strict();
 
 const screenShareReleaseRpcSuccessSchema = z.object({
@@ -87,6 +92,7 @@ const screenShareActiveRpcSuccessSchema = z.object({
   active: z.object({
     spaceId: uuidSchema,
     presenterUserId: uuidSchema,
+    presenterName: screenSharePresenterNameSchema,
     shareId: uuidSchema,
     expiresAt: isoDateTimeSchema,
   }).strict().nullable(),
