@@ -138,6 +138,7 @@ function primeAuth(): void {
       appUserId: PRESENTER_ID,
       companyId: COMPANY_ID,
       authSessionId: '88888888-8888-4888-8888-888888888888',
+      displayName: 'Presenter',
     },
     admin: {
       rpc: mocks.rpc,
@@ -179,6 +180,7 @@ function noCompanyAuth() {
       appUserId: PRESENTER_ID,
       companyId: null,
       authSessionId: '88888888-8888-4888-8888-888888888888',
+      displayName: 'Presenter',
     },
     admin: { rpc: mocks.rpc, from: mocks.from },
     supabase: { auth: { getUser: mocks.getUser } },
@@ -318,20 +320,62 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     });
   });
 
-  it('sanitizes malformed RPC results and transport failures', async () => {
+  it('uses the verified display-name snapshot only after the claim RPC succeeds', async () => {
+    mocks.rpc.mockImplementationOnce(async () => {
+      expect(mocks.from).not.toHaveBeenCalled();
+      return {
+        data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT },
+        error: null,
+      };
+    });
+
+    const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(mocks.from).not.toHaveBeenCalled();
+    expect((await json(response)).share).toMatchObject({ presenterName: 'Presenter' });
+  });
+
+  it.each(routeOperations)('maps malformed RPC results to the terminal compatibility contract for $name', async ({ invoke }) => {
     mocks.rpc.mockResolvedValueOnce({
       data: { ok: false, code: 'PRESENTER_BUSY', authSessionId: 'server-secret' },
       error: null,
     });
-    const malformedResponse = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
 
+    const response = await invoke();
+    const body = await json(response);
+
+    expect(response.status).toBe(426);
+    expect(body).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+    });
+    expect(JSON.stringify(body)).not.toContain('server-secret');
+  });
+
+  it.each(routeOperations)('maps unknown RPC result codes to the terminal compatibility contract for $name', async ({ invoke }) => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'UNKNOWN_RESULT' }, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+    });
+  });
+
+  it.each(routeOperations)('keeps unknown provider failures as sanitized internal errors for $name', async ({ invoke }) => {
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: 'private SQL failure' } });
-    const failedResponse = await releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
 
-    expect(malformedResponse.status).toBe(500);
-    expect(failedResponse.status).toBe(500);
-    expect(JSON.stringify(await json(malformedResponse))).not.toContain('server-secret');
-    expect(JSON.stringify(await json(failedResponse))).not.toContain('private SQL failure');
+    const response = await invoke();
+    const body = await json(response);
+
+    expect(response.status).toBe(500);
+    expect(body.code).toBe('INTERNAL_ERROR');
+    expect(JSON.stringify(body)).not.toContain('private SQL failure');
   });
 
   it('requires independently verified auth for release and active reads', async () => {
@@ -455,5 +499,43 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       expect(JSON.stringify(body)).not.toContain('raw provider');
       expect(JSON.stringify(body)).not.toContain(providerCode);
     }
+  });
+
+  it.each([
+    {
+      name: 'claim result with a mismatched share ID',
+      invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
+      data: { ok: true, code: 'CLAIMED', shareId: TARGET_ID, expiresAt: EXPIRES_AT },
+    },
+    {
+      name: 'release result with an unknown success code',
+      invoke: () => releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
+      data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT },
+    },
+    {
+      name: 'active result for a mismatched space',
+      invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)),
+      data: {
+        ok: true,
+        code: 'ACTIVE_READ',
+        active: {
+          spaceId: TARGET_ID,
+          presenterUserId: PRESENTER_ID,
+          shareId: SHARE_ID,
+          expiresAt: EXPIRES_AT,
+        },
+      },
+    },
+  ])('maps $name to the terminal sanitized compatibility contract', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+    });
   });
 });

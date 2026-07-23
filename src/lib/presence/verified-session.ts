@@ -7,6 +7,7 @@ export interface VerifiedPresenceIdentity {
   appUserId: string;
   companyId: string | null;
   authSessionId: string;
+  displayName: string;
 }
 
 export type VerifiedPresenceAuthResult =
@@ -111,6 +112,7 @@ async function deriveVerifiedPresenceIdentity(): Promise<VerifiedPresenceAuthRes
       appUserId: appUser.id,
       companyId: appUser.companyId,
       authSessionId: parsedSessionId.data,
+      displayName: appUser.displayName,
     },
     admin,
     supabase,

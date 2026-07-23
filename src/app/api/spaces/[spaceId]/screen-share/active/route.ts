@@ -113,7 +113,10 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
     }
 
     const parsedResult = screenShareActiveRpcResultSchema.safeParse(data);
-    if (!parsedResult.success) return internalError(correlationId);
+    if (!parsedResult.success) {
+      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
 
     if (!parsedResult.data.ok) {
       const { code, status, error: message } = screenShareErrorContract(parsedResult.data.code);
@@ -129,7 +132,8 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
     }
 
     if (parsedResult.data.active.spaceId !== parsedParams.data.spaceId) {
-      return internalError(correlationId);
+      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error }, { status });
     }
 
     const name = await presenterName(auth, parsedResult.data.active.presenterUserId);

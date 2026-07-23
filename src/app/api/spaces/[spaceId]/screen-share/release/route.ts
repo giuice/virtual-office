@@ -84,7 +84,10 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
     }
 
     const parsedResult = screenShareReleaseRpcResultSchema.safeParse(data);
-    if (!parsedResult.success) return internalError(correlationId);
+    if (!parsedResult.success) {
+      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error }, { status });
+    }
 
     if (!parsedResult.data.ok) {
       const { code, status, error: message } = screenShareErrorContract(parsedResult.data.code);
