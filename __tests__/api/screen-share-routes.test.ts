@@ -16,6 +16,31 @@ const PRESENCE_SESSION_ID = '55555555-5555-4555-8555-555555555555';
 const SHARE_ID = '66666666-6666-4666-8666-666666666666';
 const EXPIRES_AT = '2026-07-23T12:00:00.000Z';
 
+function claimRpc(presenterName = 'Locked presenter') {
+  return {
+    ok: true,
+    code: 'CLAIMED',
+    shareId: SHARE_ID,
+    expiresAt: EXPIRES_AT,
+    presenterName,
+  };
+}
+
+function activeRpc(presenterName = 'Locked presenter', overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    code: 'ACTIVE_READ',
+    active: {
+      spaceId: SPACE_ID,
+      presenterUserId: TARGET_ID,
+      shareId: SHARE_ID,
+      expiresAt: EXPIRES_AT,
+      presenterName,
+      ...overrides,
+    },
+  };
+}
+
 describe('screen-share contract boundaries', () => {
   it('accepts only client-fence IDs for claims', () => {
     expect(screenShareClaimRequestSchema.safeParse({
@@ -137,17 +162,13 @@ function primeAuth(): void {
       authSubject: AUTH_USER_ID,
       companyId: COMPANY_ID,
       authSessionId: '88888888-8888-4888-8888-888888888888',
-      displayName: 'Presenter',
+      displayName: 'Stale identity snapshot',
     },
     admin: {
       rpc: mocks.rpc,
       from: mocks.from,
     },
   });
-  mocks.from.mockReturnValue({ select: mocks.select });
-  mocks.select.mockReturnValue({ eq: mocks.eq });
-  mocks.eq.mockReturnValue({ eq: mocks.eq, maybeSingle: mocks.maybeSingle });
-  mocks.maybeSingle.mockResolvedValue({ data: { display_name: 'Presenter' }, error: null });
 }
 
 async function json(response: Response): Promise<Record<string, unknown>> {
@@ -224,11 +245,8 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it('derives claim identity from verified server state and filters authority fields', async () => {
-    mocks.rpc.mockResolvedValueOnce({
-      data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-      error: null,
-    });
+  it('derives claim authority from verified server state but takes presenter name only from locked SQL', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: claimRpc(' Locked presenter '), error: null });
 
     const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
     const body = await json(response);
@@ -248,12 +266,14 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
         companyId: COMPANY_ID,
         spaceId: SPACE_ID,
         presenterUserId: PRESENTER_ID,
-        presenterName: 'Presenter',
+        presenterName: 'Locked presenter',
         shareId: SHARE_ID,
         expiresAt: EXPIRES_AT,
       },
     });
     expect(JSON.stringify(body)).not.toContain('88888888');
+    expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
+    expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it('maps presenter contention to the stable public 409 contract', async () => {
@@ -315,20 +335,17 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     });
   });
 
-  it('uses the verified display-name snapshot only after the claim RPC succeeds', async () => {
+  it('uses only the locked claim RPC presenter name after success', async () => {
     mocks.rpc.mockImplementationOnce(async () => {
       expect(mocks.from).not.toHaveBeenCalled();
-      return {
-        data: { ok: true, code: 'CLAIMED', shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-        error: null,
-      };
+      return { data: claimRpc('Post-lock canonical name'), error: null };
     });
 
     const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
 
     expect(response.status).toBe(200);
     expect(mocks.from).not.toHaveBeenCalled();
-    expect((await json(response)).share).toMatchObject({ presenterName: 'Presenter' });
+    expect((await json(response)).share).toMatchObject({ presenterName: 'Post-lock canonical name' });
   });
 
   it.each(routeOperations)('maps malformed RPC results to the terminal compatibility contract for $name', async ({ invoke }) => {
@@ -405,34 +422,11 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it('returns an active share only as canonical public data', async () => {
-    mocks.rpc
-      .mockResolvedValueOnce({
-        data: {
-          ok: true,
-          code: 'ACTIVE_READ',
-          active: {
-            spaceId: SPACE_ID,
-            presenterUserId: TARGET_ID,
-            shareId: SHARE_ID,
-            expiresAt: EXPIRES_AT,
-          },
-        },
-        error: null,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          ok: true,
-          code: 'ACTIVE_READ',
-          active: {
-            spaceId: SPACE_ID,
-            presenterUserId: TARGET_ID,
-            shareId: SHARE_ID,
-            expiresAt: '2026-07-23T12:00:30.000Z',
-          },
-        },
-        error: null,
-      });
+  it('returns an active share only from one locked canonical RPC snapshot', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: activeRpc('Post-lock canonical presenter', { expiresAt: '2026-07-23T12:00:30.000Z' }),
+      error: null,
+    });
 
     const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
 
@@ -444,12 +438,13 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
         companyId: COMPANY_ID,
         spaceId: SPACE_ID,
         presenterUserId: TARGET_ID,
-        presenterName: 'Presenter',
+        presenterName: 'Post-lock canonical presenter',
         shareId: SHARE_ID,
         expiresAt: '2026-07-23T12:00:30.000Z',
       },
     });
-    expect(mocks.from).toHaveBeenCalledWith('users');
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it.each(routeOperations)('rejects a no-company verified identity for $name without invoking the RPC', async ({ invoke }) => {
@@ -579,7 +574,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     });
   });
 
-  it.each(['   ', 'x'.repeat(101)])('rejects invalid claim presenter profile before the mutating RPC', async (displayName) => {
+  it.each(['   ', 'x'.repeat(101)])('accepts an untrusted $displayName snapshot but maps locked claim profile invalid to a sanitized error', async (displayName) => {
     mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce({
       ok: true,
       identity: {
@@ -591,6 +586,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       },
       admin: { rpc: mocks.rpc, from: mocks.from },
     });
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'PRESENTER_PROFILE_INVALID' }, error: null });
 
     const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
     const body = await json(response);
@@ -602,130 +598,156 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       error: 'The presenter profile is unavailable for screen sharing.',
     });
     expect(JSON.stringify(body)).not.toContain(displayName);
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it.each(['claim', 'active'] as const)('maps locked %s profile invalid terminally without a users query', async (operation) => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'PRESENTER_PROFILE_INVALID' }, error: null });
+
+    const response = await (operation === 'claim'
+      ? claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID))
+      : getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)));
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({ success: false, code: 'PRESENTER_PROFILE_INVALID' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('does not emit stale presenter fields when the single locked active snapshot denies membership', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'AUTH_INVALID' }, error: null });
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(403);
+    expect(body).toMatchObject({ success: false, code: 'MEMBERSHIP_SCOPE_INVALID' });
+    expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
+    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('does not emit stale presenter fields when the single locked active snapshot reports a revoked session', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'SESSION_INVALID' }, error: null });
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(409);
+    expect(body).toMatchObject({ success: false, code: 'SESSION_INVALID' });
+    expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
+    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without stale presenter fields when the locked active snapshot is structurally incompatible', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: activeRpc('Locked name', { spaceId: TARGET_ID }), error: null });
+
+    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(426);
+    expect(body).toMatchObject({ success: false, code: 'DATABASE_CONTRACT_INCOMPATIBLE' });
+    expect(JSON.stringify(body)).not.toContain('Locked name');
+    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it.each([
-    { name: 'missing', lookup: { data: null, error: null } },
-    { name: 'invalid', lookup: { data: { display_name: '   ' }, error: null } },
-  ])('returns a terminal profile error only after final active reauthorization when the presenter name is $name', async ({ lookup }) => {
-    const active = {
-      ok: true,
-      code: 'ACTIVE_READ',
-      active: { spaceId: SPACE_ID, presenterUserId: TARGET_ID, shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-    };
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: { ...claimRpc(), presenterName: undefined } },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: { ...activeRpc(), active: { ...activeRpc().active, presenterName: undefined } } },
+  ])('rejects missing locked presenterName from $name as a compatibility failure', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toMatchObject({ success: false, code: 'DATABASE_CONTRACT_INCOMPATIBLE' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: claimRpc('   ') },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: activeRpc('   ') },
+  ])('rejects invalid locked presenterName from $name as a compatibility failure', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toMatchObject({ success: false, code: 'DATABASE_CONTRACT_INCOMPATIBLE' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: { ...claimRpc(), extra: true } },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: { ...activeRpc(), extra: true } },
+  ])('rejects extra locked presenter fields from $name without retrying', async ({ invoke, data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { name: 'claim', invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: claimRpc() },
+    { name: 'release', invoke: () => releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)), data: { ok: true, code: 'RELEASED', alreadyReleased: false } },
+    { name: 'active', invoke: () => getActiveScreenShare(activeRequest(), routeContext(SPACE_ID)), data: activeRpc() },
+  ])('retries exactly once for strict RETRY_LOCK_SET and returns the second $name result', async ({ invoke, data }) => {
     mocks.rpc
-      .mockResolvedValueOnce({ data: active, error: null })
-      .mockResolvedValueOnce({ data: active, error: null });
-    mocks.maybeSingle.mockResolvedValueOnce(lookup);
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null })
+      .mockResolvedValueOnce({ data, error: null });
 
-    const response = await getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
+    const response = await invoke();
 
-    expect(response.status).toBe(409);
-    expect(await json(response)).toMatchObject({ success: false, code: 'PRESENTER_PROFILE_INVALID' });
+    expect(response.status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledTimes(2);
   });
 
-  it('does not emit stale presenter fields when final active reauthorization denies after enrichment is held', async () => {
-    const active = {
-      ok: true,
-      code: 'ACTIVE_READ',
-      active: { spaceId: SPACE_ID, presenterUserId: TARGET_ID, shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-    };
-    let releaseLookup: ((value: { data: { display_name: string }; error: null }) => void) | undefined;
-    const lookupStarted = new Promise<void>((resolve) => {
-      mocks.maybeSingle.mockImplementationOnce(() => {
-        resolve();
-        return new Promise((lookupResolve) => {
-          releaseLookup = lookupResolve;
-        });
-      });
-    });
+  it.each(routeOperations)('maps a second strict RETRY_LOCK_SET for $name to bounded 503', async ({ invoke }) => {
     mocks.rpc
-      .mockResolvedValueOnce({ data: active, error: null })
-      .mockResolvedValueOnce({ data: { ok: false, code: 'AUTH_INVALID' }, error: null });
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null })
+      .mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET' }, error: null });
 
-    const pendingResponse = getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
-    await lookupStarted;
-    expect(mocks.rpc).toHaveBeenCalledTimes(1);
-    releaseLookup?.({ data: { display_name: 'Presenter' }, error: null });
+    const response = await invoke();
 
-    const response = await pendingResponse;
-    const body = await json(response);
-    expect(response.status).toBe(403);
-    expect(body).toMatchObject({ success: false, code: 'MEMBERSHIP_SCOPE_INVALID' });
-    expect(JSON.stringify(body)).not.toContain('Presenter');
-    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
-  });
-
-  it('does not emit stale presenter fields when final active reauthorization reports a revoked session', async () => {
-    const active = {
-      ok: true,
-      code: 'ACTIVE_READ',
-      active: { spaceId: SPACE_ID, presenterUserId: TARGET_ID, shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-    };
-    let releaseLookup: ((value: { data: { display_name: string }; error: null }) => void) | undefined;
-    const lookupStarted = new Promise<void>((resolve) => {
-      mocks.maybeSingle.mockImplementationOnce(() => {
-        resolve();
-        return new Promise((lookupResolve) => {
-          releaseLookup = lookupResolve;
-        });
-      });
-    });
-    mocks.rpc
-      .mockResolvedValueOnce({ data: active, error: null })
-      .mockResolvedValueOnce({ data: { ok: false, code: 'SESSION_INVALID' }, error: null });
-
-    const pendingResponse = getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
-    await lookupStarted;
-    expect(mocks.rpc).toHaveBeenCalledTimes(1);
-    releaseLookup?.({ data: { display_name: 'Presenter' }, error: null });
-
-    const response = await pendingResponse;
-    const body = await json(response);
-    expect(response.status).toBe(409);
-    expect(body).toMatchObject({ success: false, code: 'SESSION_INVALID' });
-    expect(JSON.stringify(body)).not.toContain('Presenter');
-    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
-  });
-
-  it('fails closed when the active lease changes while presenter enrichment is held', async () => {
-    const active = {
-      ok: true,
-      code: 'ACTIVE_READ',
-      active: { spaceId: SPACE_ID, presenterUserId: TARGET_ID, shareId: SHARE_ID, expiresAt: EXPIRES_AT },
-    };
-    let releaseLookup: ((value: { data: { display_name: string }; error: null }) => void) | undefined;
-    const lookupStarted = new Promise<void>((resolve) => {
-      mocks.maybeSingle.mockImplementationOnce(() => {
-        resolve();
-        return new Promise((lookupResolve) => {
-          releaseLookup = lookupResolve;
-        });
-      });
-    });
-    mocks.rpc
-      .mockResolvedValueOnce({ data: active, error: null })
-      .mockResolvedValueOnce({
-        data: {
-          ...active,
-          active: { ...active.active, shareId: TARGET_ID },
-        },
-        error: null,
-      });
-
-    const pendingResponse = getActiveScreenShare(activeRequest(), routeContext(SPACE_ID));
-    await lookupStarted;
-    expect(mocks.rpc).toHaveBeenCalledTimes(1);
-    releaseLookup?.({ data: { display_name: 'Presenter' }, error: null });
-
-    const response = await pendingResponse;
-    const body = await json(response);
     expect(response.status).toBe(503);
-    expect(body).toMatchObject({ success: false, code: 'SERVICE_UNAVAILABLE' });
-    expect(JSON.stringify(body)).not.toContain('Presenter');
-    expect(JSON.stringify(body)).not.toContain(SHARE_ID);
+    expect(await json(response)).toMatchObject({ success: false, code: 'SERVICE_UNAVAILABLE' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(routeOperations)('does not retry malformed RETRY_LOCK_SET payloads for $name', async ({ invoke }) => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'RETRY_LOCK_SET', extra: true }, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(426);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(routeOperations)('does not retry provider errors for $name', async ({ invoke }) => {
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: 'private provider failure' } });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(500);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(await json(response))).not.toContain('private provider failure');
+  });
+
+  it.each(routeOperations)('maps a locked post-snapshot SESSION_INVALID from $name to 409 after exactly one RPC', async ({ invoke }) => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: 'SESSION_INVALID' }, error: null });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({ success: false, code: 'SESSION_INVALID' });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 });
