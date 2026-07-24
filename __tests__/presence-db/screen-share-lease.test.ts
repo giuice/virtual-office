@@ -215,6 +215,35 @@ describe("presence-db screen-share lease authority", () => {
     );
   }
 
+  async function waitForBlock(
+    waitingPid: number,
+    blockingPid: number,
+  ): Promise<void> {
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline) {
+      const [state] = await fixtures.sql<{
+        wait_event_type: string | null;
+        blockers: number[];
+      }>(
+        `select activity.wait_event_type,
+                pg_catalog.pg_blocking_pids(activity.pid) as blockers
+           from pg_catalog.pg_stat_activity as activity
+          where activity.pid = $1`,
+        [waitingPid],
+      );
+      if (
+        state?.wait_event_type === "Lock" &&
+        state.blockers.includes(blockingPid)
+      ) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error(
+      `Timed out waiting for backend ${waitingPid} on blocker ${blockingPid}`,
+    );
+  }
+
   async function barrierClaim(
     client: Client,
     barrierKey: number,
@@ -1474,8 +1503,14 @@ describe("presence-db screen-share lease authority", () => {
           expiredShareId,
         ),
       ).toMatchObject({ ok: true, code: "CLAIMED" });
-      await asPresenceOwner(() =>
-        fixtures.sql(
+
+      await fixtures.sql("grant presence_maintenance_owner to postgres");
+      const expiryBlocker = await openServiceClient();
+      const successorClient = await openServiceClient();
+      try {
+        await expiryBlocker.client.query("set role presence_maintenance_owner");
+        await expiryBlocker.client.query("begin");
+        await expiryBlocker.client.query(
           `update public.screen_share_leases
               set expires_at = pg_catalog.clock_timestamp(),
                   heartbeat_at = least(
@@ -1484,8 +1519,30 @@ describe("presence-db screen-share lease authority", () => {
                   )
             where space_id = $1`,
           [scenario.spaceId],
-        ),
-      );
+        );
+        const successorShareId = randomUUID();
+        const successorClaim = callRpc(
+          successorClient.client,
+          "claim_screen_share_observed",
+          scenario,
+          successor,
+          successorShareId,
+        );
+        await waitForBlock(successorClient.pid, expiryBlocker.pid);
+        await expiryBlocker.client.query("commit");
+        expect(await successorClaim).toMatchObject({
+          ok: true,
+          code: "CLAIMED",
+          shareId: successorShareId,
+        });
+      } finally {
+        await expiryBlocker.client.query("rollback").catch(() => undefined);
+        await Promise.all([
+          expiryBlocker.client.end(),
+          successorClient.client.end(),
+        ]);
+        await fixtures.sql("revoke presence_maintenance_owner from postgres");
+      }
       expect(
         await callRpc(
           service.client,
@@ -1495,16 +1552,6 @@ describe("presence-db screen-share lease authority", () => {
           expiredShareId,
         ),
       ).toEqual({ ok: false, code: "LEASE_STALE" });
-      const successorShareId = randomUUID();
-      expect(
-        await callRpc(
-          service.client,
-          "claim_screen_share_observed",
-          scenario,
-          successor,
-          successorShareId,
-        ),
-      ).toMatchObject({ ok: true, code: "CLAIMED", shareId: successorShareId });
     } finally {
       await service.client.end();
     }
