@@ -95,6 +95,10 @@ status: complete
    - `6d09873` `test(03-10): add failing private media signaling tests`
    - `79120c8` `feat(03-10): secure private media signaling lifecycle`
 
+3. **Blocked-wave lifecycle remediation**
+   - `271dbae` `fix(03-10): harden media signaling lifecycle`
+   - `f6fa091` `fix(03-10): fence media signaling instances`
+
 ## Files Created/Modified
 
 - `src/lib/webrtc/WebRTCManager.ts` — role-separated media ownership, perfect negotiation, display events, and cleanup.
@@ -150,34 +154,33 @@ None.
 
 The tracer can wire the established manager and private signaling contract to provider/UI behavior. Browser P2P delivery, TURN traversal, permission flows, private-channel authorization, and multi-user isolation remain UAT work; deterministic mocks do not prove them.
 
-## Blocked-Wave Remediation — 2026-07-24
-
-**Scope-fenced signaling now waits for authorized presenter state before non-null display media reaches WebRTC, while room audio and handshake startup remain independent.**
+## Wave 3 Closure — 2026-07-24
 
 ### Application
 
-- Corrected the strict contract matrix: handshake is broadcast-only; description and ICE require exact target application-user, presence-session, and per-connection identity. Pending ICE is keyed to the exact remote session/connection instance, so stale candidates cannot drain after a peer replacement.
-- Added bounded, per-peer serialized inbound signaling and canonical active-share fencing. Realtime hints, SDP/ICE, and video tracks do not authorize a presenter: a null-share description cannot emit a remote display event, and non-null display SDP/ICE waits for canonical active authorization.
-- Made audio manager ownership depend on company, application user, presence session, space, and current access-token rotation without retaining the raw token in manager identity. Identity retirement clears muted presence state and cleans exactly once; no manager exists for an incomplete application-user identity.
-- Terminal active-route 401/403/409 responses retire the exact channel and manager even for malformed response bodies; typed presenter-profile denial also fails closed, while transport and 5xx failures remain non-terminal. Reconciliation performs one immediate active read plus at most one delayed retry per buffered batch.
+- Corrected the strict broadcast handshake fixture and added exact source/target Presence-session and connection-instance fencing for targeted descriptions and ICE.
+- Added bounded per-peer signaling queues, stale-instance ICE isolation, null-share video suppression, canonical active-share reconciliation, and deterministic scope teardown.
+- Preserved the planned private browser Broadcast signaling path and existing P2P mesh. A separate trusted-relay/registry architecture is not part of Plan 03-10.
+- Applied the remediation commits to the primary feature branch as `271dbae` and `f6fa091`.
 
 ### Database
 
-No SQL, migration, schema, RLS, grant, local database, or online database action occurred.
+No SQL, migration, schema, RLS, grant, local database, or online database action occurred during this Wave 3 closure.
 
 ### Deployment
 
-No environment, deployment, browser, TURN, RLS, or online private-channel authorization evidence was produced.
+No environment, deployment, push, pull request, browser UAT, or online-target action occurred.
 
 ### Verification
 
-- Focused signaling, manager, and AudioContext regressions: 19 tests passed, including stale instance ICE, null-share video suppression, bounded inbound queues, and bounded null-active reconciliation.
-- `npm run type-check`, focused ESLint, `npm run presence:gate`, and `git diff --check`: passed.
-- Full `npm test`: Vitest alias target under worktree `node_modules` is absent, while the primary alias target exists; final primary suite remains pending.
+- Focused Plan 03-10 suites: 4 files / 99 tests passed.
+- Full Vitest suite on the primary checkout: 104 files / 1,147 tests passed.
+- `npm run type-check`: passed.
+- Next.js production build: passed.
 
-### Known Limits
+### Remaining Human Evidence
 
-Deterministic fakes prove ordering, cleanup, and stale-scope contracts only. Real browser P2P, TURN traversal, multi-user delivery, and deployed private-channel/RLS authorization remain unproven.
+Real browser P2P delivery, permissions, TURN traversal, and multi-user presentation remain later Phase 3 UAT work. They do not block completion of the bounded manager and signaling foundation owned by Plan 03-10.
 
 ## Self-Check: PASSED
 
