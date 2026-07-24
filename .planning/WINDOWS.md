@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 6
 waived_count: 0
 fixed_count: 0
-total_count: 3
-last_updated: 2026-07-24T21:44:38.892Z
+total_count: 6
+last_updated: 2026-07-24T22:07:39.760Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,9 @@ last_updated: 2026-07-24T21:44:38.892Z
 | 1 | 03 | deviation | .planning/phases/03-video-and-screen-sharing/03-02-PLAN.md | 75 | read_first concurrency.test.ts was stale; used the live concurrency/normative-races.test.ts and support.ts analogs | open |  | 2026-07-24T21:44:37.982Z |  |
 | 2 | 03 | deviation | .planning/phases/03-video-and-screen-sharing/03-02-PLAN.md | 118 | read_first topic.ts was stale; used the live useAudioSignaling.ts canonical media-topic implementation | open |  | 2026-07-24T21:44:38.379Z |  |
 | 3 | 03 | deviation | __tests__/presence-db/screen-share-realtime-policy.test.ts |  | Task 2 RED passed immediately because immutable migrations already implemented the contract; no artificial failure was introduced | open |  | 2026-07-24T21:44:38.892Z |  |
+| 4 | 03 | unrun-verify | .planning/phases/03-video-and-screen-sharing/03-03-SUMMARY.md |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local Presence checklist completed and parent must schedule formal review | open |  | 2026-07-24T22:07:38.833Z |  |
+| 5 | 03 | lint-warning | .claude/gsd-core/bin/gsd-tools.cjs | 231 | Repository-wide lint remains blocked by 3230 pre-existing vendored rule-resolution errors and unrelated legacy warnings; focused plan lint passes | open |  | 2026-07-24T22:07:39.389Z |  |
+| 6 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Local Presence review added an exact owned-channel fence for mute metadata across simultaneous identity scope swaps | open |  | 2026-07-24T22:07:39.760Z |  |
 
 ````json
 [
@@ -55,6 +58,42 @@ last_updated: 2026-07-24T21:44:38.892Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-24T21:44:38.892Z",
+    "resolved_at": null
+  },
+  {
+    "id": 4,
+    "kind": "unrun-verify",
+    "phase": "03",
+    "file": ".planning/phases/03-video-and-screen-sharing/03-03-SUMMARY.md",
+    "line": null,
+    "description": "Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local Presence checklist completed and parent must schedule formal review",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-24T22:07:38.833Z",
+    "resolved_at": null
+  },
+  {
+    "id": 5,
+    "kind": "lint-warning",
+    "phase": "03",
+    "file": ".claude/gsd-core/bin/gsd-tools.cjs",
+    "line": 231,
+    "description": "Repository-wide lint remains blocked by 3230 pre-existing vendored rule-resolution errors and unrelated legacy warnings; focused plan lint passes",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-24T22:07:39.389Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/hooks/realtime/useAudioSignaling.ts",
+    "line": null,
+    "description": "Local Presence review added an exact owned-channel fence for mute metadata across simultaneous identity scope swaps",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-24T22:07:39.760Z",
     "resolved_at": null
   }
 ]
