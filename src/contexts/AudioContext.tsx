@@ -15,6 +15,8 @@ import { useReducerState } from '@/hooks/useReducerState';
 import { WebRTCManager, ROOM_LIMITS } from '@/lib/webrtc';
 import { useAudioSignaling } from '@/hooks/realtime/useAudioSignaling';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { toast } from 'sonner';
 
 // Permission states
@@ -64,6 +66,8 @@ interface OwnedWebRTCManager {
 }
 
 export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { user } = useAuth();
+	const { company } = useCompany();
+	const { presenceSessionId } = usePresence();
 	// Use internal userId if provided, otherwise fall back to supabase uid
 	const currentUserId = userId || user?.id;
 
@@ -85,10 +89,14 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 	// Refs for cleanup
 	const managerRef = useRef<WebRTCManager | null>(null);
 
-	// Setup signaling when manager is ready
+	// Setup signaling only for the currently authoritative company/session/space scope.
+	const signalingGeneration = `${company?.id ?? 'none'}:${currentUserId ?? 'none'}:${presenceSessionId ?? 'none'}:${spaceId ?? 'none'}`;
 	const { mutedUserIds } = useAudioSignaling({
+		companyId: company?.id,
 		spaceId,
 		currentUserId,
+		presenceSessionId,
+		generation: signalingGeneration,
 		webrtcManager,
 		enabled: !!webrtcManager, // Enable signaling immediately for listen-only mode
 		isMuted,
