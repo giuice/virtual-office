@@ -256,6 +256,74 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(impolitePeer?.addIceCandidate).not.toHaveBeenCalled();
   });
 
+  it('retains answer ICE received during glare without admitting ICE from the ignored offer', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    const localSessionId = '77777777-7777-4777-8777-777777777777';
+    const localConnectionId = '88888888-8888-4888-8888-888888888888';
+    const remoteSessionId = '55555555-5555-4555-8555-555555555555';
+    const remoteConnectionId = '66666666-6666-4666-8666-666666666666';
+    manager.setSignalingIdentity(localSessionId, localConnectionId);
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+
+    await manager.handleHandshake('user-b', remoteSessionId, remoteConnectionId);
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+      null,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+
+    const ignoredCandidate = {
+      candidate: 'candidate:ignored-offer',
+      usernameFragment: 'ignored-offer',
+    };
+    const answerCandidate = {
+      candidate: 'candidate:winning-answer',
+      usernameFragment: 'winning-answer',
+    };
+    await manager.handleIceCandidate(
+      'user-b',
+      'user-a',
+      ignoredCandidate,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+    await manager.handleIceCandidate(
+      'user-b',
+      'user-a',
+      answerCandidate,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+    expect(peer.addIceCandidate).not.toHaveBeenCalled();
+
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+      null,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+    expect(peer.addIceCandidate).toHaveBeenCalledWith(answerCandidate);
+    expect(peer.addIceCandidate).not.toHaveBeenCalledWith(ignoredCandidate);
+  });
+
   it('emits each canonical remote display track once and retires its listener on peer cleanup', async () => {
     const onRemoteDisplay = vi.fn();
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
