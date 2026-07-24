@@ -87,7 +87,10 @@ Focused checks currently retained for this correction:
 - Focused ESLint for the changed TypeScript files — passed.
 - `npm run presence:gate` — passed.
 
-Full repository suite and production build evidence are orchestrator gates and are not claimed by this summary.
+- Primary-checkout `npm run build` — passed with all three screen-share routes in the Next.js production output.
+- Primary-checkout `npm test` — 103 test files and 1,133 tests passed.
+- Final independent Presence Safety, Supabase/RLS, and Sol adversarial reviews — no material findings after the Unicode/dependency corrections.
+- Wave capability gates — schema drift and UI safety passed; codebase drift emitted a non-blocking advisory because no current mapping baseline covers 1,654 structural elements, with no mapper requested.
 
 ## Decisions Made
 

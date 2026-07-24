@@ -79,3 +79,10 @@
 - Final Sol review found the 03-02 preconditions still named only the 03-08 lease/media migration even though its atomic presenter-name and lock-order tests require `20260723224547_screen_share_atomic_presenter_contract.sql` as well.
 - Corrected 03-02 to depend on 03-09, require/read both screen-share migrations, and verify both history entries exactly once. Both migrations are immutable inputs; 03-02 still creates no migration or production symbol.
 - Database/deployment state: documentation changed locally only. Local migration state was already read back; no SQL, online database, environment, or deployment action occurred.
+
+## 2026-07-24 — Wave 2 closure evidence
+
+- Primary gates passed on the merged checkout: Next.js production build succeeded and the full Vitest suite passed 103 files / 1,133 tests.
+- Final review state: Presence Safety, Supabase/RLS, and Sol adversarial reviews returned no material findings after the Unicode and Wave 5 dependency corrections.
+- Capability gates: schema drift and UI safety did not block. Codebase drift reported a non-blocking advisory for 1,654 structural elements without a current mapping baseline; its directive was `warn` with no mapper spawn.
+- Database/deployment state: both screen-share migrations remain applied/read back only on disposable local Supabase. No online database was queried or changed and no application deployment occurred. Any rollout must apply/read back both migrations on the explicitly authorized target before application deployment.
