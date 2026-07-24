@@ -60,9 +60,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Spatial Audio & Screen Sharing
 
-- [ ] **VID-01**: Existing peer-to-peer WebRTC media, Supabase Realtime signaling, and STUN/TURN configuration are preserved and extended for room-scoped audio and screen sharing (Story 8.1)
-- [ ] **VID-02**: User entering a space connects to room audio in listen-only mode and can explicitly enable, mute, or unmute their microphone with speaker indication (Story 8.2)
-- [ ] **VID-04**: One participant at a time can share a window, tab, or entire screen on an integrated floor-plan stage that each viewer can expand or collapse (Story 8.4)
+- [x] **VID-01**: Existing peer-to-peer WebRTC media, Supabase Realtime signaling, and STUN/TURN configuration are preserved and extended for room-scoped audio and screen sharing (Story 8.1)
+- [x] **VID-02**: User entering a space connects to room audio in listen-only mode and can explicitly enable, mute, or unmute their microphone with speaker indication (Story 8.2)
+- [x] **VID-04**: One participant at a time can share a window, tab, or entire screen on an integrated floor-plan stage that each viewer can expand or collapse (Story 8.4)
 
 ## v2 Requirements
 
@@ -148,10 +148,10 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 | FLOR-02 | Phase 2 | Complete |
 | FLOR-03 | Phase 2 | Complete |
 | FLOR-04 | Phase 2 + 2.1 | Complete |
-| VID-01 | Phase 3 | Pending |
-| VID-02 | Phase 3 | Pending |
+| VID-01 | Phase 3 | Complete |
+| VID-02 | Phase 3 | Complete |
 | VID-03 | Future — Advanced Collaboration | Deferred |
-| VID-04 | Phase 3 | Pending |
+| VID-04 | Phase 3 | Complete |
 | VID-05 | Future — Advanced Collaboration | Deferred |
 | VID-06 | Future — Advanced Collaboration | Deferred |
 | VID-07 | Future — Advanced Collaboration | Deferred |
