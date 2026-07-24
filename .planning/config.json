@@ -9,8 +9,9 @@
     "gsd-executor": "gpt-5.6-sol"
   },
   "effort": {
-  "agent_overrides": {
-    "gsd-executor": "medium"
+    "agent_overrides": {
+      "gsd-executor": "medium"
+    }
   },
   "response_language": "Brazilian Portuguese",
   "workflow": {
