@@ -77,7 +77,10 @@ class FakePeerConnection {
   }
 
   async setLocalDescription(description?: RTCSessionDescriptionInit): Promise<void> {
-    this.localDescription = description ?? { type: 'offer', sdp: 'implicit-offer' };
+    this.localDescription = description ?? {
+      type: this.remoteDescription?.type === 'offer' ? 'answer' : 'offer',
+      sdp: 'implicit-description',
+    };
     this.signalingState = this.localDescription.type === 'offer' ? 'have-local-offer' : 'stable';
   }
 
