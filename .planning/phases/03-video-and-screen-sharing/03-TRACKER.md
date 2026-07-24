@@ -95,3 +95,15 @@
 - Evidence: focused Plan 03-10 suites passed 4 files / 99 tests; TypeScript passed; the primary full suite passed 104 files / 1,147 tests; the Next.js production build passed.
 - Database/deployment state: no SQL, migration, RLS, local or online database action occurred during closure. No deployment, push, or pull request occurred.
 - Next action: Wave 4 / Plan 03-01 may consume the completed manager and signaling foundation. Real browser, permission, TURN, and multi-user delivery remain assigned to later Phase 3 UAT.
+
+## 2026-07-24 — Wave 4 canonical screen-share tracer closure
+
+- Completed: Plan 03-01 added explicit current-occupant display capture, canonical claim/presenter matching, publication through the existing P2P `WebRTCManager`, and a React-owned integrated stage that attaches only the exact live canonical display stream.
+- Scope retained: the tracer reuses `AudioProvider`, the completed private browser signaling path, and the existing peer registry. No relay, connection registry, negotiation registry, migration, later-wave lifecycle provider, or final Wave 8 presentation polish was introduced.
+- Regression correction: the full suite exposed one legacy floor-plan test mock without the new `useAudio` export. The mock-only correction was authorized by the user, passed its focused 9-test file, and was committed separately as `91161b0`.
+- Evidence: Plan 03-01 focused coverage passed 19 tests; TypeScript, focused ESLint, Presence gate, and diff checks passed. The post-wave Next.js production build passed, and the full Vitest suite passed 105 files / 1,153 tests.
+- Capability gates: schema drift and UI safety passed. Codebase drift emitted a non-blocking baseline advisory with `directive: warn` and `spawn_mapper: false`; no mapper or additional work was started.
+- Database state: no SQL, migration, RLS, local database, online target, schema, data, grant, or database read occurred in Wave 4.
+- Deployment state: all commits remain local on `feature/sharing-screen`; no deployment, push, or pull request occurred.
+- Decision: the user chose to retain commit `4e6b142`, which repaired the malformed local GSD config and recorded an intermediate state update on the same feature branch.
+- Next action: stop before Wave 5. Plan 03-02 real local Postgres/RLS proof and Plan 03-03 signaling hardening require a separate explicit Wave 5 authorization.
