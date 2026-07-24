@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GET as getActiveScreenShare } from '@/app/api/spaces/[spaceId]/screen-share/active/route';
-import { POST as claimScreenShare } from '@/app/api/spaces/[spaceId]/screen-share/claim/route';
-import { POST as releaseScreenShare } from '@/app/api/spaces/[spaceId]/screen-share/release/route';
+import { GET as getActiveScreenShare } from '@/app/api/spaces/[id]/screen-share/active/route';
+import { POST as claimScreenShare } from '@/app/api/spaces/[id]/screen-share/claim/route';
+import { POST as releaseScreenShare } from '@/app/api/spaces/[id]/screen-share/release/route';
 import {
   screenShareActiveRpcResultSchema,
   screenShareClaimRequestSchema,
@@ -159,8 +159,8 @@ vi.mock('@/lib/presence/verified-session', () => ({
   requireVerifiedPresenceAuth: mocks.requireVerifiedPresenceAuth,
 }));
 
-function routeContext(spaceId: string): { params: Promise<{ spaceId: string }> } {
-  return { params: Promise.resolve({ spaceId }) };
+function routeContext(id: string): { params: Promise<{ id: string }> } {
+  return { params: Promise.resolve({ id }) };
 }
 
 function postRequest(body: unknown): Request {

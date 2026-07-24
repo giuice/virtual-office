@@ -1,21 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
-  screenShareClaimRequestSchema,
-  screenShareClaimResponseSchema,
-  screenShareClaimRpcResultSchema,
   screenShareErrorContract,
   screenShareRpcContractError,
+  screenShareReleaseRequestSchema,
+  screenShareReleaseResponseSchema,
+  screenShareReleaseRpcResultSchema,
   screenShareSpaceParamsSchema,
-  toPublicScreenShare,
 } from '@/lib/webrtc/screen-share-contract';
 import { callObservedScreenShareRpc } from '@/lib/webrtc/observed-screen-share-rpc';
 import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 
 export const dynamic = 'force-dynamic';
 
-interface ClaimRouteContext {
-  params: Promise<{ spaceId: string }>;
+interface ReleaseRouteContext {
+  params: Promise<{ id: string }>;
 }
 
 function internalError(correlationId: string): NextResponse {
@@ -27,13 +26,14 @@ function internalError(correlationId: string): NextResponse {
   }, { status: 500 });
 }
 
-export async function POST(request: Request, context: ClaimRouteContext): Promise<NextResponse> {
+export async function POST(request: Request, context: ReleaseRouteContext): Promise<NextResponse> {
   const correlationId = randomUUID();
 
   try {
-    const parsedParams = screenShareSpaceParamsSchema.safeParse(await context.params);
+    const { id } = await context.params;
+    const parsedParams = screenShareSpaceParamsSchema.safeParse({ spaceId: id });
     const body = await request.json().catch(() => null);
-    const parsedBody = screenShareClaimRequestSchema.safeParse(body);
+    const parsedBody = screenShareReleaseRequestSchema.safeParse(body);
     if (!parsedParams.success || !parsedBody.success) {
       return NextResponse.json({
         success: false,
@@ -56,16 +56,15 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
       return NextResponse.json({ success: false, code, error }, { status });
     }
 
-    const rpcArgs = {
-      p_auth_subject: auth.identity.authSubject,
-      p_auth_session_id: auth.identity.authSessionId,
-      p_presence_session_id: parsedBody.data.presenceSessionId,
-      p_space_id: parsedParams.data.spaceId,
-      p_share_id: parsedBody.data.shareId,
-    };
     const rpc = await callObservedScreenShareRpc(
-      () => auth.admin.rpc('claim_screen_share_observed', rpcArgs),
-      screenShareClaimRpcResultSchema,
+      () => auth.admin.rpc('release_screen_share_observed', {
+        p_auth_subject: auth.identity.authSubject,
+        p_auth_session_id: auth.identity.authSessionId,
+        p_presence_session_id: parsedBody.data.presenceSessionId,
+        p_space_id: parsedParams.data.spaceId,
+        p_share_id: parsedBody.data.shareId,
+      }),
+      screenShareReleaseRpcResultSchema,
     );
     if (rpc.kind === 'provider-error') {
       const compatibilityError = screenShareRpcContractError(rpc.error);
@@ -79,27 +78,15 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
       const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
       return NextResponse.json({ success: false, code, error }, { status });
     }
-
     if (!rpc.result.ok) {
       const { code, status, error } = screenShareErrorContract(rpc.result.code);
       return NextResponse.json({ success: false, code, error }, { status });
     }
-    if (rpc.result.shareId !== parsedBody.data.shareId) {
-      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
-      return NextResponse.json({ success: false, code, error }, { status });
-    }
 
-    return NextResponse.json(screenShareClaimResponseSchema.parse({
+    return NextResponse.json(screenShareReleaseResponseSchema.parse({
       success: true,
-      code: 'CLAIMED',
-      share: toPublicScreenShare({
-        companyId: auth.identity.companyId,
-        spaceId: parsedParams.data.spaceId,
-        presenterUserId: auth.identity.appUserId,
-        presenterName: rpc.result.presenterName,
-        shareId: rpc.result.shareId,
-        expiresAt: rpc.result.expiresAt,
-      }),
+      code: 'RELEASED',
+      alreadyReleased: rpc.result.alreadyReleased,
     }));
   } catch {
     return internalError(correlationId);

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
-  screenShareActiveQuerySchema,
-  screenShareActiveResponseSchema,
-  screenShareActiveRpcResultSchema,
+  screenShareClaimRequestSchema,
+  screenShareClaimResponseSchema,
+  screenShareClaimRpcResultSchema,
   screenShareErrorContract,
   screenShareRpcContractError,
   screenShareSpaceParamsSchema,
@@ -14,8 +14,8 @@ import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 
 export const dynamic = 'force-dynamic';
 
-interface ActiveRouteContext {
-  params: Promise<{ spaceId: string }>;
+interface ClaimRouteContext {
+  params: Promise<{ id: string }>;
 }
 
 function internalError(correlationId: string): NextResponse {
@@ -27,22 +27,15 @@ function internalError(correlationId: string): NextResponse {
   }, { status: 500 });
 }
 
-function queryInput(request: Request): unknown {
-  const searchParams = new URL(request.url).searchParams;
-  if (searchParams.size !== 1 || searchParams.getAll('presenceSessionId').length !== 1) {
-    return null;
-  }
-
-  return Object.fromEntries(searchParams.entries());
-}
-
-export async function GET(request: Request, context: ActiveRouteContext): Promise<NextResponse> {
+export async function POST(request: Request, context: ClaimRouteContext): Promise<NextResponse> {
   const correlationId = randomUUID();
 
   try {
-    const parsedParams = screenShareSpaceParamsSchema.safeParse(await context.params);
-    const parsedQuery = screenShareActiveQuerySchema.safeParse(queryInput(request));
-    if (!parsedParams.success || !parsedQuery.success) {
+    const { id } = await context.params;
+    const parsedParams = screenShareSpaceParamsSchema.safeParse({ spaceId: id });
+    const body = await request.json().catch(() => null);
+    const parsedBody = screenShareClaimRequestSchema.safeParse(body);
+    if (!parsedParams.success || !parsedBody.success) {
       return NextResponse.json({
         success: false,
         code: 'INVALID_REQUEST',
@@ -67,12 +60,13 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
     const rpcArgs = {
       p_auth_subject: auth.identity.authSubject,
       p_auth_session_id: auth.identity.authSessionId,
-      p_presence_session_id: parsedQuery.data.presenceSessionId,
+      p_presence_session_id: parsedBody.data.presenceSessionId,
       p_space_id: parsedParams.data.spaceId,
+      p_share_id: parsedBody.data.shareId,
     };
     const rpc = await callObservedScreenShareRpc(
-      () => auth.admin.rpc('get_active_screen_share_observed', rpcArgs),
-      screenShareActiveRpcResultSchema,
+      () => auth.admin.rpc('claim_screen_share_observed', rpcArgs),
+      screenShareClaimRpcResultSchema,
     );
     if (rpc.kind === 'provider-error') {
       const compatibilityError = screenShareRpcContractError(rpc.error);
@@ -86,32 +80,26 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
       const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
       return NextResponse.json({ success: false, code, error }, { status });
     }
+
     if (!rpc.result.ok) {
       const { code, status, error } = screenShareErrorContract(rpc.result.code);
       return NextResponse.json({ success: false, code, error }, { status });
     }
-    if (!rpc.result.active) {
-      return NextResponse.json(screenShareActiveResponseSchema.parse({
-        success: true,
-        code: 'ACTIVE_READ',
-        active: null,
-      }));
-    }
-    if (rpc.result.active.spaceId !== parsedParams.data.spaceId) {
+    if (rpc.result.shareId !== parsedBody.data.shareId) {
       const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
       return NextResponse.json({ success: false, code, error }, { status });
     }
 
-    return NextResponse.json(screenShareActiveResponseSchema.parse({
+    return NextResponse.json(screenShareClaimResponseSchema.parse({
       success: true,
-      code: 'ACTIVE_READ',
-      active: toPublicScreenShare({
+      code: 'CLAIMED',
+      share: toPublicScreenShare({
         companyId: auth.identity.companyId,
-        spaceId: rpc.result.active.spaceId,
-        presenterUserId: rpc.result.active.presenterUserId,
-        presenterName: rpc.result.active.presenterName,
-        shareId: rpc.result.active.shareId,
-        expiresAt: rpc.result.active.expiresAt,
+        spaceId: parsedParams.data.spaceId,
+        presenterUserId: auth.identity.appUserId,
+        presenterName: rpc.result.presenterName,
+        shareId: rpc.result.shareId,
+        expiresAt: rpc.result.expiresAt,
       }),
     }));
   } catch {

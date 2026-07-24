@@ -25,9 +25,9 @@ tech-stack:
 key-files:
   created:
     - src/lib/webrtc/screen-share-contract.ts
-    - src/app/api/spaces/[spaceId]/screen-share/claim/route.ts
-    - src/app/api/spaces/[spaceId]/screen-share/release/route.ts
-    - src/app/api/spaces/[spaceId]/screen-share/active/route.ts
+    - src/app/api/spaces/[id]/screen-share/claim/route.ts
+    - src/app/api/spaces/[id]/screen-share/release/route.ts
+    - src/app/api/spaces/[id]/screen-share/active/route.ts
     - __tests__/api/screen-share-routes.test.ts
     - __tests__/api/verified-presence-session.test.ts
   modified:

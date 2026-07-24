@@ -13,9 +13,9 @@
 | `package.json` and lockfile | config | batch | `package.json` | exact |
 | `supabase/migrations/<timestamp>_screen_share_lease_and_media_realtime.sql` | migration | CRUD | `supabase/migrations/20260718204506_phase6_private_company_presence.sql` | role-match |
 | `src/lib/webrtc/screen-share-contract.ts` | utility | transform | `src/lib/presence/knock-contract.ts` | role-match |
-| `src/app/api/spaces/[spaceId]/screen-share/claim/route.ts` | route | request-response | `src/app/api/spaces/knock/request/route.ts` | role-match |
-| `src/app/api/spaces/[spaceId]/screen-share/release/route.ts` | route | request-response | `src/app/api/spaces/knock/request/route.ts` | role-match |
-| `src/app/api/spaces/[spaceId]/screen-share/active/route.ts` | route | request-response | `src/app/api/spaces/knock/pending/route.ts` | role-match |
+| `src/app/api/spaces/[id]/screen-share/claim/route.ts` | route | request-response | `src/app/api/spaces/knock/request/route.ts` | role-match |
+| `src/app/api/spaces/[id]/screen-share/release/route.ts` | route | request-response | `src/app/api/spaces/knock/request/route.ts` | role-match |
+| `src/app/api/spaces/[id]/screen-share/active/route.ts` | route | request-response | `src/app/api/spaces/knock/pending/route.ts` | role-match |
 | `src/repositories/screen-share-lease-repository.ts` (only if route boundary needs it) | repository | CRUD | `src/repositories/implementations/supabase/SupabaseSpaceRepository.ts` | partial |
 | `src/lib/webrtc/WebRTCManager.ts` | service | streaming | itself | exact extension |
 | `src/contexts/AudioContext.tsx` | provider | event-driven | itself | exact extension |
