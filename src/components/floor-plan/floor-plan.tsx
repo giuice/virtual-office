@@ -29,8 +29,40 @@ import { YouAreHereChip } from './modern/YouAreHereChip';
 import { NeighborhoodManager } from './neighborhoods/NeighborhoodManager';
 import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
-import { AudioProvider } from '@/contexts/AudioContext';
+import { AudioProvider, useAudio } from '@/contexts/AudioContext';
 import { FloorPlanToolbar } from './FloorPlanToolbar';
+
+function InlineFloorPlanPresentationStage() {
+  const { activeScreenShare, displayStream } = useAudio();
+  const isCanonicalLiveStream = Boolean(
+    activeScreenShare &&
+    displayStream &&
+    displayStream.presenterUserId === activeScreenShare.presenterUserId &&
+    displayStream.shareId === activeScreenShare.shareId &&
+    displayStream.stream.getVideoTracks()[0]?.readyState === 'live'
+  );
+
+  if (!activeScreenShare || !isCanonicalLiveStream) return null;
+
+  return (
+    <section
+      className="mb-4 w-full overflow-hidden rounded-[14px] border border-[var(--vo-line)] bg-[var(--vo-bg-2)]"
+      aria-label={`Screen shared by ${activeScreenShare.presenterName}`}
+      data-testid="floor-plan-presentation-stage"
+    >
+      <header className="flex min-w-0 items-center gap-2 p-4">
+        <span className="rounded-full bg-[var(--vo-mag-soft)] px-2 py-1 text-xs font-bold text-[var(--vo-mag)]">
+          LIVE
+        </span>
+        <h2 className="font-bold">Presentation</h2>
+        <p className="min-w-0 truncate text-sm text-muted-foreground" title={activeScreenShare.presenterName}>
+          {activeScreenShare.presenterName} is sharing their screen
+        </p>
+      </header>
+      <div className="aspect-video w-full bg-black" data-share-id={activeScreenShare.shareId} />
+    </section>
+  );
+}
 const handleDuplicateRoom = (_room: Space) => {
   console.warn("handleDuplicateRoom needs API integration");
 };
@@ -459,6 +491,7 @@ export function FloorPlan() {
           onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
           onCreateRoom={() => setIsRoomDialogOpen(true)}
           onOpenNeighborhoodManager={() => setIsNeighborhoodManagerOpen(true)}
+          isCurrentOccupant={currentSpaceId !== undefined}
           onOpenSelectedChat={() => {
             if (selectedSpace) void handleOpenChat(selectedSpace);
           }}
@@ -468,6 +501,7 @@ export function FloorPlan() {
         {/* Main Floor Plan Card */}
         <Card className="w-full">
           <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+            <InlineFloorPlanPresentationStage />
             <ModernFloorPlan
               spaces={neighborhoodFilteredSpaces || []}
               neighborhoods={neighborhoods}

@@ -93,14 +93,14 @@ function TracerHarness({ isCurrentOccupant = true }: { isCurrentOccupant?: boole
   );
 }
 
-function createDisplayStream() {
+function createDisplayStream(): { stream: MediaStream; track: MediaStreamTrack & { stop: ReturnType<typeof vi.fn> } } {
   const track = {
     kind: 'video',
     readyState: 'live',
     stop: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-  } as unknown as MediaStreamTrack;
+  } as unknown as MediaStreamTrack & { stop: ReturnType<typeof vi.fn> };
   const stream = {
     getTracks: () => [track],
     getVideoTracks: () => [track],
@@ -169,9 +169,6 @@ describe('screen-share production tracer (mock-bounded wiring evidence)', () => 
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('already sharing'));
     expect(track.stop).toHaveBeenCalledTimes(1);
-    expect(track.stop.mock.invocationCallOrder[0]).toBeLessThan(
-      screen.getByRole('alert') ? Number.POSITIVE_INFINITY : 0,
-    );
     expect(mocks.managers[0].startScreenShare).not.toHaveBeenCalled();
   });
 

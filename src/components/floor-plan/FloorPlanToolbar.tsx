@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy, MessageSquare, Plus, Settings, FolderOpen } from 'lucide-react';
 import { SpaceAudioControls } from './SpaceAudioControls';
+import { ScreenShareControls } from './ScreenShareControls';
 import type { Space } from '@/types/database';
 
 interface FloorPlanToolbarProps {
@@ -16,6 +17,7 @@ interface FloorPlanToolbarProps {
   onCreateRoom: () => void;
   onOpenNeighborhoodManager: () => void;
   onOpenSelectedChat: () => void;
+  isCurrentOccupant: boolean;
 }
 
 export function FloorPlanToolbar({
@@ -28,6 +30,7 @@ export function FloorPlanToolbar({
   onCreateRoom,
   onOpenNeighborhoodManager,
   onOpenSelectedChat,
+  isCurrentOccupant,
 }: FloorPlanToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -78,6 +81,7 @@ export function FloorPlanToolbar({
         {selectedSpace && (
           <>
             <SpaceAudioControls />
+            <ScreenShareControls isCurrentOccupant={isCurrentOccupant} />
             <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={onOpenSelectedChat}>
               <MessageSquare className="size-4" />
               Chat in Room
