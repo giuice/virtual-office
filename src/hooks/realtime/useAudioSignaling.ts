@@ -8,6 +8,7 @@ import {
   screenShareDescriptionPayloadSchema,
   screenShareHandshakePayloadSchema,
   screenShareIcePayloadSchema,
+  screenSharePresenterHintPayloadSchema,
   screenSharePresenterInvalidatedPayloadSchema,
   screenSharePublicErrorSchema,
   type ScreenSharePublicShare,
@@ -40,9 +41,30 @@ interface ScopedSignalingInput {
   companyId: string; spaceId: string; currentUserId: string; presenceSessionId: string;
   accessToken: string; generation: string | number; manager: WebRTCManager; connectionId: string;
 }
+interface OwnedChannelScope {
+  channel: RealtimeChannel;
+  companyId: string;
+  spaceId: string;
+  currentUserId: string;
+  presenceSessionId: string;
+  accessToken: string;
+  generation: string | number;
+}
 type BufferedSignal =
   | { type: 'description'; payload: { sourceUserId: string; sourcePresenceSessionId: string; sourceConnectionId: string; targetUserId: string; targetPresenceSessionId: string; targetConnectionId: string; shareId: string | null; description: RTCSessionDescriptionInit } }
   | { type: 'ice'; payload: { sourceUserId: string; sourcePresenceSessionId: string; sourceConnectionId: string; targetUserId: string; targetPresenceSessionId: string; targetConnectionId: string; shareId: string | null; candidate: RTCIceCandidateInit } };
+
+class MediaSignalingError extends Error {
+  readonly code: 'SIGNALING_UNAVAILABLE' | 'SIGNALING_SEND_FAILED';
+  readonly deliveryStatus?: string;
+
+  constructor(code: 'SIGNALING_UNAVAILABLE' | 'SIGNALING_SEND_FAILED', deliveryStatus?: string) {
+    super(code);
+    this.name = 'MediaSignalingError';
+    this.code = code;
+    this.deliveryStatus = deliveryStatus;
+  }
+}
 
 function activeRoute(spaceId: string, presenceSessionId: string): string {
   return `/api/spaces/${encodeURIComponent(spaceId)}/screen-share/active?${new URLSearchParams({ presenceSessionId }).toString()}`;
@@ -62,28 +84,45 @@ function isTerminalAuthorizationResponse(status: number, body: unknown): boolean
 export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingState {
   const { companyId, spaceId, currentUserId, presenceSessionId, accessToken, generation, webrtcManager, enabled = true, isMuted, onTerminalAuthorizationDenied } = options;
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const channelScopeRef = useRef<OwnedChannelScope | null>(null);
   const scopeGenerationRef = useRef<string | number>(generation);
   const isConnectedRef = useRef(false);
   const isMutedRef = useRef(isMuted);
   const activeShareRef = useRef<ScreenSharePublicShare | null>(null);
+  const onTerminalAuthorizationDeniedRef = useRef(onTerminalAuthorizationDenied);
+  const [isConnected, setIsConnected] = useState(false);
   const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
   const [activeShare, setActiveShare] = useState<ScreenSharePublicShare | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   scopeGenerationRef.current = generation;
   isMutedRef.current = isMuted;
+  onTerminalAuthorizationDeniedRef.current = onTerminalAuthorizationDenied;
 
   useEffect(() => {
-    const channel = channelRef.current;
-    if (!channel || !isConnectedRef.current || !currentUserId) return;
-    void channel.track({ user_id: currentUserId, is_muted: isMutedRef.current }).catch(() => undefined);
-  }, [isMuted, currentUserId]);
+    const owned = channelScopeRef.current;
+    if (
+      !owned
+      || !isConnectedRef.current
+      || owned.channel !== channelRef.current
+      || owned.companyId !== companyId
+      || owned.spaceId !== spaceId
+      || owned.currentUserId !== currentUserId
+      || owned.presenceSessionId !== presenceSessionId
+      || owned.accessToken !== accessToken
+      || owned.generation !== generation
+    ) return;
+    void owned.channel.track({ user_id: owned.currentUserId, is_muted: isMutedRef.current }).catch(() => undefined);
+  }, [accessToken, companyId, currentUserId, generation, isMuted, presenceSessionId, spaceId]);
 
   useEffect(() => {
     const clearRenderedShare = (): void => { activeShareRef.current = null; setActiveShare(null); };
     if (!enabled || !companyId || !spaceId || !currentUserId || !presenceSessionId || !accessToken || !webrtcManager) {
       clearRenderedShare();
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
+      isConnectedRef.current = false;
+      setIsConnected(false);
+      setError(null);
       return;
     }
 
@@ -91,6 +130,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     // subscription, fetch, removal, or callback from an earlier scope can settle.
     clearRenderedShare();
     setMutedUserIds((current) => current.size === 0 ? current : new Set());
+    setError(null);
     const scope: ScopedSignalingInput = {
       companyId, spaceId, currentUserId, presenceSessionId, accessToken, generation,
       manager: webrtcManager, connectionId: createConnectionId(),
@@ -108,11 +148,21 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     let delayedBufferedReconcile: ReturnType<typeof setTimeout> | null = null;
     let bufferedRetryUsed = false;
     let subscriptionGeneration = 0;
+    let removalStarted = false;
     const inboundQueues = new Map<string, Promise<void>>();
     const inboundPendingCounts = new Map<string, number>();
     let inboundPendingTotal = 0;
     const bufferedSignals = new Map<string, BufferedSignal[]>();
     channelRef.current = channel;
+    channelScopeRef.current = {
+      channel,
+      companyId: scope.companyId,
+      spaceId: scope.spaceId,
+      currentUserId: scope.currentUserId,
+      presenceSessionId: scope.presenceSessionId,
+      accessToken: scope.accessToken,
+      generation: scope.generation,
+    };
 
     const isCurrent = (): boolean => !cancelled && !retired && channelRef.current === channel && scopeGenerationRef.current === scope.generation;
     const clearBuffers = (): void => {
@@ -126,8 +176,14 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       subscriptionGeneration += 1;
       if (channelRef.current === channel) {
         isConnectedRef.current = false;
+        setIsConnected(false);
         scope.manager.setSignalingChannel(null);
       }
+    };
+    const removeOwnedChannel = (): void => {
+      if (removalStarted) return;
+      removalStarted = true;
+      void supabase.removeChannel(channel).catch(() => undefined);
     };
     const retireForAuthorization = (): void => {
       if (!isCurrent()) return;
@@ -140,10 +196,11 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       clearRenderedShare();
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
       if (channelRef.current === channel) channelRef.current = null;
+      if (channelScopeRef.current?.channel === channel) channelScopeRef.current = null;
       // The provider owns the visual lifecycle; standalone consumers still clean up.
-      if (onTerminalAuthorizationDenied) onTerminalAuthorizationDenied();
+      if (onTerminalAuthorizationDeniedRef.current) onTerminalAuthorizationDeniedRef.current();
       else scope.manager.cleanup();
-      void supabase.removeChannel(channel).catch(() => undefined);
+      removeOwnedChannel();
     };
     const isScopePayload = (payload: {
       sourceUserId: string;
@@ -283,7 +340,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     };
     const sendSignal: WebRTCSignalSender = async (event: SignalingEvent): Promise<void> => {
       const sendGeneration = subscriptionGeneration;
-      if (!isCurrent() || !subscribed) throw new Error('SIGNALING_UNAVAILABLE');
+      if (!isCurrent() || !subscribed) throw new MediaSignalingError('SIGNALING_UNAVAILABLE');
       const base = { sourceUserId: scope.currentUserId, sourcePresenceSessionId: scope.presenceSessionId, sourceConnectionId: scope.connectionId, companyId: scope.companyId, spaceId: scope.spaceId, shareId: scope.manager.getActiveShareId() };
       const payload = event.type === 'handshake'
         ? screenShareHandshakePayloadSchema.parse({ type: 'handshake', ...base })
@@ -291,7 +348,10 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           ? screenShareDescriptionPayloadSchema.parse({ type: 'description', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, description: event.description })
           : screenShareIcePayloadSchema.parse({ type: 'ice', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, candidate: event.candidate });
       const result = await channel.send({ type: 'broadcast', event: payload.type, payload });
-      if (!isCurrent() || !subscribed || sendGeneration !== subscriptionGeneration || result !== 'ok') throw new Error('SIGNALING_SEND_FAILED');
+      if (!isCurrent() || !subscribed || sendGeneration !== subscriptionGeneration) {
+        throw new MediaSignalingError('SIGNALING_UNAVAILABLE');
+      }
+      if (result !== 'ok') throw new MediaSignalingError('SIGNALING_SEND_FAILED', result);
     };
 
     channel
@@ -322,6 +382,11 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         if (!parsed.success || !isScopePayload(parsed.data)) return;
         enqueue(parsed.data.sourceUserId, reconcileActive);
       })
+      .on('broadcast', { event: 'presenter-hint' }, ({ payload }) => {
+        const parsed = screenSharePresenterHintPayloadSchema.safeParse(payload);
+        if (!parsed.success || !isScopePayload(parsed.data)) return;
+        enqueue(parsed.data.sourceUserId, reconcileActive);
+      })
       .on('presence', { event: 'sync' }, updateMutedUsers)
       .on('presence', { event: 'join' }, updateMutedUsers)
       .on('presence', { event: 'leave' }, () => { updateMutedUsers(); void reconcileActive(); });
@@ -334,6 +399,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           subscribed = true;
           subscriptionGeneration += 1;
           isConnectedRef.current = true;
+          setIsConnected(true);
           scope.manager.setSignalingIdentity(scope.presenceSessionId, scope.connectionId);
           scope.manager.setSignalingChannel(channel, sendSignal);
           enqueue(scope.currentUserId, async () => {
@@ -358,11 +424,12 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       if (delayedBufferedReconcile) clearTimeout(delayedBufferedReconcile);
       clearBuffers();
       if (channelRef.current === channel) channelRef.current = null;
+      if (channelScopeRef.current?.channel === channel) channelScopeRef.current = null;
       clearRenderedShare();
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
-      void supabase.removeChannel(channel).catch(() => undefined);
+      removeOwnedChannel();
     };
-  }, [accessToken, companyId, currentUserId, enabled, generation, onTerminalAuthorizationDenied, presenceSessionId, spaceId, webrtcManager]);
+  }, [accessToken, companyId, currentUserId, enabled, generation, presenceSessionId, spaceId, webrtcManager]);
 
-  return { isConnected: isConnectedRef.current, error, mutedUserIds, activeShare };
+  return { isConnected, error, mutedUserIds, activeShare };
 }
