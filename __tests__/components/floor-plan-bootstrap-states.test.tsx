@@ -90,6 +90,10 @@ vi.mock('@/utils/debug-logger', () => ({
 
 vi.mock('@/contexts/AudioContext', () => ({
   AudioProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAudio: () => ({
+    activeScreenShare: null,
+    displayStream: null,
+  }),
 }));
 
 vi.mock('@/components/floor-plan/modern/ModernFloorPlan', () => ({
