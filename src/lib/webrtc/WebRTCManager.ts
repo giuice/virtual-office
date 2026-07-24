@@ -448,6 +448,7 @@ export class WebRTCManager {
     if (!queued || peer.ignoreOffer || !peer.pc.remoteDescription) return;
     this.pendingIceCandidates.delete(key);
     const acceptedIceUfrags = this.getDescriptionIceUfrags(peer.pc.remoteDescription);
+    const errors: unknown[] = [];
     for (const pending of queued) {
       if (
         pending.receivedWhileIgnoringOffer
@@ -457,11 +458,15 @@ export class WebRTCManager {
       ) {
         continue;
       }
-      await this.addIceCandidate(
-        peer,
-        pending.candidate,
-        pending.receivedWhileIgnoringOffer && pending.generation.kind === 'unclassified',
-      );
+      try {
+        await this.addIceCandidate(peer, pending.candidate);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'QUEUED_ICE_CANDIDATE_ERRORS');
     }
   }
 
@@ -476,17 +481,8 @@ export class WebRTCManager {
     return [peerId, presenceSessionId ?? '', connectionId ?? ''].map(encodeURIComponent).join(':');
   }
 
-  private async addIceCandidate(
-    peer: PeerConnection,
-    candidate: RTCIceCandidateInit,
-    suppressIgnoredOfferError = false,
-  ): Promise<void> {
-    try {
-      await peer.pc.addIceCandidate(candidate);
-    } catch (error) {
-      if (suppressIgnoredOfferError && this.isIceGenerationMismatch(error)) return;
-      throw error;
-    }
+  private async addIceCandidate(peer: PeerConnection, candidate: RTCIceCandidateInit): Promise<void> {
+    await peer.pc.addIceCandidate(candidate);
   }
 
   private classifyCandidateIceGeneration(candidate: RTCIceCandidateInit): IceGeneration {
@@ -511,12 +507,6 @@ export class WebRTCManager {
       if (ufrag) ufrags.add(ufrag);
     }
     return ufrags;
-  }
-
-  private isIceGenerationMismatch(error: unknown): boolean {
-    return error instanceof DOMException
-      && error.name === 'OperationError'
-      && /\b(?:ufrag|username fragment|ice generation)\b/i.test(error.message);
   }
 
   private matchesLocalInstance(targetPresenceSessionId?: string, targetConnectionId?: string): boolean {

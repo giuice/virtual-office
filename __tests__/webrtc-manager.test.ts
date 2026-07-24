@@ -381,7 +381,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(peer.addIceCandidate).toHaveBeenNthCalledWith(2, nullUfrag);
   });
 
-  it('suppresses only an unclassified ignored-offer generation mismatch and continues draining answer ICE', async () => {
+  it('surfaces an unclassified ignored-offer mismatch after continuing to valid answer ICE', async () => {
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
     const manager = new WebRTCManager('space-1', 'user-a');
     manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
@@ -395,9 +395,10 @@ describe('WebRTCManager display and negotiation ownership', () => {
     );
     const ignoredCandidate = { candidate: 'candidate:unclassified-ignored-offer' };
     const winningCandidate = { candidate: 'candidate:unclassified-winning-answer' };
+    const mismatch = new DOMException('Unknown ICE ufrag from ignored offer', 'OperationError');
     peer.addIceCandidate.mockImplementation(async (candidate: RTCIceCandidateInit) => {
       if (candidate === ignoredCandidate) {
-        throw new DOMException('Unknown ICE ufrag from ignored offer', 'OperationError');
+        throw mismatch;
       }
     });
 
@@ -407,7 +408,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
       'user-b',
       'user-a',
       { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
-    )).resolves.toBeUndefined();
+    )).rejects.toBe(mismatch);
 
     expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
     expect(peer.signalingState).toBe('stable');
