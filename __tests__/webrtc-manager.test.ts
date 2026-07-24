@@ -15,11 +15,28 @@ vi.mock('@/lib/audio/VoiceActivityDetector', () => ({
 class FakeTrack {
   enabled = true;
   stopped = false;
+  readyState: MediaStreamTrackState = 'live';
+  private readonly listeners = new Map<string, Set<() => void>>();
 
   constructor(readonly kind: 'audio' | 'video') {}
 
+  addEventListener(type: string, listener: () => void): void {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: () => void): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  emit(type: string): void {
+    this.listeners.get(type)?.forEach((listener) => listener());
+  }
+
   stop(): void {
     this.stopped = true;
+    this.readyState = 'ended';
   }
 }
 
@@ -57,14 +74,21 @@ class FakePeerConnection {
     this.connectionState = 'closed';
   });
   readonly senders: Array<{ track: FakeTrack | null; replaceTrack: ReturnType<typeof vi.fn> }> = [];
+  readonly transceivers: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
 
   constructor(_configuration: RTCConfiguration) {
     FakePeerConnection.instances.push(this);
   }
 
   addTrack(track: FakeTrack): { track: FakeTrack; replaceTrack: ReturnType<typeof vi.fn> } {
-    const sender = { track, replaceTrack: vi.fn().mockResolvedValue(undefined) };
+    const sender = {
+      track,
+      replaceTrack: vi.fn(async (replacement: FakeTrack | null) => {
+        sender.track = replacement;
+      }),
+    };
     this.senders.push(sender);
+    this.transceivers.push({ stop: vi.fn() });
     queueMicrotask(() => this.onnegotiationneeded?.());
     return sender;
   }
@@ -74,7 +98,7 @@ class FakePeerConnection {
   }
 
   getTransceivers(): Array<{ stop: ReturnType<typeof vi.fn> }> {
-    return this.senders.map(() => ({ stop: vi.fn() }));
+    return this.transceivers;
   }
 
   async setLocalDescription(description?: RTCSessionDescriptionInit): Promise<void> {
@@ -208,8 +232,54 @@ describe('WebRTCManager display and negotiation ownership', () => {
     await impoliteManager.handleDescription('user-b', 'user-a', { type: 'offer', sdp: 'collision' }, null,
       '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666',
       '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
-    await impoliteManager.handleIceCandidate('user-b', 'user-a', { candidate: 'ignored' });
+    await impoliteManager.handleIceCandidate(
+      'user-b',
+      'user-a',
+      { candidate: 'ignored' },
+      '55555555-5555-4555-8555-555555555555',
+      '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777',
+      '88888888-8888-4888-8888-888888888888',
+    );
     expect(impolitePeer?.addIceCandidate).not.toHaveBeenCalled();
+
+    await impoliteManager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'winning-answer' },
+      null,
+      '55555555-5555-4555-8555-555555555555',
+      '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777',
+      '88888888-8888-4888-8888-888888888888',
+    );
+    expect(impolitePeer?.addIceCandidate).not.toHaveBeenCalled();
+  });
+
+  it('emits each canonical remote display track once and retires its listener on peer cleanup', async () => {
+    const onRemoteDisplay = vi.fn();
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-b', { onRemoteDisplay });
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+
+    await manager.handleDescription(
+      'user-a',
+      'user-b',
+      { type: 'offer', sdp: 'canonical-display' },
+      'share-1',
+    );
+    const display = new FakeTrack('video');
+    const stream = new FakeStream([display]);
+    const peer = FakePeerConnection.instances[0];
+    const event = { track: display, streams: [stream] } as never;
+
+    peer.ontrack?.(event);
+    peer.ontrack?.(event);
+
+    expect(onRemoteDisplay).toHaveBeenCalledTimes(1);
+    manager.cleanupPeer('user-a');
+    display.emit('ended');
+    expect(onRemoteDisplay).toHaveBeenCalledTimes(1);
   });
 
   it('fully releases connections, sender resources, owned streams, audio elements, VADs, timers, and callbacks', async () => {
@@ -232,6 +302,9 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(display.stopped).toBe(true);
     expect(FakePeerConnection.instances[0].close).toHaveBeenCalledTimes(1);
     expect(FakePeerConnection.instances[0].removeTrack).toHaveBeenCalled();
+    expect(FakePeerConnection.instances[0].transceivers.every(
+      (transceiver) => transceiver.stop.mock.calls.length === 1,
+    )).toBe(true);
     expect(vadStops.every((stop) => stop.mock.calls.length === 1)).toBe(true);
     expect(manager.getConnectedPeers()).toEqual([]);
   });
