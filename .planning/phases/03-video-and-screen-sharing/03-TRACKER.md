@@ -117,3 +117,12 @@
 - Database state: no schema, migration, data, function, grant, RLS, local database, or online database was queried or changed.
 - Deployment state: commits remain local on `feature/sharing-screen`; no deployment, push, or pull request occurred.
 - Next action: the orchestrator must run the formal read-only Presence re-review. No formal reviewer was run by this executor.
+
+## 2026-07-24 — Wave 5 optional-ufrag interoperability correction
+
+- Remaining Presence Safety risk corrected: `usernameFragment` omitted/null no longer causes unconditional ICE loss during glare. Such candidates stay quarantined in the existing bounded, exact-instance queue until the accepted answer is installed.
+- Generation safety: explicit or raw ufrags are normalized and matched against the answer SDP; known mismatches and malformed generation data are discarded. Unclassified candidates are browser-validated after the answer, and only an `OperationError` explicitly identifying ufrag/username-fragment/ICE-generation mismatch is suppressed. Unrelated ICE errors propagate.
+- Deterministic evidence: RED `5184a69` failed 3/13 for omitted/null loss and error classification; GREEN `3eaf134` passed 13/13. Raw ufrag fallback, malformed explicit/raw metadata, ignored-generation isolation, unrelated-error propagation, peer replacement, bounded queues, peer cleanup, and manager cleanup remain covered.
+- Regression evidence: Wave 5 transport passed 25/25; critical Presence passed 61 files / 558 tests; TypeScript, focused ESLint, Presence movement gate, and Presence skill validation passed.
+- Database/deployment state: no local or online database action and no deployment, push, or pull request occurred.
+- Next action: the orchestrator owns the formal read-only Presence re-review; this executor did not run it.
