@@ -324,6 +324,161 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(peer.addIceCandidate).not.toHaveBeenCalledWith(ignoredCandidate);
   });
 
+  it('quarantines answer ICE with omitted or null username fragments until the answer is accepted', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    const localSessionId = '77777777-7777-4777-8777-777777777777';
+    const localConnectionId = '88888888-8888-4888-8888-888888888888';
+    const remoteSessionId = '55555555-5555-4555-8555-555555555555';
+    const remoteConnectionId = '66666666-6666-4666-8666-666666666666';
+    manager.setSignalingIdentity(localSessionId, localConnectionId);
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b', remoteSessionId, remoteConnectionId);
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+      null,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+
+    const omittedUfrag = { candidate: 'candidate:answer-with-omitted-ufrag' };
+    const nullUfrag = {
+      candidate: 'candidate:answer-with-null-ufrag',
+      usernameFragment: null,
+    };
+    for (const candidate of [omittedUfrag, nullUfrag]) {
+      await manager.handleIceCandidate(
+        'user-b',
+        'user-a',
+        candidate,
+        remoteSessionId,
+        remoteConnectionId,
+        localSessionId,
+        localConnectionId,
+      );
+    }
+    expect(peer.addIceCandidate).not.toHaveBeenCalled();
+
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+      null,
+      remoteSessionId,
+      remoteConnectionId,
+      localSessionId,
+      localConnectionId,
+    );
+
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
+    expect(peer.addIceCandidate).toHaveBeenNthCalledWith(1, omittedUfrag);
+    expect(peer.addIceCandidate).toHaveBeenNthCalledWith(2, nullUfrag);
+  });
+
+  it('suppresses only an unclassified ignored-offer generation mismatch and continues draining answer ICE', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+    );
+    const ignoredCandidate = { candidate: 'candidate:unclassified-ignored-offer' };
+    const winningCandidate = { candidate: 'candidate:unclassified-winning-answer' };
+    peer.addIceCandidate.mockImplementation(async (candidate: RTCIceCandidateInit) => {
+      if (candidate === ignoredCandidate) {
+        throw new DOMException('Unknown ICE ufrag from ignored offer', 'OperationError');
+      }
+    });
+
+    await manager.handleIceCandidate('user-b', 'user-a', ignoredCandidate);
+    await manager.handleIceCandidate('user-b', 'user-a', winningCandidate);
+    await expect(manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    )).resolves.toBeUndefined();
+
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
+    expect(peer.signalingState).toBe('stable');
+  });
+
+  it('uses raw candidate ufrag fallback and rejects malformed generation metadata without contamination', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+    );
+
+    const ignoredRawUfrag = {
+      candidate: 'candidate:1 1 udp 1 192.0.2.1 5000 typ host ufrag ignored-offer',
+    };
+    const winningRawUfrag = {
+      candidate: 'candidate:2 1 udp 1 192.0.2.2 5001 typ host ufrag winning-answer',
+    };
+    const malformedExplicitUfrag = {
+      candidate: 'candidate:3 1 udp 1 192.0.2.3 5002 typ host',
+      usernameFragment: 'bad generation value',
+    };
+    await manager.handleIceCandidate('user-b', 'user-a', ignoredRawUfrag);
+    await manager.handleIceCandidate('user-b', 'user-a', winningRawUfrag);
+    await manager.handleIceCandidate('user-b', 'user-a', malformedExplicitUfrag);
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    );
+
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+    expect(peer.addIceCandidate).toHaveBeenCalledWith(winningRawUfrag);
+    expect(peer.addIceCandidate).not.toHaveBeenCalledWith(ignoredRawUfrag);
+    expect(peer.addIceCandidate).not.toHaveBeenCalledWith(malformedExplicitUfrag);
+  });
+
+  it('does not swallow unrelated addIceCandidate failures from quarantined ICE', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+    );
+    peer.addIceCandidate.mockRejectedValue(
+      new DOMException('sdpMid does not match the remote description', 'OperationError'),
+    );
+
+    await manager.handleIceCandidate(
+      'user-b',
+      'user-a',
+      { candidate: 'candidate:unclassified-mid-error' },
+    );
+    await expect(manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    )).rejects.toThrow('sdpMid does not match');
+  });
+
   it('emits each canonical remote display track once and retires its listener on peer cleanup', async () => {
     const onRemoteDisplay = vi.fn();
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
