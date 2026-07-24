@@ -484,6 +484,86 @@ describe('WebRTCManager display and negotiation ownership', () => {
     )).rejects.toThrow('sdpMid does not match');
   });
 
+  it('drains valid answer ICE after an earlier failure, surfaces the error, and never replays the retired queue', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+    );
+    const invalidCandidate = { candidate: 'candidate:unclassified-invalid' };
+    const validCandidate = { candidate: 'candidate:unclassified-valid-answer' };
+    const failure = new DOMException('candidate syntax is invalid', 'OperationError');
+    peer.addIceCandidate.mockImplementation(async (candidate: RTCIceCandidateInit) => {
+      if (candidate === invalidCandidate) throw failure;
+    });
+
+    await manager.handleIceCandidate('user-b', 'user-a', invalidCandidate);
+    await manager.handleIceCandidate('user-b', 'user-a', validCandidate);
+    await expect(manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    )).rejects.toBe(failure);
+
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
+    expect(peer.addIceCandidate).toHaveBeenNthCalledWith(1, invalidCandidate);
+    expect(peer.addIceCandidate).toHaveBeenNthCalledWith(2, validCandidate);
+    expect(peer.signalingState).toBe('stable');
+
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    );
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(2);
+  });
+
+  it('drains past multiple failures and reports them in deterministic queue order', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-a');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    await manager.handleHandshake('user-b');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    await manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'offer', sdp: 'v=0\r\na=ice-ufrag:ignored-offer\r\n' },
+    );
+    const firstInvalid = { candidate: 'candidate:first-invalid' };
+    const secondInvalid = { candidate: 'candidate:second-invalid' };
+    const validCandidate = { candidate: 'candidate:valid-after-errors' };
+    const firstFailure = new TypeError('first candidate failed');
+    const secondFailure = new DOMException('second candidate failed', 'OperationError');
+    peer.addIceCandidate.mockImplementation(async (candidate: RTCIceCandidateInit) => {
+      if (candidate === firstInvalid) throw firstFailure;
+      if (candidate === secondInvalid) throw secondFailure;
+    });
+
+    await manager.handleIceCandidate('user-b', 'user-a', firstInvalid);
+    await manager.handleIceCandidate('user-b', 'user-a', secondInvalid);
+    await manager.handleIceCandidate('user-b', 'user-a', validCandidate);
+    const answer = manager.handleDescription(
+      'user-b',
+      'user-a',
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
+    );
+
+    await expect(answer).rejects.toMatchObject({
+      name: 'AggregateError',
+      errors: [firstFailure, secondFailure],
+    });
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(3);
+    expect(peer.addIceCandidate).toHaveBeenNthCalledWith(3, validCandidate);
+    expect(peer.signalingState).toBe('stable');
+  });
+
   it('emits each canonical remote display track once and retires its listener on peer cleanup', async () => {
     const onRemoteDisplay = vi.fn();
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
