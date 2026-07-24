@@ -21,16 +21,23 @@ const mocks = vi.hoisted(() => ({
   }>,
 }));
 
+const contextState = vi.hoisted(() => ({
+  companyId: '11111111-1111-4111-8111-111111111111',
+  authUserId: 'auth-user',
+  presenceSessionId: '55555555-5555-4555-8555-555555555555' as string | null,
+  accessToken: 'test-access-token',
+}));
+
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'auth-user' } }),
+  useAuth: () => ({ user: contextState.authUserId ? { id: contextState.authUserId } : null, session: contextState.accessToken ? { access_token: contextState.accessToken } : null }),
 }));
 
 vi.mock('@/contexts/CompanyContext', () => ({
-  useCompany: () => ({ company: { id: COMPANY_ID } }),
+  useCompany: () => ({ company: contextState.companyId ? { id: contextState.companyId } : null }),
 }));
 
 vi.mock('@/contexts/PresenceContext', () => ({
-  usePresence: () => ({ presenceSessionId: SESSION_ID }),
+  usePresence: () => ({ presenceSessionId: contextState.presenceSessionId }),
 }));
 
 vi.mock('@/lib/webrtc', () => {
@@ -40,7 +47,9 @@ vi.mock('@/lib/webrtc', () => {
     readonly resumeRemoteAudio = vi.fn();
     readonly initializeLocalStream = vi.fn().mockResolvedValue(undefined);
     readonly setMuted = vi.fn();
+    readonly setSignalingIdentity = vi.fn();
     readonly setSignalingChannel = vi.fn();
+    readonly renegotiateExistingPeers = vi.fn().mockResolvedValue(undefined);
     readonly getActiveShareId = vi.fn().mockReturnValue(null);
 
     constructor(
@@ -94,6 +103,10 @@ describe('AudioProvider manager ownership', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.managers.length = 0;
+    contextState.companyId = COMPANY_ID;
+    contextState.authUserId = 'auth-user';
+    contextState.presenceSessionId = SESSION_ID;
+    contextState.accessToken = 'test-access-token';
     latestAudio = null;
     mocks.removeChannel.mockResolvedValue('ok');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -157,5 +170,30 @@ describe('AudioProvider manager ownership', () => {
     expect(latestAudio?.peerCount).toBe(0);
     expect(latestAudio?.speakingUsers.size).toBe(0);
     expect(latestAudio?.error).toBeNull();
+  });
+
+  it('retires session A before B, creates no manager without a complete identity, and fences stale callbacks', async () => {
+    const { rerender } = render(<AudioProvider spaceId="room-a" userId={USER_ID}><AudioStateProbe /></AudioProvider>);
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+    const managerA = mocks.managers[0];
+    contextState.presenceSessionId = null;
+    rerender(<AudioProvider spaceId="room-a" userId={USER_ID}><AudioStateProbe /></AudioProvider>);
+    await waitFor(() => expect(managerA.cleanup).toHaveBeenCalledTimes(1));
+    expect(mocks.managers).toHaveLength(1);
+    expect(latestAudio?.webrtcManager).toBeNull();
+
+    contextState.presenceSessionId = '66666666-6666-4666-8666-666666666666';
+    contextState.accessToken = 'rotated-access-token';
+    rerender(<AudioProvider spaceId="room-a" userId={USER_ID}><AudioStateProbe /></AudioProvider>);
+    await waitFor(() => expect(mocks.managers).toHaveLength(2));
+    const managerB = mocks.managers[1];
+    expect(managerA.cleanup).toHaveBeenCalledTimes(1);
+    act(() => managerA.callbacks.onPeerSpeaking('stale-peer', true));
+    expect(latestAudio?.speakingUsers.has('stale-peer')).toBe(false);
+    expect(managerB.cleanup).not.toHaveBeenCalled();
+    contextState.companyId = '77777777-7777-4777-8777-777777777777';
+    rerender(<AudioProvider spaceId="room-b" userId="88888888-8888-4888-8888-888888888888"><AudioStateProbe /></AudioProvider>);
+    await waitFor(() => expect(mocks.managers).toHaveLength(3));
+    expect(managerB.cleanup).toHaveBeenCalledTimes(1);
   });
 });

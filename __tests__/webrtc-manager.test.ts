@@ -41,6 +41,7 @@ class FakeStream {
 
 class FakePeerConnection {
   static instances: FakePeerConnection[] = [];
+  static remoteDescriptionGate: Promise<void> | null = null;
 
   connectionState: RTCPeerConnectionState = 'new';
   signalingState: RTCSignalingState = 'stable';
@@ -85,13 +86,21 @@ class FakePeerConnection {
   }
 
   async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
+    if (FakePeerConnection.remoteDescriptionGate) await FakePeerConnection.remoteDescriptionGate;
     this.remoteDescription = description;
     this.signalingState = description.type === 'offer' ? 'have-remote-offer' : 'stable';
   }
 }
 
-function flushMicrotasks(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
+  return { promise, resolve };
 }
 
 describe('WebRTCManager display and negotiation ownership', () => {
@@ -99,6 +108,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     vi.clearAllMocks();
     vadStops.length = 0;
     FakePeerConnection.instances.length = 0;
+    FakePeerConnection.remoteDescriptionGate = null;
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
     vi.stubGlobal('RTCSessionDescription', class {
       constructor(init: RTCSessionDescriptionInit) {
@@ -129,11 +139,12 @@ describe('WebRTCManager display and negotiation ownership', () => {
     const microphone = new FakeTrack('audio');
     const display = new FakeTrack('video');
     const manager = new (await import('@/lib/webrtc/WebRTCManager')).WebRTCManager('space-1', 'user-b');
+    manager.setSignalingIdentity('55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666');
     manager.setSignalingChannel({ send } as never);
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new FakeStream([microphone])) } });
 
     await manager.initializeLocalStream();
-    await manager.handleHandshake('user-a');
+    await manager.handleHandshake('user-a', '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
     await flushMicrotasks();
     await manager.startScreenShare(new FakeStream([display]) as never, 'share-1');
     await flushMicrotasks();
@@ -142,7 +153,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(display.stopped).toBe(false);
     expect(FakePeerConnection.instances[0].senders.map((sender) => sender.track?.kind)).toEqual(['audio', 'video']);
 
-    await manager.handleHandshake('user-c');
+    await manager.handleHandshake('user-c', '99999999-9999-4999-8999-999999999999', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     await flushMicrotasks();
     expect(FakePeerConnection.instances[1].senders.map((sender) => sender.track?.kind)).toEqual(['audio', 'video']);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ event: 'description' }));
@@ -158,11 +169,14 @@ describe('WebRTCManager display and negotiation ownership', () => {
     const send = vi.fn().mockResolvedValue('ok');
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
     const politeManager = new WebRTCManager('space-1', 'user-b', { onRemoteDisplay });
+    politeManager.setSignalingIdentity('55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666');
     politeManager.setSignalingChannel({ send } as never);
-    await politeManager.handleHandshake('user-a');
+    await politeManager.handleHandshake('user-a', '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
     await flushMicrotasks();
 
-    await politeManager.handleDescription('user-a', 'user-b', { type: 'offer', sdp: 'collision' });
+    await politeManager.handleDescription('user-a', 'user-b', { type: 'offer', sdp: 'collision' }, null,
+      '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888',
+      '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666');
     await flushMicrotasks();
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       event: 'description',
@@ -179,11 +193,14 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(onRemoteDisplay).toHaveBeenCalledWith({ peerId: 'user-a', shareId: null, stream: remoteStream });
 
     const impoliteManager = new WebRTCManager('space-1', 'user-a');
+    impoliteManager.setSignalingIdentity('77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
     impoliteManager.setSignalingChannel({ send } as never);
-    await impoliteManager.handleHandshake('user-b');
+    await impoliteManager.handleHandshake('user-b', '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666');
     await flushMicrotasks();
     const impolitePeer = FakePeerConnection.instances.at(-1);
-    await impoliteManager.handleDescription('user-b', 'user-a', { type: 'offer', sdp: 'collision' });
+    await impoliteManager.handleDescription('user-b', 'user-a', { type: 'offer', sdp: 'collision' }, null,
+      '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
     await impoliteManager.handleIceCandidate('user-b', 'user-a', { candidate: 'ignored' });
     expect(impolitePeer?.addIceCandidate).not.toHaveBeenCalled();
   });
@@ -193,9 +210,10 @@ describe('WebRTCManager display and negotiation ownership', () => {
     const microphone = new FakeTrack('audio');
     const display = new FakeTrack('video');
     const manager = new WebRTCManager('space-1', 'user-b');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new FakeStream([microphone])) } });
     await manager.initializeLocalStream();
-    await manager.handleHandshake('user-a');
+    await manager.handleHandshake('user-a', '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
     await manager.startScreenShare(new FakeStream([display]) as never, 'share-1');
     await flushMicrotasks();
     const remoteAudio = new FakeTrack('audio');
@@ -209,5 +227,48 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(FakePeerConnection.instances[0].removeTrack).toHaveBeenCalled();
     expect(vadStops.every((stop) => stop.mock.calls.length === 1)).toBe(true);
     expect(manager.getConnectedPeers()).toEqual([]);
+  });
+
+  it('queues pre-peer and pending-description ICE once, then clears queued work on cleanup', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-b');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    const candidate = { candidate: 'candidate:before', sdpMid: '0', sdpMLineIndex: 0 };
+    await manager.handleIceCandidate('user-a', 'user-b', candidate);
+    expect(manager.getPeerCount()).toBe(0);
+    const firstDescription = manager.handleDescription('user-a', 'user-b', { type: 'offer', sdp: 'first' });
+    await firstDescription;
+    expect(FakePeerConnection.instances[0].addIceCandidate).toHaveBeenCalledTimes(1);
+
+    const gate = deferred<void>();
+    FakePeerConnection.remoteDescriptionGate = gate.promise;
+    const pendingDescription = manager.handleDescription('user-c', 'user-b', { type: 'offer', sdp: 'pending' });
+    await Promise.resolve();
+    await manager.handleIceCandidate('user-c', 'user-b', { candidate: 'candidate:pending', sdpMid: '0', sdpMLineIndex: 0 });
+    expect(FakePeerConnection.instances[1].addIceCandidate).not.toHaveBeenCalled();
+    gate.resolve();
+    await pendingDescription;
+    expect(FakePeerConnection.instances[1].addIceCandidate).toHaveBeenCalledTimes(1);
+
+    await manager.handleIceCandidate('user-d', 'user-b', { candidate: 'candidate:cleanup', sdpMid: '0', sdpMLineIndex: 0 });
+    manager.cleanup();
+    expect(manager.getConnectedPeers()).toEqual([]);
+  });
+
+  it('serializes microphone acquisition and releases a late stream after cleanup', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const acquisition = deferred<FakeStream>();
+    const microphone = new FakeTrack('audio');
+    const getUserMedia = vi.fn().mockReturnValue(acquisition.promise);
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    const manager = new WebRTCManager('space-1', 'user-b');
+    const first = manager.initializeLocalStream();
+    const second = manager.initializeLocalStream();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    manager.cleanup();
+    acquisition.resolve(new FakeStream([microphone]));
+    await expect(first).rejects.toThrow('WEBRTC_MANAGER_CLEANED_UP');
+    await expect(second).rejects.toThrow('WEBRTC_MANAGER_CLEANED_UP');
+    expect(microphone.stopped).toBe(true);
   });
 });

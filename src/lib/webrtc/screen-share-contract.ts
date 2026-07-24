@@ -164,6 +164,8 @@ export const screenShareActiveResponseSchema = z.object({
 
 const signalingScopeSchema = {
   sourceUserId: uuidSchema,
+  sourcePresenceSessionId: uuidSchema,
+  sourceConnectionId: uuidSchema,
   companyId: uuidSchema,
   spaceId: uuidSchema,
   shareId: uuidSchema.nullable(),
@@ -172,6 +174,8 @@ const signalingScopeSchema = {
 const targetedSignalingScopeSchema = {
   ...signalingScopeSchema,
   targetUserId: uuidSchema,
+  targetPresenceSessionId: uuidSchema,
+  targetConnectionId: uuidSchema,
 } as const;
 
 const sessionDescriptionSchema = z.object({

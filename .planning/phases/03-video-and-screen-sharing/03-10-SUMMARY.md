@@ -150,6 +150,35 @@ None.
 
 The tracer can wire the established manager and private signaling contract to provider/UI behavior. Browser P2P delivery, TURN traversal, permission flows, private-channel authorization, and multi-user isolation remain UAT work; deterministic mocks do not prove them.
 
+## Blocked-Wave Remediation — 2026-07-23
+
+**Scope-fenced signaling now waits for authorized presenter state before non-null display media reaches WebRTC, while room audio and handshake startup remain independent.**
+
+### Application
+
+- Corrected the strict contract matrix: handshake is broadcast-only; description and ICE require exact target application-user, presence-session, and per-connection identity.
+- Added bounded, per-peer serialized inbound signaling and canonical active-share fencing. Realtime hints, SDP/ICE, and video tracks do not authorize a presenter. Terminal active-route authorization responses retire the exact channel and manager; transient failures do not.
+- Made audio manager ownership depend on company, application user, presence session, space, and current access-token identity. Identity retirement cleans exactly once and no manager exists for an incomplete identity.
+- Preserved one WebRTC manager and peer registry; added bounded pre-peer/pending-description ICE queues, ACK failure rollback, reconnect renegotiation, serialized microphone acquisition, and exactly-once display ownership release.
+
+### Database
+
+No SQL, migration, schema, RLS, grant, local database, or online database action occurred.
+
+### Deployment
+
+No environment, deployment, browser, TURN, RLS, or online private-channel authorization evidence was produced.
+
+### Verification
+
+- Focused screen-share, audio signaling/manager/context, and presence-session tests: 114 passed.
+- `npm run type-check`, focused ESLint, `npm run presence:gate`, and `git diff --check`: passed.
+- Full `npm test`: 1,036 passing tests, 16 unrelated existing suites blocked before collection because this worktree cannot resolve the existing `server-only` package/import path. This remediation did not change those files.
+
+### Known Limits
+
+Deterministic fakes prove ordering, cleanup, and stale-scope contracts only. Real browser P2P, TURN traversal, multi-user delivery, and deployed private-channel/RLS authorization remain unproven.
+
 ## Self-Check: PASSED
 
 - Required manager test and implementation files exist.
