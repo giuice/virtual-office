@@ -81,8 +81,8 @@ class FakePeerConnection {
   }
 
   addTrack(track: FakeTrack): { track: FakeTrack; replaceTrack: ReturnType<typeof vi.fn> } {
-    const sender = {
-      track,
+    const sender: { track: FakeTrack | null; replaceTrack: ReturnType<typeof vi.fn> } = {
+      track: track,
       replaceTrack: vi.fn(async (replacement: FakeTrack | null) => {
         sender.track = replacement;
       }),
@@ -90,7 +90,7 @@ class FakePeerConnection {
     this.senders.push(sender);
     this.transceivers.push({ stop: vi.fn() });
     queueMicrotask(() => this.onnegotiationneeded?.());
-    return sender;
+    return sender as { track: FakeTrack; replaceTrack: ReturnType<typeof vi.fn> };
   }
 
   getSenders(): Array<{ track: FakeTrack | null; replaceTrack: ReturnType<typeof vi.fn> }> {
@@ -356,6 +356,23 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(peer.addIceCandidate).not.toHaveBeenCalled();
     await manager.handleIceCandidate('user-a', 'user-b', { candidate: 'candidate:current' }, newSessionId, newConnectionId, localSessionId, localConnectionId);
     expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates peer entry through the existing P2P registry up to the warning threshold', async () => {
+    const onRoomLimitWarning = vi.fn();
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'local-user', { onRoomLimitWarning });
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+
+    for (let index = 0; index < 8; index += 1) {
+      await manager.handleHandshake(`peer-${index}`, `session-${index}`, `connection-${index}`);
+    }
+
+    await manager.handleHandshake('peer-0', 'session-0', 'connection-0');
+
+    expect(manager.getPeerCount()).toBe(8);
+    expect(FakePeerConnection.instances).toHaveLength(8);
+    expect(onRoomLimitWarning).not.toHaveBeenCalled();
   });
 
   it('serializes microphone acquisition and releases a late stream after cleanup', async () => {

@@ -54,6 +54,9 @@ export interface PeerConnection {
   audioElement?: HTMLAudioElement;
   remoteAudioStream?: MediaStream;
   remoteDisplayStream?: MediaStream;
+  remoteDisplayTrack?: MediaStreamTrack;
+  remoteDisplayEndedListener?: () => void;
+  emittedRemoteShareId: string | null;
   remoteShareId: string | null;
 }
 
@@ -245,7 +248,8 @@ export class WebRTCManager {
     if (targetUserId !== this.currentUserId || !this.matchesLocalInstance(targetPresenceSessionId, targetConnectionId)) return;
     const peer = this.peerConnections.get(senderId);
     if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
-    if (!peer || peer.ignoreOffer || peer.isSettingRemoteAnswerPending || !peer.pc.remoteDescription) {
+    if (peer?.ignoreOffer) return;
+    if (!peer || peer.isSettingRemoteAnswerPending || !peer.pc.remoteDescription) {
       this.queueIceCandidate(senderId, sourcePresenceSessionId, sourceConnectionId, candidate);
       return;
     }
@@ -276,6 +280,8 @@ export class WebRTCManager {
       peer.pc.onconnectionstatechange = null;
       peer.pc.onnegotiationneeded = null;
       peer.pc.close();
+      this.cleanupRemoteDisplay(peer);
+      peer.remoteAudioStream = undefined;
       this.peerConnections.delete(peerId);
     }
     this.cleanupRemoteAudio(peerId);
@@ -306,7 +312,7 @@ export class WebRTCManager {
     const peer: PeerConnection = {
       pc, userId: peerId, presenceSessionId: presenceSessionId ?? null, connectionId: connectionId ?? null,
       polite: this.currentUserId.localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false,
-      isSettingRemoteAnswerPending: false, remoteShareId: null,
+      isSettingRemoteAnswerPending: false, remoteShareId: null, emittedRemoteShareId: null,
     };
     pc.onnegotiationneeded = () => { void this.negotiate(peer).catch((error: unknown) => this.reportError(error)); };
     pc.ontrack = (event) => this.handleRemoteTrack(peer, event);
@@ -358,7 +364,7 @@ export class WebRTCManager {
   }
 
   private async negotiate(peer: PeerConnection): Promise<void> {
-    if (peer.pc.signalingState !== 'stable') return;
+    if (peer.makingOffer || peer.pc.signalingState !== 'stable') return;
     try {
       peer.makingOffer = true;
       await peer.pc.setLocalDescription();
@@ -452,7 +458,23 @@ export class WebRTCManager {
     if (!stream) return;
     if (event.track.kind === 'video') {
       if (!peer.remoteShareId) return;
+      if (
+        peer.remoteDisplayTrack === event.track
+        && peer.remoteDisplayStream === stream
+        && peer.emittedRemoteShareId === peer.remoteShareId
+      ) {
+        return;
+      }
+      this.cleanupRemoteDisplay(peer);
       peer.remoteDisplayStream = stream;
+      peer.remoteDisplayTrack = event.track;
+      peer.emittedRemoteShareId = peer.remoteShareId;
+      const endedListener = () => {
+        if (peer.remoteDisplayTrack !== event.track) return;
+        this.cleanupRemoteDisplay(peer);
+      };
+      peer.remoteDisplayEndedListener = endedListener;
+      event.track.addEventListener?.('ended', endedListener, { once: true });
       this.events.onRemoteDisplay?.({ peerId: peer.userId, shareId: peer.remoteShareId, stream });
       return;
     }
@@ -478,6 +500,16 @@ export class WebRTCManager {
     if (audioElement) { audioElement.srcObject = null; audioElement.remove(); this.audioElements.delete(peerId); }
     const vad = this.vadMap.get(peerId);
     if (vad) { vad.stop(); this.vadMap.delete(peerId); }
+  }
+
+  private cleanupRemoteDisplay(peer: PeerConnection): void {
+    if (peer.remoteDisplayTrack && peer.remoteDisplayEndedListener) {
+      peer.remoteDisplayTrack.removeEventListener?.('ended', peer.remoteDisplayEndedListener);
+    }
+    peer.remoteDisplayTrack = undefined;
+    peer.remoteDisplayStream = undefined;
+    peer.remoteDisplayEndedListener = undefined;
+    peer.emittedRemoteShareId = null;
   }
 
   private startAudioRetryInterval(): void {
