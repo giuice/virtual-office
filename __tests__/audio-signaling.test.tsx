@@ -87,7 +87,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
 
-    renderHook(() => useAudioSignaling(options(manager)));
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
 
     await waitFor(() => expect(mocks.client.channel).toHaveBeenCalledWith(
       `company:${COMPANY_ID}:space:${SPACE_ID}:media`,
@@ -103,6 +103,7 @@ describe('useAudioSignaling private media lifecycle', () => {
 
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
     expect(manager.setSignalingChannel).toHaveBeenCalledWith(mocks.channelApi, expect.any(Function));
     expect(mocks.channelApi.track).toHaveBeenCalledWith(expect.objectContaining({
       user_id: USER_ID,
@@ -188,6 +189,7 @@ describe('useAudioSignaling private media lifecycle', () => {
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(handlers.has('broadcast:presenter-hint')).toBe(true);
     const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
     if (!localConnectionId) throw new Error('local signaling identity was not installed');
 
@@ -208,6 +210,25 @@ describe('useAudioSignaling private media lifecycle', () => {
       `/api/spaces/${SPACE_ID}/screen-share/active?presenceSessionId=${SESSION_ID}`,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+
+    vi.mocked(fetch).mockResolvedValueOnce(activeResponse(null));
+    act(() => handlers.get('broadcast:presenter-hint')?.({ payload: {
+      type: 'presenter-hint',
+      sourceUserId: PEER_ID,
+      sourcePresenceSessionId: SESSION_ID,
+      sourceConnectionId: '77777777-7777-4777-8777-777777777777',
+      targetUserId: USER_ID,
+      targetPresenceSessionId: SESSION_ID,
+      targetConnectionId: localConnectionId,
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: SHARE_ID,
+      presenterUserId: PEER_ID,
+      presenterName: 'Untrusted hint',
+      expiresAt: '2026-07-24T00:00:00.000Z',
+    } }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(result.current.activeShare).toBeNull());
   });
 
   it('fences deferred subscribe, fetch, remove, and callbacks from scope A after scope B starts', async () => {
@@ -324,16 +345,20 @@ describe('useAudioSignaling private media lifecycle', () => {
       setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined), getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
-    renderHook(() => useAudioSignaling(options(manager)));
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(manager.setSignalingChannel).toHaveBeenCalled());
     const sender = vi.mocked(manager.setSignalingChannel).mock.calls[0][1];
     if (!sender) throw new Error('signal sender was not installed');
     mocks.channelApi.send.mockResolvedValueOnce('timed out');
-    await expect(sender({ type: 'handshake', userId: USER_ID })).rejects.toThrow('SIGNALING_SEND_FAILED');
+    await expect(sender({ type: 'handshake', userId: USER_ID })).rejects.toMatchObject({
+      code: 'SIGNALING_SEND_FAILED',
+      deliveryStatus: 'timed out',
+    });
     act(() => mocks.statusHandler?.('TIMED_OUT'));
     expect(manager.setSignalingChannel).toHaveBeenLastCalledWith(null);
+    await waitFor(() => expect(result.current.isConnected).toBe(false));
     await expect(sender({ type: 'handshake', userId: USER_ID })).rejects.toThrow('SIGNALING_UNAVAILABLE');
   });
 
@@ -423,11 +448,13 @@ describe('useAudioSignaling private media lifecycle', () => {
       broadcastHandshake: vi.fn().mockResolvedValue(undefined), cleanup, getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
     vi.mocked(fetch).mockResolvedValueOnce(new Response('malformed authorization response', { status: 409 }));
-    renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
+    const { unmount } = renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(terminal).toHaveBeenCalledTimes(1));
     expect(manager.setSignalingChannel).toHaveBeenLastCalledWith(null);
+    unmount();
+    expect(mocks.client.removeChannel).toHaveBeenCalledTimes(1);
 
     vi.mocked(fetch).mockResolvedValueOnce(new Response('unavailable', { status: 503 }));
     const retryManager = { ...manager, setSignalingChannel: vi.fn(), broadcastHandshake: vi.fn().mockResolvedValue(undefined), cleanup: vi.fn(), getActiveShareId: vi.fn().mockReturnValue(null) } as unknown as WebRTCManager;
