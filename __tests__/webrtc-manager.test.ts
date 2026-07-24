@@ -235,7 +235,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     await impoliteManager.handleIceCandidate(
       'user-b',
       'user-a',
-      { candidate: 'ignored' },
+      { candidate: 'ignored', usernameFragment: 'ignored-offer' },
       '55555555-5555-4555-8555-555555555555',
       '66666666-6666-4666-8666-666666666666',
       '77777777-7777-4777-8777-777777777777',
@@ -246,7 +246,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     await impoliteManager.handleDescription(
       'user-b',
       'user-a',
-      { type: 'answer', sdp: 'winning-answer' },
+      { type: 'answer', sdp: 'v=0\r\na=ice-ufrag:winning-answer\r\n' },
       null,
       '55555555-5555-4555-8555-555555555555',
       '66666666-6666-4666-8666-666666666666',
@@ -436,9 +436,13 @@ describe('WebRTCManager display and negotiation ownership', () => {
       candidate: 'candidate:3 1 udp 1 192.0.2.3 5002 typ host',
       usernameFragment: 'bad generation value',
     };
+    const malformedRawUfrag = {
+      candidate: 'candidate:4 1 udp 1 192.0.2.4 5003 typ host ufrag bad*generation',
+    };
     await manager.handleIceCandidate('user-b', 'user-a', ignoredRawUfrag);
     await manager.handleIceCandidate('user-b', 'user-a', winningRawUfrag);
     await manager.handleIceCandidate('user-b', 'user-a', malformedExplicitUfrag);
+    await manager.handleIceCandidate('user-b', 'user-a', malformedRawUfrag);
     await manager.handleDescription(
       'user-b',
       'user-a',
@@ -449,6 +453,7 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(peer.addIceCandidate).toHaveBeenCalledWith(winningRawUfrag);
     expect(peer.addIceCandidate).not.toHaveBeenCalledWith(ignoredRawUfrag);
     expect(peer.addIceCandidate).not.toHaveBeenCalledWith(malformedExplicitUfrag);
+    expect(peer.addIceCandidate).not.toHaveBeenCalledWith(malformedRawUfrag);
   });
 
   it('does not swallow unrelated addIceCandidate failures from quarantined ICE', async () => {

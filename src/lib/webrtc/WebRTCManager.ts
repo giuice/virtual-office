@@ -63,7 +63,13 @@ export interface PeerConnection {
 interface PendingIceCandidate {
   candidate: RTCIceCandidateInit;
   receivedWhileIgnoringOffer: boolean;
+  generation: IceGeneration;
 }
+
+type IceGeneration =
+  | { kind: 'classified'; ufrag: string }
+  | { kind: 'unclassified' }
+  | { kind: 'malformed' };
 
 export interface WebRTCManagerEvents {
   onPeerConnected: (userId: string) => void;
@@ -254,13 +260,15 @@ export class WebRTCManager {
     const peer = this.peerConnections.get(senderId);
     if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
     if (peer?.ignoreOffer) {
-      if (!this.getCandidateIceUfrag(candidate)) return;
+      const generation = this.classifyCandidateIceGeneration(candidate);
+      if (generation.kind === 'malformed') return;
       this.queueIceCandidate(
         senderId,
         sourcePresenceSessionId,
         sourceConnectionId,
         candidate,
         true,
+        generation,
       );
       return;
     }
@@ -421,6 +429,7 @@ export class WebRTCManager {
     connectionId: string | undefined,
     candidate: RTCIceCandidateInit,
     receivedWhileIgnoringOffer = false,
+    generation = this.classifyCandidateIceGeneration(candidate),
   ): void {
     const key = this.pendingIceKey(peerId, presenceSessionId, connectionId);
     let queue = this.pendingIceCandidates.get(key);
@@ -430,7 +439,7 @@ export class WebRTCManager {
       this.pendingIceCandidates.set(key, queue);
     }
     if (queue.length >= MAX_PENDING_ICE_PER_PEER) queue.shift();
-    queue.push({ candidate, receivedWhileIgnoringOffer });
+    queue.push({ candidate, receivedWhileIgnoringOffer, generation });
   }
 
   private async drainIceCandidates(peer: PeerConnection): Promise<void> {
@@ -440,14 +449,18 @@ export class WebRTCManager {
     this.pendingIceCandidates.delete(key);
     const acceptedIceUfrags = this.getDescriptionIceUfrags(peer.pc.remoteDescription);
     for (const pending of queued) {
-      if (pending.receivedWhileIgnoringOffer && acceptedIceUfrags.size > 0) {
-        const candidateUfrag = this.getCandidateIceUfrag(pending.candidate);
-        if (!candidateUfrag || !acceptedIceUfrags.has(candidateUfrag)) continue;
+      if (
+        pending.receivedWhileIgnoringOffer
+        && pending.generation.kind === 'classified'
+        && acceptedIceUfrags.size > 0
+        && !acceptedIceUfrags.has(pending.generation.ufrag)
+      ) {
+        continue;
       }
       await this.addIceCandidate(
         peer,
         pending.candidate,
-        pending.receivedWhileIgnoringOffer,
+        pending.receivedWhileIgnoringOffer && pending.generation.kind === 'unclassified',
       );
     }
   }
@@ -471,21 +484,39 @@ export class WebRTCManager {
     try {
       await peer.pc.addIceCandidate(candidate);
     } catch (error) {
-      if (!peer.ignoreOffer && !suppressIgnoredOfferError) throw error;
+      if (suppressIgnoredOfferError && this.isIceGenerationMismatch(error)) return;
+      throw error;
     }
   }
 
-  private getCandidateIceUfrag(candidate: RTCIceCandidateInit): string | null {
-    if (candidate.usernameFragment) return candidate.usernameFragment;
-    return /\bufrag\s+([^\s]+)/i.exec(candidate.candidate ?? '')?.[1] ?? null;
+  private classifyCandidateIceGeneration(candidate: RTCIceCandidateInit): IceGeneration {
+    if (candidate.usernameFragment !== undefined && candidate.usernameFragment !== null) {
+      const ufrag = this.normalizeIceUfrag(candidate.usernameFragment);
+      return ufrag ? { kind: 'classified', ufrag } : { kind: 'malformed' };
+    }
+    const rawUfrag = /(?:^|\s)ufrag\s+([^\s]+)/i.exec(candidate.candidate ?? '')?.[1];
+    if (rawUfrag === undefined) return { kind: 'unclassified' };
+    const ufrag = this.normalizeIceUfrag(rawUfrag);
+    return ufrag ? { kind: 'classified', ufrag } : { kind: 'malformed' };
+  }
+
+  private normalizeIceUfrag(value: string): string | null {
+    return /^[A-Za-z0-9+/_-]{1,256}$/.test(value) ? value : null;
   }
 
   private getDescriptionIceUfrags(description: RTCSessionDescriptionInit): Set<string> {
     const ufrags = new Set<string>();
     for (const match of description.sdp?.matchAll(/^a=ice-ufrag:([^\r\n]+)$/gm) ?? []) {
-      ufrags.add(match[1].trim());
+      const ufrag = this.normalizeIceUfrag(match[1].trim());
+      if (ufrag) ufrags.add(ufrag);
     }
     return ufrags;
+  }
+
+  private isIceGenerationMismatch(error: unknown): boolean {
+    return error instanceof DOMException
+      && error.name === 'OperationError'
+      && /\b(?:ufrag|username fragment|ice generation)\b/i.test(error.message);
   }
 
   private matchesLocalInstance(targetPresenceSessionId?: string, targetConnectionId?: string): boolean {
