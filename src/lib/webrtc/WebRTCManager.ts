@@ -210,7 +210,7 @@ export class WebRTCManager {
     const offerCollision = isOffer && !readyForOffer;
     peer.ignoreOffer = !peer.polite && offerCollision;
     if (peer.ignoreOffer) {
-      this.pendingIceCandidates.delete(senderId);
+      this.clearPendingIceForPeer(senderId);
       return;
     }
 
@@ -233,11 +233,20 @@ export class WebRTCManager {
     }
   }
 
-  async handleIceCandidate(senderId: string, targetUserId: string, candidate: RTCIceCandidateInit): Promise<void> {
-    if (targetUserId !== this.currentUserId) return;
+  async handleIceCandidate(
+    senderId: string,
+    targetUserId: string,
+    candidate: RTCIceCandidateInit,
+    sourcePresenceSessionId?: string,
+    sourceConnectionId?: string,
+    targetPresenceSessionId?: string,
+    targetConnectionId?: string,
+  ): Promise<void> {
+    if (targetUserId !== this.currentUserId || !this.matchesLocalInstance(targetPresenceSessionId, targetConnectionId)) return;
     const peer = this.peerConnections.get(senderId);
+    if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
     if (!peer || peer.ignoreOffer || peer.isSettingRemoteAnswerPending || !peer.pc.remoteDescription) {
-      this.queueIceCandidate(senderId, candidate);
+      this.queueIceCandidate(senderId, sourcePresenceSessionId, sourceConnectionId, candidate);
       return;
     }
     await this.addIceCandidate(peer, candidate);
@@ -256,7 +265,7 @@ export class WebRTCManager {
   getPeerCount(): number { return this.peerConnections.size; }
 
   cleanupPeer(peerId: string): void {
-    this.pendingIceCandidates.delete(peerId);
+    this.clearPendingIceForPeer(peerId);
     const peer = this.peerConnections.get(peerId);
     if (peer) {
       if (peer.microphoneSender) peer.pc.removeTrack(peer.microphoneSender);
@@ -385,22 +394,40 @@ export class WebRTCManager {
     if (result !== 'ok') throw new Error('SIGNALING_SEND_FAILED');
   }
 
-  private queueIceCandidate(peerId: string, candidate: RTCIceCandidateInit): void {
-    let queue = this.pendingIceCandidates.get(peerId);
+  private queueIceCandidate(
+    peerId: string,
+    presenceSessionId: string | undefined,
+    connectionId: string | undefined,
+    candidate: RTCIceCandidateInit,
+  ): void {
+    const key = this.pendingIceKey(peerId, presenceSessionId, connectionId);
+    let queue = this.pendingIceCandidates.get(key);
     if (!queue) {
       if (this.pendingIceCandidates.size >= MAX_PENDING_ICE_PEERS) return;
       queue = [];
-      this.pendingIceCandidates.set(peerId, queue);
+      this.pendingIceCandidates.set(key, queue);
     }
     if (queue.length >= MAX_PENDING_ICE_PER_PEER) queue.shift();
     queue.push(candidate);
   }
 
   private async drainIceCandidates(peer: PeerConnection): Promise<void> {
-    const queued = this.pendingIceCandidates.get(peer.userId);
+    const key = this.pendingIceKey(peer.userId, peer.presenceSessionId ?? undefined, peer.connectionId ?? undefined);
+    const queued = this.pendingIceCandidates.get(key);
     if (!queued || peer.ignoreOffer || !peer.pc.remoteDescription) return;
-    this.pendingIceCandidates.delete(peer.userId);
+    this.pendingIceCandidates.delete(key);
     for (const candidate of queued) await this.addIceCandidate(peer, candidate);
+  }
+
+  private clearPendingIceForPeer(peerId: string): void {
+    const prefix = `${encodeURIComponent(peerId)}:`;
+    for (const key of this.pendingIceCandidates.keys()) {
+      if (key.startsWith(prefix)) this.pendingIceCandidates.delete(key);
+    }
+  }
+
+  private pendingIceKey(peerId: string, presenceSessionId?: string, connectionId?: string): string {
+    return [peerId, presenceSessionId ?? '', connectionId ?? ''].map(encodeURIComponent).join(':');
   }
 
   private async addIceCandidate(peer: PeerConnection, candidate: RTCIceCandidateInit): Promise<void> {
@@ -423,7 +450,12 @@ export class WebRTCManager {
   private handleRemoteTrack(peer: PeerConnection, event: RTCTrackEvent): void {
     const [stream] = event.streams;
     if (!stream) return;
-    if (event.track.kind === 'video') { peer.remoteDisplayStream = stream; this.events.onRemoteDisplay?.({ peerId: peer.userId, shareId: peer.remoteShareId, stream }); return; }
+    if (event.track.kind === 'video') {
+      if (!peer.remoteShareId) return;
+      peer.remoteDisplayStream = stream;
+      this.events.onRemoteDisplay?.({ peerId: peer.userId, shareId: peer.remoteShareId, stream });
+      return;
+    }
     if (event.track.kind !== 'audio') return;
     let audioElement = this.audioElements.get(peer.userId);
     if (!audioElement) {

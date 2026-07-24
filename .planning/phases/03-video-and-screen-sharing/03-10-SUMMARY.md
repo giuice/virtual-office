@@ -150,16 +150,16 @@ None.
 
 The tracer can wire the established manager and private signaling contract to provider/UI behavior. Browser P2P delivery, TURN traversal, permission flows, private-channel authorization, and multi-user isolation remain UAT work; deterministic mocks do not prove them.
 
-## Blocked-Wave Remediation — 2026-07-23
+## Blocked-Wave Remediation — 2026-07-24
 
 **Scope-fenced signaling now waits for authorized presenter state before non-null display media reaches WebRTC, while room audio and handshake startup remain independent.**
 
 ### Application
 
-- Corrected the strict contract matrix: handshake is broadcast-only; description and ICE require exact target application-user, presence-session, and per-connection identity.
-- Added bounded, per-peer serialized inbound signaling and canonical active-share fencing. Realtime hints, SDP/ICE, and video tracks do not authorize a presenter. Terminal active-route authorization responses retire the exact channel and manager; transient failures do not.
-- Made audio manager ownership depend on company, application user, presence session, space, and current access-token identity. Identity retirement cleans exactly once and no manager exists for an incomplete identity.
-- Preserved one WebRTC manager and peer registry; added bounded pre-peer/pending-description ICE queues, ACK failure rollback, reconnect renegotiation, serialized microphone acquisition, and exactly-once display ownership release.
+- Corrected the strict contract matrix: handshake is broadcast-only; description and ICE require exact target application-user, presence-session, and per-connection identity. Pending ICE is keyed to the exact remote session/connection instance, so stale candidates cannot drain after a peer replacement.
+- Added bounded, per-peer serialized inbound signaling and canonical active-share fencing. Realtime hints, SDP/ICE, and video tracks do not authorize a presenter: a null-share description cannot emit a remote display event, and non-null display SDP/ICE waits for canonical active authorization.
+- Made audio manager ownership depend on company, application user, presence session, space, and current access-token rotation without retaining the raw token in manager identity. Identity retirement clears muted presence state and cleans exactly once; no manager exists for an incomplete application-user identity.
+- Terminal active-route 401/403/409 responses retire the exact channel and manager even for malformed response bodies; typed presenter-profile denial also fails closed, while transport and 5xx failures remain non-terminal. Reconciliation performs one immediate active read plus at most one delayed retry per buffered batch.
 
 ### Database
 
@@ -171,9 +171,9 @@ No environment, deployment, browser, TURN, RLS, or online private-channel author
 
 ### Verification
 
-- Focused screen-share, audio signaling/manager/context, and presence-session tests: 114 passed.
+- Focused signaling, manager, and AudioContext regressions: 19 tests passed, including stale instance ICE, null-share video suppression, bounded inbound queues, and bounded null-active reconciliation.
 - `npm run type-check`, focused ESLint, `npm run presence:gate`, and `git diff --check`: passed.
-- Full `npm test`: 1,036 passing tests, 16 unrelated existing suites blocked before collection because this worktree cannot resolve the existing `server-only` package/import path. This remediation did not change those files.
+- Full `npm test`: Vitest alias target under worktree `node_modules` is absent, while the primary alias target exists; final primary suite remains pending.
 
 ### Known Limits
 

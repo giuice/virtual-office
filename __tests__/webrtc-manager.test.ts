@@ -190,7 +190,14 @@ describe('WebRTCManager display and negotiation ownership', () => {
     peer.ontrack?.({ track: audio, streams: [remoteStream] } as never);
     peer.ontrack?.({ track: video, streams: [remoteStream] } as never);
     expect(document.createElement).toHaveBeenCalledTimes(1);
-    expect(onRemoteDisplay).toHaveBeenCalledWith({ peerId: 'user-a', shareId: null, stream: remoteStream });
+    expect(onRemoteDisplay).not.toHaveBeenCalled();
+
+    await politeManager.handleDescription('user-a', 'user-b', { type: 'offer', sdp: 'authorized-display' }, 'share-1',
+      '77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888',
+      '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666');
+    peer.ontrack?.({ track: video, streams: [remoteStream] } as never);
+    expect(onRemoteDisplay).toHaveBeenCalledTimes(1);
+    expect(onRemoteDisplay).toHaveBeenCalledWith({ peerId: 'user-a', shareId: 'share-1', stream: remoteStream });
 
     const impoliteManager = new WebRTCManager('space-1', 'user-a');
     impoliteManager.setSignalingIdentity('77777777-7777-4777-8777-777777777777', '88888888-8888-4888-8888-888888888888');
@@ -253,6 +260,29 @@ describe('WebRTCManager display and negotiation ownership', () => {
     await manager.handleIceCandidate('user-d', 'user-b', { candidate: 'candidate:cleanup', sdpMid: '0', sdpMLineIndex: 0 });
     manager.cleanup();
     expect(manager.getConnectedPeers()).toEqual([]);
+  });
+
+  it('keys queued ICE to the exact remote session instance so stale candidates cannot drain after replacement', async () => {
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-b');
+    const localSessionId = '55555555-5555-4555-8555-555555555555';
+    const localConnectionId = '66666666-6666-4666-8666-666666666666';
+    const oldSessionId = '77777777-7777-4777-8777-777777777777';
+    const oldConnectionId = '88888888-8888-4888-8888-888888888888';
+    const newSessionId = '99999999-9999-4999-8999-999999999999';
+    const newConnectionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    manager.setSignalingIdentity(localSessionId, localConnectionId);
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+
+    await manager.handleIceCandidate('user-a', 'user-b', { candidate: 'candidate:old' }, oldSessionId, oldConnectionId, localSessionId, localConnectionId);
+    await manager.handleHandshake('user-a', newSessionId, newConnectionId);
+    await manager.handleDescription('user-a', 'user-b', { type: 'offer', sdp: 'replacement' }, null,
+      newSessionId, newConnectionId, localSessionId, localConnectionId);
+
+    const peer = FakePeerConnection.instances[0];
+    expect(peer.addIceCandidate).not.toHaveBeenCalled();
+    await manager.handleIceCandidate('user-a', 'user-b', { candidate: 'candidate:current' }, newSessionId, newConnectionId, localSessionId, localConnectionId);
+    expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
   });
 
   it('serializes microphone acquisition and releases a late stream after cleanup', async () => {

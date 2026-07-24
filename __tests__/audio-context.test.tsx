@@ -172,6 +172,14 @@ describe('AudioProvider manager ownership', () => {
     expect(latestAudio?.error).toBeNull();
   });
 
+  it('does not substitute the Supabase Auth UUID when the application user ID is unavailable', async () => {
+    render(<AudioProvider spaceId="room-a"><AudioStateProbe /></AudioProvider>);
+
+    await act(async () => {});
+    expect(mocks.managers).toHaveLength(0);
+    expect(mocks.channel).not.toHaveBeenCalled();
+  });
+
   it('retires session A before B, creates no manager without a complete identity, and fences stale callbacks', async () => {
     const { rerender } = render(<AudioProvider spaceId="room-a" userId={USER_ID}><AudioStateProbe /></AudioProvider>);
     await waitFor(() => expect(mocks.managers).toHaveLength(1));

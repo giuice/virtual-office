@@ -131,6 +131,8 @@ describe('useAudioSignaling private media lifecycle', () => {
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
+    const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!localConnectionId) throw new Error('local signaling identity was not installed');
 
     const description = {
       type: 'description',
@@ -139,7 +141,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       sourceConnectionId: '77777777-7777-4777-8777-777777777777',
       targetUserId: USER_ID,
       targetPresenceSessionId: SESSION_ID,
-      targetConnectionId: '88888888-8888-4888-8888-888888888888',
+      targetConnectionId: localConnectionId,
       companyId: COMPANY_ID,
       spaceId: SPACE_ID,
       shareId: null,
@@ -148,6 +150,8 @@ describe('useAudioSignaling private media lifecycle', () => {
     act(() => {
       handlers.get('broadcast:description')?.({ payload: { ...description, description: { type: 'offer' } } });
       handlers.get('broadcast:description')?.({ payload: { ...description, companyId: SHARE_ID } });
+      handlers.get('broadcast:description')?.({ payload: { ...description, targetPresenceSessionId: SHARE_ID } });
+      handlers.get('broadcast:description')?.({ payload: { ...description, targetConnectionId: '88888888-8888-4888-8888-888888888888' } });
       handlers.get('broadcast:description')?.({ payload: description });
     });
 
@@ -184,6 +188,8 @@ describe('useAudioSignaling private media lifecycle', () => {
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!localConnectionId) throw new Error('local signaling identity was not installed');
 
     act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: {
       type: 'presenter-invalidated',
@@ -192,7 +198,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       sourceConnectionId: '77777777-7777-4777-8777-777777777777',
       targetUserId: USER_ID,
       targetPresenceSessionId: SESSION_ID,
-      targetConnectionId: '88888888-8888-4888-8888-888888888888',
+      targetConnectionId: localConnectionId,
       companyId: COMPANY_ID,
       spaceId: SPACE_ID,
       shareId: SHARE_ID,
@@ -296,7 +302,10 @@ describe('useAudioSignaling private media lifecycle', () => {
     renderHook(() => useAudioSignaling(options(manager)));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
-    const target = { targetUserId: USER_ID, targetPresenceSessionId: SESSION_ID, targetConnectionId: '88888888-8888-4888-8888-888888888888' };
+    await waitFor(() => expect(manager.setSignalingIdentity).toHaveBeenCalledTimes(1));
+    const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!localConnectionId) throw new Error('local signaling identity was not installed');
+    const target = { targetUserId: USER_ID, targetPresenceSessionId: SESSION_ID, targetConnectionId: localConnectionId };
     const source = { sourceUserId: PEER_ID, sourcePresenceSessionId: SESSION_ID, sourceConnectionId: '77777777-7777-4777-8777-777777777777', companyId: COMPANY_ID, spaceId: SPACE_ID };
     act(() => {
       handlers.get('broadcast:handshake')?.({ payload: { type: 'handshake', ...source, shareId: null } });
@@ -328,6 +337,84 @@ describe('useAudioSignaling private media lifecycle', () => {
     await expect(sender({ type: 'handshake', userId: USER_ID })).rejects.toThrow('SIGNALING_UNAVAILABLE');
   });
 
+  it('performs one delayed canonical retry for a null active response, then discards that buffered batch', async () => {
+    vi.useFakeTimers();
+    try {
+      const handlers = new Map<string, (value: { payload: unknown }) => void>();
+      mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+        handlers.set(`${type}:${filter.event}`, handler);
+        return mocks.channelApi;
+      });
+      const initialRead = deferred<Response>();
+      vi.mocked(fetch).mockReturnValueOnce(initialRead.promise).mockResolvedValueOnce(activeResponse(null));
+      const manager = {
+        setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+        broadcastHandshake: vi.fn().mockResolvedValue(undefined), handleDescription: vi.fn().mockResolvedValue(undefined), getActiveShareId: vi.fn().mockReturnValue(null),
+      } as unknown as WebRTCManager;
+      renderHook(() => useAudioSignaling(options(manager)));
+      await act(async () => {});
+      act(() => mocks.statusHandler?.('SUBSCRIBED'));
+      await act(async () => {});
+      const targetConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+      if (!targetConnectionId) throw new Error('local signaling identity was not installed');
+      const handler = handlers.get('broadcast:description');
+      if (!handler) throw new Error('description handler was not installed');
+      act(() => handler({ payload: {
+        type: 'description', sourceUserId: PEER_ID, sourcePresenceSessionId: SESSION_ID,
+        sourceConnectionId: '77777777-7777-4777-8777-777777777777', targetUserId: USER_ID,
+        targetPresenceSessionId: SESSION_ID, targetConnectionId, companyId: COMPANY_ID, spaceId: SPACE_ID,
+        shareId: SHARE_ID, description: { type: 'offer', sdp: 'display' },
+      } }));
+      await act(async () => initialRead.resolve(activeResponse(null)));
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await act(async () => vi.advanceTimersByTimeAsync(1_000));
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await act(async () => vi.advanceTimersByTimeAsync(5_000));
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(manager.handleDescription).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds serialized inbound work per source while preserving accepted signal order', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const gate = deferred<void>();
+    const manager = {
+      setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined), handleDescription: vi.fn().mockImplementation(() => gate.promise),
+      getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(manager.setSignalingIdentity).toHaveBeenCalledTimes(1));
+    const targetConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!targetConnectionId) throw new Error('local signaling identity was not installed');
+    const handler = handlers.get('broadcast:description');
+    if (!handler) throw new Error('description handler was not installed');
+    const payload = {
+      type: 'description', sourceUserId: PEER_ID, sourcePresenceSessionId: SESSION_ID,
+      sourceConnectionId: '77777777-7777-4777-8777-777777777777', targetUserId: USER_ID,
+      targetPresenceSessionId: SESSION_ID, targetConnectionId, companyId: COMPANY_ID, spaceId: SPACE_ID,
+      shareId: null, description: { type: 'offer', sdp: 'audio' },
+    };
+    act(() => {
+      for (let index = 0; index < 33; index += 1) handler({ payload: { ...payload, description: { type: 'offer', sdp: `audio-${index}` } } });
+    });
+    await waitFor(() => expect(manager.handleDescription).toHaveBeenCalledTimes(1));
+    expect(result.current.error).toBe('Media signaling queue limit reached.');
+    await act(async () => gate.resolve());
+    await waitFor(() => expect(manager.handleDescription).toHaveBeenCalledTimes(32));
+    expect(vi.mocked(manager.handleDescription).mock.calls.map((call) => call[2].sdp)).toEqual(
+      Array.from({ length: 32 }, (_, index) => `audio-${index}`),
+    );
+  });
+
   it('retires terminal authorized access denial without treating transient failures as authorization', async () => {
     const cleanup = vi.fn();
     const terminal = vi.fn(cleanup);
@@ -335,7 +422,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined), cleanup, getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ success: false, code: 'ACCESS_DENIED', error: 'denied' }), { status: 403 }));
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('malformed authorization response', { status: 409 }));
     renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));

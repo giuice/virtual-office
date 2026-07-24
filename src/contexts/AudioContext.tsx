@@ -56,7 +56,7 @@ export function useAudio(): AudioContextValue { const context = use(AudioContext
 }
 
 interface AudioProviderProps { spaceId: string | undefined;
-	userId?: string; // Internal user.id (from profile), not supabase_uid
+	userId?: string; // Internal application user.id, never the Supabase Auth UUID
 	children: ReactNode; }
 
 interface OwnedWebRTCManager {
@@ -65,24 +65,28 @@ interface OwnedWebRTCManager {
 	spaceId: string;
 	userId: string;
 	presenceSessionId: string;
-	accessToken: string;
 	identity: string;
 }
 
-export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { user, session } = useAuth();
+export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { session } = useAuth();
 	const { company } = useCompany();
 	const { presenceSessionId } = usePresence();
-	// Use internal userId if provided, otherwise fall back to supabase uid
-	const currentUserId = userId || user?.id;
+	const currentUserId = userId;
 	const accessToken = session?.access_token ?? null;
+	const tokenIdentityRef = useRef<string | null>(null);
+	const tokenEpochRef = useRef(0);
+	if (tokenIdentityRef.current !== accessToken) {
+		tokenIdentityRef.current = accessToken;
+		tokenEpochRef.current += 1;
+	}
 	const managerIdentity = company?.id && currentUserId && presenceSessionId && spaceId && accessToken
-		? `${company.id}:${currentUserId}:${presenceSessionId}:${spaceId}:${accessToken}`
+		? `${company.id}:${currentUserId}:${presenceSessionId}:${spaceId}:token-${tokenEpochRef.current}`
 		: null;
 
 	// State
 	const [ownedWebrtcManager, updateOwnedWebrtcManager] = useReducerState<OwnedWebRTCManager | null>(null);
 	const retiredIdentityRef = useRef<string | null>(null);
-	const cleanedManagersRef = useRef(new Set<WebRTCManager>());
+	const cleanedManagersRef = useRef(new WeakSet<WebRTCManager>());
 	const cleanupOwnedManager = useCallback((manager: WebRTCManager): void => {
 		if (cleanedManagersRef.current.has(manager)) return;
 		cleanedManagersRef.current.add(manager);
@@ -179,7 +183,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			},
 		});
 
-		updateOwnedWebrtcManager({ manager, companyId: company.id, spaceId, userId: currentUserId, presenceSessionId, accessToken, identity: managerIdentity });
+		updateOwnedWebrtcManager({ manager, companyId: company.id, spaceId, userId: currentUserId, presenceSessionId, identity: managerIdentity });
 		managerRef.current = manager;
 
 		// Browser audio policy: resume any blocked audio on ANY user interaction
