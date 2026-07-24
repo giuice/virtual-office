@@ -164,10 +164,14 @@ export const screenShareActiveResponseSchema = z.object({
 
 const signalingScopeSchema = {
   sourceUserId: uuidSchema,
-  targetUserId: uuidSchema,
   companyId: uuidSchema,
   spaceId: uuidSchema,
-  shareId: uuidSchema,
+  shareId: uuidSchema.nullable(),
+} as const;
+
+const targetedSignalingScopeSchema = {
+  ...signalingScopeSchema,
+  targetUserId: uuidSchema,
 } as const;
 
 const sessionDescriptionSchema = z.object({
@@ -189,19 +193,19 @@ export const screenShareHandshakePayloadSchema = z.object({
 
 export const screenShareDescriptionPayloadSchema = z.object({
   type: z.literal('description'),
-  ...signalingScopeSchema,
+  ...targetedSignalingScopeSchema,
   description: sessionDescriptionSchema,
 }).strict();
 
 export const screenShareIcePayloadSchema = z.object({
   type: z.literal('ice'),
-  ...signalingScopeSchema,
+  ...targetedSignalingScopeSchema,
   candidate: iceCandidateSchema,
 }).strict();
 
 export const screenSharePresenterHintPayloadSchema = z.object({
   type: z.literal('presenter-hint'),
-  ...signalingScopeSchema,
+  ...targetedSignalingScopeSchema,
   presenterUserId: uuidSchema,
   presenterName: screenSharePresenterNameSchema,
   expiresAt: isoDateTimeSchema,
@@ -209,7 +213,8 @@ export const screenSharePresenterHintPayloadSchema = z.object({
 
 export const screenSharePresenterInvalidatedPayloadSchema = z.object({
   type: z.literal('presenter-invalidated'),
-  ...signalingScopeSchema,
+  ...targetedSignalingScopeSchema,
+  shareId: uuidSchema,
 }).strict();
 
 export const screenShareSignalingPayloadSchema = z.union([

@@ -1,227 +1,280 @@
-/**
- * Audio Signaling Hook for WebRTC P2P Connections
- * 
- * Manages Supabase Realtime channel for WebRTC signaling:
- * - handshake: Announce presence to existing peers
- * - offer: Send SDP offer to new peer
- * - answer: Respond to SDP offer
- * - ice-candidate: Exchange ICE candidates for NAT traversal
- */
+'use client';
 
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { WebRTCManager } from '@/lib/webrtc';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import {
+  screenShareActiveResponseSchema,
+  screenShareDescriptionPayloadSchema,
+  screenShareHandshakePayloadSchema,
+  screenShareIcePayloadSchema,
+  screenSharePresenterInvalidatedPayloadSchema,
+  type ScreenSharePublicShare,
+} from '@/lib/webrtc/screen-share-contract';
+import { WebRTCManager, type SignalingEvent, type WebRTCSignalSender } from '@/lib/webrtc';
 
 interface UseAudioSignalingOptions {
-	spaceId: string | undefined;
-	currentUserId: string | undefined;
-	webrtcManager: WebRTCManager | null;
-	enabled?: boolean;
-	// Mute state to track
-	isMuted: boolean;
+  companyId: string | undefined;
+  spaceId: string | undefined;
+  currentUserId: string | undefined;
+  presenceSessionId: string | null | undefined;
+  generation: string | number;
+  webrtcManager: WebRTCManager | null;
+  enabled?: boolean;
+  isMuted: boolean;
 }
 
 interface AudioPresenceState {
-	[key: string]: {
-		user_id: string;
-		is_muted: boolean;
-		online_at: string;
-	}[];
+  [key: string]: Array<{
+    user_id?: string;
+    is_muted?: boolean;
+  }>;
 }
 
 interface SignalingState {
-	isConnected: boolean;
-	error: string | null;
-	mutedUserIds: Set<string>;
+  isConnected: boolean;
+  error: string | null;
+  mutedUserIds: Set<string>;
+  activeShare: ScreenSharePublicShare | null;
 }
 
-export function useAudioSignaling({
-	spaceId,
-	currentUserId,
-	webrtcManager,
-	enabled = true,
-	isMuted = true,
-}: UseAudioSignalingOptions): SignalingState {
-	const channelRef = useRef<RealtimeChannel | null>(null);
-	const isConnectedRef = useRef(false);
-	const isMutedRef = useRef(isMuted);
-	const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
-	isMutedRef.current = isMuted;
+interface ScopedSignalingInput {
+  companyId: string;
+  spaceId: string;
+  currentUserId: string;
+  presenceSessionId: string;
+  generation: string | number;
+  manager: WebRTCManager;
+}
 
-	// Handle incoming handshake
-	const handleHandshake = useCallback(
-		async (payload: { userId: string }) => {
-			if (!webrtcManager || payload.userId === currentUserId) return;
-			// console.log('[AudioSignaling] Received handshake from:', payload.userId);
-			await webrtcManager.handleHandshake(payload.userId);
-		},
-		[webrtcManager, currentUserId]
-	);
+function activeRoute(spaceId: string, presenceSessionId: string): string {
+  const query = new URLSearchParams({ presenceSessionId });
+  return `/api/spaces/${encodeURIComponent(spaceId)}/screen-share/active?${query.toString()}`;
+}
 
-	// Handle incoming offer
-	const handleOffer = useCallback(
-		async (payload: { targetUserId: string; senderId: string; sdp: RTCSessionDescriptionInit }) => {
-			if (!webrtcManager) return;
-			// console.log('[AudioSignaling] Received offer from:', payload.senderId);
-			await webrtcManager.handleOffer(payload.senderId, payload.targetUserId, payload.sdp);
-		},
-		[webrtcManager]
-	);
+export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingState {
+  const {
+    companyId,
+    spaceId,
+    currentUserId,
+    presenceSessionId,
+    generation,
+    webrtcManager,
+    enabled = true,
+    isMuted,
+  } = options;
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const scopeGenerationRef = useRef<string | number>(generation);
+  const isConnectedRef = useRef(false);
+  const isMutedRef = useRef(isMuted);
+  const activeShareRef = useRef<ScreenSharePublicShare | null>(null);
+  const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
+  const [activeShare, setActiveShare] = useState<ScreenSharePublicShare | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-	// Handle incoming answer
-	const handleAnswer = useCallback(
-		async (payload: { targetUserId: string; senderId: string; sdp: RTCSessionDescriptionInit }) => {
-			if (!webrtcManager) return;
-			// console.log('[AudioSignaling] Received answer from:', payload.senderId);
-			await webrtcManager.handleAnswer(payload.senderId, payload.targetUserId, payload.sdp);
-		},
-		[webrtcManager]
-	);
+  scopeGenerationRef.current = generation;
+  isMutedRef.current = isMuted;
 
-	// Handle incoming ICE candidate
-	const handleIceCandidate = useCallback(
-		async (payload: { targetUserId: string; senderId: string; candidate: RTCIceCandidateInit }) => {
-			if (!webrtcManager) return;
-			await webrtcManager.handleIceCandidate(payload.senderId, payload.targetUserId, payload.candidate);
-		},
-		[webrtcManager]
-	);
+  useEffect(() => {
+    const channel = channelRef.current;
+    if (!channel || !isConnectedRef.current || !currentUserId) return;
+    void channel.track({ user_id: currentUserId, is_muted: isMutedRef.current }).catch(() => undefined);
+  }, [isMuted, currentUserId]);
 
-	// Update presence state
-	const updatePresenceState = useCallback((channel: RealtimeChannel) => {
-		const state = channel.presenceState() as AudioPresenceState;
-		const mutedIds = new Set<string>();
+  useEffect(() => {
+    if (!enabled || !companyId || !spaceId || !currentUserId || !presenceSessionId || !webrtcManager) {
+      activeShareRef.current = null;
+      setActiveShare(null);
+      setMutedUserIds(new Set());
+      return;
+    }
 
-		Object.values(state).forEach(presences => {
-			presences.forEach(p => {
-				if (p.is_muted && p.user_id) {
-					mutedIds.add(p.user_id);
-				}
-			});
-		});
+    const scope: ScopedSignalingInput = {
+      companyId,
+      spaceId,
+      currentUserId,
+      presenceSessionId,
+      generation,
+      manager: webrtcManager,
+    };
+    const supabase = createSupabaseBrowserClient();
+    const topic = `company:${scope.companyId}:space:${scope.spaceId}:media`;
+    const channel = supabase.channel(topic, {
+      config: {
+        private: true,
+        broadcast: { self: false, ack: true },
+        presence: { key: `${scope.currentUserId}:${scope.presenceSessionId}` },
+      },
+    });
+    let cancelled = false;
+    let subscribed = false;
+    let activeRequest: AbortController | null = null;
+    channelRef.current = channel;
 
-		setMutedUserIds(mutedIds);
-	}, []);
+    const isCurrent = (): boolean => (
+      !cancelled &&
+      channelRef.current === channel &&
+      scopeGenerationRef.current === scope.generation
+    );
+    const isScopePayload = (payload: {
+      sourceUserId: string;
+      companyId: string;
+      spaceId: string;
+      targetUserId?: string;
+      shareId: string | null;
+    }, allowUnverifiedShare = false): boolean => (
+      isCurrent() &&
+      payload.sourceUserId !== scope.currentUserId &&
+      payload.companyId === scope.companyId &&
+      payload.spaceId === scope.spaceId &&
+      (payload.targetUserId === undefined || payload.targetUserId === scope.currentUserId) &&
+      (allowUnverifiedShare || payload.shareId === null || payload.shareId === activeShareRef.current?.shareId)
+    );
+    const updateMutedUsers = (): void => {
+      if (!isCurrent()) return;
+      const muted = new Set<string>();
+      const state = channel.presenceState() as AudioPresenceState;
+      Object.values(state).forEach((presences) => {
+        presences.forEach((presence) => {
+          if (presence.user_id && presence.is_muted) muted.add(presence.user_id);
+        });
+      });
+      setMutedUserIds(muted);
+    };
+    const reconcileActive = async (): Promise<void> => {
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
+      try {
+        const response = await fetch(activeRoute(scope.spaceId, scope.presenceSessionId), { signal: controller.signal });
+        const body: unknown = await response.json().catch(() => null);
+        if (!isCurrent() || controller.signal.aborted || !response.ok) return;
+        const parsed = screenShareActiveResponseSchema.safeParse(body);
+        if (!parsed.success || (parsed.data.active && (
+          parsed.data.active.companyId !== scope.companyId ||
+          parsed.data.active.spaceId !== scope.spaceId
+        ))) {
+          setError('Screen-share reconciliation rejected an invalid response.');
+          return;
+        }
+        activeShareRef.current = parsed.data.active;
+        setActiveShare(parsed.data.active);
+      } catch (reconcileError) {
+        if (isCurrent() && !controller.signal.aborted) {
+          setError(reconcileError instanceof Error ? reconcileError.message : 'Screen-share reconciliation failed.');
+        }
+      }
+    };
+    const sendSignal: WebRTCSignalSender = async (event: SignalingEvent): Promise<void> => {
+      if (!isCurrent() || !subscribed) return;
+      const base = {
+        sourceUserId: scope.currentUserId,
+        companyId: scope.companyId,
+        spaceId: scope.spaceId,
+        shareId: scope.manager.getActiveShareId(),
+      };
+      const payload = event.type === 'handshake'
+        ? screenShareHandshakePayloadSchema.parse({ type: 'handshake', ...base })
+        : event.type === 'description'
+          ? screenShareDescriptionPayloadSchema.parse({
+            type: 'description',
+            ...base,
+            targetUserId: event.targetUserId,
+            description: event.description,
+          })
+          : screenShareIcePayloadSchema.parse({
+            type: 'ice',
+            ...base,
+            targetUserId: event.targetUserId,
+            candidate: event.candidate,
+          });
+      await channel.send({ type: 'broadcast', event: payload.type, payload });
+    };
+    const runCurrent = (handler: () => Promise<void>): void => {
+      if (!isCurrent()) return;
+      void handler().catch((handlerError: unknown) => {
+        if (isCurrent()) setError(handlerError instanceof Error ? handlerError.message : 'Media signaling failed.');
+      });
+    };
 
-	// Track own presence
-	useEffect(() => {
-		const channel = channelRef.current;
-		if (channel && isConnectedRef.current && currentUserId) {
-			void channel.track({
-				user_id: currentUserId,
-				is_muted: isMuted,
-				online_at: new Date().toISOString(),
-			}).catch((error) => {
-				if (channelRef.current === channel) {
-					console.error('[AudioSignaling] Failed to update presence:', error);
-				}
-			});
-		}
-	}, [isMuted, currentUserId]);
+    channel
+      .on('broadcast', { event: 'handshake' }, ({ payload }) => {
+        const parsed = screenShareHandshakePayloadSchema.safeParse(payload);
+        if (!parsed.success || !isScopePayload(parsed.data)) return;
+        runCurrent(() => scope.manager.handleHandshake(parsed.data.sourceUserId));
+      })
+      .on('broadcast', { event: 'description' }, ({ payload }) => {
+        const parsed = screenShareDescriptionPayloadSchema.safeParse(payload);
+        if (!parsed.success || !isScopePayload(parsed.data)) return;
+        runCurrent(() => scope.manager.handleDescription(
+          parsed.data.sourceUserId,
+          parsed.data.targetUserId,
+          parsed.data.description,
+          parsed.data.shareId,
+        ));
+      })
+      .on('broadcast', { event: 'ice' }, ({ payload }) => {
+        const parsed = screenShareIcePayloadSchema.safeParse(payload);
+        if (!parsed.success || !isScopePayload(parsed.data)) return;
+        runCurrent(() => scope.manager.handleIceCandidate(
+          parsed.data.sourceUserId,
+          parsed.data.targetUserId,
+          parsed.data.candidate,
+        ));
+      })
+      .on('broadcast', { event: 'presenter-invalidated' }, ({ payload }) => {
+        const parsed = screenSharePresenterInvalidatedPayloadSchema.safeParse(payload);
+        if (!parsed.success || !isScopePayload(parsed.data, true)) return;
+        runCurrent(reconcileActive);
+      })
+      .on('presence', { event: 'sync' }, updateMutedUsers)
+      .on('presence', { event: 'join' }, updateMutedUsers)
+      .on('presence', { event: 'leave' }, () => {
+        updateMutedUsers();
+        runCurrent(reconcileActive);
+      });
 
-	useEffect(() => {
-		if (!spaceId || !currentUserId || !webrtcManager || !enabled) {
-			return;
-		}
+    void supabase.realtime.setAuth().then(() => {
+      if (isCurrent()) {
+        channel.subscribe((status) => {
+          if (!isCurrent()) return;
+          if (status === 'SUBSCRIBED') {
+            subscribed = true;
+            isConnectedRef.current = true;
+            scope.manager.setSignalingChannel(channel, sendSignal);
+            runCurrent(async () => {
+              await channel.track({ user_id: scope.currentUserId, is_muted: isMutedRef.current });
+              if (!isCurrent()) return;
+              void reconcileActive();
+              await scope.manager.broadcastHandshake();
+            });
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            subscribed = false;
+            isConnectedRef.current = false;
+          }
+        });
+      }
+    }).catch(() => {
+      if (isCurrent()) setError('Private media signaling authentication failed.');
+    });
 
-		const channelName = `room:audio:${spaceId}`;
-		console.log('[AudioSignaling] Subscribing to channel:', channelName);
+    return () => {
+      cancelled = true;
+      subscribed = false;
+      activeRequest?.abort();
+      if (channelRef.current === channel) {
+        channelRef.current = null;
+        isConnectedRef.current = false;
+        scope.manager.setSignalingChannel(null);
+      }
+      void supabase.removeChannel(channel).catch(() => undefined);
+    };
+  }, [companyId, currentUserId, enabled, generation, presenceSessionId, spaceId, webrtcManager]);
 
-		const channel = supabase.channel(channelName, {
-			config: {
-				broadcast: { self: false },
-				presence: { key: currentUserId },
-			},
-		});
-		let cancelled = false;
-		channelRef.current = channel;
-		const isCurrentChannel = () => !cancelled && channelRef.current === channel;
-		const runCurrentHandler = (handler: () => Promise<void>) => {
-			if (!isCurrentChannel()) return;
-			void handler().catch((error: unknown) => {
-				if (isCurrentChannel()) {
-					console.error('[AudioSignaling] Signaling handler failed:', error);
-				}
-			});
-		};
-
-		// Set up event listeners
-		channel
-			.on('broadcast', { event: 'handshake' }, ({ payload }) => {
-				runCurrentHandler(() => handleHandshake(payload));
-			})
-			.on('broadcast', { event: 'offer' }, ({ payload }) => {
-				runCurrentHandler(() => handleOffer(payload));
-			})
-			.on('broadcast', { event: 'answer' }, ({ payload }) => {
-				runCurrentHandler(() => handleAnswer(payload));
-			})
-			.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-				runCurrentHandler(() => handleIceCandidate(payload));
-			})
-			.on('presence', { event: 'sync' }, () => {
-				if (isCurrentChannel()) updatePresenceState(channel);
-			})
-			.on('presence', { event: 'join' }, () => {
-				if (isCurrentChannel()) updatePresenceState(channel);
-			})
-			.on('presence', { event: 'leave' }, () => {
-				if (isCurrentChannel()) updatePresenceState(channel);
-			})
-			.subscribe((status) => {
-				// console.log('[AudioSignaling] Channel status:', status);
-
-				if (status === 'SUBSCRIBED') {
-					void (async () => {
-						if (cancelled || channelRef.current !== channel) return;
-						isConnectedRef.current = true;
-						webrtcManager.setSignalingChannel(channel);
-
-						try {
-							// Track initial state before announcing this peer.
-							await channel.track({
-								user_id: currentUserId,
-								is_muted: isMutedRef.current,
-								online_at: new Date().toISOString(),
-							});
-
-							// A space/manager transition may retire this subscription while
-							// track is in flight. Never handshake through a stale manager.
-							if (cancelled || channelRef.current !== channel) return;
-							await webrtcManager.broadcastHandshake();
-						} catch (error) {
-							if (!cancelled && channelRef.current === channel) {
-								isConnectedRef.current = false;
-								console.error('[AudioSignaling] Failed to initialize signaling:', error);
-							}
-						}
-					})();
-				} else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-					if (channelRef.current === channel) {
-						isConnectedRef.current = false;
-					}
-				}
-			});
-
-		// Cleanup on unmount
-		return () => {
-			cancelled = true;
-			console.log('[AudioSignaling] Unsubscribing from channel:', channelName);
-			if (channelRef.current === channel) {
-				webrtcManager.setSignalingChannel(null);
-				channelRef.current = null;
-				isConnectedRef.current = false;
-			}
-			void supabase.removeChannel(channel).catch((error: unknown) => {
-				console.error('[AudioSignaling] Failed to remove signaling channel:', error);
-			});
-		};
-		}, [spaceId, currentUserId, webrtcManager, enabled, handleHandshake, handleOffer, handleAnswer, handleIceCandidate, updatePresenceState]);
-
-	return {
-		isConnected: isConnectedRef.current,
-		error: null,
-		mutedUserIds
-	};
+  return {
+    isConnected: isConnectedRef.current,
+    error,
+    mutedUserIds,
+    activeShare,
+  };
 }

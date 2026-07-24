@@ -331,15 +331,17 @@ export class WebRTCManager {
   }
 
   private async attachMicrophone(peer: PeerConnection): Promise<void> {
-    const track = this.microphoneStream?.getAudioTracks()[0];
-    if (!track || peer.microphoneSender) return;
-    peer.microphoneSender = peer.pc.addTrack(track, this.microphoneStream!);
+    const stream = this.microphoneStream;
+    const track = stream?.getAudioTracks()[0];
+    if (!track || !stream || peer.microphoneSender) return;
+    peer.microphoneSender = peer.pc.addTrack(track, stream);
   }
 
   private async attachDisplay(peer: PeerConnection): Promise<void> {
-    const track = this.displayStream?.getVideoTracks()[0];
-    if (!track || peer.displaySender) return;
-    peer.displaySender = peer.pc.addTrack(track, this.displayStream!);
+    const stream = this.displayStream;
+    const track = stream?.getVideoTracks()[0];
+    if (!track || !stream || peer.displaySender) return;
+    peer.displaySender = peer.pc.addTrack(track, stream);
   }
 
   private async detachDisplay(peer: PeerConnection): Promise<void> {

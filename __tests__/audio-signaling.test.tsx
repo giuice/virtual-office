@@ -2,7 +2,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAudioSignaling } from '@/hooks/realtime/useAudioSignaling';
 import type { WebRTCManager } from '@/lib/webrtc';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
 const SPACE_ID = '22222222-2222-4222-8222-222222222222';
@@ -16,6 +15,7 @@ const mocks = vi.hoisted(() => {
     on: vi.fn(),
     subscribe: vi.fn(),
     track: vi.fn(),
+    send: vi.fn(),
     presenceState: vi.fn(() => ({})),
   };
   const client = {
@@ -43,7 +43,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function activeResponse(active = null): Response {
+function activeResponse(active: unknown = null): Response {
   return new Response(JSON.stringify({ success: true, code: 'ACTIVE_READ', active }), { status: 200 });
 }
 
