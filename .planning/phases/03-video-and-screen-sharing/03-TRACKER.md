@@ -126,3 +126,13 @@
 - Regression evidence: Wave 5 transport passed 25/25; critical Presence passed 61 files / 558 tests; TypeScript, focused ESLint, Presence movement gate, and Presence skill validation passed.
 - Database/deployment state: no local or online database action and no deployment, push, or pull request occurred.
 - Next action: the orchestrator owns the formal read-only Presence re-review; this executor did not run it.
+
+## 2026-07-24 — Wave 5 full ICE queue drain correction
+
+- Final Presence Safety blocker corrected: one rejected quarantined candidate can no longer abort the remainder of the accepted-answer ICE queue.
+- Exact-once semantics: the exact instance queue is retired before iteration and never replayed. Every eligible candidate is attempted in queue order; successful additions remain applied. A single failure is rethrown unchanged after drain, while multiple failures become an ordered `AggregateError`.
+- Removed brittle behavior: browser-specific error-message matching and silent suppression were deleted. Known generation mismatches are still filtered before browser mutation; unrelated candidate errors remain visible after all candidates are attempted.
+- Deterministic evidence: RED `a52a1d3` failed 2/15 because later valid ICE was skipped and multiple failures were not aggregated; GREEN `3728dee` passed 15/15, including no replay after error and stable signaling after successful later ICE.
+- Regression evidence: Wave 5 transport passed 27/27; critical Presence passed 61 files / 558 tests; TypeScript, focused ESLint, Presence movement gate, and Presence skill validation passed.
+- Database/deployment state: no local or online database action and no deployment, push, or pull request occurred.
+- Next action: formal read-only Presence re-review remains orchestrator-owned.

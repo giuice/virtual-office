@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 8
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 8
-last_updated: 2026-07-24T22:31:18.711Z
+total_count: 9
+last_updated: 2026-07-24T22:38:16.280Z
 ---
 
 # Broken Windows Ledger
@@ -23,6 +23,7 @@ last_updated: 2026-07-24T22:31:18.711Z
 | 6 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Local Presence review added an exact owned-channel fence for mute metadata across simultaneous identity scope swaps | open |  | 2026-07-24T22:07:39.760Z |  |
 | 7 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: retain generation-matched winning-answer ICE received before the answer while excluding ignored colliding-offer ICE | open |  | 2026-07-24T22:21:50.012Z |  |
 | 8 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety interoperability risk fixed: quarantine omitted/null-generation glare ICE and suppress only explicit ICE-generation mismatch errors | open |  | 2026-07-24T22:31:18.711Z |  |
+| 9 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: drain every eligible queued ICE candidate exactly once before surfacing ordered errors | open |  | 2026-07-24T22:38:16.280Z |  |
 
 ````json
 [
@@ -120,6 +121,18 @@ last_updated: 2026-07-24T22:31:18.711Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-24T22:31:18.711Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/lib/webrtc/WebRTCManager.ts",
+    "line": null,
+    "description": "Presence Safety blocker fixed: drain every eligible queued ICE candidate exactly once before surfacing ordered errors",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-24T22:38:16.280Z",
     "resolved_at": null
   }
 ]

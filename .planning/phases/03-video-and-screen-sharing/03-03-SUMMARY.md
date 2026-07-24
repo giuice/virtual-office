@@ -31,7 +31,7 @@ key-files:
     - "__tests__/audio-signaling.test.tsx"
 key-decisions:
   - "Retained the existing AudioProvider/WebRTCManager P2P registry and getIceServers STUN/TURN path as the sole media transport."
-  - "Quarantine classified and unclassified ICE during an ignored collision; filter known generations against the winning answer and browser-validate unclassified candidates without swallowing unrelated errors."
+  - "Quarantine classified and unclassified ICE during an ignored collision; filter known generations, drain every eligible candidate exactly once, then surface ordered errors after preserving successful additions."
   - "Presenter hints and Presence leave events only trigger the authorized active endpoint; they never select stage media directly."
   - "Token or identity-scope changes retire and recreate the exact private channel because Realtime authorization is connection-cached."
 patterns-established:
@@ -84,7 +84,7 @@ status: complete
 
 ## Accomplishments
 
-- Completed per-peer polite/impolite collision behavior, quarantined classified and unclassified ICE during glare, filtered known generations against the winning answer, browser-validated unknown generations, serialized overlapping negotiation callbacks, and retained the configured STUN/TURN path.
+- Completed per-peer polite/impolite collision behavior, quarantined classified and unclassified ICE during glare, filtered known generations against the winning answer, fully drained unknown generations past failures, surfaced deterministic post-drain errors, serialized overlapping negotiation callbacks, and retained the configured STUN/TURN path.
 - Preserved one P2P connection registry while keeping local microphone, local display, remote audio/VAD, and canonical remote display ownership separate.
 - Deduplicated identical display-track events and removed exact display listeners, sender/transceiver references, streams, audio elements, VADs, timers, and callbacks during peer or manager retirement.
 - Hardened the private `company:{companyId}:space:{spaceId}:media` lifecycle with `private: true`, acknowledged Broadcast, scoped Presence keys, Zod parsing, target/session/connection fences, token-driven recreation, and exact-once removal.
@@ -101,6 +101,8 @@ status: complete
 - `3348f48` — `fix(03-03): retain winning answer ICE through glare`
 - `5184a69` — `test(03-03): expose unclassified glare ICE loss`
 - `3eaf134` — `fix(03-03): quarantine unclassified glare ICE`
+- `a52a1d3` — `test(03-03): expose aborting ICE queue drain`
+- `3728dee` — `fix(03-03): drain queued ICE past failures`
 
 ### Task 2: Fence and validate private media signaling through reconnects
 
@@ -118,7 +120,7 @@ status: complete
 
 - Kept `AudioProvider`, `WebRTCManager`, the P2P peer map, and `getIceServers()` unchanged as the architecture boundary; no SDK, SFU, second registry, or parallel signaling path was introduced.
 - Used stable application user ID ordering for polite/impolite roles.
-- Quarantined all structurally safe ICE received during an ignored glare offer. Known generations are matched to the accepted answer SDP; omitted/null generations are tried only after that answer, with suppression limited to explicit ICE-generation mismatch errors.
+- Quarantined all structurally safe ICE received during an ignored glare offer. Known generations are matched to the accepted answer SDP; omitted/null generations are tried only after that answer. Every eligible candidate is attempted exactly once and errors are reported only after the complete queue drains.
 - Kept mute Presence data as UI metadata only and fenced it to company, application user, Presence session, space, token, channel, and generation.
 - Recreated the channel after access-token changes instead of assuming cached Realtime authorization changed in place.
 
@@ -157,12 +159,21 @@ status: complete
 
 - **Found during:** Formal Presence Safety review of the first glare correction
 - **Issue:** `RTCIceCandidateInit.usernameFragment` is optional. The first correction still dropped a valid winning-answer candidate when both the field and raw `ufrag` extension were absent.
-- **Fix:** Classified glare candidates as known, unclassified, or malformed. Known mismatches are discarded before browser mutation; unclassified candidates remain in the bounded per-instance queue until the answer is installed and are then attempted. Only an `OperationError` explicitly identifying ufrag/username-fragment/ICE-generation mismatch is suppressed; unrelated MID, state, parsing, or transport failures propagate. Malformed explicit and raw generations are dropped before queueing.
+- **Fix:** Classified glare candidates as known, unclassified, or malformed. Known mismatches are discarded before browser mutation; unclassified candidates remain in the bounded per-instance queue until the answer is installed and are then attempted. Malformed explicit and raw generations are dropped before queueing.
 - **Files modified:** `src/lib/webrtc/WebRTCManager.ts`, `__tests__/webrtc-manager.test.ts`
 - **Verification:** Deterministic RED failed 3/13 for omitted/null loss and error-classification behavior; GREEN passed 13/13. Wave 5 passed 25/25, Presence passed 558/558, and type-check, focused ESLint, movement gate, and skill validation passed.
 - **Commits:** RED `5184a69`; GREEN `3eaf134`
 
-**Total deviations:** 4 auto-fixed — 3 bugs and 1 missing critical scope fence.
+**5. [Rule 1 - Bug] Drained the complete retired ICE queue before surfacing candidate errors**
+
+- **Found during:** Formal Presence Safety review of the optional-generation correction
+- **Issue:** The queue was retired before draining, but the first non-suppressed `addIceCandidate()` rejection aborted iteration. A stale or invalid candidate could therefore prevent later winning-answer ICE from being attempted. Error suppression also depended on non-standard browser message text.
+- **Fix:** Kept exact-once queue retirement before iteration, collected every candidate error while continuing through all eligible entries, preserved successful additions, then rethrew the single original error or an ordered `AggregateError`. Removed browser-message classification entirely. Known mismatched generations remain filtered before `addIceCandidate()`.
+- **Files modified:** `src/lib/webrtc/WebRTCManager.ts`, `__tests__/webrtc-manager.test.ts`
+- **Verification:** Deterministic RED failed 2/15 because valid later ICE was skipped and errors were not aggregated; GREEN passed 15/15. Wave 5 passed 27/27, Presence passed 558/558, and type-check, focused ESLint, movement gate, and skill validation passed.
+- **Commits:** RED `a52a1d3`; GREEN `3728dee`
+
+**Total deviations:** 5 auto-fixed — 4 bugs and 1 missing critical scope fence.
 **Impact:** The changes strengthen the planned collision and stale-scope guarantees without expanding architecture or product scope.
 
 ## TDD Gate Compliance
@@ -170,19 +181,20 @@ status: complete
 - Task 1: RED `65d0d78` → GREEN `acb0642`.
 - Task 1 corrective regression: RED `eb721a7` → GREEN `3348f48`.
 - Task 1 interoperability regression: RED `5184a69` → GREEN `3eaf134`.
+- Task 1 full-drain regression: RED `a52a1d3` → GREEN `3728dee`.
 - Task 2: RED `89fda14` → GREEN `4a691fd`.
 - All RED runs failed for their intended behavioral reasons before production changes.
 
 ## Presence Safety Review
 
-- The mandatory Presence Safety review surfaced the answer-before-ICE blocker and then the optional-`usernameFragment` interoperability risk described above; both RED/GREEN corrections and all local gates are complete.
+- The mandatory Presence Safety review surfaced the answer-before-ICE blocker, optional-`usernameFragment` interoperability risk, and aborting-drain blocker described above; all RED/GREEN corrections and local gates are complete.
 - Per orchestration instructions, this executor did not run the formal re-review. The orchestrator owns that final read-only confirmation, which remains recorded in `.planning/WINDOWS.md`.
 - No database, migration, RLS, repository, API route, or service-role boundary changed, so the Supabase/RLS reviewer was not triggered.
 
 ## Verification
 
-- `npm test -- __tests__/webrtc-manager.test.ts` — 1 file, 13 tests passed after a deterministic 3/13 interoperability RED.
-- `npm test -- __tests__/audio-signaling.test.tsx __tests__/webrtc-manager.test.ts` — 2 files, 25 tests passed.
+- `npm test -- __tests__/webrtc-manager.test.ts` — 1 file, 15 tests passed after a deterministic 2/15 full-drain RED.
+- `npm test -- __tests__/audio-signaling.test.tsx __tests__/webrtc-manager.test.ts` — 2 files, 27 tests passed.
 - `npm run type-check` — passed.
 - Focused ESLint for all four plan-owned files — passed.
 - `npm run test:presence` — 61 files, 558 tests passed.
@@ -226,7 +238,7 @@ None for this local implementation.
 ## Self-Check: PASSED
 
 - All four plan-owned source/test files exist.
-- RED/GREEN commits `65d0d78`, `acb0642`, `89fda14`, `4a691fd`, `eb721a7`, `3348f48`, `5184a69`, and `3eaf134` exist in Git history.
+- RED/GREEN commits `65d0d78`, `acb0642`, `89fda14`, `4a691fd`, `eb721a7`, `3348f48`, `5184a69`, `3eaf134`, `a52a1d3`, and `3728dee` exist in Git history.
 - Summary frontmatter declares `status: complete`.
 - All plan acceptance criteria are represented by passing focused tests and static/runtime gates.
 - `git diff --check` passed.
