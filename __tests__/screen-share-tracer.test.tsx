@@ -20,7 +20,7 @@ const SHARE_ID = '55555555-5555-4555-8555-555555555555';
 const REMOTE_USER_ID = '66666666-6666-4666-8666-666666666666';
 
 interface ManagerCallbacks {
-  onRemoteDisplayTrack: (peerId: string, shareId: string | null, stream: MediaStream) => void;
+  onRemoteDisplay: (event: { peerId: string; shareId: string | null; stream: MediaStream }) => void;
 }
 
 const mocks = vi.hoisted(() => ({
@@ -74,7 +74,7 @@ vi.mock('@/lib/webrtc', () => ({
     setMuted = vi.fn();
     resumeRemoteAudio = vi.fn();
     emitRemoteDisplay = (peerId: string, shareId: string | null, stream: MediaStream) => {
-      this.callbacks.onRemoteDisplayTrack(peerId, shareId, stream);
+      this.callbacks.onRemoteDisplay({ peerId, shareId, stream });
     };
 
     constructor(_spaceId: string, _userId: string, callbacks: ManagerCallbacks) {
