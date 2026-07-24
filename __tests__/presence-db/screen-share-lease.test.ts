@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import { Client } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createAuthedUser, type AuthedUser } from './auth-clients';
-import { PresenceFixtures } from './fixtures';
-import { LOCAL_DB_URL } from './setup';
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createAuthedUser, type AuthedUser } from "./auth-clients";
+import { PresenceFixtures } from "./fixtures";
+import { LOCAL_DB_URL } from "./setup";
 
 const NS = `screen-share-lease-${randomUUID()}`;
 
@@ -25,16 +25,19 @@ type RpcResult = Readonly<Record<string, unknown>> & {
 };
 
 function sessionIdFromAccessToken(token: string): string {
-  const encodedPayload = token.split('.')[1];
-  if (!encodedPayload) throw new Error('Local Auth token was malformed');
-  const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as {
+  const encodedPayload = token.split(".")[1];
+  if (!encodedPayload) throw new Error("Local Auth token was malformed");
+  const payload = JSON.parse(
+    Buffer.from(encodedPayload, "base64url").toString("utf8"),
+  ) as {
     session_id?: string;
   };
-  if (!payload.session_id) throw new Error('Local Auth session did not include session_id');
+  if (!payload.session_id)
+    throw new Error("Local Auth session did not include session_id");
   return payload.session_id;
 }
 
-describe('presence-db screen-share lease authority', () => {
+describe("presence-db screen-share lease authority", () => {
   let fixtures: PresenceFixtures;
   let companyId: string;
   let spaceId: string;
@@ -50,7 +53,8 @@ describe('presence-db screen-share lease authority', () => {
        returning id`,
       [`Screen share ${key}::${NS}`],
     );
-    if (!company) throw new Error(`Failed to create company fixture for ${key}`);
+    if (!company)
+      throw new Error(`Failed to create company fixture for ${key}`);
     companyIds.add(company.id);
 
     const [space] = await fixtures.sql<{
@@ -76,13 +80,16 @@ describe('presence-db screen-share lease authority', () => {
   async function createScenarioOccupant(
     scenario: LeaseScenario,
     key: string,
+    role: "admin" | "member" = "member",
   ): Promise<Occupant> {
     const user = await createAuthedUser(fixtures, NS, {
       key: `${key}-${randomUUID()}`,
       companyId: scenario.companyId,
+      role,
     });
     const { data, error } = await user.client.auth.getSession();
-    if (error || !data.session?.access_token) throw new Error('Missing local Auth session');
+    if (error || !data.session?.access_token)
+      throw new Error("Missing local Auth session");
     const authSessionId = sessionIdFromAccessToken(data.session.access_token);
     const [placed] = await fixtures.sql<{
       location_version: number;
@@ -116,7 +123,8 @@ describe('presence-db screen-share lease authority', () => {
         scenario.spaceAccessRevision,
       ],
     );
-    if (!session) throw new Error(`Failed to create scenario Presence session ${key}`);
+    if (!session)
+      throw new Error(`Failed to create scenario Presence session ${key}`);
     return { user, authSessionId, presenceSessionId: session.id };
   }
 
@@ -141,7 +149,7 @@ describe('presence-db screen-share lease authority', () => {
           occupant.presenceSessionId,
           scenario.spaceId,
         ];
-    const placeholders = params.map((_, index) => `$${index + 1}`).join(', ');
+    const placeholders = params.map((_, index) => `$${index + 1}`).join(", ");
     const row = (
       await client.query<{ result: RpcResult }>(
         `select public.${functionName}(${placeholders}) as result`,
@@ -163,17 +171,33 @@ describe('presence-db screen-share lease authority', () => {
        )`,
     );
     const pid = Number(
-      (await client.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid'))
-        .rows[0]?.pid,
+      (
+        await client.query<{ pid: number }>(
+          "select pg_catalog.pg_backend_pid() as pid",
+        )
+      ).rows[0]?.pid,
     );
     if (!pid) {
       await client.end();
-      throw new Error('Could not read local Postgres backend PID');
+      throw new Error("Could not read local Postgres backend PID");
     }
     return { client, pid };
   }
 
-  async function waitForAdvisoryBarrier(pids: readonly number[]): Promise<void> {
+  async function asPresenceOwner<T>(operation: () => Promise<T>): Promise<T> {
+    await fixtures.sql("grant presence_maintenance_owner to postgres");
+    await fixtures.sql("set role presence_maintenance_owner");
+    try {
+      return await operation();
+    } finally {
+      await fixtures.sql("reset role");
+      await fixtures.sql("revoke presence_maintenance_owner from postgres");
+    }
+  }
+
+  async function waitForAdvisoryBarrier(
+    pids: readonly number[],
+  ): Promise<void> {
     const deadline = Date.now() + 2_000;
     while (Date.now() < deadline) {
       const rows = await fixtures.sql<{ pid: number }>(
@@ -186,7 +210,9 @@ describe('presence-db screen-share lease authority', () => {
       if (rows.length === pids.length) return;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    throw new Error(`Timed out waiting for advisory claim barrier: ${pids.join(', ')}`);
+    throw new Error(
+      `Timed out waiting for advisory claim barrier: ${pids.join(", ")}`,
+    );
   }
 
   async function barrierClaim(
@@ -213,18 +239,40 @@ describe('presence-db screen-share lease authority', () => {
         ],
       )
     ).rows[0];
-    if (!row) throw new Error('Barrier claim returned no result');
+    if (!row) throw new Error("Barrier claim returned no result");
     return row.result;
   }
 
-  async function createOccupant(key: string, displayName?: string): Promise<Occupant> {
+  async function startScenarioRpc(
+    functionName: string,
+    scenario: LeaseScenario,
+    occupant: Occupant,
+    shareId?: string,
+  ): Promise<{
+    client: Client;
+    pid: number;
+    result: Promise<RpcResult>;
+  }> {
+    const { client, pid } = await openServiceClient();
+    return {
+      client,
+      pid,
+      result: callRpc(client, functionName, scenario, occupant, shareId),
+    };
+  }
+
+  async function createOccupant(
+    key: string,
+    displayName?: string,
+  ): Promise<Occupant> {
     const user = await createAuthedUser(fixtures, NS, {
       key,
       companyId,
       ...(displayName ? { displayName } : {}),
     });
     const { data, error } = await user.client.auth.getSession();
-    if (error || !data.session?.access_token) throw new Error('Missing local Auth session');
+    if (error || !data.session?.access_token)
+      throw new Error("Missing local Auth session");
     const authSessionId = sessionIdFromAccessToken(data.session.access_token);
 
     const [placed] = await fixtures.sql<{
@@ -235,7 +283,7 @@ describe('presence-db screen-share lease authority', () => {
        where id = $2 returning location_version, presence_access_revision`,
       [spaceId, user.appUserId],
     );
-    if (!placed) throw new Error('Failed to place occupant fixture');
+    if (!placed) throw new Error("Failed to place occupant fixture");
     const [session] = await fixtures.sql<{ id: string }>(
       `insert into public.user_presence_sessions
          (registration_id, user_id, auth_session_id, company_id, space_id,
@@ -246,11 +294,18 @@ describe('presence-db screen-share lease authority', () => {
                pg_catalog.clock_timestamp() + interval '90 seconds')
        returning id`,
       [
-        randomUUID(), user.appUserId, authSessionId, companyId, spaceId,
-        placed.location_version, placed.presence_access_revision, spaceAccessRevision,
+        randomUUID(),
+        user.appUserId,
+        authSessionId,
+        companyId,
+        spaceId,
+        placed.location_version,
+        placed.presence_access_revision,
+        spaceAccessRevision,
       ],
     );
-    if (!session) throw new Error('Failed to create qualifying Presence session');
+    if (!session)
+      throw new Error("Failed to create qualifying Presence session");
     return { user, authSessionId, presenceSessionId: session.id };
   }
 
@@ -260,9 +315,20 @@ describe('presence-db screen-share lease authority', () => {
     shareId?: string,
   ): Promise<Record<string, unknown>> {
     const params = shareId
-      ? [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId, shareId]
-      : [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId];
-    const placeholders = params.map((_, index) => `$${index + 1}`).join(', ');
+      ? [
+          occupant.user.supabaseUid,
+          occupant.authSessionId,
+          occupant.presenceSessionId,
+          spaceId,
+          shareId,
+        ]
+      : [
+          occupant.user.supabaseUid,
+          occupant.authSessionId,
+          occupant.presenceSessionId,
+          spaceId,
+        ];
+    const placeholders = params.map((_, index) => `$${index + 1}`).join(", ");
     const [row] = await fixtures.sql<{ result: Record<string, unknown> }>(
       `select public.${functionName}(${placeholders}) as result`,
       params,
@@ -275,27 +341,49 @@ describe('presence-db screen-share lease authority', () => {
     functionName: string,
     occupant: Occupant,
     shareId?: string,
-  ): Promise<{ client: Client; backendPid: number; result: Promise<Record<string, unknown>> }> {
+  ): Promise<{
+    client: Client;
+    backendPid: number;
+    result: Promise<Record<string, unknown>>;
+  }> {
     const client = new Client({ connectionString: LOCAL_DB_URL });
     try {
       await client.connect();
-      await client.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
-      const backend = await client.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      await client.query(
+        `select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`,
+      );
+      const backend = await client.query<{ pid: number }>(
+        "select pg_catalog.pg_backend_pid() as pid",
+      );
       const backendPid = backend.rows[0]?.pid;
-      if (!backendPid) throw new Error('Could not read observed RPC backend PID');
+      if (!backendPid)
+        throw new Error("Could not read observed RPC backend PID");
 
       const params = shareId
-        ? [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId, shareId]
-        : [occupant.user.supabaseUid, occupant.authSessionId, occupant.presenceSessionId, spaceId];
-      const placeholders = params.map((_, index) => `$${index + 1}`).join(', ');
-      const result = client.query<{ result: Record<string, unknown> }>(
-        `select public.${functionName}(${placeholders}) as result`,
-        params,
-      ).then(({ rows }) => {
-        const [row] = rows;
-        if (!row) throw new Error(`No result from ${functionName}`);
-        return row.result;
-      });
+        ? [
+            occupant.user.supabaseUid,
+            occupant.authSessionId,
+            occupant.presenceSessionId,
+            spaceId,
+            shareId,
+          ]
+        : [
+            occupant.user.supabaseUid,
+            occupant.authSessionId,
+            occupant.presenceSessionId,
+            spaceId,
+          ];
+      const placeholders = params.map((_, index) => `$${index + 1}`).join(", ");
+      const result = client
+        .query<{ result: Record<string, unknown> }>(
+          `select public.${functionName}(${placeholders}) as result`,
+          params,
+        )
+        .then(({ rows }) => {
+          const [row] = rows;
+          if (!row) throw new Error(`No result from ${functionName}`);
+          return row.result;
+        });
 
       return { client, backendPid, result };
     } catch (error) {
@@ -304,7 +392,10 @@ describe('presence-db screen-share lease authority', () => {
     }
   }
 
-  async function waitForObservedUserLock(waiterPid: number, lockerPid: number): Promise<void> {
+  async function waitForObservedUserLock(
+    waiterPid: number,
+    lockerPid: number,
+  ): Promise<void> {
     const deadline = Date.now() + 2_000;
     let lastState: Record<string, unknown> | undefined;
 
@@ -345,10 +436,10 @@ describe('presence-db screen-share lease authority', () => {
       );
       lastState = state;
       if (
-        state?.wait_event_type === 'Lock'
-        && state.blocked_by_locker
-        && state.waits_for_locker_transaction
-        && state.locker_holds_users_write_lock
+        state?.wait_event_type === "Lock" &&
+        state.blocked_by_locker &&
+        state.waits_for_locker_transaction &&
+        state.locker_holds_users_write_lock
       ) {
         return;
       }
@@ -366,20 +457,23 @@ describe('presence-db screen-share lease authority', () => {
       `insert into public.companies (name, settings) values ($1, '{}'::jsonb) returning id`,
       [`Screen share company::${NS}`],
     );
-    if (!company) throw new Error('Failed to create company fixture');
+    if (!company) throw new Error("Failed to create company fixture");
     companyId = company.id;
     companyIds.add(companyId);
-    const [space] = await fixtures.sql<{ id: string; presence_access_revision: string }>(
+    const [space] = await fixtures.sql<{
+      id: string;
+      presence_access_revision: string;
+    }>(
       `insert into public.spaces (company_id, name, type, status, capacity, access_control)
        values ($1, $2, 'private_office'::public.space_type, 'active'::public.space_status, 8, '{"isPublic":true}'::jsonb)
        returning id, presence_access_revision`,
       [companyId, `Screen share room::${NS}`],
     );
-    if (!space) throw new Error('Failed to create space fixture');
+    if (!space) throw new Error("Failed to create space fixture");
     spaceId = space.id;
     spaceAccessRevision = space.presence_access_revision;
-    owner = await createOccupant('owner');
-    viewer = await createOccupant('viewer');
+    owner = await createOccupant("owner");
+    viewer = await createOccupant("viewer");
   });
 
   afterAll(async () => {
@@ -393,58 +487,94 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
-  it('returns the documented empty-release result for a valid occupant with no lease', async () => {
-    expect(await observed('release_screen_share_observed', owner, randomUUID())).toEqual({
-      ok: false, code: 'LEASE_NOT_FOUND',
+  it("returns the documented empty-release result for a valid occupant with no lease", async () => {
+    expect(
+      await observed("release_screen_share_observed", owner, randomUUID()),
+    ).toEqual({
+      ok: false,
+      code: "LEASE_NOT_FOUND",
     });
   });
 
-  it('claims an initially empty lease and reads no active presenter before the claim', async () => {
-    expect(await observed('get_active_screen_share_observed', owner)).toMatchObject({
-      ok: true, code: 'ACTIVE_READ', active: null,
-    });
-    const shareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', owner, shareId)).toMatchObject({
-      ok: true, code: 'CLAIMED', shareId, presenterName: 'Phase 1 owner',
-    });
-    expect(await observed('get_active_screen_share_observed', viewer)).toMatchObject({
+  it("claims an initially empty lease and reads no active presenter before the claim", async () => {
+    expect(
+      await observed("get_active_screen_share_observed", owner),
+    ).toMatchObject({
       ok: true,
-      code: 'ACTIVE_READ',
-      active: { presenterUserId: owner.user.appUserId, shareId, presenterName: 'Phase 1 owner' },
+      code: "ACTIVE_READ",
+      active: null,
     });
-  });
-
-  it('permits only the exact owner release and preserves repeated-release idempotency', async () => {
-    const active = await observed('get_active_screen_share_observed', owner);
-    const shareId = (active.active as { shareId: string }).shareId;
-    expect(await observed('release_screen_share_observed', viewer, shareId)).toEqual({
-      ok: false, code: 'LEASE_NOT_OWNER',
-    });
-    expect(await observed('release_screen_share_observed', owner, shareId)).toEqual({
-      ok: true, code: 'RELEASED', alreadyReleased: false,
-    });
-    expect(await observed('release_screen_share_observed', owner, shareId)).toEqual({
-      ok: true, code: 'RELEASED', alreadyReleased: true,
-    });
-  });
-
-  it('invalidates stale owner session and movement/revision fences without mutating Presence', async () => {
     const shareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', owner, shareId)).toMatchObject({ ok: true, code: 'CLAIMED' });
+    expect(
+      await observed("claim_screen_share_observed", owner, shareId),
+    ).toMatchObject({
+      ok: true,
+      code: "CLAIMED",
+      shareId,
+      presenterName: "Phase 1 owner",
+    });
+    expect(
+      await observed("get_active_screen_share_observed", viewer),
+    ).toMatchObject({
+      ok: true,
+      code: "ACTIVE_READ",
+      active: {
+        presenterUserId: owner.user.appUserId,
+        shareId,
+        presenterName: "Phase 1 owner",
+      },
+    });
+  });
+
+  it("permits only the exact owner release and preserves repeated-release idempotency", async () => {
+    const active = await observed("get_active_screen_share_observed", owner);
+    const shareId = (active.active as { shareId: string }).shareId;
+    expect(
+      await observed("release_screen_share_observed", viewer, shareId),
+    ).toEqual({
+      ok: false,
+      code: "LEASE_NOT_OWNER",
+    });
+    expect(
+      await observed("release_screen_share_observed", owner, shareId),
+    ).toEqual({
+      ok: true,
+      code: "RELEASED",
+      alreadyReleased: false,
+    });
+    expect(
+      await observed("release_screen_share_observed", owner, shareId),
+    ).toEqual({
+      ok: true,
+      code: "RELEASED",
+      alreadyReleased: true,
+    });
+  });
+
+  it("invalidates stale owner session and movement/revision fences without mutating Presence", async () => {
+    const shareId = randomUUID();
+    expect(
+      await observed("claim_screen_share_observed", owner, shareId),
+    ).toMatchObject({ ok: true, code: "CLAIMED" });
     await fixtures.sql(
       `update public.user_presence_sessions set retired_at = pg_catalog.clock_timestamp(), retirement_reason = 'explicit-disconnect'
        where id = $1`,
       [owner.presenceSessionId],
     );
-    expect(await observed('get_active_screen_share_observed', viewer)).toMatchObject({ ok: true, code: 'ACTIVE_READ', active: null });
+    expect(
+      await observed("get_active_screen_share_observed", viewer),
+    ).toMatchObject({ ok: true, code: "ACTIVE_READ", active: null });
     const [lease] = await fixtures.sql<{ released_at: string | null }>(
-      `select released_at from public.screen_share_leases where space_id = $1`, [spaceId],
+      `select released_at from public.screen_share_leases where space_id = $1`,
+      [spaceId],
     );
     expect(lease?.released_at).not.toBeNull();
 
-    const mover = await createOccupant('mover');
+    const mover = await createOccupant("mover");
     const movedShareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', mover, movedShareId)).toMatchObject({ ok: true, code: 'CLAIMED' });
+    expect(
+      await observed("claim_screen_share_observed", mover, movedShareId),
+    ).toMatchObject({ ok: true, code: "CLAIMED" });
     // Legacy-mode fixture SQL simulates a committed move: neither the old
     // placement nor its claim-time revision may keep the presenter active.
     await fixtures.sql(
@@ -453,129 +583,225 @@ describe('presence-db screen-share lease authority', () => {
         where id = $1`,
       [mover.user.appUserId],
     );
-    expect(await observed('get_active_screen_share_observed', viewer)).toMatchObject({ ok: true, code: 'ACTIVE_READ', active: null });
+    expect(
+      await observed("get_active_screen_share_observed", viewer),
+    ).toMatchObject({ ok: true, code: "ACTIVE_READ", active: null });
   });
 
-  it('returns only PROFILE_INVALID and writes no active lease when a held rename commits an invalid current name', async () => {
-    const presenter = await createOccupant('invalid-name-race');
+  it("returns only PROFILE_INVALID and writes no active lease when a held rename commits an invalid current name", async () => {
+    const presenter = await createOccupant("invalid-name-race");
     const locker = new Client({ connectionString: LOCAL_DB_URL });
     await locker.connect();
-    await locker.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
+    await locker.query(
+      `select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`,
+    );
     try {
-      const lockerBackend = await locker.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      const lockerBackend = await locker.query<{ pid: number }>(
+        "select pg_catalog.pg_backend_pid() as pid",
+      );
       const lockerPid = lockerBackend.rows[0]?.pid;
-      if (!lockerPid) throw new Error('Could not read held-rename backend PID');
-      await locker.query('begin');
+      if (!lockerPid) throw new Error("Could not read held-rename backend PID");
+      await locker.query("begin");
       await locker.query(
         `update public.users set display_name = $1 where id = $2`,
-        ['  ', presenter.user.appUserId],
+        ["  ", presenter.user.appUserId],
       );
 
-      const claim = await startObserved('claim_screen_share_observed', presenter, randomUUID());
+      const claim = await startObserved(
+        "claim_screen_share_observed",
+        presenter,
+        randomUUID(),
+      );
       try {
         await waitForObservedUserLock(claim.backendPid, lockerPid);
-        await locker.query('commit');
+        await locker.query("commit");
 
-        expect(await claim.result).toEqual({ ok: false, code: 'PRESENTER_PROFILE_INVALID' });
+        expect(await claim.result).toEqual({
+          ok: false,
+          code: "PRESENTER_PROFILE_INVALID",
+        });
       } finally {
         await claim.client.end();
       }
-      expect(await fixtures.sql(
-        `select * from public.screen_share_leases
+      expect(
+        await fixtures.sql(
+          `select * from public.screen_share_leases
          where space_id = $1
            and presenter_user_id = $2
            and released_at is null
            and expires_at > pg_catalog.clock_timestamp()`,
-        [spaceId, presenter.user.appUserId],
-      )).toHaveLength(0);
+          [spaceId, presenter.user.appUserId],
+        ),
+      ).toHaveLength(0);
     } finally {
-      await locker.query('rollback').catch(() => undefined);
+      await locker.query("rollback").catch(() => undefined);
       await locker.end();
     }
   });
 
-  it('canonicalizes whitespace and matches PostgreSQL Unicode code-point limits before mutation', async () => {
-    const canonical = await createOccupant('canonical-name', '   Canonical presenter  ');
+  it("canonicalizes whitespace and matches PostgreSQL Unicode code-point limits before mutation", async () => {
+    const canonical = await createOccupant(
+      "canonical-name",
+      "   Canonical presenter  ",
+    );
     const canonicalShareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', canonical, canonicalShareId)).toMatchObject({
-      ok: true, code: 'CLAIMED', presenterName: 'Canonical presenter',
+    expect(
+      await observed(
+        "claim_screen_share_observed",
+        canonical,
+        canonicalShareId,
+      ),
+    ).toMatchObject({
+      ok: true,
+      code: "CLAIMED",
+      presenterName: "Canonical presenter",
     });
-    expect(await observed('release_screen_share_observed', canonical, canonicalShareId)).toMatchObject({
-      ok: true, code: 'RELEASED',
+    expect(
+      await observed(
+        "release_screen_share_observed",
+        canonical,
+        canonicalShareId,
+      ),
+    ).toMatchObject({
+      ok: true,
+      code: "RELEASED",
     });
 
-    const boundary = await createOccupant('boundary-name', 'x'.repeat(100));
+    const boundary = await createOccupant("boundary-name", "x".repeat(100));
     const boundaryShareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', boundary, boundaryShareId)).toMatchObject({
-      ok: true, code: 'CLAIMED', presenterName: 'x'.repeat(100),
+    expect(
+      await observed("claim_screen_share_observed", boundary, boundaryShareId),
+    ).toMatchObject({
+      ok: true,
+      code: "CLAIMED",
+      presenterName: "x".repeat(100),
     });
-    expect(await observed('release_screen_share_observed', boundary, boundaryShareId)).toMatchObject({
-      ok: true, code: 'RELEASED',
+    expect(
+      await observed(
+        "release_screen_share_observed",
+        boundary,
+        boundaryShareId,
+      ),
+    ).toMatchObject({
+      ok: true,
+      code: "RELEASED",
     });
-    await fixtures.sql(`update public.users set display_name = $1 where id = $2`, ['x'.repeat(101), boundary.user.appUserId]);
-    expect(await observed('claim_screen_share_observed', boundary, randomUUID())).toEqual({
-      ok: false, code: 'PRESENTER_PROFILE_INVALID',
+    await fixtures.sql(
+      `update public.users set display_name = $1 where id = $2`,
+      ["x".repeat(101), boundary.user.appUserId],
+    );
+    expect(
+      await observed("claim_screen_share_observed", boundary, randomUUID()),
+    ).toEqual({
+      ok: false,
+      code: "PRESENTER_PROFILE_INVALID",
     });
 
-    const emoji = '😀';
-    const emojiBoundary = await createOccupant('emoji-boundary-name', `  ${emoji.repeat(100)}  `);
+    const emoji = "😀";
+    const emojiBoundary = await createOccupant(
+      "emoji-boundary-name",
+      `  ${emoji.repeat(100)}  `,
+    );
     const emojiShareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', emojiBoundary, emojiShareId)).toMatchObject({
-      ok: true, code: 'CLAIMED', presenterName: emoji.repeat(100),
+    expect(
+      await observed(
+        "claim_screen_share_observed",
+        emojiBoundary,
+        emojiShareId,
+      ),
+    ).toMatchObject({
+      ok: true,
+      code: "CLAIMED",
+      presenterName: emoji.repeat(100),
     });
-    expect(await observed('release_screen_share_observed', emojiBoundary, emojiShareId)).toMatchObject({
-      ok: true, code: 'RELEASED',
+    expect(
+      await observed(
+        "release_screen_share_observed",
+        emojiBoundary,
+        emojiShareId,
+      ),
+    ).toMatchObject({
+      ok: true,
+      code: "RELEASED",
     });
 
-    const emojiOverflow = await createOccupant('emoji-overflow-name', emoji.repeat(101));
-    expect(await observed('claim_screen_share_observed', emojiOverflow, randomUUID())).toEqual({
-      ok: false, code: 'PRESENTER_PROFILE_INVALID',
+    const emojiOverflow = await createOccupant(
+      "emoji-overflow-name",
+      emoji.repeat(101),
+    );
+    expect(
+      await observed(
+        "claim_screen_share_observed",
+        emojiOverflow,
+        randomUUID(),
+      ),
+    ).toEqual({
+      ok: false,
+      code: "PRESENTER_PROFILE_INVALID",
     });
-    expect(await fixtures.sql(
-      `select * from public.screen_share_leases
+    expect(
+      await fixtures.sql(
+        `select * from public.screen_share_leases
        where space_id = $1
          and presenter_user_id = $2
          and released_at is null
          and expires_at > pg_catalog.clock_timestamp()`,
-      [spaceId, emojiOverflow.user.appUserId],
-    )).toHaveLength(0);
+        [spaceId, emojiOverflow.user.appUserId],
+      ),
+    ).toHaveLength(0);
   });
 
-  it('returns an active name from the same locked owner snapshot after a held rename commits', async () => {
-    const presenter = await createOccupant('active-name-race', 'Before rename');
+  it("returns an active name from the same locked owner snapshot after a held rename commits", async () => {
+    const presenter = await createOccupant("active-name-race", "Before rename");
     const shareId = randomUUID();
-    expect(await observed('claim_screen_share_observed', presenter, shareId)).toMatchObject({ ok: true, code: 'CLAIMED' });
+    expect(
+      await observed("claim_screen_share_observed", presenter, shareId),
+    ).toMatchObject({ ok: true, code: "CLAIMED" });
 
     const locker = new Client({ connectionString: LOCAL_DB_URL });
     await locker.connect();
-    await locker.query(`select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
+    await locker.query(
+      `select pg_catalog.set_config('request.jwt.claims', '{"role":"service_role"}', false)`,
+    );
     try {
-      const lockerBackend = await locker.query<{ pid: number }>('select pg_catalog.pg_backend_pid() as pid');
+      const lockerBackend = await locker.query<{ pid: number }>(
+        "select pg_catalog.pg_backend_pid() as pid",
+      );
       const lockerPid = lockerBackend.rows[0]?.pid;
-      if (!lockerPid) throw new Error('Could not read held-rename backend PID');
-      await locker.query('begin');
-      await locker.query(`update public.users set display_name = 'After rename' where id = $1`, [presenter.user.appUserId]);
+      if (!lockerPid) throw new Error("Could not read held-rename backend PID");
+      await locker.query("begin");
+      await locker.query(
+        `update public.users set display_name = 'After rename' where id = $1`,
+        [presenter.user.appUserId],
+      );
 
-      const active = await startObserved('get_active_screen_share_observed', viewer);
+      const active = await startObserved(
+        "get_active_screen_share_observed",
+        viewer,
+      );
       try {
         await waitForObservedUserLock(active.backendPid, lockerPid);
-        await locker.query('commit');
+        await locker.query("commit");
 
         expect(await active.result).toMatchObject({
           ok: true,
-          code: 'ACTIVE_READ',
-          active: { presenterUserId: presenter.user.appUserId, shareId, presenterName: 'After rename' },
+          code: "ACTIVE_READ",
+          active: {
+            presenterUserId: presenter.user.appUserId,
+            shareId,
+            presenterName: "After rename",
+          },
         });
       } finally {
         await active.client.end();
       }
     } finally {
-      await locker.query('rollback').catch(() => undefined);
+      await locker.query("rollback").catch(() => undefined);
       await locker.end();
     }
   });
 
-  it('reads back the owner, search_path, grants, and display-name privilege from local Postgres', async () => {
+  it("reads back the owner, search_path, grants, and display-name privilege from local Postgres", async () => {
     const [catalog] = await fixtures.sql<{
       owner: string;
       security_definer: boolean;
@@ -596,36 +822,56 @@ describe('presence-db screen-share lease authority', () => {
           and p.proname = 'claim_screen_share_observed'`,
     );
     expect(catalog).toEqual({
-      owner: 'presence_maintenance_owner',
+      owner: "presence_maintenance_owner",
       security_definer: true,
-      config: ['search_path=pg_catalog'],
+      config: ["search_path=pg_catalog"],
       service_execute: true,
       authenticated_execute: false,
       display_name_select: true,
     });
   });
 
-  it('enforces media-topic RLS for a mapped Auth UID rather than the application UUID', async () => {
+  it("enforces media-topic RLS for a mapped Auth UID rather than the application UUID", async () => {
     const topic = `company:${companyId}:space:${spaceId}:media`;
-    await fixtures.sql('begin');
+    await fixtures.sql("begin");
     try {
       await fixtures.sql(
         `select pg_catalog.set_config('request.jwt.claims', $1, true), pg_catalog.set_config('realtime.topic', $2, true)`,
-        [JSON.stringify({ role: 'authenticated', sub: viewer.user.supabaseUid, session_id: viewer.authSessionId }), topic],
+        [
+          JSON.stringify({
+            role: "authenticated",
+            sub: viewer.user.supabaseUid,
+            session_id: viewer.authSessionId,
+          }),
+          topic,
+        ],
       );
-      await fixtures.sql('set local role authenticated');
-      expect(await fixtures.sql(`insert into realtime.messages (topic, extension) values ($1, 'broadcast') returning extension`, [topic])).toEqual([{ extension: 'broadcast' }]);
-      await fixtures.sql(`select pg_catalog.set_config('realtime.topic', $1, true)`, [`company:${companyId}:space:${randomUUID()}:media`]);
-      await expect(fixtures.sql(`insert into realtime.messages (topic, extension) values ($1, 'broadcast')`, [`company:${companyId}:space:${randomUUID()}:media`])).rejects.toMatchObject({ code: '42501' });
+      await fixtures.sql("set local role authenticated");
+      expect(
+        await fixtures.sql(
+          `insert into realtime.messages (topic, extension) values ($1, 'broadcast') returning extension`,
+          [topic],
+        ),
+      ).toEqual([{ extension: "broadcast" }]);
+      await fixtures.sql(
+        `select pg_catalog.set_config('realtime.topic', $1, true)`,
+        [`company:${companyId}:space:${randomUUID()}:media`],
+      );
+      await expect(
+        fixtures.sql(
+          `insert into realtime.messages (topic, extension) values ($1, 'broadcast')`,
+          [`company:${companyId}:space:${randomUUID()}:media`],
+        ),
+      ).rejects.toMatchObject({ code: "42501" });
     } finally {
-      await fixtures.sql('rollback');
+      await fixtures.sql("rollback");
     }
   });
 
-  it('repeats equal-order same-space claims with one canonical winner and one bounded loser', async () => {
-    const scenario = await createScenario('same-space-race');
-    const claimantA = await createScenarioOccupant(scenario, 'race-a');
-    const claimantB = await createScenarioOccupant(scenario, 'race-b');
+  it("repeats equal-order same-space claims with one canonical winner and one bounded loser", async () => {
+    const scenario = await createScenario("same-space-race");
+    const claimantA = await createScenarioOccupant(scenario, "race-a");
+    const claimantB = await createScenarioOccupant(scenario, "race-b");
     const [deadlocksBefore] = await fixtures.sql<{ deadlocks: string }>(
       `select deadlocks::text
          from pg_catalog.pg_stat_database
@@ -633,9 +879,11 @@ describe('presence-db screen-share lease authority', () => {
     );
 
     for (let iteration = 0; iteration < 8; iteration += 1) {
-      await fixtures.sql(
-        `delete from public.screen_share_leases where space_id = $1`,
-        [scenario.spaceId],
+      await asPresenceOwner(() =>
+        fixtures.sql(
+          `delete from public.screen_share_leases where space_id = $1`,
+          [scenario.spaceId],
+        ),
       );
       const blocker = await openServiceClient();
       const first = await openServiceClient();
@@ -643,26 +891,44 @@ describe('presence-db screen-share lease authority', () => {
       const barrierKey = 100_000 + Math.floor(Math.random() * 1_000_000_000);
       const shareA = randomUUID();
       const shareB = randomUUID();
-      await blocker.client.query('select pg_catalog.pg_advisory_lock($1)', [barrierKey]);
+      await blocker.client.query("select pg_catalog.pg_advisory_lock($1)", [
+        barrierKey,
+      ]);
       const startedAt = Date.now();
       try {
-        const rawA = barrierClaim(first.client, barrierKey, scenario, claimantA, shareA);
-        const rawB = barrierClaim(second.client, barrierKey, scenario, claimantB, shareB);
+        const rawA = barrierClaim(
+          first.client,
+          barrierKey,
+          scenario,
+          claimantA,
+          shareA,
+        );
+        const rawB = barrierClaim(
+          second.client,
+          barrierKey,
+          scenario,
+          claimantB,
+          shareB,
+        );
         await waitForAdvisoryBarrier([first.pid, second.pid]);
-        await blocker.client.query('select pg_catalog.pg_advisory_unlock($1)', [barrierKey]);
+        await blocker.client.query("select pg_catalog.pg_advisory_unlock($1)", [
+          barrierKey,
+        ]);
         const rawResults = await Promise.all([rawA, rawB]);
 
         for (const result of rawResults) {
-          expect(['CLAIMED', 'PRESENTER_BUSY', 'RETRY_LOCK_SET']).toContain(result.code);
+          expect(["CLAIMED", "PRESENTER_BUSY", "RETRY_LOCK_SET"]).toContain(
+            result.code,
+          );
         }
         const converged = await Promise.all(
           rawResults.map(async (result, index) => {
-            if (result.code !== 'RETRY_LOCK_SET') return result;
+            if (result.code !== "RETRY_LOCK_SET") return result;
             const fresh = await openServiceClient();
             try {
               return await callRpc(
                 fresh.client,
-                'claim_screen_share_observed',
+                "claim_screen_share_observed",
                 scenario,
                 index === 0 ? claimantA : claimantB,
                 index === 0 ? shareA : shareB,
@@ -672,8 +938,12 @@ describe('presence-db screen-share lease authority', () => {
             }
           }),
         );
-        expect(converged.filter(({ code }) => code === 'CLAIMED')).toHaveLength(1);
-        expect(converged.filter(({ code }) => code === 'PRESENTER_BUSY')).toHaveLength(1);
+        expect(converged.filter(({ code }) => code === "CLAIMED")).toHaveLength(
+          1,
+        );
+        expect(
+          converged.filter(({ code }) => code === "PRESENTER_BUSY"),
+        ).toHaveLength(1);
         expect(Date.now() - startedAt).toBeLessThan(2_000);
 
         const activeRows = await fixtures.sql<{
@@ -691,10 +961,12 @@ describe('presence-db screen-share lease authority', () => {
         expect([
           `${claimantA.user.appUserId}:${shareA}`,
           `${claimantB.user.appUserId}:${shareB}`,
-        ]).toContain(`${activeRows[0]?.presenter_user_id}:${activeRows[0]?.share_id}`);
+        ]).toContain(
+          `${activeRows[0]?.presenter_user_id}:${activeRows[0]?.share_id}`,
+        );
       } finally {
         await blocker.client
-          .query('select pg_catalog.pg_advisory_unlock($1)', [barrierKey])
+          .query("select pg_catalog.pg_advisory_unlock($1)", [barrierKey])
           .catch(() => undefined);
         await Promise.all([
           blocker.client.end(),
@@ -712,38 +984,63 @@ describe('presence-db screen-share lease authority', () => {
     expect(deadlocksAfter?.deadlocks).toBe(deadlocksBefore?.deadlocks);
   }, 30_000);
 
-  it('keeps independent-space claims independent and returns canonical empty/single reads', async () => {
-    const scenarioA = await createScenario('independent-a');
-    const scenarioB = await createScenario('independent-b');
-    const claimantA = await createScenarioOccupant(scenarioA, 'independent-a');
-    const claimantB = await createScenarioOccupant(scenarioB, 'independent-b');
+  it("keeps independent-space claims independent and returns canonical empty/single reads", async () => {
+    const scenarioA = await createScenario("independent-a");
+    const scenarioB = await createScenario("independent-b");
+    const claimantA = await createScenarioOccupant(scenarioA, "independent-a");
+    const claimantB = await createScenarioOccupant(scenarioB, "independent-b");
     const serviceA = await openServiceClient();
     const serviceB = await openServiceClient();
     try {
       expect(
-        await callRpc(serviceA.client, 'get_active_screen_share_observed', scenarioA, claimantA),
-      ).toEqual({ ok: true, code: 'ACTIVE_READ', active: null });
+        await callRpc(
+          serviceA.client,
+          "get_active_screen_share_observed",
+          scenarioA,
+          claimantA,
+        ),
+      ).toEqual({ ok: true, code: "ACTIVE_READ", active: null });
 
       const shareA = randomUUID();
       const shareB = randomUUID();
       const startedAt = Date.now();
       const [claimA, claimB] = await Promise.all([
-        callRpc(serviceA.client, 'claim_screen_share_observed', scenarioA, claimantA, shareA),
-        callRpc(serviceB.client, 'claim_screen_share_observed', scenarioB, claimantB, shareB),
+        callRpc(
+          serviceA.client,
+          "claim_screen_share_observed",
+          scenarioA,
+          claimantA,
+          shareA,
+        ),
+        callRpc(
+          serviceB.client,
+          "claim_screen_share_observed",
+          scenarioB,
+          claimantB,
+          shareB,
+        ),
       ]);
-      expect(claimA).toMatchObject({ ok: true, code: 'CLAIMED', shareId: shareA });
-      expect(claimB).toMatchObject({ ok: true, code: 'CLAIMED', shareId: shareB });
+      expect(claimA).toMatchObject({
+        ok: true,
+        code: "CLAIMED",
+        shareId: shareA,
+      });
+      expect(claimB).toMatchObject({
+        ok: true,
+        code: "CLAIMED",
+        shareId: shareB,
+      });
       expect(Date.now() - startedAt).toBeLessThan(1_000);
 
       const active = await callRpc(
         serviceA.client,
-        'get_active_screen_share_observed',
+        "get_active_screen_share_observed",
         scenarioA,
         claimantA,
       );
       expect(active).toMatchObject({
         ok: true,
-        code: 'ACTIVE_READ',
+        code: "ACTIVE_READ",
         active: {
           spaceId: scenarioA.spaceId,
           presenterUserId: claimantA.user.appUserId,
@@ -755,29 +1052,32 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
-  it('fails every foreign or stale caller closed without replacing the active owner', async () => {
-    const scenario = await createScenario('denials');
-    const owner = await createScenarioOccupant(scenario, 'denial-owner');
-    const outsiderScenario = await createScenario('denials-outsider');
-    const outsider = await createScenarioOccupant(outsiderScenario, 'denial-outsider');
+  it("fails every foreign or stale caller closed without replacing the active owner", async () => {
+    const scenario = await createScenario("denials");
+    const owner = await createScenarioOccupant(scenario, "denial-owner");
+    const outsiderScenario = await createScenario("denials-outsider");
+    const outsider = await createScenarioOccupant(
+      outsiderScenario,
+      "denial-outsider",
+    );
     const service = await openServiceClient();
     const ownerShareId = randomUUID();
     try {
       expect(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           owner,
           ownerShareId,
         ),
-      ).toMatchObject({ ok: true, code: 'CLAIMED' });
+      ).toMatchObject({ ok: true, code: "CLAIMED" });
 
       const attempts: RpcResult[] = [];
       attempts.push(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           { ...owner, authSessionId: randomUUID() },
           randomUUID(),
@@ -786,7 +1086,7 @@ describe('presence-db screen-share lease authority', () => {
       attempts.push(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           { ...owner, presenceSessionId: randomUUID() },
           randomUUID(),
@@ -795,7 +1095,7 @@ describe('presence-db screen-share lease authority', () => {
       attempts.push(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           outsider,
           randomUUID(),
@@ -804,7 +1104,7 @@ describe('presence-db screen-share lease authority', () => {
       attempts.push(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           {
             ...owner,
@@ -814,10 +1114,10 @@ describe('presence-db screen-share lease authority', () => {
         ),
       );
       expect(attempts.map(({ code }) => code)).toEqual([
-        'SESSION_INVALID',
-        'SESSION_INVALID',
-        'SESSION_INVALID',
-        'AUTH_INVALID',
+        "SESSION_INVALID",
+        "SESSION_INVALID",
+        "SESSION_INVALID",
+        "AUTH_INVALID",
       ]);
 
       const [stored] = await fixtures.sql<{
@@ -838,10 +1138,10 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
-  it('revalidates retirement, revocation, departure, and access revisions after ownership', async () => {
+  it("revalidates retirement, revocation, departure, and access revisions after ownership", async () => {
     const mutations = [
       {
-        key: 'retired',
+        key: "retired",
         mutate: (occupant: Occupant) =>
           fixtures.sql(
             `update public.user_presence_sessions
@@ -852,7 +1152,7 @@ describe('presence-db screen-share lease authority', () => {
           ),
       },
       {
-        key: 'revoked',
+        key: "revoked",
         mutate: (occupant: Occupant) =>
           fixtures.sql(
             `insert into public.revoked_presence_auth_sessions
@@ -862,7 +1162,7 @@ describe('presence-db screen-share lease authority', () => {
           ),
       },
       {
-        key: 'departed',
+        key: "departed",
         mutate: (occupant: Occupant) =>
           fixtures.sql(
             `update public.users
@@ -873,11 +1173,11 @@ describe('presence-db screen-share lease authority', () => {
           ),
       },
       {
-        key: 'user-revision',
+        key: "user-revision",
         mutate: (occupant: Occupant) =>
           fixtures.sql(
             `update public.users
-                set presence_access_revision = presence_access_revision + 1
+                set role = 'admin'::public.user_role
               where id = $1`,
             [occupant.user.appUserId],
           ),
@@ -886,28 +1186,34 @@ describe('presence-db screen-share lease authority', () => {
 
     for (const mutation of mutations) {
       const scenario = await createScenario(`fence-${mutation.key}`);
-      const presenter = await createScenarioOccupant(scenario, `fence-presenter-${mutation.key}`);
-      const reader = await createScenarioOccupant(scenario, `fence-reader-${mutation.key}`);
+      const presenter = await createScenarioOccupant(
+        scenario,
+        `fence-presenter-${mutation.key}`,
+      );
+      const reader = await createScenarioOccupant(
+        scenario,
+        `fence-reader-${mutation.key}`,
+      );
       const service = await openServiceClient();
       try {
         expect(
           await callRpc(
             service.client,
-            'claim_screen_share_observed',
+            "claim_screen_share_observed",
             scenario,
             presenter,
             randomUUID(),
           ),
-        ).toMatchObject({ ok: true, code: 'CLAIMED' });
+        ).toMatchObject({ ok: true, code: "CLAIMED" });
         await mutation.mutate(presenter);
         expect(
           await callRpc(
             service.client,
-            'get_active_screen_share_observed',
+            "get_active_screen_share_observed",
             scenario,
             reader,
           ),
-        ).toEqual({ ok: true, code: 'ACTIVE_READ', active: null });
+        ).toEqual({ ok: true, code: "ACTIVE_READ", active: null });
         const [lease] = await fixtures.sql<{ released_at: string | null }>(
           `select released_at
              from public.screen_share_leases
@@ -920,29 +1226,37 @@ describe('presence-db screen-share lease authority', () => {
       }
     }
 
-    const scenario = await createScenario('fence-space-revision');
-    const presenter = await createScenarioOccupant(scenario, 'fence-space-presenter');
-    const reader = await createScenarioOccupant(scenario, 'fence-space-reader');
+    const scenario = await createScenario("fence-space-revision");
+    const presenter = await createScenarioOccupant(
+      scenario,
+      "fence-space-presenter",
+    );
+    const reader = await createScenarioOccupant(scenario, "fence-space-reader");
     const service = await openServiceClient();
     try {
       expect(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           presenter,
           randomUUID(),
         ),
-      ).toMatchObject({ ok: true, code: 'CLAIMED' });
+      ).toMatchObject({ ok: true, code: "CLAIMED" });
       await fixtures.sql(
         `update public.spaces
-            set presence_access_revision = presence_access_revision + 1
+            set access_control = '{"isPublic":false,"allowedUsers":[]}'::jsonb
           where id = $1`,
         [scenario.spaceId],
       );
       expect(
-        await callRpc(service.client, 'get_active_screen_share_observed', scenario, reader),
-      ).toEqual({ ok: false, code: 'SESSION_INVALID' });
+        await callRpc(
+          service.client,
+          "get_active_screen_share_observed",
+          scenario,
+          reader,
+        ),
+      ).toEqual({ ok: false, code: "SESSION_INVALID" });
       const [lease] = await fixtures.sql<{ released_at: string | null }>(
         `select released_at from public.screen_share_leases where space_id = $1`,
         [scenario.spaceId],
@@ -953,44 +1267,172 @@ describe('presence-db screen-share lease authority', () => {
     }
   });
 
-  it('makes exact release idempotent, rejects stale shares, and never revives expired ownership', async () => {
-    const scenario = await createScenario('lifecycle');
-    const presenter = await createScenarioOccupant(scenario, 'lifecycle-presenter');
-    const successor = await createScenarioOccupant(scenario, 'lifecycle-successor');
+  it("revalidates active reads after concurrent membership, revocation, departure, and ACL commits", async () => {
+    for (const race of [
+      "membership",
+      "revocation",
+      "departure",
+      "acl",
+    ] as const) {
+      const scenario = await createScenario(`active-race-${race}`);
+      const presenter = await createScenarioOccupant(
+        scenario,
+        `active-race-presenter-${race}`,
+      );
+      const reader = await createScenarioOccupant(
+        scenario,
+        `active-race-reader-${race}`,
+      );
+      const admin =
+        race === "membership"
+          ? await createScenarioOccupant(scenario, "active-race-admin", "admin")
+          : null;
+      const shareId = randomUUID();
+      const service = await openServiceClient();
+      const blocker = await openServiceClient();
+      try {
+        expect(
+          await callRpc(
+            service.client,
+            "claim_screen_share_observed",
+            scenario,
+            presenter,
+            shareId,
+          ),
+        ).toMatchObject({ ok: true, code: "CLAIMED" });
+
+        await blocker.client.query("begin");
+        if (race === "membership") {
+          await blocker.client.query("set local role service_role");
+          const removal = await blocker.client.query<{
+            result: { code: string };
+          }>(
+            `select public.remove_company_member_and_presence($1, $2, $3) as result`,
+            [
+              admin?.user.appUserId,
+              presenter.user.appUserId,
+              scenario.companyId,
+            ],
+          );
+          expect(removal.rows[0]?.result.code).toBe("COMPANY_MEMBER_REMOVED");
+          await blocker.client.query("reset role");
+        } else if (race === "departure") {
+          await blocker.client.query(
+            `update public.users
+                set current_space_id = null,
+                    location_version = location_version + 1
+              where id = $1`,
+            [presenter.user.appUserId],
+          );
+        } else {
+          await blocker.client.query(
+            `update public.users set display_name = display_name where id = $1`,
+            [presenter.user.appUserId],
+          );
+        }
+
+        const active = await startScenarioRpc(
+          "get_active_screen_share_observed",
+          scenario,
+          reader,
+        );
+        try {
+          await waitForObservedUserLock(active.pid, blocker.pid);
+          if (race === "revocation") {
+            await fixtures.sql(
+              `insert into public.revoked_presence_auth_sessions
+                 (auth_session_id, user_id, revoked_at)
+               values ($1, $2, pg_catalog.clock_timestamp())`,
+              [presenter.authSessionId, presenter.user.appUserId],
+            );
+          } else if (race === "acl") {
+            const [updatedSpace] = await fixtures.sql<{
+              presence_access_revision: string;
+            }>(
+              `update public.spaces
+                  set access_control = '{"isPublic":false,"allowedUsers":[]}'::jsonb
+                where id = $1
+                returning presence_access_revision`,
+              [scenario.spaceId],
+            );
+            if (!updatedSpace)
+              throw new Error("ACL race did not update the space");
+            await fixtures.sql(
+              `update public.user_presence_sessions
+                  set space_access_revision = $1
+                where id = $2`,
+              [updatedSpace.presence_access_revision, reader.presenceSessionId],
+            );
+          }
+          await blocker.client.query("commit");
+
+          expect(await active.result).toEqual({
+            ok: true,
+            code: "ACTIVE_READ",
+            active: null,
+          });
+        } finally {
+          await active.client.end();
+        }
+
+        const [lease] = await fixtures.sql<{ released_at: string | null }>(
+          `select released_at
+             from public.screen_share_leases
+            where space_id = $1`,
+          [scenario.spaceId],
+        );
+        expect(lease?.released_at).not.toBeNull();
+      } finally {
+        await blocker.client.query("rollback").catch(() => undefined);
+        await Promise.all([service.client.end(), blocker.client.end()]);
+      }
+    }
+  }, 30_000);
+
+  it("makes exact release idempotent, rejects stale shares, and never revives expired ownership", async () => {
+    const scenario = await createScenario("lifecycle");
+    const presenter = await createScenarioOccupant(
+      scenario,
+      "lifecycle-presenter",
+    );
+    const successor = await createScenarioOccupant(
+      scenario,
+      "lifecycle-successor",
+    );
     const service = await openServiceClient();
     const shareId = randomUUID();
     try {
       expect(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           presenter,
           shareId,
         ),
-      ).toMatchObject({ ok: true, code: 'CLAIMED' });
+      ).toMatchObject({ ok: true, code: "CLAIMED" });
       expect(
         await callRpc(
           service.client,
-          'renew_screen_share_observed',
+          "renew_screen_share_observed",
           scenario,
           presenter,
           randomUUID(),
         ),
-      ).toEqual({ ok: false, code: 'LEASE_STALE' });
+      ).toEqual({ ok: false, code: "LEASE_STALE" });
       expect(
         await callRpc(
           service.client,
-          'release_screen_share_observed',
+          "release_screen_share_observed",
           scenario,
           presenter,
           randomUUID(),
         ),
-      ).toEqual({ ok: false, code: 'LEASE_NOT_OWNER' });
+      ).toEqual({ ok: false, code: "LEASE_NOT_OWNER" });
 
       const release = callRpc(
         service.client,
-        'release_screen_share_observed',
+        "release_screen_share_observed",
         scenario,
         presenter,
         shareId,
@@ -999,68 +1441,76 @@ describe('presence-db screen-share lease authority', () => {
       try {
         const renewal = callRpc(
           competing.client,
-          'renew_screen_share_observed',
+          "renew_screen_share_observed",
           scenario,
           presenter,
           shareId,
         );
         const results = await Promise.all([release, renewal]);
-        expect(results.map(({ code }) => code).sort()).toEqual(['LEASE_STALE', 'RELEASED']);
+        expect(results.map(({ code }) => code).sort()).toEqual([
+          "LEASE_STALE",
+          "RELEASED",
+        ]);
       } finally {
         await competing.client.end();
       }
       expect(
         await callRpc(
           service.client,
-          'release_screen_share_observed',
+          "release_screen_share_observed",
           scenario,
           presenter,
           shareId,
         ),
-      ).toEqual({ ok: true, code: 'RELEASED', alreadyReleased: true });
+      ).toEqual({ ok: true, code: "RELEASED", alreadyReleased: true });
 
       const expiredShareId = randomUUID();
       expect(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           presenter,
           expiredShareId,
         ),
-      ).toMatchObject({ ok: true, code: 'CLAIMED' });
-      await fixtures.sql(
-        `update public.screen_share_leases
-            set expires_at = pg_catalog.clock_timestamp(),
-                heartbeat_at = least(heartbeat_at, pg_catalog.clock_timestamp() - interval '1 microsecond')
-          where space_id = $1`,
-        [scenario.spaceId],
+      ).toMatchObject({ ok: true, code: "CLAIMED" });
+      await asPresenceOwner(() =>
+        fixtures.sql(
+          `update public.screen_share_leases
+              set expires_at = pg_catalog.clock_timestamp(),
+                  heartbeat_at = least(
+                    heartbeat_at,
+                    pg_catalog.clock_timestamp() - interval '1 microsecond'
+                  )
+            where space_id = $1`,
+          [scenario.spaceId],
+        ),
       );
       expect(
         await callRpc(
           service.client,
-          'renew_screen_share_observed',
+          "renew_screen_share_observed",
           scenario,
           presenter,
           expiredShareId,
         ),
-      ).toEqual({ ok: false, code: 'LEASE_STALE' });
+      ).toEqual({ ok: false, code: "LEASE_STALE" });
       const successorShareId = randomUUID();
       expect(
         await callRpc(
           service.client,
-          'claim_screen_share_observed',
+          "claim_screen_share_observed",
           scenario,
           successor,
           successorShareId,
         ),
-      ).toMatchObject({ ok: true, code: 'CLAIMED', shareId: successorShareId });
+      ).toMatchObject({ ok: true, code: "CLAIMED", shareId: successorShareId });
     } finally {
       await service.client.end();
     }
   });
 
-  it('reads the exact lease schema, indexes, RLS, RPC owners, paths, and grants from pg_catalog', async () => {
+  it("reads the exact lease schema, indexes, RLS, RPC owners, paths, and grants from pg_catalog", async () => {
     const [table] = await fixtures.sql<{
       owner: string;
       rls: boolean;
@@ -1085,7 +1535,7 @@ describe('presence-db screen-share lease authority', () => {
         where c.oid = 'public.screen_share_leases'::pg_catalog.regclass`,
     );
     expect(table).toEqual({
-      owner: 'presence_maintenance_owner',
+      owner: "presence_maintenance_owner",
       rls: true,
       force_rls: true,
       authenticated_privileges: false,
@@ -1100,16 +1550,15 @@ describe('presence-db screen-share lease authority', () => {
         order by con.conname`,
     );
     expect(constraints).toEqual([
-      { name: 'screen_share_leases_auth_session_id_fkey', type: 'f' },
-      { name: 'screen_share_leases_company_id_fkey', type: 'f' },
-      { name: 'screen_share_leases_company_share_key', type: 'u' },
-      { name: 'screen_share_leases_expiry_order', type: 'c' },
-      { name: 'screen_share_leases_heartbeat_order', type: 'c' },
-      { name: 'screen_share_leases_pkey', type: 'p' },
-      { name: 'screen_share_leases_presence_session_id_fkey', type: 'f' },
-      { name: 'screen_share_leases_presenter_user_id_fkey', type: 'f' },
-      { name: 'screen_share_leases_release_order', type: 'c' },
-      { name: 'screen_share_leases_space_id_fkey', type: 'f' },
+      { name: "screen_share_leases_company_id_fkey", type: "f" },
+      { name: "screen_share_leases_company_share_key", type: "u" },
+      { name: "screen_share_leases_expiry_order", type: "c" },
+      { name: "screen_share_leases_heartbeat_order", type: "c" },
+      { name: "screen_share_leases_pkey", type: "p" },
+      { name: "screen_share_leases_presence_session_id_fkey", type: "f" },
+      { name: "screen_share_leases_presenter_user_id_fkey", type: "f" },
+      { name: "screen_share_leases_release_order", type: "c" },
+      { name: "screen_share_leases_space_id_fkey", type: "f" },
     ]);
 
     const indexes = await fixtures.sql<{ indexname: string; indexdef: string }>(
@@ -1120,17 +1569,19 @@ describe('presence-db screen-share lease authority', () => {
         order by indexname`,
     );
     expect(indexes.map(({ indexname }) => indexname)).toEqual([
-      'idx_screen_share_leases_active_expiry',
-      'idx_screen_share_leases_company_id',
-      'idx_screen_share_leases_presence_session_id',
-      'idx_screen_share_leases_presenter_user_id',
-      'screen_share_leases_company_share_key',
-      'screen_share_leases_pkey',
+      "idx_screen_share_leases_active_expiry",
+      "idx_screen_share_leases_company_id",
+      "idx_screen_share_leases_presence_session_id",
+      "idx_screen_share_leases_presenter_user_id",
+      "screen_share_leases_company_share_key",
+      "screen_share_leases_pkey",
     ]);
     expect(
-      indexes.find(({ indexname }) => indexname === 'idx_screen_share_leases_active_expiry')
-        ?.indexdef,
-    ).toContain('WHERE (released_at IS NULL)');
+      indexes.find(
+        ({ indexname }) =>
+          indexname === "idx_screen_share_leases_active_expiry",
+      )?.indexdef,
+    ).toContain("WHERE (released_at IS NULL)");
 
     const functions = await fixtures.sql<{
       schema_name: string;
@@ -1170,16 +1621,13 @@ describe('presence-db screen-share lease authority', () => {
     expect(functions).toHaveLength(8);
     for (const fn of functions) {
       expect(fn).toMatchObject({
-        owner: 'presence_maintenance_owner',
+        owner: "presence_maintenance_owner",
         security_definer: true,
-        config: ['search_path=pg_catalog'],
-        authenticated_execute:
-          fn.function_name === 'is_media_topic_authorized',
+        config: ["search_path=pg_catalog"],
+        authenticated_execute: fn.function_name === "is_media_topic_authorized",
         anon_execute: false,
       });
-      expect(fn.service_execute).toBe(
-        fn.schema_name === 'public',
-      );
+      expect(fn.service_execute).toBe(fn.schema_name === "public");
     }
   });
 });
