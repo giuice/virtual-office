@@ -60,6 +60,11 @@ export interface PeerConnection {
   remoteShareId: string | null;
 }
 
+interface PendingIceCandidate {
+  candidate: RTCIceCandidateInit;
+  receivedWhileIgnoringOffer: boolean;
+}
+
 export interface WebRTCManagerEvents {
   onPeerConnected: (userId: string) => void;
   onPeerDisconnected: (userId: string) => void;
@@ -79,7 +84,7 @@ export class WebRTCManager {
   private displayShareId: string | null = null;
   private displayEndedListener: (() => void) | null = null;
   private readonly peerConnections = new Map<string, PeerConnection>();
-  private readonly pendingIceCandidates = new Map<string, RTCIceCandidateInit[]>();
+  private readonly pendingIceCandidates = new Map<string, PendingIceCandidate[]>();
   private readonly audioElements = new Map<string, HTMLAudioElement>();
   private readonly vadMap = new Map<string, VoiceActivityDetector>();
   private signalingChannel: RealtimeChannel | null = null;
@@ -248,7 +253,17 @@ export class WebRTCManager {
     if (targetUserId !== this.currentUserId || !this.matchesLocalInstance(targetPresenceSessionId, targetConnectionId)) return;
     const peer = this.peerConnections.get(senderId);
     if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
-    if (peer?.ignoreOffer) return;
+    if (peer?.ignoreOffer) {
+      if (!this.getCandidateIceUfrag(candidate)) return;
+      this.queueIceCandidate(
+        senderId,
+        sourcePresenceSessionId,
+        sourceConnectionId,
+        candidate,
+        true,
+      );
+      return;
+    }
     if (!peer || peer.isSettingRemoteAnswerPending || !peer.pc.remoteDescription) {
       this.queueIceCandidate(senderId, sourcePresenceSessionId, sourceConnectionId, candidate);
       return;
@@ -405,6 +420,7 @@ export class WebRTCManager {
     presenceSessionId: string | undefined,
     connectionId: string | undefined,
     candidate: RTCIceCandidateInit,
+    receivedWhileIgnoringOffer = false,
   ): void {
     const key = this.pendingIceKey(peerId, presenceSessionId, connectionId);
     let queue = this.pendingIceCandidates.get(key);
@@ -414,7 +430,7 @@ export class WebRTCManager {
       this.pendingIceCandidates.set(key, queue);
     }
     if (queue.length >= MAX_PENDING_ICE_PER_PEER) queue.shift();
-    queue.push(candidate);
+    queue.push({ candidate, receivedWhileIgnoringOffer });
   }
 
   private async drainIceCandidates(peer: PeerConnection): Promise<void> {
@@ -422,7 +438,18 @@ export class WebRTCManager {
     const queued = this.pendingIceCandidates.get(key);
     if (!queued || peer.ignoreOffer || !peer.pc.remoteDescription) return;
     this.pendingIceCandidates.delete(key);
-    for (const candidate of queued) await this.addIceCandidate(peer, candidate);
+    const acceptedIceUfrags = this.getDescriptionIceUfrags(peer.pc.remoteDescription);
+    for (const pending of queued) {
+      if (pending.receivedWhileIgnoringOffer && acceptedIceUfrags.size > 0) {
+        const candidateUfrag = this.getCandidateIceUfrag(pending.candidate);
+        if (!candidateUfrag || !acceptedIceUfrags.has(candidateUfrag)) continue;
+      }
+      await this.addIceCandidate(
+        peer,
+        pending.candidate,
+        pending.receivedWhileIgnoringOffer,
+      );
+    }
   }
 
   private clearPendingIceForPeer(peerId: string): void {
@@ -436,8 +463,29 @@ export class WebRTCManager {
     return [peerId, presenceSessionId ?? '', connectionId ?? ''].map(encodeURIComponent).join(':');
   }
 
-  private async addIceCandidate(peer: PeerConnection, candidate: RTCIceCandidateInit): Promise<void> {
-    try { await peer.pc.addIceCandidate(candidate); } catch (error) { if (!peer.ignoreOffer) throw error; }
+  private async addIceCandidate(
+    peer: PeerConnection,
+    candidate: RTCIceCandidateInit,
+    suppressIgnoredOfferError = false,
+  ): Promise<void> {
+    try {
+      await peer.pc.addIceCandidate(candidate);
+    } catch (error) {
+      if (!peer.ignoreOffer && !suppressIgnoredOfferError) throw error;
+    }
+  }
+
+  private getCandidateIceUfrag(candidate: RTCIceCandidateInit): string | null {
+    if (candidate.usernameFragment) return candidate.usernameFragment;
+    return /\bufrag\s+([^\s]+)/i.exec(candidate.candidate ?? '')?.[1] ?? null;
+  }
+
+  private getDescriptionIceUfrags(description: RTCSessionDescriptionInit): Set<string> {
+    const ufrags = new Set<string>();
+    for (const match of description.sdp?.matchAll(/^a=ice-ufrag:([^\r\n]+)$/gm) ?? []) {
+      ufrags.add(match[1].trim());
+    }
+    return ufrags;
   }
 
   private matchesLocalInstance(targetPresenceSessionId?: string, targetConnectionId?: string): boolean {
