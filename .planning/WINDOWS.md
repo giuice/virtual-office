@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 6
+open_count: 7
 waived_count: 0
 fixed_count: 0
-total_count: 6
-last_updated: 2026-07-24T22:07:39.760Z
+total_count: 7
+last_updated: 2026-07-24T22:21:50.012Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-07-24T22:07:39.760Z
 | 4 | 03 | unrun-verify | .planning/phases/03-video-and-screen-sharing/03-03-SUMMARY.md |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local Presence checklist completed and parent must schedule formal review | open |  | 2026-07-24T22:07:38.833Z |  |
 | 5 | 03 | lint-warning | .claude/gsd-core/bin/gsd-tools.cjs | 231 | Repository-wide lint remains blocked by 3230 pre-existing vendored rule-resolution errors and unrelated legacy warnings; focused plan lint passes | open |  | 2026-07-24T22:07:39.389Z |  |
 | 6 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Local Presence review added an exact owned-channel fence for mute metadata across simultaneous identity scope swaps | open |  | 2026-07-24T22:07:39.760Z |  |
+| 7 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: retain generation-matched winning-answer ICE received before the answer while excluding ignored colliding-offer ICE | open |  | 2026-07-24T22:21:50.012Z |  |
 
 ````json
 [
@@ -94,6 +95,18 @@ last_updated: 2026-07-24T22:07:39.760Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-24T22:07:39.760Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/lib/webrtc/WebRTCManager.ts",
+    "line": null,
+    "description": "Presence Safety blocker fixed: retain generation-matched winning-answer ICE received before the answer while excluding ignored colliding-offer ICE",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-24T22:21:50.012Z",
     "resolved_at": null
   }
 ]

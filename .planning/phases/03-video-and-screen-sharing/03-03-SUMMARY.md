@@ -31,7 +31,7 @@ key-files:
     - "__tests__/audio-signaling.test.tsx"
 key-decisions:
   - "Retained the existing AudioProvider/WebRTCManager P2P registry and getIceServers STUN/TURN path as the sole media transport."
-  - "Discard ICE received while an impolite peer ignores a colliding offer; never queue it for a later accepted description."
+  - "Quarantine only ICE with an identifiable generation while an impolite peer ignores a colliding offer, then drain only the generation accepted by the winning answer."
   - "Presenter hints and Presence leave events only trigger the authorized active endpoint; they never select stage media directly."
   - "Token or identity-scope changes retire and recreate the exact private channel because Realtime authorization is connection-cached."
 patterns-established:
@@ -84,7 +84,7 @@ status: complete
 
 ## Accomplishments
 
-- Completed per-peer polite/impolite collision behavior, suppressed ICE belonging to ignored offers, serialized overlapping negotiation callbacks, and retained the configured STUN/TURN path.
+- Completed per-peer polite/impolite collision behavior, quarantined generation-identifiable ICE during glare, drained only the winning answer generation, serialized overlapping negotiation callbacks, and retained the configured STUN/TURN path.
 - Preserved one P2P connection registry while keeping local microphone, local display, remote audio/VAD, and canonical remote display ownership separate.
 - Deduplicated identical display-track events and removed exact display listeners, sender/transceiver references, streams, audio elements, VADs, timers, and callbacks during peer or manager retirement.
 - Hardened the private `company:{companyId}:space:{spaceId}:media` lifecycle with `private: true`, acknowledged Broadcast, scoped Presence keys, Zod parsing, target/session/connection fences, token-driven recreation, and exact-once removal.
@@ -97,6 +97,8 @@ status: complete
 
 - `65d0d78` — `test(03-03): add failing perfect negotiation regressions`
 - `acb0642` — `feat(03-03): harden perfect negotiation media isolation`
+- `eb721a7` — `test(03-03): expose answer ICE loss during glare`
+- `3348f48` — `fix(03-03): retain winning answer ICE through glare`
 
 ### Task 2: Fence and validate private media signaling through reconnects
 
@@ -114,7 +116,7 @@ status: complete
 
 - Kept `AudioProvider`, `WebRTCManager`, the P2P peer map, and `getIceServers()` unchanged as the architecture boundary; no SDK, SFU, second registry, or parallel signaling path was introduced.
 - Used stable application user ID ordering for polite/impolite roles.
-- Dropped, rather than buffered, ICE associated with an ignored glare offer so it cannot poison a later accepted answer.
+- Quarantined ICE received during an ignored glare offer only when it carries an ICE username fragment, then matched that generation against the accepted answer SDP before delivery; uncorrelatable glare ICE remains dropped.
 - Kept mute Presence data as UI metadata only and fenced it to company, application user, Presence session, space, token, channel, and generation.
 - Recreated the channel after access-token changes instead of assuming cached Realtime authorization changed in place.
 
@@ -140,25 +142,35 @@ status: complete
 - **Verification:** 20 combined focused tests, 558 Presence tests, type-check, focused ESLint, build, movement gate, and skill validation passed.
 - **Commit:** `4a691fd`
 
-**Total deviations:** 2 auto-fixed — 1 bug and 1 missing critical scope fence.
-**Impact:** Both changes strengthen the planned collision and stale-scope guarantees without expanding architecture or product scope.
+**3. [Rule 1 - Bug] Preserved valid winning-answer ICE that arrives before the answer during glare**
+
+- **Found during:** Mandatory Presence Safety review of Task 1
+- **Issue:** The impolite peer returned from every ICE message while `ignoreOffer` remained true. Broadcast ordering can deliver a valid candidate for the eventual answer before that answer, so the candidate was permanently lost.
+- **Fix:** Added an ICE-generation-aware quarantine. Candidates received during glare require an identifiable `usernameFragment`; after the answer is accepted, only candidates matching its `a=ice-ufrag` are delivered. If an accepted SDP omits ufrag data, `addIceCandidate()` performs browser validation and only errors marked as originating in the ignored window are suppressed, matching the MDN perfect-negotiation fallback.
+- **Files modified:** `src/lib/webrtc/WebRTCManager.ts`, `__tests__/webrtc-manager.test.ts`
+- **Verification:** Deterministic RED failed 1/9 at the missing winning candidate; GREEN passed 9/9. Wave 5 passed 21/21, Presence passed 558/558, and type-check, focused ESLint, movement gate, and skill validation passed.
+- **Commits:** RED `eb721a7`; GREEN `3348f48`
+
+**Total deviations:** 3 auto-fixed — 2 bugs and 1 missing critical scope fence.
+**Impact:** The changes strengthen the planned collision and stale-scope guarantees without expanding architecture or product scope.
 
 ## TDD Gate Compliance
 
 - Task 1: RED `65d0d78` → GREEN `acb0642`.
+- Task 1 corrective regression: RED `eb721a7` → GREEN `3348f48`.
 - Task 2: RED `89fda14` → GREEN `4a691fd`.
 - Both RED runs failed for their intended behavioral reasons before production changes.
 
 ## Presence Safety Review
 
-- The required `presence-safety-reviewer` was requested twice but could not spawn because the orchestrator and executor occupied both available agent threads.
-- The executor completed the same checklist locally and found the missing full-scope mute fence described above; it was fixed and the full focused/Presence evidence was rerun.
-- The formal read-only reviewer remains recorded in `.planning/WINDOWS.md` for the orchestrator to schedule after this executor releases its slot.
+- The mandatory Presence Safety review surfaced the answer-before-ICE glare blocker described above; its RED/GREEN correction and all local gates are complete.
+- Per orchestration instructions, this executor did not run the formal re-review. The orchestrator owns that final read-only confirmation, which remains recorded in `.planning/WINDOWS.md`.
 - No database, migration, RLS, repository, API route, or service-role boundary changed, so the Supabase/RLS reviewer was not triggered.
 
 ## Verification
 
-- `npm test -- __tests__/audio-signaling.test.tsx __tests__/webrtc-manager.test.ts` — 2 files, 20 tests passed.
+- `npm test -- __tests__/webrtc-manager.test.ts` — 1 file, 9 tests passed after a deterministic 1/9 RED.
+- `npm test -- __tests__/audio-signaling.test.tsx __tests__/webrtc-manager.test.ts` — 2 files, 21 tests passed.
 - `npm run type-check` — passed.
 - Focused ESLint for all four plan-owned files — passed.
 - `npm run test:presence` — 61 files, 558 tests passed.
@@ -187,7 +199,7 @@ No unplanned security surface was introduced. Untrusted SDP/ICE/hints, private c
 
 ## Issues Encountered
 
-- The specialized Presence reviewer could not be spawned due to the environment's two-agent concurrency limit; the formal gate remains open for the orchestrator.
+- Formal Presence re-review remains open for the orchestrator after this blocker correction, by explicit orchestration instruction.
 - Full repository lint is blocked by unrelated pre-existing vendored ESLint configuration errors and legacy warnings. Details are recorded in `deferred-items.md` and `.planning/WINDOWS.md`.
 
 ## User Setup Required
@@ -196,13 +208,13 @@ None for this local implementation.
 
 ## Next Phase Readiness
 
-- Wave 5 application hardening is ready for the orchestrator's formal Presence review.
+- Wave 5 application hardening is ready for the orchestrator's formal Presence re-review.
 - Real two-user browser media, permission behavior, TURN traversal, and deployed private Realtime authorization remain deliberately assigned to later browser/TURN UAT.
 
 ## Self-Check: PASSED
 
 - All four plan-owned source/test files exist.
-- RED/GREEN commits `65d0d78`, `acb0642`, `89fda14`, and `4a691fd` exist in Git history.
+- RED/GREEN commits `65d0d78`, `acb0642`, `89fda14`, `4a691fd`, `eb721a7`, and `3348f48` exist in Git history.
 - Summary frontmatter declares `status: complete`.
 - All plan acceptance criteria are represented by passing focused tests and static/runtime gates.
 - `git diff --check` passed.

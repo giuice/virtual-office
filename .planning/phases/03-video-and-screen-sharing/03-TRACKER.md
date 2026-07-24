@@ -107,3 +107,13 @@
 - Deployment state: all commits remain local on `feature/sharing-screen`; no deployment, push, or pull request occurred.
 - Decision: the user chose to retain commit `4e6b142`, which repaired the malformed local GSD config and recorded an intermediate state update on the same feature branch.
 - Next action: stop before Wave 5. Plan 03-02 real local Postgres/RLS proof and Plan 03-03 signaling hardening require a separate explicit Wave 5 authorization.
+
+## 2026-07-24 — Wave 5 glare ICE blocker correction
+
+- Presence Safety blocker corrected: the impolite peer no longer drops every candidate while `ignoreOffer` is true. Generation-identifiable ICE is quarantined until the winning answer is accepted; candidates whose `usernameFragment` does not match that answer's `a=ice-ufrag` are discarded, while the winning answer candidate is delivered.
+- Deterministic evidence: RED commit `eb721a7` failed exactly 1/9 because valid answer ICE arriving before the answer was lost; GREEN commit `3348f48` passed 9/9 while preserving the existing ignored-offer isolation case.
+- Regression evidence: Wave 5 transport passed 21/21; critical Presence passed 61 files / 558 tests; TypeScript, focused ESLint, Presence movement gate, and Presence skill validation passed.
+- Known repository gate: whole-repository lint remains blocked by the same 3,230 pre-existing vendored rule-resolution and unrelated legacy findings; the two touched files pass focused ESLint.
+- Database state: no schema, migration, data, function, grant, RLS, local database, or online database was queried or changed.
+- Deployment state: commits remain local on `feature/sharing-screen`; no deployment, push, or pull request occurred.
+- Next action: the orchestrator must run the formal read-only Presence re-review. No formal reviewer was run by this executor.
