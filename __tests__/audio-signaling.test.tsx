@@ -4,25 +4,35 @@ import { useAudioSignaling } from '@/hooks/realtime/useAudioSignaling';
 import type { WebRTCManager } from '@/lib/webrtc';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+const SPACE_ID = '22222222-2222-4222-8222-222222222222';
+const USER_ID = '33333333-3333-4333-8333-333333333333';
+const PEER_ID = '44444444-4444-4444-8444-444444444444';
+const SESSION_ID = '55555555-5555-4555-8555-555555555555';
+const SHARE_ID = '66666666-6666-4666-8666-666666666666';
+
 const mocks = vi.hoisted(() => {
   const channelApi = {
     on: vi.fn(),
     subscribe: vi.fn(),
     track: vi.fn(),
-    unsubscribe: vi.fn(),
     presenceState: vi.fn(() => ({})),
+  };
+  const client = {
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+    realtime: { setAuth: vi.fn() },
   };
 
   return {
     channelApi,
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    client,
     statusHandler: undefined as ((status: string) => void) | undefined,
   };
 });
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: { channel: mocks.channel, removeChannel: mocks.removeChannel },
+vi.mock('@/lib/supabase/browser-client', () => ({
+  createSupabaseBrowserClient: () => mocks.client,
 }));
 
 function deferred<T>() {
@@ -33,146 +43,212 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-describe('useAudioSignaling subscription lifecycle', () => {
+function activeResponse(active = null): Response {
+  return new Response(JSON.stringify({ success: true, code: 'ACTIVE_READ', active }), { status: 200 });
+}
+
+function options(manager: WebRTCManager, overrides: Partial<Parameters<typeof useAudioSignaling>[0]> = {}) {
+  return {
+    companyId: COMPANY_ID,
+    spaceId: SPACE_ID,
+    currentUserId: USER_ID,
+    presenceSessionId: SESSION_ID,
+    generation: 1,
+    webrtcManager: manager,
+    isMuted: true,
+    ...overrides,
+  };
+}
+
+describe('useAudioSignaling private media lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.statusHandler = undefined;
-    mocks.channel.mockReturnValue(mocks.channelApi);
+    mocks.client.channel.mockReturnValue(mocks.channelApi);
+    mocks.client.removeChannel.mockResolvedValue('ok');
+    mocks.client.realtime.setAuth.mockResolvedValue(undefined);
     mocks.channelApi.on.mockReturnValue(mocks.channelApi);
     mocks.channelApi.subscribe.mockImplementation((handler: (status: string) => void) => {
       mocks.statusHandler = handler;
       return mocks.channelApi;
     });
-    mocks.channelApi.unsubscribe.mockResolvedValue('ok');
-    mocks.removeChannel.mockResolvedValue('ok');
+    mocks.channelApi.track.mockResolvedValue('ok');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(activeResponse()));
   });
 
-  it('tracks then handshakes once for the current subscription', async () => {
-    mocks.channelApi.track.mockResolvedValue('ok');
+  it('opens the exact private media topic and sends initial signaling only after SUBSCRIBED', async () => {
     const manager = {
       setSignalingChannel: vi.fn(),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
 
-    renderHook(() => useAudioSignaling({
-      spaceId: 'space-1',
-      currentUserId: 'user-1',
-      webrtcManager: manager,
-      isMuted: true,
-    }));
+    renderHook(() => useAudioSignaling(options(manager)));
+
+    await waitFor(() => expect(mocks.client.channel).toHaveBeenCalledWith(
+      `company:${COMPANY_ID}:space:${SPACE_ID}:media`,
+      {
+        config: {
+          private: true,
+          broadcast: { self: false, ack: true },
+          presence: { key: `${USER_ID}:${SESSION_ID}` },
+        },
+      },
+    ));
+    expect(manager.broadcastHandshake).not.toHaveBeenCalled();
 
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
-
     await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
-    expect(manager.setSignalingChannel).toHaveBeenCalledWith(mocks.channelApi);
-    expect(mocks.channelApi.track).toHaveBeenCalledTimes(1);
+    expect(manager.setSignalingChannel).toHaveBeenCalledWith(mocks.channelApi, expect.any(Function));
+    expect(mocks.channelApi.track).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: USER_ID,
+      is_muted: true,
+    }));
   });
 
-  it('does not handshake after cleanup retires an in-flight subscription', async () => {
+  it('parses every broadcast before scope checks or manager dispatch', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const manager = {
+      setSignalingChannel: vi.fn(),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      handleDescription: vi.fn().mockResolvedValue(undefined),
+      handleIceCandidate: vi.fn().mockResolvedValue(undefined),
+      handleHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+
+    renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
+
+    const description = {
+      type: 'description',
+      sourceUserId: PEER_ID,
+      targetUserId: USER_ID,
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: null,
+      description: { type: 'offer', sdp: 'v=0' },
+    };
+    act(() => {
+      handlers.get('broadcast:description')?.({ payload: { ...description, description: { type: 'offer' } } });
+      handlers.get('broadcast:description')?.({ payload: { ...description, companyId: SHARE_ID } });
+      handlers.get('broadcast:description')?.({ payload: description });
+    });
+
+    await waitFor(() => expect(manager.handleDescription).toHaveBeenCalledTimes(1));
+    expect(manager.handleDescription).toHaveBeenCalledWith(PEER_ID, USER_ID, description.description, null);
+  });
+
+  it('uses the authorized active route after subscribe and invalidation instead of treating hints as presenter authority', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const manager = {
+      setSignalingChannel: vi.fn(),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    const active = {
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      presenterUserId: PEER_ID,
+      presenterName: 'Presenter',
+      shareId: SHARE_ID,
+      expiresAt: '2026-07-24T00:00:00.000Z',
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(activeResponse(null))
+      .mockResolvedValueOnce(activeResponse(active));
+
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: {
+      type: 'presenter-invalidated',
+      sourceUserId: PEER_ID,
+      targetUserId: USER_ID,
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: SHARE_ID,
+    } }));
+    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    expect(fetch).toHaveBeenLastCalledWith(
+      `/api/spaces/${SPACE_ID}/screen-share/active?presenceSessionId=${SESSION_ID}`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('fences deferred subscribe, fetch, remove, and callbacks from scope A after scope B starts', async () => {
     const tracked = deferred<string>();
     mocks.channelApi.track.mockReturnValue(tracked.promise);
-    const manager = {
+    const managerA = {
       setSignalingChannel: vi.fn(),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
-
-    const { unmount } = renderHook(() => useAudioSignaling({
-      spaceId: 'space-1',
-      currentUserId: 'user-1',
-      webrtcManager: manager,
-      isMuted: true,
-    }));
-
-    act(() => mocks.statusHandler?.('SUBSCRIBED'));
-    unmount();
-    await act(async () => tracked.resolve('ok'));
-
-    expect(manager.broadcastHandshake).not.toHaveBeenCalled();
-    expect(manager.setSignalingChannel).toHaveBeenLastCalledWith(null);
-    expect(mocks.removeChannel).toHaveBeenCalledWith(mocks.channelApi);
-  });
-
-  it('updates mute tracking without recreating the signaling subscription', async () => {
-    mocks.channelApi.track.mockResolvedValue('ok');
-    const manager = {
+    const managerB = {
       setSignalingChannel: vi.fn(),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
 
     const { rerender } = renderHook(
-      ({ isMuted }) => useAudioSignaling({
-        spaceId: 'space-1',
-        currentUserId: 'user-1',
-        webrtcManager: manager,
-        isMuted,
-      }),
-      { initialProps: { isMuted: true } },
+      ({ manager, spaceId, generation }) => useAudioSignaling(options(manager, { spaceId, generation })),
+      { initialProps: { manager: managerA, spaceId: SPACE_ID, generation: 1 } },
     );
-
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
-    await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
+    rerender({ manager: managerB, spaceId: SHARE_ID, generation: 2 });
+    await act(async () => tracked.resolve('ok'));
 
-    rerender({ isMuted: false });
-    await waitFor(() => expect(mocks.channelApi.track).toHaveBeenCalledTimes(2));
-
-    expect(mocks.channel).toHaveBeenCalledTimes(1);
-    expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1);
-    expect(mocks.channelApi.track).toHaveBeenLastCalledWith(expect.objectContaining({
-      user_id: 'user-1',
-      is_muted: false,
-    }));
-    expect(mocks.removeChannel).not.toHaveBeenCalled();
+    expect(managerA.broadcastHandshake).not.toHaveBeenCalled();
+    expect(managerA.setSignalingChannel).toHaveBeenLastCalledWith(null);
+    expect(mocks.client.removeChannel).toHaveBeenCalledWith(mocks.channelApi);
   });
 
-  it('ignores queued events from a channel retired by a room transition', async () => {
-    const createChannel = (presenceState: Record<string, unknown>) => {
-      const handlers = new Map<string, (payload: unknown) => void>();
-      const channel = {
-        on: vi.fn((type: string, filter: { event: string }, handler: (payload: unknown) => void) => {
-          handlers.set(`${type}:${filter.event}`, handler);
-          return channel;
-        }),
-        subscribe: vi.fn(() => channel),
-        track: vi.fn().mockResolvedValue('ok'),
-        presenceState: vi.fn(() => presenceState),
-      } as unknown as RealtimeChannel;
-      return { channel, handlers };
-    };
-    const oldRoom = createChannel({
-      old: [{ user_id: 'old-user', is_muted: true, online_at: '2026-07-18T00:00:00.000Z' }],
-    });
-    const newRoom = createChannel({});
-    mocks.channel
-      .mockReturnValueOnce(oldRoom.channel)
-      .mockReturnValueOnce(newRoom.channel);
+  it('wraps manager signaling with validated scoped payloads and refuses sends before subscription', async () => {
     const manager = {
       setSignalingChannel: vi.fn(),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined),
-      handleHandshake: vi.fn().mockResolvedValue(undefined),
-      handleOffer: vi.fn().mockResolvedValue(undefined),
-      handleAnswer: vi.fn().mockResolvedValue(undefined),
-      handleIceCandidate: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(SHARE_ID),
     } as unknown as WebRTCManager;
 
-    const { result, rerender } = renderHook(
-      ({ spaceId }) => useAudioSignaling({
-        spaceId,
-        currentUserId: 'user-1',
-        webrtcManager: manager,
-        isMuted: false,
-      }),
-      { initialProps: { spaceId: 'space-1' } },
-    );
-    rerender({ spaceId: 'space-2' });
+    renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(manager.setSignalingChannel).not.toHaveBeenCalled());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(manager.setSignalingChannel).toHaveBeenCalled());
+    const sendSignal = vi.mocked(manager.setSignalingChannel).mock.calls[0][1];
+    if (!sendSignal) throw new Error('signal sender was not installed');
 
-    act(() => {
-      oldRoom.handlers.get('broadcast:handshake')?.({ payload: { userId: 'old-user' } });
-      oldRoom.handlers.get('presence:sync')?.({});
+    await sendSignal({
+      type: 'description',
+      senderId: USER_ID,
+      targetUserId: PEER_ID,
+      description: { type: 'offer', sdp: 'v=0' },
     });
-    await act(async () => Promise.resolve());
 
-    expect(manager.handleHandshake).not.toHaveBeenCalled();
-    expect(result.current.mutedUserIds.has('old-user')).toBe(false);
-    expect(mocks.removeChannel).toHaveBeenCalledWith(oldRoom.channel);
+    expect(mocks.channelApi.send).toHaveBeenCalledWith({
+      type: 'broadcast',
+      event: 'description',
+      payload: {
+        type: 'description',
+        sourceUserId: USER_ID,
+        targetUserId: PEER_ID,
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        shareId: SHARE_ID,
+        description: { type: 'offer', sdp: 'v=0' },
+      },
+    });
   });
 });
