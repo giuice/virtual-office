@@ -23,6 +23,7 @@ const PRESENTER_BUSY_RESPONSE = {
   success: false,
   code: 'PRESENTER_BUSY',
   error: 'Another participant is already sharing this space.',
+  retryable: false,
 };
 
 interface ManagerCallbacks {
