@@ -277,7 +277,7 @@ function noCompanyAuth() {
 
 describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     primeAuth();
   });
 
@@ -347,6 +347,151 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(JSON.stringify(body)).not.toContain('88888888');
     expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('compensates an exact legacy claim success before returning terminal incompatibility', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    mocks.rpc
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          code: 'CLAIMED',
+          shareId: SHARE_ID,
+          expiresAt: EXPIRES_AT,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { ok: true, code: 'RELEASED', alreadyReleased: false },
+        error: null,
+      });
+
+    const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
+    });
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'claim_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'release_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+    expect(info).toHaveBeenCalledWith('screen_share_route', {
+      correlationId: expect.any(String),
+      operation: 'claim',
+      outcome: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      retryable: false,
+      compensation: 'released',
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toContain(AUTH_USER_ID);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(PRESENCE_SESSION_ID);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(SHARE_ID);
+    info.mockRestore();
+  });
+
+  it('keeps legacy claim incompatibility terminal when compensation fails without broad retry', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    mocks.rpc
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          code: 'CLAIMED',
+          shareId: SHARE_ID,
+          expiresAt: EXPIRES_AT,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: 'XX000',
+          message: 'private compensation failure',
+          details: 'must remain server-only',
+        },
+      });
+
+    const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(426);
+    expect(body).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
+    });
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(body)).not.toContain('private compensation failure');
+    expect(JSON.stringify(info.mock.calls)).not.toContain('private compensation failure');
+    expect(info).toHaveBeenCalledWith('screen_share_route', {
+      correlationId: expect.any(String),
+      operation: 'claim',
+      outcome: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      retryable: false,
+      compensation: 'failed',
+    });
+    info.mockRestore();
+  });
+
+  it.each([
+    {
+      name: 'extra-field success',
+      data: {
+        ok: true,
+        code: 'CLAIMED',
+        shareId: SHARE_ID,
+        expiresAt: EXPIRES_AT,
+        authSessionId: 'server-secret',
+      },
+    },
+    {
+      name: 'mismatched-share success',
+      data: {
+        ok: true,
+        code: 'CLAIMED',
+        shareId: TARGET_ID,
+        expiresAt: EXPIRES_AT,
+      },
+    },
+    {
+      name: 'missing-share success',
+      data: {
+        ok: true,
+        code: 'CLAIMED',
+        expiresAt: EXPIRES_AT,
+      },
+    },
+    {
+      name: 'unknown failure',
+      data: {
+        ok: false,
+        code: 'UNKNOWN_RESULT',
+      },
+    },
+  ])('does not compensate ambiguous legacy envelope: $name', async ({ data }) => {
+    mocks.rpc.mockResolvedValueOnce({ data, error: null });
+
+    const response = await claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(426);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).not.toHaveBeenCalledWith(
+      'release_screen_share_observed',
+      expect.anything(),
+    );
   });
 
   it.each([
