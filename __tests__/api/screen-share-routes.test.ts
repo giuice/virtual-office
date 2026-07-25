@@ -7,6 +7,7 @@ import {
   screenShareClaimRequestSchema,
   screenShareClaimRpcResultSchema,
   screenSharePresenterNameSchema,
+  screenSharePublicErrorSchema,
   screenSharePublicShareSchema,
   screenShareSignalingPayloadSchema,
 } from '@/lib/webrtc/screen-share-contract';
@@ -84,6 +85,26 @@ describe('screen-share contract boundaries', () => {
     expect(screenSharePublicShareSchema.safeParse({
       ...publicShare,
       authSessionId: PRESENCE_SESSION_ID,
+    }).success).toBe(false);
+  });
+
+  it('requires an explicit retryability classification on every public error', () => {
+    expect(screenSharePublicErrorSchema.safeParse({
+      success: false,
+      code: 'SERVICE_UNAVAILABLE',
+      error: 'Screen sharing is temporarily unavailable.',
+      retryable: true,
+    }).success).toBe(true);
+    expect(screenSharePublicErrorSchema.safeParse({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
+    }).success).toBe(true);
+    expect(screenSharePublicErrorSchema.safeParse({
+      success: false,
+      code: 'INTERNAL_ERROR',
+      error: 'Screen share operation failed.',
     }).success).toBe(false);
   });
 
