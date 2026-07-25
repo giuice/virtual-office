@@ -43,7 +43,6 @@ export function FloorPlanPresentationStage({
     activeScreenShare
     && (
       unavailableShareId === activeScreenShare.shareId
-      || (displayStream !== null && matchingStream === null)
       || (matchingTrack && matchingTrack.readyState !== 'live')
     )
   );

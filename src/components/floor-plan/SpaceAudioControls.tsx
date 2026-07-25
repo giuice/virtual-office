@@ -14,7 +14,7 @@
 'use client';
 
 import React, { useEffect, useCallback } from 'react';
-import { Mic, MicOff, AlertCircle, PhoneCall } from 'lucide-react';
+import { Mic, MicOff, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
 	Tooltip,
@@ -116,7 +116,7 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 							className={cn('size-9', className)}
 							aria-label="Enable microphone"
 							data-space-action
-							onClick={handleEnableAudio}
+							onClick={() => void handleEnableAudio()}
 							disabled={isInitializing}
 						>
 							{isInitializing ? (
@@ -146,7 +146,7 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 							className={cn('size-9 text-amber-500', className)}
 							aria-label="Retry microphone"
 							data-space-action
-							onClick={handleEnableAudio}
+							onClick={() => void handleEnableAudio()}
 						>
 							<AlertCircle className="size-4" />
 						</Button>
