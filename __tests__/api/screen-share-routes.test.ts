@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as getActiveScreenShare } from '@/app/api/spaces/[id]/screen-share/active/route';
 import { POST as claimScreenShare } from '@/app/api/spaces/[id]/screen-share/claim/route';
 import { POST as releaseScreenShare } from '@/app/api/spaces/[id]/screen-share/release/route';
+import { POST as renewScreenShare } from '@/app/api/spaces/[id]/screen-share/renew/route';
 import {
   screenShareActiveRpcResultSchema,
   screenShareClaimRequestSchema,
@@ -9,6 +10,8 @@ import {
   screenSharePresenterNameSchema,
   screenSharePublicErrorSchema,
   screenSharePublicShareSchema,
+  screenShareReleaseRequestSchema,
+  screenShareRenewRequestSchema,
   screenShareSignalingPayloadSchema,
 } from '@/lib/webrtc/screen-share-contract';
 
@@ -105,6 +108,22 @@ describe('screen-share contract boundaries', () => {
       success: false,
       code: 'INTERNAL_ERROR',
       error: 'Screen share operation failed.',
+    }).success).toBe(false);
+  });
+
+  it('keeps renew expiry server-owned and release reasons observational', () => {
+    expect(screenShareRenewRequestSchema.safeParse(claimBody()).success).toBe(true);
+    expect(screenShareRenewRequestSchema.safeParse({
+      ...claimBody(),
+      expiresAt: EXPIRES_AT,
+    }).success).toBe(false);
+    expect(screenShareReleaseRequestSchema.safeParse({
+      ...claimBody(),
+      stopReason: 'track-ended',
+    }).success).toBe(true);
+    expect(screenShareReleaseRequestSchema.safeParse({
+      ...claimBody(),
+      stopReason: 'clear-another-presenter',
     }).success).toBe(false);
   });
 
@@ -227,6 +246,10 @@ const routeOperations = [
   {
     name: 'claim',
     invoke: () => claimScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
+  },
+  {
+    name: 'renew',
+    invoke: () => renewScreenShare(postRequest(claimBody()), routeContext(SPACE_ID)),
   },
   {
     name: 'release',
@@ -374,6 +397,101 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
 
     expect(response.status).toBe(200);
     expect(await json(response)).toEqual({ success: true, code: 'RELEASED', alreadyReleased: true });
+    expect(mocks.rpc).toHaveBeenCalledWith('release_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+  });
+
+  it('renews only the exact verified owner scope and returns the committed expiry', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        code: 'RENEWED',
+        shareId: SHARE_ID,
+        expiresAt: EXPIRES_AT,
+      },
+      error: null,
+    });
+
+    const response = await renewScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toEqual({
+      success: true,
+      code: 'RENEWED',
+      shareId: SHARE_ID,
+      expiresAt: EXPIRES_AT,
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith('renew_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+  });
+
+  it('rejects client-selected renew expiry without invoking the RPC', async () => {
+    const response = await renewScreenShare(
+      postRequest(claimBody({ expiresAt: EXPIRES_AT })),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['expired or replaced lease', 'LEASE_STALE', 409, 'LEASE_STALE'],
+    ['revoked presence session', 'SESSION_INVALID', 409, 'SESSION_INVALID'],
+  ] as const)('maps %s renew ownership failure without exposing lease internals', async (
+    _scenario,
+    rpcCode,
+    expectedStatus,
+    expectedCode,
+  ) => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, code: rpcCode }, error: null });
+
+    const response = await renewScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(expectedStatus);
+    expect(body).toMatchObject({ success: false, code: expectedCode, retryable: false });
+    expect(body).not.toHaveProperty('authSessionId');
+    expect(body).not.toHaveProperty('presenceSessionId');
+    expect(body).not.toHaveProperty('revision');
+  });
+
+  it('treats a zero-row renew outcome as terminal contract incompatibility', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: null });
+
+    const response = await renewScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(426);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
+    });
+  });
+
+  it('accepts a release stop reason without forwarding it as authority to the RPC', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: { ok: true, code: 'RELEASED', alreadyReleased: true },
+      error: null,
+    });
+
+    const response = await releaseScreenShare(
+      postRequest(claimBody({ stopReason: 'track-ended' })),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledWith('release_screen_share_observed', {
       p_auth_subject: AUTH_USER_ID,
       p_auth_session_id: '88888888-8888-4888-8888-888888888888',
