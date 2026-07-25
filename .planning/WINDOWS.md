@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 9
 waived_count: 0
-fixed_count: 5
-total_count: 14
-last_updated: 2026-07-25T16:46:35.176Z
+fixed_count: 8
+total_count: 17
+last_updated: 2026-07-25T21:21:16.050Z
 ---
 
 # Broken Windows Ledger
@@ -29,6 +29,9 @@ last_updated: 2026-07-25T16:46:35.176Z
 | 12 | 03 | deviation | src/app/api/spaces/[id]/screen-share/claim/route.ts |  | Resolved: aborted committed claims require server-side compensation under the original verified auth identity. | fixed |  | 2026-07-25T16:46:15.165Z | 2026-07-25T16:46:34.239Z |
 | 13 | 03 | deviation | src/contexts/AudioContext.tsx |  | Resolved: screen-share renewal cadence must not depend on the browser clock. | fixed |  | 2026-07-25T16:46:15.642Z | 2026-07-25T16:46:34.781Z |
 | 14 | 03 | deviation | __tests__/screen-share-tracer.test.tsx |  | Resolved: fixed claim expiry fixtures became stale relative to test execution. | fixed |  | 2026-07-25T16:46:16.047Z | 2026-07-25T16:46:35.176Z |
+| 15 | 03 | deviation | src/contexts/AudioContext.tsx |  | Exposed the existing scoped application user identity so duplicate owner controls agree | fixed |  | 2026-07-25T21:20:02.235Z | 2026-07-25T21:21:15.188Z |
+| 16 | 03 | deviation | src/components/floor-plan/SpaceAudioControls.tsx |  | Hardened the M shortcut for non-HTMLElement event targets | fixed |  | 2026-07-25T21:20:02.825Z | 2026-07-25T21:21:15.653Z |
+| 17 | 03 | deviation | src/components/floor-plan/FloorPlanPresentationStage.tsx |  | Kept mismatched display candidates in connecting state while refusing attachment | fixed |  | 2026-07-25T21:20:03.516Z | 2026-07-25T21:21:16.050Z |
 
 ````json
 [
@@ -199,6 +202,42 @@ last_updated: 2026-07-25T16:46:35.176Z
     "reason": "",
     "recorded_at": "2026-07-25T16:46:16.047Z",
     "resolved_at": "2026-07-25T16:46:35.176Z"
+  },
+  {
+    "id": 15,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/contexts/AudioContext.tsx",
+    "line": null,
+    "description": "Exposed the existing scoped application user identity so duplicate owner controls agree",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-25T21:20:02.235Z",
+    "resolved_at": "2026-07-25T21:21:15.188Z"
+  },
+  {
+    "id": 16,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/components/floor-plan/SpaceAudioControls.tsx",
+    "line": null,
+    "description": "Hardened the M shortcut for non-HTMLElement event targets",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-25T21:20:02.825Z",
+    "resolved_at": "2026-07-25T21:21:15.653Z"
+  },
+  {
+    "id": 17,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/components/floor-plan/FloorPlanPresentationStage.tsx",
+    "line": null,
+    "description": "Kept mismatched display candidates in connecting state while refusing attachment",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-25T21:20:03.516Z",
+    "resolved_at": "2026-07-25T21:21:16.050Z"
   }
 ]
 ````

@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
 status: Executing
-stopped_at: Completed 03-11-PLAN.md
-last_updated: "2026-07-25T16:45:50.022Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-07-25T21:20:45.668Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 11 of 13
+Plan: 5 of 13
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Plan: 11 of 13
 | Phase 03 P03 | 18min | 2 tasks | 4 files |
 | Phase 03 P04 | 10min | 2 tasks | 6 files |
 | Phase 03-video-and-screen-sharing P11 | 29min | 1 tasks | 5 files |
+| Phase 03-video-and-screen-sharing P05 | 12min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,9 @@ Recent decisions affecting current work:
 - [Phase 03]: [03-11] Screen sharing remains video-only on the sole AudioProvider/WebRTCManager path and never mutates microphone or remote audio.
 - [Phase 03]: [03-11] Renewal uses a fixed 10-second cadence so browser clock skew cannot invalidate a server lease.
 - [Phase 03]: [03-11] Aborted committed claims are compensated server-side with the original verified auth identity and exact RPC arguments.
+- [Phase ?]: [03-05] Viewer-local presentation expansion is keyed by canonical shareId and never written to Realtime or persistence.
+- [Phase ?]: [03-05] Qualifying current occupancy gates media controls; selectedSpace remains chat-only.
+- [Phase ?]: [03-05] Mismatched display candidates remain connecting and are never attached; only retired canonical tracks become unavailable.
 
 ### Pending Todos
 
@@ -143,9 +147,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-25T16:45:49.980Z
+**Last session:** 2026-07-25T21:20:45.632Z
 
 Last activity: 2026-07-25
-Stopped at: Completed 03-11-PLAN.md
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md
