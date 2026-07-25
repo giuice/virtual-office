@@ -72,6 +72,49 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
       p_space_id: parsedParams.data.spaceId,
       p_share_id: parsedBody.data.shareId,
     };
+    const compensateExactClaim = async (
+      shareId: string,
+    ): Promise<'released' | 'already-released' | 'failed'> => {
+      try {
+        const release = await callObservedScreenShareRpc(
+          () => auth.admin.rpc('release_screen_share_observed', {
+            ...rpcArgs,
+            p_share_id: shareId,
+          }),
+          screenShareReleaseRpcResultSchema,
+        );
+        if (release.kind === 'result' && release.result.ok) {
+          return release.result.alreadyReleased ? 'already-released' : 'released';
+        }
+      } catch {
+        // The claim outcome remains authoritative even when cleanup fails.
+      }
+      return 'failed';
+    };
+    let committedShareId: string | null = null;
+    let abortCompensation: Promise<'released' | 'already-released' | 'failed'> | null = null;
+    const compensateAbortedClaimOnce = (): Promise<'released' | 'already-released' | 'failed'> | null => {
+      if (!committedShareId) return null;
+      if (abortCompensation) return abortCompensation;
+      abortCompensation = compensateExactClaim(committedShareId).then((compensation) => {
+        console.info('screen_share_route', {
+          correlationId,
+          operation: 'claim',
+          outcome: 'CLIENT_DISCONNECTED',
+          retryable: false,
+          compensation,
+        });
+        return compensation;
+      }).catch(() => {
+        // compensateExactClaim is fail-closed, but retain a handled fallback
+        // so an observer/logging failure cannot become an unhandled rejection.
+        return 'failed' as const;
+      });
+      return abortCompensation;
+    };
+    request.signal.addEventListener('abort', () => {
+      void compensateAbortedClaimOnce();
+    }, { once: true });
     const rpc = await callObservedScreenShareRpc(
       () => auth.admin.rpc('claim_screen_share_observed', rpcArgs),
       screenShareClaimRpcResultSchema,
@@ -91,24 +134,7 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
         legacyCommitted.success
         && legacyCommitted.data.shareId === parsedBody.data.shareId
       ) {
-        let compensation: 'released' | 'already-released' | 'failed' = 'failed';
-        try {
-          const release = await callObservedScreenShareRpc(
-            () => auth.admin.rpc('release_screen_share_observed', {
-              p_auth_subject: auth.identity.authSubject,
-              p_auth_session_id: auth.identity.authSessionId,
-              p_presence_session_id: parsedBody.data.presenceSessionId,
-              p_space_id: parsedParams.data.spaceId,
-              p_share_id: legacyCommitted.data.shareId,
-            }),
-            screenShareReleaseRpcResultSchema,
-          );
-          if (release.kind === 'result' && release.result.ok) {
-            compensation = release.result.alreadyReleased ? 'already-released' : 'released';
-          }
-        } catch {
-          // The original incompatibility remains authoritative even when cleanup fails.
-        }
+        const compensation = await compensateExactClaim(legacyCommitted.data.shareId);
         console.info('screen_share_route', {
           correlationId,
           operation: 'claim',
@@ -127,6 +153,20 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
     if (rpc.result.shareId !== parsedBody.data.shareId) {
       const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
       return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
+
+    committedShareId = rpc.result.shareId;
+    if (request.signal.aborted) {
+      await compensateAbortedClaimOnce();
+      // The transport is already retired. Keep the fallback response within
+      // the strict public contract and never claim success for a compensated lease.
+      const aborted = screenShareErrorContract('INVALID_REQUEST');
+      return NextResponse.json({
+        success: false,
+        code: aborted.code,
+        error: aborted.error,
+        retryable: aborted.retryable,
+      }, { status: aborted.status });
     }
 
     const response = screenShareClaimResponseSchema.parse({

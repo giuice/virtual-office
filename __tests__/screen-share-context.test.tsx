@@ -149,6 +149,11 @@ function Probe() {
   return null;
 }
 
+function currentAudio(): ReturnType<typeof useAudio> {
+  if (!latestAudio) throw new Error('AudioProvider probe is not ready');
+  return latestAudio;
+}
+
 function claimed(expiresAt = new Date(Date.now() + 30_000).toISOString()): Response {
   return new Response(JSON.stringify({
     success: true,
@@ -247,7 +252,7 @@ describe('AudioProvider screen-share lifecycle', () => {
     expect(latestAudio?.isMuted).toBe(audioBefore.muted);
     expect(latestAudio?.isAudioEnabled).toBe(audioBefore.enabled);
     expect(latestAudio?.speakingUsers).toBe(audioBefore.speaking);
-    expect(latestAudio?.mutedUserIds).toBe(audioBefore.mutedUsers);
+    expect(latestAudio?.mutedUserIds).toEqual(audioBefore.mutedUsers);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(16_000);
@@ -300,7 +305,7 @@ describe('AudioProvider screen-share lifecycle', () => {
 
     let startPromise!: Promise<boolean>;
     act(() => {
-      startPromise = latestAudio!.startScreenShare();
+      startPromise = currentAudio().startScreenShare();
     });
     contextState.companyId = COMPANY_B;
     contextState.presenceSessionId = SESSION_B;
@@ -321,6 +326,172 @@ describe('AudioProvider screen-share lifecycle', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mocks.managers[0].startScreenShare).not.toHaveBeenCalled();
     expect(latestAudio?.activeScreenShare).toBeNull();
+  });
+
+  it('compensates a deferred scope-A claim and ignores its deferred release completion in scope B', async () => {
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    let resolveClaim!: (response: Response) => void;
+    let resolveRelease!: (response: Response) => void;
+    const claimPromise = new Promise<Response>((resolve) => {
+      resolveClaim = resolve;
+    });
+    const releasePromise = new Promise<Response>((resolve) => {
+      resolveRelease = resolve;
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimPromise;
+      if (url.endsWith('/release')) return releasePromise;
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    let startPromise!: Promise<boolean>;
+    act(() => {
+      startPromise = currentAudio().startScreenShare();
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    contextState.companyId = COMPANY_B;
+    contextState.presenceSessionId = SESSION_B;
+    contextState.accessToken = 'token-b';
+    view.rerender(
+      <AudioProvider spaceId={SPACE_B} userId={USER_B}>
+        <Probe />
+      </AudioProvider>,
+    );
+    await waitFor(() => expect(mocks.managers).toHaveLength(2));
+
+    await act(async () => {
+      resolveClaim(new Response(JSON.stringify({
+        success: true,
+        code: 'CLAIMED',
+        share: {
+          companyId: COMPANY_A,
+          spaceId: SPACE_A,
+          presenterUserId: USER_A,
+          presenterName: 'Presenter A',
+          shareId: SHARE_A,
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        },
+      }), { status: 200 }));
+      expect(await startPromise).toBe(false);
+    });
+
+    const releaseCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/release'));
+    expect(releaseCall).toBeDefined();
+    expect(JSON.parse(releaseCall?.[1]?.body as string)).toEqual({
+      presenceSessionId: SESSION_A,
+      shareId: SHARE_A,
+      stopReason: 'scope-changed',
+    });
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(mocks.managers[0].startScreenShare).not.toHaveBeenCalled();
+    expect(latestAudio?.activeScreenShare).toBeNull();
+    expect(latestAudio?.webrtcManager).toBe(mocks.managers[1]);
+
+    await act(async () => {
+      resolveRelease(released());
+      await releasePromise;
+    });
+    expect(latestAudio?.activeScreenShare).toBeNull();
+    expect(latestAudio?.webrtcManager).toBe(mocks.managers[1]);
+  });
+
+  it('keeps an aborted old-claim release attempt best-effort when the replacement auth scope rejects it', async () => {
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    let serverClaimCommitted = false;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) {
+        serverClaimCommitted = true;
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('retired request', 'AbortError'));
+          }, { once: true });
+        });
+      }
+      if (url.endsWith('/release')) {
+        expect(serverClaimCommitted).toBe(true);
+        return Promise.resolve(new Response(JSON.stringify({
+          success: false,
+          code: 'SESSION_INVALID',
+          error: 'The original auth session is no longer active.',
+          retryable: false,
+        }), { status: 409 }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    let startPromise!: Promise<boolean>;
+    act(() => {
+      startPromise = currentAudio().startScreenShare();
+    });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/claim'))).toBe(true));
+    contextState.companyId = COMPANY_B;
+    contextState.presenceSessionId = SESSION_B;
+    contextState.accessToken = 'token-b';
+    view.rerender(
+      <AudioProvider spaceId={SPACE_B} userId={USER_B}>
+        <Probe />
+      </AudioProvider>,
+    );
+
+    await act(async () => {
+      expect(await startPromise).toBe(false);
+    });
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+    });
+    const releaseCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/release'));
+    expect(JSON.parse(releaseCall?.[1]?.body as string)).toEqual({
+      presenceSessionId: SESSION_A,
+      shareId: SHARE_A,
+      stopReason: 'scope-changed',
+    });
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(mocks.managers[0].startScreenShare).not.toHaveBeenCalled();
+    expect(mocks.managers).toHaveLength(2);
+    expect(latestAudio?.webrtcManager).toBe(mocks.managers[1]);
+    expect(latestAudio?.activeScreenShare).toBeNull();
+    expect(latestAudio?.displayStream).toBeNull();
+  });
+
+  it.each([
+    ['far ahead', '2035-01-01T00:00:00.000Z'],
+    ['far behind', '2020-01-01T00:00:00.000Z'],
+  ])('renews on a fixed conservative cadence when the client clock is %s', async (_label, clientNow) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(clientNow));
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const serverExpiry = '2026-07-25T12:00:30.000Z';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed(serverExpiry);
+      if (url.endsWith('/renew')) return renewed(serverExpiry);
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderProvider();
+    await act(async () => {});
+
+    await act(async () => {
+      expect(await latestAudio?.startScreenShare()).toBe(true);
+      await vi.advanceTimersByTimeAsync(10_500);
+    });
+
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/renew'))).toHaveLength(1);
+    expect(mocks.managers[0].stopScreenShare).not.toHaveBeenCalled();
+    expect(latestAudio?.activeScreenShare?.shareId).toBe(SHARE_A);
+    expect(latestAudio?.displayStream?.stream.getVideoTracks()[0]).toBe(track);
   });
 
   it('converges track-ended and rejected renewal on idempotent local stop plus exact release', async () => {

@@ -203,11 +203,12 @@ function routeContext(id: string): { params: Promise<{ id: string }> } {
   return { params: Promise.resolve({ id }) };
 }
 
-function postRequest(body: unknown): Request {
+function postRequest(body: unknown, signal?: AbortSignal): Request {
   return new Request('http://test.local/api/spaces/placeholder/screen-share', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal,
   });
 }
 
@@ -347,6 +348,135 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(JSON.stringify(body)).not.toContain('88888888');
     expect(JSON.stringify(body)).not.toContain('Stale identity snapshot');
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('releases a committed claim under auth A when its request aborts before delivery without consulting auth B', async () => {
+    const controller = new AbortController();
+    const rpcA = vi.fn()
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        return { data: claimRpc('Auth A presenter'), error: null };
+      })
+      .mockResolvedValueOnce({
+        data: { ok: true, code: 'RELEASED', alreadyReleased: false },
+        error: null,
+      });
+    const rpcB = vi.fn();
+    mocks.requireVerifiedPresenceAuth
+      .mockReset()
+      .mockResolvedValueOnce({
+        ok: true,
+        identity: {
+          appUserId: PRESENTER_ID,
+          authSubject: AUTH_USER_ID,
+          companyId: COMPANY_ID,
+          authSessionId: '88888888-8888-4888-8888-888888888888',
+          displayName: 'Auth A',
+        },
+        admin: { rpc: rpcA, from: mocks.from },
+      })
+      .mockResolvedValue({
+        ok: true,
+        identity: {
+          appUserId: TARGET_ID,
+          authSubject: '99999999-9999-4999-8999-999999999999',
+          companyId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          authSessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          displayName: 'Auth B',
+        },
+        admin: { rpc: rpcB, from: mocks.from },
+      });
+
+    const response = await claimScreenShare(
+      postRequest(claimBody(), controller.signal),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toEqual({
+      success: false,
+      code: 'INVALID_REQUEST',
+      error: 'Invalid screen share request.',
+      retryable: false,
+    });
+    expect(mocks.requireVerifiedPresenceAuth).toHaveBeenCalledTimes(1);
+    expect(rpcA).toHaveBeenNthCalledWith(1, 'claim_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+    expect(rpcA).toHaveBeenNthCalledWith(2, 'release_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+    expect(rpcB).not.toHaveBeenCalled();
+  });
+
+  it('retains auth A after returning CLAIMED and compensates a later abort exactly once without reauth B', async () => {
+    const controller = new AbortController();
+    const rpcA = vi.fn()
+      .mockResolvedValueOnce({ data: claimRpc('Auth A presenter'), error: null })
+      .mockResolvedValueOnce({
+        data: { ok: true, code: 'RELEASED', alreadyReleased: false },
+        error: null,
+      });
+    const rpcB = vi.fn();
+    mocks.requireVerifiedPresenceAuth
+      .mockReset()
+      .mockResolvedValueOnce({
+        ok: true,
+        identity: {
+          appUserId: PRESENTER_ID,
+          authSubject: AUTH_USER_ID,
+          companyId: COMPANY_ID,
+          authSessionId: '88888888-8888-4888-8888-888888888888',
+          displayName: 'Auth A',
+        },
+        admin: { rpc: rpcA, from: mocks.from },
+      })
+      .mockResolvedValue({
+        ok: true,
+        identity: {
+          appUserId: TARGET_ID,
+          authSubject: '99999999-9999-4999-8999-999999999999',
+          companyId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          authSessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          displayName: 'Auth B',
+        },
+        admin: { rpc: rpcB, from: mocks.from },
+      });
+
+    const response = await claimScreenShare(
+      postRequest(claimBody(), controller.signal),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      success: true,
+      code: 'CLAIMED',
+      share: { shareId: SHARE_ID },
+    });
+    expect(rpcA).toHaveBeenCalledTimes(1);
+
+    controller.abort();
+    controller.abort();
+
+    await vi.waitFor(() => expect(rpcA).toHaveBeenCalledTimes(2));
+    expect(rpcA).toHaveBeenNthCalledWith(2, 'release_screen_share_observed', {
+      p_auth_subject: AUTH_USER_ID,
+      p_auth_session_id: '88888888-8888-4888-8888-888888888888',
+      p_presence_session_id: PRESENCE_SESSION_ID,
+      p_space_id: SPACE_ID,
+      p_share_id: SHARE_ID,
+    });
+    expect(mocks.requireVerifiedPresenceAuth).toHaveBeenCalledTimes(1);
+    expect(rpcB).not.toHaveBeenCalled();
   });
 
   it('compensates an exact legacy claim success before returning terminal incompatibility', async () => {

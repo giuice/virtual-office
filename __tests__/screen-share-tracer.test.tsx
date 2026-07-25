@@ -177,7 +177,7 @@ describe('screen-share production tracer (mock-bounded wiring evidence)', () => 
         presenterUserId: USER_ID,
         presenterName: 'Ada Lovelace',
         shareId: SHARE_ID,
-        expiresAt: '2026-07-24T18:00:00.000Z',
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
       },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
 
@@ -291,7 +291,7 @@ describe('screen-share production tracer (mock-bounded wiring evidence)', () => 
         presenterUserId: USER_ID,
         presenterName: 'Ada Lovelace',
         shareId: SHARE_ID,
-        expiresAt: '2026-07-24T18:00:00.000Z',
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
       },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
 
