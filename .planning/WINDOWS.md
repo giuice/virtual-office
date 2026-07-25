@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 9
 waived_count: 0
-fixed_count: 0
-total_count: 9
-last_updated: 2026-07-24T22:38:16.280Z
+fixed_count: 1
+total_count: 10
+last_updated: 2026-07-25T12:38:52.224Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,7 @@ last_updated: 2026-07-24T22:38:16.280Z
 | 7 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: retain generation-matched winning-answer ICE received before the answer while excluding ignored colliding-offer ICE | open |  | 2026-07-24T22:21:50.012Z |  |
 | 8 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety interoperability risk fixed: quarantine omitted/null-generation glare ICE and suppress only explicit ICE-generation mismatch errors | open |  | 2026-07-24T22:31:18.711Z |  |
 | 9 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: drain every eligible queued ICE candidate exactly once before surfacing ordered errors | open |  | 2026-07-24T22:38:16.280Z |  |
+| 10 | 03 | deviation | src/app/api/spaces/[id]/screen-share/claim/route.ts |  | Formal Presence risk fixed: exact legacy CLAIMED envelopes receive bounded observed-release compensation before terminal 426; migration 20260723224547 remains database-first required | fixed |  | 2026-07-25T12:38:47.614Z | 2026-07-25T12:38:52.224Z |
 
 ````json
 [
@@ -134,6 +135,18 @@ last_updated: 2026-07-24T22:38:16.280Z
     "reason": "",
     "recorded_at": "2026-07-24T22:38:16.280Z",
     "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/app/api/spaces/[id]/screen-share/claim/route.ts",
+    "line": null,
+    "description": "Formal Presence risk fixed: exact legacy CLAIMED envelopes receive bounded observed-release compensation before terminal 426; migration 20260723224547 remains database-first required",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-25T12:38:47.614Z",
+    "resolved_at": "2026-07-25T12:38:52.224Z"
   }
 ]
 ````

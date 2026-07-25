@@ -6,7 +6,7 @@ current_phase: 03
 current_phase_name: video-and-screen-sharing
 status: Executing
 stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-07-25T12:20:06.763Z"
+last_updated: "2026-07-25T12:39:01.689Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 4
@@ -113,6 +113,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [03-03] Access-token and identity changes recreate the exact private media channel because Realtime authorization is connection-cached.
 - [Phase 03]: [03-04] Only strict RETRY_LOCK_SET service unavailability and sanitized internal failures are retryable; compatibility and stale authority outcomes are terminal.
 - [Phase 03]: [03-04] Release stopReason remains observability-only and is never forwarded as RPC authority.
+- [Phase 03]: [03-04] Exact legacy CLAIMED envelopes receive bounded observed-release compensation before terminal 426; migration 20260723224547 remains required database-first.
 
 ### Pending Todos
 
