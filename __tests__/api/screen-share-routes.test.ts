@@ -273,6 +273,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'UNAUTHORIZED',
       error: 'Authentication required',
+      retryable: false,
     });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
@@ -289,6 +290,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'INVALID_REQUEST',
       error: 'Invalid screen share request.',
+      retryable: false,
     });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
@@ -358,6 +360,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'PRESENTER_BUSY',
       error: 'Another participant is already sharing this space.',
+      retryable: false,
     });
   });
 
@@ -434,6 +437,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'DATABASE_CONTRACT_INCOMPATIBLE',
       error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
     });
     expect(JSON.stringify(body)).not.toContain('server-secret');
   });
@@ -448,6 +452,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'DATABASE_CONTRACT_INCOMPATIBLE',
       error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
     });
   });
 
@@ -529,6 +534,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'MEMBERSHIP_SCOPE_INVALID',
       error: 'Your company membership changed. Refresh before using screen sharing.',
+      retryable: false,
     });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
@@ -571,6 +577,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
         success: false,
         code: 'DATABASE_CONTRACT_INCOMPATIBLE',
         error: 'Screen sharing is unavailable until server compatibility is restored.',
+        retryable: false,
       });
       expect(JSON.stringify(body)).not.toContain('raw provider');
       expect(JSON.stringify(body)).not.toContain(providerCode);
@@ -604,6 +611,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'DATABASE_CONTRACT_INCOMPATIBLE',
       error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
     });
   });
 
@@ -618,6 +626,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'DATABASE_CONTRACT_INCOMPATIBLE',
       error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
     });
   });
 
@@ -631,6 +640,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'MEMBERSHIP_SCOPE_INVALID',
       error: 'Your company membership changed. Refresh before using screen sharing.',
+      retryable: false,
     });
   });
 
@@ -649,6 +659,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'DATABASE_CONTRACT_INCOMPATIBLE',
       error: 'Screen sharing is unavailable until server compatibility is restored.',
+      retryable: false,
     });
   });
 
@@ -674,6 +685,7 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       success: false,
       code: 'PRESENTER_PROFILE_INVALID',
       error: 'The presenter profile is unavailable for screen sharing.',
+      retryable: false,
     });
     expect(JSON.stringify(body)).not.toContain(displayName);
     expect(mocks.rpc).toHaveBeenCalledTimes(1);

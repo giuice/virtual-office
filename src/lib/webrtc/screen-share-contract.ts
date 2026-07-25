@@ -141,6 +141,7 @@ export const screenSharePublicErrorSchema = z.object({
   success: z.literal(false),
   code: screenSharePublicErrorCodeSchema,
   error: z.string().min(1),
+  retryable: z.boolean(),
   correlationId: uuidSchema.optional(),
 }).strict();
 
@@ -267,38 +268,94 @@ export interface ScreenShareErrorContract {
   code: z.infer<typeof screenSharePublicErrorCodeSchema>;
   status: number;
   error: string;
+  retryable: boolean;
 }
 
 const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorContract>> = {
-  INVALID_REQUEST: { code: 'INVALID_REQUEST', status: 400, error: 'Invalid screen share request.' },
+  INVALID_REQUEST: {
+    code: 'INVALID_REQUEST',
+    status: 400,
+    error: 'Invalid screen share request.',
+    retryable: false,
+  },
   AUTH_INVALID: {
     code: 'MEMBERSHIP_SCOPE_INVALID',
     status: 403,
     error: 'Your company membership changed. Refresh before using screen sharing.',
+    retryable: false,
   },
-  SESSION_INVALID: { code: 'SESSION_INVALID', status: 409, error: 'Your presence session is no longer active.' },
-  SPACE_NOT_FOUND: { code: 'SPACE_NOT_FOUND', status: 404, error: 'Space not found.' },
-  CROSS_COMPANY_SPACE: { code: 'ACCESS_DENIED', status: 403, error: 'Screen sharing is not available in this space.' },
-  SPACE_UNAVAILABLE: { code: 'SPACE_UNAVAILABLE', status: 409, error: 'Screen sharing is not available in this space.' },
-  PRESENTER_BUSY: { code: 'PRESENTER_BUSY', status: 409, error: 'Another participant is already sharing this space.' },
-  LEASE_NOT_FOUND: { code: 'LEASE_NOT_FOUND', status: 404, error: 'The screen share lease was not found.' },
-  LEASE_NOT_OWNER: { code: 'LEASE_NOT_OWNER', status: 403, error: 'You do not own this screen share lease.' },
-  LEASE_STALE: { code: 'LEASE_STALE', status: 409, error: 'This screen share lease is no longer active.' },
-  RETRY_LOCK_SET: { code: 'SERVICE_UNAVAILABLE', status: 503, error: 'Screen sharing is temporarily unavailable.' },
+  SESSION_INVALID: {
+    code: 'SESSION_INVALID',
+    status: 409,
+    error: 'Your presence session is no longer active.',
+    retryable: false,
+  },
+  SPACE_NOT_FOUND: { code: 'SPACE_NOT_FOUND', status: 404, error: 'Space not found.', retryable: false },
+  CROSS_COMPANY_SPACE: {
+    code: 'ACCESS_DENIED',
+    status: 403,
+    error: 'Screen sharing is not available in this space.',
+    retryable: false,
+  },
+  SPACE_UNAVAILABLE: {
+    code: 'SPACE_UNAVAILABLE',
+    status: 409,
+    error: 'Screen sharing is not available in this space.',
+    retryable: false,
+  },
+  PRESENTER_BUSY: {
+    code: 'PRESENTER_BUSY',
+    status: 409,
+    error: 'Another participant is already sharing this space.',
+    retryable: false,
+  },
+  LEASE_NOT_FOUND: {
+    code: 'LEASE_NOT_FOUND',
+    status: 404,
+    error: 'The screen share lease was not found.',
+    retryable: false,
+  },
+  LEASE_NOT_OWNER: {
+    code: 'LEASE_NOT_OWNER',
+    status: 403,
+    error: 'You do not own this screen share lease.',
+    retryable: false,
+  },
+  LEASE_STALE: {
+    code: 'LEASE_STALE',
+    status: 409,
+    error: 'This screen share lease is no longer active.',
+    retryable: false,
+  },
+  RETRY_LOCK_SET: {
+    code: 'SERVICE_UNAVAILABLE',
+    status: 503,
+    error: 'Screen sharing is temporarily unavailable.',
+    retryable: true,
+  },
   MEMBERSHIP_SCOPE_INVALID: {
     code: 'MEMBERSHIP_SCOPE_INVALID',
     status: 403,
     error: 'Your company membership changed. Refresh before using screen sharing.',
+    retryable: false,
   },
   PRESENTER_PROFILE_INVALID: {
     code: 'PRESENTER_PROFILE_INVALID',
     status: 409,
     error: 'The presenter profile is unavailable for screen sharing.',
+    retryable: false,
   },
   DATABASE_CONTRACT_INCOMPATIBLE: {
     code: 'DATABASE_CONTRACT_INCOMPATIBLE',
     status: 426,
     error: 'Screen sharing is unavailable until server compatibility is restored.',
+    retryable: false,
+  },
+  INTERNAL_ERROR: {
+    code: 'INTERNAL_ERROR',
+    status: 500,
+    error: 'Screen share operation failed.',
+    retryable: true,
   },
 };
 
@@ -332,5 +389,6 @@ export function screenShareErrorContract(code: string): ScreenShareErrorContract
     code: 'INTERNAL_ERROR',
     status: 500,
     error: 'Screen share operation failed.',
+    retryable: true,
   };
 }

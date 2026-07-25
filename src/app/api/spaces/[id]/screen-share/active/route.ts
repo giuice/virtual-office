@@ -19,10 +19,12 @@ interface ActiveRouteContext {
 }
 
 function internalError(correlationId: string): NextResponse {
+  const { code, error, retryable } = screenShareErrorContract('INTERNAL_ERROR');
   return NextResponse.json({
     success: false,
-    code: 'INTERNAL_ERROR',
-    error: 'Screen share operation failed.',
+    code,
+    error,
+    retryable,
     correlationId,
   }, { status: 500 });
 }
@@ -48,6 +50,7 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
         success: false,
         code: 'INVALID_REQUEST',
         error: 'Invalid screen share request.',
+        retryable: false,
       }, { status: 400 });
     }
 
@@ -57,12 +60,13 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
         success: false,
         code: 'UNAUTHORIZED',
         error: 'Authentication required',
+        retryable: false,
       }, { status: auth.status });
     }
 
     if (!auth.identity.companyId) {
-      const { code, status, error } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
-      return NextResponse.json({ success: false, code, error }, { status });
+      const { code, status, error, retryable } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
     const rpcArgs = {
@@ -78,18 +82,18 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
     if (rpc.kind === 'provider-error') {
       const compatibilityError = screenShareRpcContractError(rpc.error);
       if (compatibilityError) {
-        const { code, status, error } = compatibilityError;
-        return NextResponse.json({ success: false, code, error }, { status });
+        const { code, status, error, retryable } = compatibilityError;
+        return NextResponse.json({ success: false, code, error, retryable }, { status });
       }
       return internalError(correlationId);
     }
     if (rpc.kind === 'malformed') {
-      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
-      return NextResponse.json({ success: false, code, error }, { status });
+      const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
     if (!rpc.result.ok) {
-      const { code, status, error } = screenShareErrorContract(rpc.result.code);
-      return NextResponse.json({ success: false, code, error }, { status });
+      const { code, status, error, retryable } = screenShareErrorContract(rpc.result.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
     if (!rpc.result.active) {
       return NextResponse.json(screenShareActiveResponseSchema.parse({
@@ -99,8 +103,8 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
       }));
     }
     if (rpc.result.active.spaceId !== parsedParams.data.spaceId) {
-      const { code, status, error } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
-      return NextResponse.json({ success: false, code, error }, { status });
+      const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
     return NextResponse.json(screenShareActiveResponseSchema.parse({
