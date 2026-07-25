@@ -399,6 +399,10 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			});
 		} catch {
 			// Release is best effort; server expiry remains the final cleanup fence.
+		} finally {
+			// Realtime is invalidation-only: peers re-read the authorized active
+			// route before clearing or accepting any presenter state.
+			await lifecycle.manager.broadcastPresenterInvalidated(shareId);
 		}
 	}, []);
 

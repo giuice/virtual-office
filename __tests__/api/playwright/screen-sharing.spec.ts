@@ -1,6 +1,7 @@
 import {
   expect,
   test,
+  type APIRequestContext,
   type Browser,
   type BrowserContext,
   type Page,
@@ -50,6 +51,40 @@ interface LoggedInBrowser {
   spaces: RuntimeSpace[];
 }
 
+type AuthStorageState = Awaited<ReturnType<BrowserContext['storageState']>>;
+
+async function warmScreenSharingRoutes(request: APIRequestContext): Promise<void> {
+  const placeholderId = '00000000-0000-4000-8000-000000000000';
+  const responses = await Promise.all([
+    request.get('/login'),
+    request.get('/floor-plan'),
+    request.post('/api/users/sync-profile', { data: {} }),
+    request.get('/api/users/list'),
+    request.get(`/api/users/get-by-id?supabase_uid=${placeholderId}`),
+    request.get(`/api/users/by-company?companyId=${placeholderId}`),
+    request.get(`/api/companies/get?id=${placeholderId}`),
+    request.get('/api/conversations/get'),
+    request.get(`/api/spaces?companyId=${placeholderId}`),
+    request.get('/api/neighborhoods'),
+    request.get('/api/presence/snapshot'),
+    request.post('/api/presence/sessions', { data: {} }),
+    request.post(`/api/presence/sessions/${placeholderId}/heartbeat`),
+    request.post(`/api/presence/sessions/${placeholderId}/disconnect`),
+    request.post('/api/presence/location', { data: {} }),
+    request.get(
+      `/api/spaces/knock/pending?spaceId=${placeholderId}&sessionId=${placeholderId}`,
+    ),
+    request.get(`/api/messages/get?conversationId=${placeholderId}&limit=1`),
+    request.get(
+      `/api/spaces/${placeholderId}/screen-share/active?presenceSessionId=${placeholderId}`,
+    ),
+    request.post(`/api/spaces/${placeholderId}/screen-share/claim`, { data: {} }),
+    request.post(`/api/spaces/${placeholderId}/screen-share/renew`, { data: {} }),
+    request.post(`/api/spaces/${placeholderId}/screen-share/release`, { data: {} }),
+  ]);
+  await Promise.all(responses.map((response) => response.dispose()));
+}
+
 declare global {
   interface Window {
     __screenShareTest?: {
@@ -87,7 +122,7 @@ async function installDeterministicMedia(context: BrowserContext): Promise<void>
     });
     Object.defineProperty(mediaDevices, 'getDisplayMedia', {
       configurable: true,
-      value: async (constraints?: DisplayMediaStreamOptions): Promise<MediaStream> => {
+      value: async (_constraints?: DisplayMediaStreamOptions): Promise<MediaStream> => {
         if (captureMode === 'denied') {
           throw new DOMException('Deterministic permission denial', 'NotAllowedError');
         }
@@ -174,6 +209,33 @@ async function openLoggedInBrowser(
   return { context, page, ...await readRuntimeModel(page, account) };
 }
 
+async function createAuthenticatedState(
+  browser: Browser,
+  account: PresenceE2EAccount,
+): Promise<AuthStorageState> {
+  const authenticated = await openLoggedInBrowser(browser, account);
+  try {
+    return await authenticated.context.storageState();
+  } finally {
+    await authenticated.context.close();
+  }
+}
+
+async function openLoggedInBrowserFromState(
+  browser: Browser,
+  account: PresenceE2EAccount,
+  storageState: AuthStorageState,
+): Promise<LoggedInBrowser> {
+  const context = await browser.newContext({ storageState });
+  await installDeterministicMedia(context);
+  const page = await context.newPage();
+  await page.goto('/floor-plan');
+  await expect(page.locator('[data-testid^="space-"]').first()).toBeVisible({
+    timeout: 30_000,
+  });
+  return { context, page, ...await readRuntimeModel(page, account) };
+}
+
 function spaceCard(page: Page, spaceId: string) {
   return page.locator(`[data-testid="space-${spaceId}"]`);
 }
@@ -196,8 +258,17 @@ async function openPairInOneSpace(
   browser: Browser,
   environment: PresenceE2EEnvironment,
 ): Promise<{ presenter: LoggedInBrowser; viewer: LoggedInBrowser; space: RuntimeSpace }> {
-  const presenter = await openLoggedInBrowser(browser, environment.admin);
-  const viewer = await openLoggedInBrowser(browser, environment.member);
+  // Build each authenticated state with no other live page. This avoids dev
+  // compilation/session-registration churn influencing the second login while
+  // preserving isolated cookies, storage, and live contexts for the scenario.
+  const presenterState = await createAuthenticatedState(browser, environment.admin);
+  const viewerState = await createAuthenticatedState(browser, environment.member);
+  const presenter = await openLoggedInBrowserFromState(
+    browser,
+    environment.admin,
+    presenterState,
+  );
+  const viewer = await openLoggedInBrowserFromState(browser, environment.member, viewerState);
   expect(presenter.user.companyId).toBe(viewer.user.companyId);
   const space = presenter.spaces.find(
     (candidate) =>
@@ -228,7 +299,18 @@ function audioSnapshot(page: Page) {
 }
 
 async function shareFrom(page: Page): Promise<void> {
+  const claimResponsePromise = page.waitForResponse((response) => {
+    const request = response.request();
+    return request.method() === 'POST'
+      && /\/api\/spaces\/[^/]+\/screen-share\/claim$/.test(new URL(response.url()).pathname);
+  });
   await page.getByRole('button', { name: 'Share screen' }).first().click();
+  const claimResponse = await claimResponsePromise;
+  const claimBody = await claimResponse.text();
+  expect(
+    claimResponse.ok(),
+    `screen-share claim failed (${claimResponse.status()}): ${claimBody}`,
+  ).toBe(true);
   await expect(page.getByTestId('floor-plan-presentation-stage')).toBeVisible({
     timeout: 30_000,
   });
@@ -240,8 +322,18 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
 
   let environment: PresenceE2EEnvironment;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ request }) => {
     environment = await resolvePresenceE2EEnvironment();
+    if (!environment.localFixture) {
+      throw new Error(
+        'The screen-sharing browser suite requires PRESENCE_E2E_PROVISION_LOCAL=1 '
+        + 'and a disposable loopback Supabase stack.',
+      );
+    }
+    // Next dev recompilation can Fast Refresh already-authenticated pages and
+    // invalidate their presence session. Compile the complete route surface
+    // before either isolated identity is opened.
+    await warmScreenSharingRoutes(request);
   });
 
   test('@smoke shares, collapses, expands, and stops without changing audio', async ({ browser }) => {

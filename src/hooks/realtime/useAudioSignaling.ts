@@ -344,6 +344,15 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       const base = { sourceUserId: scope.currentUserId, sourcePresenceSessionId: scope.presenceSessionId, sourceConnectionId: scope.connectionId, companyId: scope.companyId, spaceId: scope.spaceId, shareId: scope.manager.getActiveShareId() };
       const payload = event.type === 'handshake'
         ? screenShareHandshakePayloadSchema.parse({ type: 'handshake', ...base })
+        : event.type === 'presenter-invalidated'
+          ? screenSharePresenterInvalidatedPayloadSchema.parse({
+              type: 'presenter-invalidated',
+              ...base,
+              targetUserId: event.targetUserId,
+              targetPresenceSessionId: event.targetPresenceSessionId,
+              targetConnectionId: event.targetConnectionId,
+              shareId: event.shareId,
+            })
         : event.type === 'description'
           ? screenShareDescriptionPayloadSchema.parse({ type: 'description', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, description: event.description })
           : screenShareIcePayloadSchema.parse({ type: 'ice', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, candidate: event.candidate });

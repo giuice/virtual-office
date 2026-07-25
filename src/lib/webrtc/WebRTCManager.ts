@@ -30,6 +30,13 @@ export type SignalingEvent =
     targetConnectionId: string;
     senderId: string;
     candidate: RTCIceCandidateInit;
+  }
+  | {
+    type: 'presenter-invalidated';
+    targetUserId: string;
+    targetPresenceSessionId: string;
+    targetConnectionId: string;
+    shareId: string;
   };
 
 export type WebRTCSignalSender = (event: SignalingEvent) => Promise<void>;
@@ -174,6 +181,24 @@ export class WebRTCManager {
 
   async renegotiateExistingPeers(): Promise<void> {
     await Promise.all([...this.peerConnections.values()].map((peer) => this.negotiate(peer)));
+  }
+
+  async broadcastPresenterInvalidated(shareId: string): Promise<void> {
+    await Promise.allSettled(
+      [...this.peerConnections.values()]
+        .flatMap((peer) => {
+          const presenceSessionId = peer.presenceSessionId;
+          const connectionId = peer.connectionId;
+          if (!presenceSessionId || !connectionId) return [];
+          return [this.sendSignal({
+            type: 'presenter-invalidated',
+            targetUserId: peer.userId,
+            targetPresenceSessionId: presenceSessionId,
+            targetConnectionId: connectionId,
+            shareId,
+          })];
+        }),
+    );
   }
 
   async handleHandshake(senderId: string, presenceSessionId?: string, connectionId?: string): Promise<void> {

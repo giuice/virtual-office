@@ -69,6 +69,7 @@ const mocks = vi.hoisted(() => ({
     cleanup: ReturnType<typeof vi.fn>;
     startScreenShare: ReturnType<typeof vi.fn>;
     stopScreenShare: ReturnType<typeof vi.fn>;
+    broadcastPresenterInvalidated: ReturnType<typeof vi.fn>;
     initializeLocalStream: ReturnType<typeof vi.fn>;
     setMuted: ReturnType<typeof vi.fn>;
   }>,
@@ -113,6 +114,7 @@ vi.mock('@/lib/webrtc', () => {
     readonly setSignalingIdentity = vi.fn();
     readonly setSignalingChannel = vi.fn();
     readonly broadcastHandshake = vi.fn().mockResolvedValue(undefined);
+    readonly broadcastPresenterInvalidated = vi.fn().mockResolvedValue(undefined);
     readonly renegotiateExistingPeers = vi.fn().mockResolvedValue(undefined);
     private activeShareId: string | null = null;
 
@@ -263,6 +265,7 @@ describe('AudioProvider screen-share lifecycle', () => {
       await latestAudio?.stopScreenShare('user-stop');
     });
     expect(manager.stopScreenShare).toHaveBeenCalledTimes(1);
+    expect(manager.broadcastPresenterInvalidated).toHaveBeenCalledWith(SHARE_A);
     expect(track.removeEventListener).toHaveBeenCalledWith('ended', expect.any(Function));
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
     expect(latestAudio?.activeScreenShare).toBeNull();

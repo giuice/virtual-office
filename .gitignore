@@ -21,6 +21,7 @@
 
 # next.js
 /.next/
+/.next-screen-sharing/
 /.next-auth-metrics*/
 /out/
 
