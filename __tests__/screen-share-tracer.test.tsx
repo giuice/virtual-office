@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioProvider, useAudio } from '@/contexts/AudioContext';
 import { FloorPlanPresentationStage } from '@/components/floor-plan/FloorPlanPresentationStage';
 import { ScreenShareControls } from '@/components/floor-plan/ScreenShareControls';
+import { screenSharePublicErrorSchema } from '@/lib/webrtc/screen-share-contract';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const COMPANY_ID = '22222222-2222-4222-8222-222222222222';
@@ -18,6 +19,11 @@ const SPACE_ID = '33333333-3333-4333-8333-333333333333';
 const SESSION_ID = '44444444-4444-4444-8444-444444444444';
 const SHARE_ID = '55555555-5555-4555-8555-555555555555';
 const REMOTE_USER_ID = '66666666-6666-4666-8666-666666666666';
+const PRESENTER_BUSY_RESPONSE = {
+  success: false,
+  code: 'PRESENTER_BUSY',
+  error: 'Another participant is already sharing this space.',
+};
 
 interface ManagerCallbacks {
   onRemoteDisplay: (event: { peerId: string; shareId: string | null; stream: MediaStream }) => void;
@@ -149,6 +155,10 @@ describe('screen-share production tracer (mock-bounded wiring evidence)', () => 
     vi.stubGlobal('crypto', { randomUUID: vi.fn(() => SHARE_ID) });
   });
 
+  it('keeps the presenter-busy tracer fixture aligned with the strict public API contract', () => {
+    expect(screenSharePublicErrorSchema.safeParse(PRESENTER_BUSY_RESPONSE).success).toBe(true);
+  });
+
   it('captures video-only from the direct click, claims, and attaches the exact stream without touching microphone state', async () => {
     const { stream, track } = createDisplayStream();
     const getDisplayMedia = vi.fn(async () => stream);
@@ -192,11 +202,10 @@ describe('screen-share production tracer (mock-bounded wiring evidence)', () => 
       ...navigator,
       mediaDevices: { getDisplayMedia: vi.fn(async () => stream), getUserMedia: vi.fn() },
     });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      success: false,
-      code: 'PRESENTER_BUSY',
-      error: 'Another participant is already sharing this space.',
-    }), { status: 409, headers: { 'Content-Type': 'application/json' } })));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify(PRESENTER_BUSY_RESPONSE),
+      { status: 409, headers: { 'Content-Type': 'application/json' } },
+    )));
 
     render(<TracerHarness />);
     await waitFor(() => expect(mocks.managers).toHaveLength(1));
