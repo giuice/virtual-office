@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 9
 waived_count: 0
-fixed_count: 1
-total_count: 10
-last_updated: 2026-07-25T12:38:52.224Z
+fixed_count: 2
+total_count: 11
+last_updated: 2026-07-25T12:52:35.991Z
 ---
 
 # Broken Windows Ledger
@@ -25,6 +25,7 @@ last_updated: 2026-07-25T12:38:52.224Z
 | 8 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety interoperability risk fixed: quarantine omitted/null-generation glare ICE and suppress only explicit ICE-generation mismatch errors | open |  | 2026-07-24T22:31:18.711Z |  |
 | 9 | 03 | deviation | src/lib/webrtc/WebRTCManager.ts |  | Presence Safety blocker fixed: drain every eligible queued ICE candidate exactly once before surfacing ordered errors | open |  | 2026-07-24T22:38:16.280Z |  |
 | 10 | 03 | deviation | src/app/api/spaces/[id]/screen-share/claim/route.ts |  | Formal Presence risk fixed: exact legacy CLAIMED envelopes receive bounded observed-release compensation before terminal 426; migration 20260723224547 remains database-first required | fixed |  | 2026-07-25T12:38:47.614Z | 2026-07-25T12:38:52.224Z |
+| 11 | 03 | deviation | __tests__/screen-share-tracer.test.tsx |  | Post-merge regression fixed: PRESENTER_BUSY tracer fixture now matches strict public retryability contract and preserves exact losing-track cleanup plus zero manager publication | fixed |  | 2026-07-25T12:52:28.907Z | 2026-07-25T12:52:35.991Z |
 
 ````json
 [
@@ -147,6 +148,18 @@ last_updated: 2026-07-25T12:38:52.224Z
     "reason": "",
     "recorded_at": "2026-07-25T12:38:47.614Z",
     "resolved_at": "2026-07-25T12:38:52.224Z"
+  },
+  {
+    "id": 11,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "__tests__/screen-share-tracer.test.tsx",
+    "line": null,
+    "description": "Post-merge regression fixed: PRESENTER_BUSY tracer fixture now matches strict public retryability contract and preserves exact losing-track cleanup plus zero manager publication",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-25T12:52:28.907Z",
+    "resolved_at": "2026-07-25T12:52:35.991Z"
   }
 ]
 ````

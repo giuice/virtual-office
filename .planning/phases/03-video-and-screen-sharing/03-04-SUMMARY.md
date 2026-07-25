@@ -34,6 +34,7 @@ key-files:
     - src/app/api/spaces/[id]/screen-share/active/route.ts
     - __tests__/api/screen-share-routes.test.ts
     - src/lib/webrtc/observed-screen-share-rpc.ts
+    - __tests__/screen-share-tracer.test.tsx
 
 key-decisions:
   - "Only RETRY_LOCK_SET-derived SERVICE_UNAVAILABLE and sanitized INTERNAL_ERROR are retryable; compatibility, ownership, membership, and stale-session outcomes are terminal."
@@ -71,7 +72,7 @@ coverage:
         status: pass
     human_judgment: false
 
-duration: 14min
+duration: 18min
 completed: 2026-07-25
 status: complete
 ---
@@ -82,11 +83,11 @@ status: complete
 
 ## Performance
 
-- **Duration:** 14 min
+- **Duration:** 18 min
 - **Started:** 2026-07-25T12:08:41Z
 - **Completed:** 2026-07-25T12:19:00Z
 - **Tasks:** 2
-- **Files modified:** 7
+- **Files modified:** 8
 
 ## Accomplishments
 
@@ -95,6 +96,7 @@ status: complete
 - Completed release with strict observational stop reasons, idempotent committed-result exposure, and no ability for the reason or request body to grant authority.
 - Expanded the focused HTTP matrix to 107 passing cases covering authentication, invalid/mismatched inputs, presenter conflicts, renew/release ownership, expiry/stale scope, zero-row/malformed outcomes, compatibility, sanitization, retry bounds, strict response shapes, and mixed-version compensation.
 - Closed the mixed-version rollout lease leak: a strict legacy committed claim is released through the existing observed RPC before the route preserves its terminal 426 response; ambiguous payloads never trigger compensation.
+- Restored end-to-end `PRESENTER_BUSY` feedback by aligning the production tracer fixture with the strict public error response, while retaining exact losing-track cleanup and zero manager publication.
 
 ## Task Commits
 
@@ -105,6 +107,8 @@ status: complete
 5. **Final security correction: Preserve verified auth failure semantics** - `8b5f75a` (fix)
 6. **Presence review RED: Expose mixed-version claim lease leak** - `7009dc8` (test)
 7. **Presence review GREEN: Compensate incompatible legacy claims** - `da65f17` (fix)
+8. **Post-merge RED: Expose stale presenter-busy tracer contract** - `8ba5d5a` (test)
+9. **Post-merge GREEN: Align busy tracer with strict API error** - `ef15859` (test)
 
 ## Files Created/Modified
 
@@ -115,6 +119,7 @@ status: complete
 - `src/app/api/spaces/[id]/screen-share/active/route.ts` - Authorized canonical reconciliation with typed failures.
 - `__tests__/api/screen-share-routes.test.ts` - Complete mocked four-route HTTP contract matrix.
 - `src/lib/webrtc/observed-screen-share-rpc.ts` - Retains malformed server values for server-only strict compatibility classification.
+- `__tests__/screen-share-tracer.test.tsx` - Strict API-to-client busy feedback, exact cleanup, and no-publication regression proof.
 
 ## Decisions Made
 
@@ -151,9 +156,17 @@ status: complete
 - **Verification:** 107/107 focused tests, type-check, focused ESLint, build, Presence movement gate, and Presence skill validation passed.
 - **Committed in:** `7009dc8` (RED), `da65f17` (GREEN)
 
+**4. [Rule 1 - Bug] Restored typed presenter-busy feedback in the production tracer**
+- **Found during:** Post-merge full Vitest run
+- **Issue:** The tracer's mocked 409 response predated required `retryable` classification, so the strict client parser correctly rejected it and displayed generic feedback even though the real route response was valid.
+- **Fix:** Bound the fixture directly to `screenSharePublicErrorSchema` and added `retryable:false`, matching the real sanitized `PRESENTER_BUSY` route response without loosening production parsing.
+- **Files modified:** `__tests__/screen-share-tracer.test.tsx`
+- **Verification:** The tracer proves losing display tracks stop exactly once before busy feedback and `manager.startScreenShare` is never called. Related suites passed 129/129 and the full suite passed 1,192/1,192.
+- **Committed in:** `8ba5d5a` (RED), `ef15859` (GREEN)
+
 ---
 
-**Total deviations:** 3 auto-fixed (1 missing critical consistency fix, 2 correctness/security bugs).
+**Total deviations:** 4 auto-fixed (1 missing critical consistency fix, 3 correctness/security bugs).
 **Impact on plan:** All changes close correctness/security gaps within the planned HTTP boundary; database schema and RPC authority remain unchanged.
 
 ## TDD Gate Compliance
@@ -161,10 +174,13 @@ status: complete
 - Task 1 has a failing RED commit (`2d130e8`) followed by GREEN (`fac32d1`).
 - Task 2 has a failing RED commit (`70d7c43`) followed by GREEN (`b0b5931`).
 - The mixed-version Presence finding has a failing RED commit (`7009dc8`) followed by GREEN (`da65f17`).
+- The post-merge busy-feedback regression has a failing RED commit (`8ba5d5a`) followed by GREEN (`ef15859`).
 
 ## Verification
 
 - `npm test -- __tests__/api/screen-share-routes.test.ts`: 107/107 passed.
+- Related tracer/route/context/signaling suites: 129/129 passed.
+- Full `npm test`: 105 files, 1,192/1,192 passed.
 - `npm run type-check`: passed.
 - Focused ESLint for all six plan-owned TypeScript files: passed.
 - `npm run build`: passed; all four screen-share routes are dynamic server routes.
@@ -198,7 +214,7 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - All six plan-owned implementation/test files and this summary exist.
-- Commits `2d130e8`, `fac32d1`, `70d7c43`, `b0b5931`, `8b5f75a`, `7009dc8`, and `da65f17` exist in repository history.
+- Commits `2d130e8`, `fac32d1`, `70d7c43`, `b0b5931`, `8b5f75a`, `7009dc8`, `da65f17`, `8ba5d5a`, and `ef15859` exist in repository history.
 - Summary declares `status: complete`; no plan-owned stubs or skipped tests remain.
 
 ---

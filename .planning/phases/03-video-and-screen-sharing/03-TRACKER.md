@@ -145,3 +145,11 @@
 - Rollout order remains database-first: migration `20260723224547_screen_share_atomic_presenter_contract.sql` is still required. On a separately authorized named target, apply and read back both screen-share migrations/functions/grants first, smoke-test the exact RPC response, then deploy the application. Compensation only limits stale-lease harm during accidental skew; it does not make the old database compatible.
 - Deterministic evidence: RED `7009dc8` failed only the two missing-compensation cases while 105 existing cases stayed green. GREEN `da65f17` passed 107/107 route cases; type-check, focused ESLint, Next production build, Presence movement gate, Presence skill validation, and diff check passed.
 - Database/deployment state: no migration/schema/data/RLS/grant change, no local or online database access, and no deployment occurred. Formal Presence and Supabase/RLS re-reviews remain orchestrator-owned.
+
+## 2026-07-25 — Plan 03-04 post-merge presenter-busy tracer correction
+
+- Full-suite regression: the screen-share tracer mocked the pre-03-04 `PRESENTER_BUSY` body without the now-required `retryable:false`. The real claim route already emitted the strict sanitized shape, but the client correctly rejected the stale fixture and therefore selected generic feedback.
+- Test-boundary correction only: the shared tracer fixture is now parsed by `screenSharePublicErrorSchema` and includes terminal retryability. No production parser, route, user-facing copy, authority decision, or provider-error handling changed.
+- Workflow proof: the losing display track is stopped exactly once before busy feedback, and `manager.startScreenShare` remains uncalled. RED `8ba5d5a` failed the schema-alignment and feedback cases; GREEN `ef15859` passed the tracer 7/7.
+- Regression evidence: related tracer/route/context/signaling suites passed 129/129; full Vitest passed 105 files / 1,192 tests; type-check, focused ESLint, Next production build, Presence movement gate, Presence skill validation, and diff check passed.
+- Database/deployment state: no migration, local/online database action, environment change, production boundary change, or deployment occurred. Formal Presence/Supabase re-reviews remain orchestrator-owned for the earlier production correction, not this test-fixture-only update.
