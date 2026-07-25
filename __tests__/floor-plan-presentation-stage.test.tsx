@@ -102,7 +102,14 @@ describe('ScreenShareControls', () => {
     expect(idleButtons).toHaveLength(2);
     expect(screen.getAllByText('No one is sharing a screen')).toHaveLength(2);
     fireEvent.click(idleButtons[0]);
-    expect(await screen.findByText('Opening screen picker…')).toBeInTheDocument();
+    expect(await screen.findAllByText('Opening screen picker…')).toHaveLength(2);
+    audio.screenShareStatus = 'opening-picker';
+    view.rerender(
+      <>
+        <ScreenShareControls isCurrentOccupant currentUserId={LOCAL_USER_ID} />
+        <ScreenShareControls isCurrentOccupant currentUserId={LOCAL_USER_ID} />
+      </>,
+    );
     expect(screen.getAllByRole('button', { name: 'Share screen' })[1]).toBeDisabled();
 
     audio.activeScreenShare = share();
@@ -219,7 +226,7 @@ describe('FloorPlanPresentationStage', () => {
 
   it('renders owner Stop sharing in expanded and rail states and returns focus to Share screen', async () => {
     audio.activeScreenShare = share(LOCAL_USER_ID);
-    render(
+    const view = render(
       <>
         <ScreenShareControls isCurrentOccupant currentUserId={LOCAL_USER_ID} />
         <FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />
@@ -227,11 +234,18 @@ describe('FloorPlanPresentationStage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Collapse presentation' }));
     expect(screen.getByTitle('Grace Hopper')).toHaveClass('truncate');
-    const stop = screen.getByRole('button', { name: 'Stop sharing' });
-    expect(stop).toHaveClass('min-h-11');
+    const stop = screen.getAllByRole('button', { name: 'Stop sharing' })[1];
+    expect(stop.className).toContain('[@media(pointer:coarse)]:min-h-11');
     fireEvent.click(stop);
     await waitFor(() => expect(audio.stopScreenShare).toHaveBeenCalledWith('user-stop'));
-    expect(screen.getByRole('button', { name: 'Stop sharing' })).toHaveFocus();
+    audio.activeScreenShare = null;
+    view.rerender(
+      <>
+        <ScreenShareControls isCurrentOccupant currentUserId={LOCAL_USER_ID} />
+        <FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />
+      </>,
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Share screen' })).toHaveFocus());
   });
 
   it('does not steal focus when a remote presentation ends', () => {
