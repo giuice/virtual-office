@@ -19,9 +19,22 @@ export const screenShareClaimRequestSchema = z.object({
   shareId: uuidSchema,
 }).strict();
 
+export const screenShareRenewRequestSchema = z.object({
+  presenceSessionId: uuidSchema,
+  shareId: uuidSchema,
+}).strict();
+
+export const screenShareStopReasonSchema = z.enum([
+  'user-stop',
+  'track-ended',
+  'scope-changed',
+  'error-cleanup',
+]);
+
 export const screenShareReleaseRequestSchema = z.object({
   presenceSessionId: uuidSchema,
   shareId: uuidSchema,
+  stopReason: screenShareStopReasonSchema.optional(),
 }).strict();
 
 export const screenShareActiveQuerySchema = z.object({
@@ -59,7 +72,16 @@ const screenShareReleaseRpcErrorCodeValues = [
   'LEASE_NOT_OWNER',
 ] as const;
 
+const screenShareRenewRpcErrorCodeValues = [
+  'INVALID_REQUEST',
+  'AUTH_INVALID',
+  'SESSION_INVALID',
+  'RETRY_LOCK_SET',
+  'LEASE_STALE',
+] as const;
+
 export const screenShareClaimRpcErrorCodeSchema = z.enum(screenShareClaimRpcErrorCodeValues);
+export const screenShareRenewRpcErrorCodeSchema = z.enum(screenShareRenewRpcErrorCodeValues);
 export const screenShareReleaseRpcErrorCodeSchema = z.enum(screenShareReleaseRpcErrorCodeValues);
 export const screenShareActiveRpcErrorCodeSchema = z.enum(screenShareCommonRpcErrorCodeValues);
 
@@ -71,6 +93,11 @@ const screenShareClaimRpcErrorSchema = z.object({
 const screenShareReleaseRpcErrorSchema = z.object({
   ok: z.literal(false),
   code: screenShareReleaseRpcErrorCodeSchema,
+}).strict();
+
+const screenShareRenewRpcErrorSchema = z.object({
+  ok: z.literal(false),
+  code: screenShareRenewRpcErrorCodeSchema,
 }).strict();
 
 const screenShareActiveRpcErrorSchema = z.object({
@@ -90,6 +117,13 @@ const screenShareReleaseRpcSuccessSchema = z.object({
   ok: z.literal(true),
   code: z.literal('RELEASED'),
   alreadyReleased: z.boolean(),
+}).strict();
+
+const screenShareRenewRpcSuccessSchema = z.object({
+  ok: z.literal(true),
+  code: z.literal('RENEWED'),
+  shareId: uuidSchema,
+  expiresAt: isoDateTimeSchema,
 }).strict();
 
 const screenShareActiveRpcSuccessSchema = z.object({
@@ -112,6 +146,11 @@ export const screenShareClaimRpcResultSchema = z.union([
 export const screenShareReleaseRpcResultSchema = z.union([
   screenShareReleaseRpcSuccessSchema,
   screenShareReleaseRpcErrorSchema,
+]);
+
+export const screenShareRenewRpcResultSchema = z.union([
+  screenShareRenewRpcSuccessSchema,
+  screenShareRenewRpcErrorSchema,
 ]);
 
 export const screenShareActiveRpcResultSchema = z.union([
@@ -155,6 +194,13 @@ export const screenShareReleaseResponseSchema = z.object({
   success: z.literal(true),
   code: z.literal('RELEASED'),
   alreadyReleased: z.boolean(),
+}).strict();
+
+export const screenShareRenewResponseSchema = z.object({
+  success: z.literal(true),
+  code: z.literal('RENEWED'),
+  shareId: uuidSchema,
+  expiresAt: isoDateTimeSchema,
 }).strict();
 
 export const screenShareActiveResponseSchema = z.object({
@@ -240,15 +286,18 @@ export interface ScreenSharePublicShare {
 }
 
 export type ScreenShareClaimRequest = z.infer<typeof screenShareClaimRequestSchema>;
+export type ScreenShareRenewRequest = z.infer<typeof screenShareRenewRequestSchema>;
 export type ScreenShareReleaseRequest = z.infer<typeof screenShareReleaseRequestSchema>;
 export type ScreenShareActiveQuery = z.infer<typeof screenShareActiveQuerySchema>;
 export type ScreenShareClaimRpcResult = z.infer<typeof screenShareClaimRpcResultSchema>;
+export type ScreenShareRenewRpcResult = z.infer<typeof screenShareRenewRpcResultSchema>;
 export type ScreenShareReleaseRpcResult = z.infer<typeof screenShareReleaseRpcResultSchema>;
 export type ScreenShareActiveRpcResult = z.infer<typeof screenShareActiveRpcResultSchema>;
 export type ScreenShareSignalingPayload = z.infer<typeof screenShareSignalingPayloadSchema>;
 export type ScreenSharePublicError = z.infer<typeof screenSharePublicErrorSchema>;
 export type ScreenSharePublicResult =
   | z.infer<typeof screenShareClaimResponseSchema>
+  | z.infer<typeof screenShareRenewResponseSchema>
   | z.infer<typeof screenShareReleaseResponseSchema>
   | z.infer<typeof screenShareActiveResponseSchema>
   | ScreenSharePublicError;

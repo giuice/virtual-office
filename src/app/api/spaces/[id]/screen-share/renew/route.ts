@@ -1,19 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 import {
   screenShareErrorContract,
+  screenShareRenewRequestSchema,
+  screenShareRenewResponseSchema,
+  screenShareRenewRpcResultSchema,
   screenShareRpcContractError,
-  screenShareReleaseRequestSchema,
-  screenShareReleaseResponseSchema,
-  screenShareReleaseRpcResultSchema,
   screenShareSpaceParamsSchema,
 } from '@/lib/webrtc/screen-share-contract';
 import { callObservedScreenShareRpc } from '@/lib/webrtc/observed-screen-share-rpc';
-import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
 
 export const dynamic = 'force-dynamic';
 
-interface ReleaseRouteContext {
+interface RenewRouteContext {
   params: Promise<{ id: string }>;
 }
 
@@ -28,14 +28,14 @@ function internalError(correlationId: string): NextResponse {
   }, { status: 500 });
 }
 
-export async function POST(request: Request, context: ReleaseRouteContext): Promise<NextResponse> {
+export async function POST(request: Request, context: RenewRouteContext): Promise<NextResponse> {
   const correlationId = randomUUID();
 
   try {
     const { id } = await context.params;
     const parsedParams = screenShareSpaceParamsSchema.safeParse({ spaceId: id });
     const body = await request.json().catch(() => null);
-    const parsedBody = screenShareReleaseRequestSchema.safeParse(body);
+    const parsedBody = screenShareRenewRequestSchema.safeParse(body);
     if (!parsedParams.success || !parsedBody.success) {
       return NextResponse.json({
         success: false,
@@ -56,19 +56,24 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
     }
 
     if (!auth.identity.companyId) {
-      const { code, status, error, retryable } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
-      return NextResponse.json({ success: false, code, error, retryable }, { status });
+      const contract = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
+      return NextResponse.json({
+        success: false,
+        code: contract.code,
+        error: contract.error,
+        retryable: contract.retryable,
+      }, { status: contract.status });
     }
 
     const rpc = await callObservedScreenShareRpc(
-      () => auth.admin.rpc('release_screen_share_observed', {
+      () => auth.admin.rpc('renew_screen_share_observed', {
         p_auth_subject: auth.identity.authSubject,
         p_auth_session_id: auth.identity.authSessionId,
         p_presence_session_id: parsedBody.data.presenceSessionId,
         p_space_id: parsedParams.data.spaceId,
         p_share_id: parsedBody.data.shareId,
       }),
-      screenShareReleaseRpcResultSchema,
+      screenShareRenewRpcResultSchema,
     );
     if (rpc.kind === 'provider-error') {
       const compatibilityError = screenShareRpcContractError(rpc.error);
@@ -79,26 +84,27 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
       return internalError(correlationId);
     }
     if (rpc.kind === 'malformed') {
-      const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      const { code, status, error, retryable } = screenShareErrorContract(
+        'DATABASE_CONTRACT_INCOMPATIBLE',
+      );
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
     if (!rpc.result.ok) {
       const { code, status, error, retryable } = screenShareErrorContract(rpc.result.code);
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
+    if (rpc.result.shareId !== parsedBody.data.shareId) {
+      const { code, status, error, retryable } = screenShareErrorContract(
+        'DATABASE_CONTRACT_INCOMPATIBLE',
+      );
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
 
-    console.info('screen_share_route', {
-      correlationId,
-      operation: 'release',
-      outcome: rpc.result.code,
-      retryable: false,
-      stopReason: parsedBody.data.stopReason ?? 'user-stop',
-    });
-
-    return NextResponse.json(screenShareReleaseResponseSchema.parse({
+    return NextResponse.json(screenShareRenewResponseSchema.parse({
       success: true,
-      code: 'RELEASED',
-      alreadyReleased: rpc.result.alreadyReleased,
+      code: 'RENEWED',
+      shareId: rpc.result.shareId,
+      expiresAt: rpc.result.expiresAt,
     }));
   } catch {
     return internalError(correlationId);

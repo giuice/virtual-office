@@ -445,6 +445,16 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
+  it('rejects an invalid release stop reason without invoking the RPC', async () => {
+    const response = await releaseScreenShare(
+      postRequest(claimBody({ stopReason: 'clear-another-presenter' })),
+      routeContext(SPACE_ID),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['expired or replaced lease', 'LEASE_STALE', 409, 'LEASE_STALE'],
     ['revoked presence session', 'SESSION_INVALID', 409, 'SESSION_INVALID'],
@@ -480,7 +490,31 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     });
   });
 
+  it('rejects a mismatched renew success share without exposing the committed expiry', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        code: 'RENEWED',
+        shareId: TARGET_ID,
+        expiresAt: EXPIRES_AT,
+      },
+      error: null,
+    });
+
+    const response = await renewScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+    const body = await json(response);
+
+    expect(response.status).toBe(426);
+    expect(body).toMatchObject({
+      success: false,
+      code: 'DATABASE_CONTRACT_INCOMPATIBLE',
+      retryable: false,
+    });
+    expect(body).not.toHaveProperty('expiresAt');
+  });
+
   it('accepts a release stop reason without forwarding it as authority to the RPC', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     mocks.rpc.mockResolvedValueOnce({
       data: { ok: true, code: 'RELEASED', alreadyReleased: true },
       error: null,
@@ -499,6 +533,17 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       p_space_id: SPACE_ID,
       p_share_id: SHARE_ID,
     });
+    expect(info).toHaveBeenCalledWith('screen_share_route', {
+      correlationId: expect.any(String),
+      operation: 'release',
+      outcome: 'RELEASED',
+      retryable: false,
+      stopReason: 'track-ended',
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toContain(AUTH_USER_ID);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(PRESENCE_SESSION_ID);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(SHARE_ID);
+    info.mockRestore();
   });
 
   it.each([
