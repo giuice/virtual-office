@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 13
 waived_count: 0
 fixed_count: 8
-total_count: 17
-last_updated: 2026-07-25T21:21:16.050Z
+total_count: 21
+last_updated: 2026-07-25T22:13:35.048Z
 ---
 
 # Broken Windows Ledger
@@ -32,6 +32,10 @@ last_updated: 2026-07-25T21:21:16.050Z
 | 15 | 03 | deviation | src/contexts/AudioContext.tsx |  | Exposed the existing scoped application user identity so duplicate owner controls agree | fixed |  | 2026-07-25T21:20:02.235Z | 2026-07-25T21:21:15.188Z |
 | 16 | 03 | deviation | src/components/floor-plan/SpaceAudioControls.tsx |  | Hardened the M shortcut for non-HTMLElement event targets | fixed |  | 2026-07-25T21:20:02.825Z | 2026-07-25T21:21:15.653Z |
 | 17 | 03 | deviation | src/components/floor-plan/FloorPlanPresentationStage.tsx |  | Kept mismatched display candidates in connecting state while refusing attachment | fixed |  | 2026-07-25T21:20:03.516Z | 2026-07-25T21:21:16.050Z |
+| 18 | 03 | deviation | __tests__/api/playwright/screen-sharing.spec.ts |  | Plan referenced stale monolithic Presence helper paths; execution reused the live split helper layout. | open |  | 2026-07-25T22:13:09.992Z |  |
+| 19 | 03 | deviation | src/contexts/AudioContext.tsx |  | Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread. | open |  | 2026-07-25T22:13:14.841Z |  |
+| 20 | 03 | deviation | playwright.config.ts |  | Default reused development server targeted the incompatible online project; the screen-sharing project now starts a fresh loopback-only local-fixture server. | open |  | 2026-07-25T22:13:22.669Z |  |
+| 21 | 03 | unrun-verify | src/hooks/realtime/useAudioSignaling.ts |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review. | open |  | 2026-07-25T22:13:35.048Z |  |
 
 ````json
 [
@@ -238,6 +242,54 @@ last_updated: 2026-07-25T21:21:16.050Z
     "reason": "",
     "recorded_at": "2026-07-25T21:20:03.516Z",
     "resolved_at": "2026-07-25T21:21:16.050Z"
+  },
+  {
+    "id": 18,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "__tests__/api/playwright/screen-sharing.spec.ts",
+    "line": null,
+    "description": "Plan referenced stale monolithic Presence helper paths; execution reused the live split helper layout.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-25T22:13:09.992Z",
+    "resolved_at": null
+  },
+  {
+    "id": 19,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/contexts/AudioContext.tsx",
+    "line": null,
+    "description": "Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-25T22:13:14.841Z",
+    "resolved_at": null
+  },
+  {
+    "id": 20,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "playwright.config.ts",
+    "line": null,
+    "description": "Default reused development server targeted the incompatible online project; the screen-sharing project now starts a fresh loopback-only local-fixture server.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-25T22:13:22.669Z",
+    "resolved_at": null
+  },
+  {
+    "id": 21,
+    "kind": "unrun-verify",
+    "phase": "03",
+    "file": "src/hooks/realtime/useAudioSignaling.ts",
+    "line": null,
+    "description": "Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-25T22:13:35.048Z",
+    "resolved_at": null
   }
 ]
 ````

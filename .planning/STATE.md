@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
 status: Executing
-stopped_at: Completed 03-05-PLAN.md
-last_updated: "2026-07-25T21:20:45.668Z"
+stopped_at: Completed 03-06-PLAN.md
+last_updated: "2026-07-25T22:12:53.329Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 5 of 13
+Plan: 2 of 13
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Plan: 5 of 13
 | Phase 03 P04 | 10min | 2 tasks | 6 files |
 | Phase 03-video-and-screen-sharing P11 | 29min | 1 tasks | 5 files |
 | Phase 03-video-and-screen-sharing P05 | 12min | 2 tasks | 10 files |
+| Phase 03-video-and-screen-sharing P06 | 50min | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [03-05] Viewer-local presentation expansion is keyed by canonical shareId and never written to Realtime or persistence.
 - [Phase ?]: [03-05] Qualifying current occupancy gates media controls; selectedSpace remains chat-only.
 - [Phase ?]: [03-05] Mismatched display candidates remain connecting and are never attached; only retired canonical tracks become unavailable.
+- [Phase ?]: 03-06: Screen-sharing browser evidence is loopback-only and requires the disposable local fixture.
+- [Phase ?]: 03-06: Deterministic canvas streams and host-only peers prove UI/lifecycle behavior, not permissions, P2P/TURN, RLS, or concurrency.
+- [Phase ?]: 03-06: Presenter teardown sends targeted invalidation only; viewers re-read the authorized active route.
 
 ### Pending Todos
 
@@ -147,9 +151,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-25T21:20:45.632Z
+**Last session:** 2026-07-25T22:12:53.299Z
 
 Last activity: 2026-07-25
-Stopped at: Completed 03-05-PLAN.md
+Stopped at: Completed 03-06-PLAN.md
 Resume file: None
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md

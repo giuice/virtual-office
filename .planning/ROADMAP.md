@@ -98,7 +98,7 @@ Plans:
   3. Exactly one participant can share a window, tab, or entire screen at a time, visible to occupants on an integrated stage that each viewer can expand or collapse
   4. Permission denial, cancellation, browser-ended sharing, presenter departure, and space changes restore a stable non-sharing layout without breaking room audio
 
-**Plans**: 9/13 plans executed
+**Plans**: 10/13 plans executed
 
 Plans:
 **Wave 1**
@@ -136,7 +136,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 03-06-PLAN.md — Tagged two-context Chromium UI/lifecycle automation
+- [x] 03-06-PLAN.md — Tagged two-context Chromium UI/lifecycle automation
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
@@ -247,7 +247,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Spatial Audio and Screen Sharing | 9/13 | In Progress|  |
+| 3. Spatial Audio and Screen Sharing | 10/13 | In Progress|  |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |
