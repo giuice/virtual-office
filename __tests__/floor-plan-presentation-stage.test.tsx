@@ -3,6 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FloorPlanPresentationStage } from '@/components/floor-plan/FloorPlanPresentationStage';
 import { ScreenShareControls } from '@/components/floor-plan/ScreenShareControls';
+import { FloorPlanToolbar } from '@/components/floor-plan/FloorPlanToolbar';
+import { SpaceDetailPanel } from '@/components/floor-plan/modern/SpaceDetailPanel';
+import type { Space } from '@/types/database';
 
 const LOCAL_USER_ID = '11111111-1111-4111-8111-111111111111';
 const REMOTE_USER_ID = '22222222-2222-4222-8222-222222222222';
@@ -29,6 +32,14 @@ const audio = vi.hoisted(() => ({
 
 vi.mock('@/contexts/AudioContext', () => ({
   useAudio: () => audio,
+}));
+
+vi.mock('@/contexts/CompanyContext', () => ({
+  useCompany: () => ({ currentUserProfile: { id: LOCAL_USER_ID } }),
+}));
+
+vi.mock('@/components/floor-plan/SpaceAudioControls', () => ({
+  SpaceAudioControls: () => <button type="button" aria-label="Space audio" data-space-action />,
 }));
 
 vi.mock('@/components/ui/enhanced-avatar-v2', () => ({
@@ -73,6 +84,19 @@ function display(presenterUserId = REMOTE_USER_ID, shareId = 'share-a') {
     },
   };
 }
+
+const SPACE = {
+  id: 'space-a',
+  companyId: 'company-a',
+  name: 'Engineering',
+  type: 'conference',
+  status: 'active',
+  capacity: 12,
+  features: [],
+  position: { x: 0, y: 0, width: 1, height: 1 },
+  accessControl: { isPublic: true },
+  createdAt: '2030-01-01T00:00:00.000Z',
+} as Space;
 
 describe('ScreenShareControls', () => {
   beforeEach(() => {
@@ -265,5 +289,91 @@ describe('FloorPlanPresentationStage', () => {
       </>,
     );
     expect(viewerAction).toHaveFocus();
+  });
+});
+
+describe('authoritative floor-plan media integration', () => {
+  beforeEach(() => {
+    audio.activeScreenShare = null;
+    audio.displayStream = null;
+    audio.screenShareStatus = 'idle';
+    audio.screenShareError = null;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getDisplayMedia: vi.fn() },
+    });
+  });
+
+  const toolbarProps = {
+    filterType: 'all',
+    isAdmin: false,
+    onFilterTypeChange: vi.fn(),
+    onOpenRoomManagement: vi.fn(),
+    onOpenTemplateDialog: vi.fn(),
+    onCreateRoom: vi.fn(),
+    onOpenNeighborhoodManager: vi.fn(),
+    onOpenSelectedChat: vi.fn(),
+    currentUserId: LOCAL_USER_ID,
+  };
+
+  it('gates toolbar media by authoritative occupancy while selectedSpace controls only chat', () => {
+    const view = render(
+      <FloorPlanToolbar
+        {...toolbarProps}
+        selectedSpace={SPACE}
+        isCurrentOccupant={false}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Share screen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Space audio' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Chat in Room' })).toBeInTheDocument();
+
+    view.rerender(
+      <FloorPlanToolbar
+        {...toolbarProps}
+        selectedSpace={null}
+        isCurrentOccupant
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Share screen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Space audio' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Chat in Room' })).not.toBeInTheDocument();
+  });
+
+  it('shows one shared Audio & presentation state only for the authoritative current card', () => {
+    const baseProps = {
+      space: SPACE,
+      usersInSpace: [],
+      onJoin: vi.fn(),
+      onLeave: vi.fn(),
+    };
+    const view = render(
+      <SpaceDetailPanel {...baseProps} state={{ userInSpace: false }} />,
+    );
+    expect(screen.queryByText('Audio & presentation')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Share screen' })).not.toBeInTheDocument();
+
+    view.rerender(
+      <SpaceDetailPanel {...baseProps} state={{ userInSpace: true }} />,
+    );
+    expect(screen.getByText('Audio & presentation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Space audio' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share screen' })).toBeInTheDocument();
+  });
+
+  it('prevents pointer, click, and keyboard media interactions from reaching a clickable card', () => {
+    const parentClick = vi.fn();
+    const parentKeyDown = vi.fn();
+    render(
+      <div onClick={parentClick} onKeyDown={parentKeyDown}>
+        <ScreenShareControls isCurrentOccupant currentUserId={LOCAL_USER_ID} />
+      </div>,
+    );
+    const shareButton = screen.getByRole('button', { name: 'Share screen' });
+    fireEvent.pointerDown(shareButton);
+    fireEvent.click(shareButton);
+    fireEvent.keyDown(shareButton, { key: 'Enter' });
+    expect(parentClick).not.toHaveBeenCalled();
+    expect(parentKeyDown).not.toHaveBeenCalled();
   });
 });
