@@ -119,6 +119,13 @@ const screenShareReleaseRpcSuccessSchema = z.object({
   alreadyReleased: z.boolean(),
 }).strict();
 
+export const screenShareLegacyClaimCommittedResultSchema = z.object({
+  ok: z.literal(true),
+  code: z.literal('CLAIMED'),
+  shareId: uuidSchema,
+  expiresAt: isoDateTimeSchema,
+}).strict();
+
 const screenShareRenewRpcSuccessSchema = z.object({
   ok: z.literal(true),
   code: z.literal('RENEWED'),

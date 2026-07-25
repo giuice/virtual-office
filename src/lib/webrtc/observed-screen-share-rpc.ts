@@ -7,7 +7,7 @@ interface ObservedRpcResponse {
 
 export type ObservedScreenShareRpcResult<T> =
   | { kind: 'result'; result: T }
-  | { kind: 'malformed' }
+  | { kind: 'malformed'; value: unknown }
   | { kind: 'provider-error'; error: unknown };
 
 function isStrictRetryLockSet(value: unknown): boolean {
@@ -31,7 +31,7 @@ function parseResponse<T>(
   const parsed = schema.safeParse(response.data);
   return parsed.success
     ? { kind: 'result', result: parsed.data }
-    : { kind: 'malformed' };
+    : { kind: 'malformed', value: response.data };
 }
 
 /**

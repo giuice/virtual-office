@@ -5,6 +5,8 @@ import {
   screenShareClaimResponseSchema,
   screenShareClaimRpcResultSchema,
   screenShareErrorContract,
+  screenShareLegacyClaimCommittedResultSchema,
+  screenShareReleaseRpcResultSchema,
   screenShareRpcContractError,
   screenShareSpaceParamsSchema,
   toPublicScreenShare,
@@ -84,6 +86,37 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
     }
     if (rpc.kind === 'malformed') {
       const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      const legacyCommitted = screenShareLegacyClaimCommittedResultSchema.safeParse(rpc.value);
+      if (
+        legacyCommitted.success
+        && legacyCommitted.data.shareId === parsedBody.data.shareId
+      ) {
+        let compensation: 'released' | 'already-released' | 'failed' = 'failed';
+        try {
+          const release = await callObservedScreenShareRpc(
+            () => auth.admin.rpc('release_screen_share_observed', {
+              p_auth_subject: auth.identity.authSubject,
+              p_auth_session_id: auth.identity.authSessionId,
+              p_presence_session_id: parsedBody.data.presenceSessionId,
+              p_space_id: parsedParams.data.spaceId,
+              p_share_id: legacyCommitted.data.shareId,
+            }),
+            screenShareReleaseRpcResultSchema,
+          );
+          if (release.kind === 'result' && release.result.ok) {
+            compensation = release.result.alreadyReleased ? 'already-released' : 'released';
+          }
+        } catch {
+          // The original incompatibility remains authoritative even when cleanup fails.
+        }
+        console.info('screen_share_route', {
+          correlationId,
+          operation: 'claim',
+          outcome: code,
+          retryable,
+          compensation,
+        });
+      }
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
