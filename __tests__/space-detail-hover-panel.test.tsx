@@ -39,6 +39,10 @@ vi.mock('@/components/floor-plan/SpaceAudioControls', () => ({
   SpaceAudioControls: () => <button type="button" aria-label="Mock space audio">Audio</button>,
 }));
 
+vi.mock('@/components/floor-plan/ScreenShareControls', () => ({
+  ScreenShareControls: () => <button type="button" aria-label="Mock screen share">Share</button>,
+}));
+
 // ============================================
 // Test Data Fixtures
 // ============================================

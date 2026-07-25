@@ -55,10 +55,10 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 	// Keyboard shortcut: M to toggle mute (only when not typing)
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			const target = e.target as HTMLElement;
+			const target = e.target instanceof HTMLElement ? e.target : null;
 			// Ignore if user is typing in any input field or contenteditable
 			const isTyping =
-				['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) ||
+				['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '') ||
 				target?.isContentEditable ||
 				target?.closest('[contenteditable="true"]');
 
@@ -89,6 +89,8 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 							variant="ghost"
 							size="icon"
 							className={cn('size-9 text-destructive', className)}
+							aria-label="Microphone permission denied"
+							data-space-action
 							disabled
 						>
 							<MicOff className="size-4" />
@@ -112,6 +114,8 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 							variant="ghost"
 							size="icon"
 							className={cn('size-9', className)}
+							aria-label="Enable microphone"
+							data-space-action
 							onClick={handleEnableAudio}
 							disabled={isInitializing}
 						>
@@ -140,6 +144,8 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 							variant="ghost"
 							size="icon"
 							className={cn('size-9 text-amber-500', className)}
+							aria-label="Retry microphone"
+							data-space-action
 							onClick={handleEnableAudio}
 						>
 							<AlertCircle className="size-4" />
@@ -161,6 +167,13 @@ export function SpaceAudioControls({ className, onSpeakingChange }: SpaceAudioCo
 					<Button
 						variant={isMuted ? 'ghost' : 'default'}
 						size="icon"
+						aria-label={
+							isMuted
+								? 'Unmute microphone'
+								: `Mute microphone${isSpeaking ? ', speaking' : ''}`
+						}
+						data-space-action
+						data-speaking={isSpeaking ? 'true' : 'false'}
 						onClick={toggleMute}
 						className={cn(
 							'size-9 transition-all duration-200',

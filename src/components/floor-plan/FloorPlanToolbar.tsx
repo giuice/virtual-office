@@ -18,6 +18,7 @@ interface FloorPlanToolbarProps {
   onOpenNeighborhoodManager: () => void;
   onOpenSelectedChat: () => void;
   isCurrentOccupant: boolean;
+  currentUserId?: string;
 }
 
 export function FloorPlanToolbar({
@@ -31,6 +32,7 @@ export function FloorPlanToolbar({
   onOpenNeighborhoodManager,
   onOpenSelectedChat,
   isCurrentOccupant,
+  currentUserId,
 }: FloorPlanToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -78,16 +80,23 @@ export function FloorPlanToolbar({
           </Button>
         )}
 
-        {selectedSpace && (
+        {isCurrentOccupant ? (
           <>
             <SpaceAudioControls />
-            <ScreenShareControls isCurrentOccupant={isCurrentOccupant} />
+            <ScreenShareControls
+              isCurrentOccupant
+              currentUserId={currentUserId}
+            />
+          </>
+        ) : null}
+        {selectedSpace ? (
+          <>
             <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={onOpenSelectedChat}>
               <MessageSquare className="size-4" />
               Chat in Room
             </Button>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

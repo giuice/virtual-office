@@ -51,6 +51,7 @@ interface AudioContextValue { // Manager access
 	displayStream: ScreenShareDisplayStream | null;
 	screenShareStatus: ScreenShareStartStatus;
 	screenShareError: string | null;
+	currentUserId: string | undefined;
 
 	// Helpers
 	isUserMuted: (userId: string) => boolean;
@@ -716,6 +717,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		displayStream,
 		screenShareStatus,
 		screenShareError,
+		currentUserId,
 		initializeAudio,
 		setMuted,
 		toggleMute,

@@ -38,15 +38,17 @@ export function ScreenShareControls({
     screenShareStatus,
     startScreenShare,
     stopScreenShare,
+    currentUserId: contextCurrentUserId,
   } = useAudio();
   const [isLocalStartPending, setIsLocalStartPending] = useState(false);
 
   if (!isCurrentOccupant) return null;
 
+  const resolvedCurrentUserId = currentUserId ?? contextCurrentUserId;
   const isOwner = Boolean(
     activeScreenShare
-    && currentUserId
-    && activeScreenShare.presenterUserId === currentUserId,
+    && resolvedCurrentUserId
+    && activeScreenShare.presenterUserId === resolvedCurrentUserId,
   );
   const supported = isCaptureSupported();
   const isCanonicalBusy = screenShareStatus === 'opening-picker'
