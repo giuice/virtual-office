@@ -19,6 +19,12 @@ interface RenewRouteContext {
 
 function internalError(correlationId: string): NextResponse {
   const { code, error, retryable } = screenShareErrorContract('INTERNAL_ERROR');
+  console.warn('screen_share_route', {
+    correlationId,
+    operation: 'renew',
+    outcome: code,
+    retryable,
+  });
   return NextResponse.json({
     success: false,
     code,
@@ -47,12 +53,8 @@ export async function POST(request: Request, context: RenewRouteContext): Promis
 
     const auth = await requireVerifiedPresenceAuth();
     if (!auth.ok) {
-      return NextResponse.json({
-        success: false,
-        code: 'UNAUTHORIZED',
-        error: 'Authentication required',
-        retryable: false,
-      }, { status: auth.status });
+      const { code, status, error, retryable } = screenShareErrorContract(auth.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
     if (!auth.identity.companyId) {
@@ -100,12 +102,19 @@ export async function POST(request: Request, context: RenewRouteContext): Promis
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
-    return NextResponse.json(screenShareRenewResponseSchema.parse({
+    const response = screenShareRenewResponseSchema.parse({
       success: true,
       code: 'RENEWED',
       shareId: rpc.result.shareId,
       expiresAt: rpc.result.expiresAt,
-    }));
+    });
+    console.info('screen_share_route', {
+      correlationId,
+      operation: 'renew',
+      outcome: response.code,
+      retryable: false,
+    });
+    return NextResponse.json(response);
   } catch {
     return internalError(correlationId);
   }

@@ -327,6 +327,24 @@ const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorCont
     error: 'Invalid screen share request.',
     retryable: false,
   },
+  UNAUTHORIZED: {
+    code: 'UNAUTHORIZED',
+    status: 401,
+    error: 'Authentication required',
+    retryable: false,
+  },
+  AUTH_SESSION_REVOKED: {
+    code: 'SESSION_INVALID',
+    status: 409,
+    error: 'Your presence session is no longer active.',
+    retryable: false,
+  },
+  USER_NOT_FOUND: {
+    code: 'MEMBERSHIP_SCOPE_INVALID',
+    status: 403,
+    error: 'Your company membership changed. Refresh before using screen sharing.',
+    retryable: false,
+  },
   AUTH_INVALID: {
     code: 'MEMBERSHIP_SCOPE_INVALID',
     status: 403,

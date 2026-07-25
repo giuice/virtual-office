@@ -20,6 +20,12 @@ interface ActiveRouteContext {
 
 function internalError(correlationId: string): NextResponse {
   const { code, error, retryable } = screenShareErrorContract('INTERNAL_ERROR');
+  console.warn('screen_share_route', {
+    correlationId,
+    operation: 'active',
+    outcome: code,
+    retryable,
+  });
   return NextResponse.json({
     success: false,
     code,
@@ -56,12 +62,8 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
 
     const auth = await requireVerifiedPresenceAuth();
     if (!auth.ok) {
-      return NextResponse.json({
-        success: false,
-        code: 'UNAUTHORIZED',
-        error: 'Authentication required',
-        retryable: false,
-      }, { status: auth.status });
+      const { code, status, error, retryable } = screenShareErrorContract(auth.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
     if (!auth.identity.companyId) {
@@ -96,18 +98,25 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
     if (!rpc.result.active) {
-      return NextResponse.json(screenShareActiveResponseSchema.parse({
+      const response = screenShareActiveResponseSchema.parse({
         success: true,
         code: 'ACTIVE_READ',
         active: null,
-      }));
+      });
+      console.info('screen_share_route', {
+        correlationId,
+        operation: 'active',
+        outcome: response.code,
+        retryable: false,
+      });
+      return NextResponse.json(response);
     }
     if (rpc.result.active.spaceId !== parsedParams.data.spaceId) {
       const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
-    return NextResponse.json(screenShareActiveResponseSchema.parse({
+    const response = screenShareActiveResponseSchema.parse({
       success: true,
       code: 'ACTIVE_READ',
       active: toPublicScreenShare({
@@ -118,7 +127,14 @@ export async function GET(request: Request, context: ActiveRouteContext): Promis
         shareId: rpc.result.active.shareId,
         expiresAt: rpc.result.active.expiresAt,
       }),
-    }));
+    });
+    console.info('screen_share_route', {
+      correlationId,
+      operation: 'active',
+      outcome: response.code,
+      retryable: false,
+    });
+    return NextResponse.json(response);
   } catch {
     return internalError(correlationId);
   }

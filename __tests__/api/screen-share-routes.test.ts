@@ -445,6 +445,51 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      auth: {
+        ok: false as const,
+        status: 401,
+        code: 'AUTH_SESSION_REVOKED' as const,
+        error: 'Authentication session revoked',
+      },
+      status: 409,
+      code: 'SESSION_INVALID',
+    },
+    {
+      auth: {
+        ok: false as const,
+        status: 404,
+        code: 'USER_NOT_FOUND' as const,
+        error: 'Authenticated user profile not found',
+      },
+      status: 403,
+      code: 'MEMBERSHIP_SCOPE_INVALID',
+    },
+  ])('maps verified identity failure $auth.code consistently across all routes', async ({
+    auth,
+    status,
+    code,
+  }) => {
+    for (const { invoke } of routeOperations) {
+      mocks.requireVerifiedPresenceAuth.mockResolvedValueOnce(auth);
+
+      const response = await invoke();
+      const body = await json(response);
+
+      expect(response.status).toBe(status);
+      expect(body).toEqual({
+        success: false,
+        code,
+        error: code === 'SESSION_INVALID'
+          ? 'Your presence session is no longer active.'
+          : 'Your company membership changed. Refresh before using screen sharing.',
+        retryable: false,
+      });
+    }
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid release stop reason without invoking the RPC', async () => {
     const response = await releaseScreenShare(
       postRequest(claimBody({ stopReason: 'clear-another-presenter' })),

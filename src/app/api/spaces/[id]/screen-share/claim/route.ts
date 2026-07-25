@@ -20,6 +20,12 @@ interface ClaimRouteContext {
 
 function internalError(correlationId: string): NextResponse {
   const { code, error, retryable } = screenShareErrorContract('INTERNAL_ERROR');
+  console.warn('screen_share_route', {
+    correlationId,
+    operation: 'claim',
+    outcome: code,
+    retryable,
+  });
   return NextResponse.json({
     success: false,
     code,
@@ -48,12 +54,8 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
 
     const auth = await requireVerifiedPresenceAuth();
     if (!auth.ok) {
-      return NextResponse.json({
-        success: false,
-        code: 'UNAUTHORIZED',
-        error: 'Authentication required',
-        retryable: false,
-      }, { status: auth.status });
+      const { code, status, error, retryable } = screenShareErrorContract(auth.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
     if (!auth.identity.companyId) {
@@ -94,7 +96,7 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
 
-    return NextResponse.json(screenShareClaimResponseSchema.parse({
+    const response = screenShareClaimResponseSchema.parse({
       success: true,
       code: 'CLAIMED',
       share: toPublicScreenShare({
@@ -105,7 +107,14 @@ export async function POST(request: Request, context: ClaimRouteContext): Promis
         shareId: rpc.result.shareId,
         expiresAt: rpc.result.expiresAt,
       }),
-    }));
+    });
+    console.info('screen_share_route', {
+      correlationId,
+      operation: 'claim',
+      outcome: response.code,
+      retryable: false,
+    });
+    return NextResponse.json(response);
   } catch {
     return internalError(correlationId);
   }
