@@ -93,6 +93,10 @@ declare global {
       stoppedTrackCount: () => number;
       peerConnectionCount: () => number;
       heldSignalingCount: () => number;
+      signalingIdentities: () => Array<{
+        presenceSessionId: string;
+        connectionId: string;
+      }>;
     };
   }
 }
@@ -107,33 +111,49 @@ async function installDeterministicMedia(
     let stoppedTracks = 0;
     let peerConnections = 0;
     let heldSignaling = 0;
+    const signalingIdentities = new Map<string, {
+      presenceSessionId: string;
+      connectionId: string;
+    }>();
 
-    if (holdOutboundSignaling) {
-      const nativeSend = WebSocket.prototype.send;
-      const decode = (data: Parameters<WebSocket['send']>[0]): string | null => {
-        if (typeof data === 'string') return data;
-        if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
-        if (ArrayBuffer.isView(data)) {
-          return new TextDecoder().decode(
-            new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+    const nativeSend = WebSocket.prototype.send;
+    const decode = (data: Parameters<WebSocket['send']>[0]): string | null => {
+      if (typeof data === 'string') return data;
+      if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
+      if (ArrayBuffer.isView(data)) {
+        return new TextDecoder().decode(
+          new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        );
+      }
+      return null;
+    };
+    WebSocket.prototype.send = function send(
+      data: Parameters<WebSocket['send']>[0],
+    ): void {
+      const serialized = decode(data);
+      if (serialized) {
+        const presenceSessionId = serialized.match(
+          /"sourcePresenceSessionId"\s*:\s*"([^"]+)"/u,
+        )?.[1];
+        const connectionId = serialized.match(
+          /"sourceConnectionId"\s*:\s*"([^"]+)"/u,
+        )?.[1];
+        if (presenceSessionId && connectionId) {
+          signalingIdentities.set(
+            `${presenceSessionId}:${connectionId}`,
+            { presenceSessionId, connectionId },
           );
         }
-        return null;
-      };
-      WebSocket.prototype.send = function send(
-        data: Parameters<WebSocket['send']>[0],
-      ): void {
-        const serialized = decode(data);
         if (
-          serialized
+          holdOutboundSignaling
           && /"(?:event|type)"\s*:\s*"(?:handshake|description|ice)"/u.test(serialized)
         ) {
           heldSignaling += 1;
           return;
         }
-        nativeSend.call(this, data);
-      };
-    }
+      }
+      nativeSend.call(this, data);
+    };
 
     const NativePeerConnection = window.RTCPeerConnection;
     class DeterministicPeerConnection extends NativePeerConnection {
@@ -194,6 +214,7 @@ async function installDeterministicMedia(
       stoppedTrackCount: () => stoppedTracks,
       peerConnectionCount: () => peerConnections,
       heldSignalingCount: () => heldSignaling,
+      signalingIdentities: () => [...signalingIdentities.values()],
     };
   }, { holdOutboundSignaling: options.holdOutboundSignaling ?? false });
 }
@@ -465,6 +486,24 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
   test('@same-identity clears a distinct session of the presenter identity without moving its avatar', async ({ browser }) => {
     const { presenter, viewer, space } = await openSameIdentityPairInOneSpace(browser, environment);
     try {
+      expect(presenter.user.id).toBe(viewer.user.id);
+      await expect.poll(() => presenter.page.evaluate(
+        () => window.__screenShareTest?.signalingIdentities().length ?? 0,
+      )).toBeGreaterThan(0);
+      await expect.poll(() => viewer.page.evaluate(
+        () => window.__screenShareTest?.signalingIdentities().length ?? 0,
+      )).toBeGreaterThan(0);
+      const presenterIdentity = await presenter.page.evaluate(
+        () => window.__screenShareTest?.signalingIdentities()[0] ?? null,
+      );
+      const viewerIdentity = await viewer.page.evaluate(
+        () => window.__screenShareTest?.signalingIdentities()[0] ?? null,
+      );
+      expect(presenterIdentity).not.toBeNull();
+      expect(viewerIdentity).not.toBeNull();
+      expect(presenterIdentity?.presenceSessionId).not.toBe(viewerIdentity?.presenceSessionId);
+      expect(presenterIdentity?.connectionId).not.toBe(viewerIdentity?.connectionId);
+
       const presenterCard = spaceCard(presenter.page, space.id);
       const viewerCard = spaceCard(viewer.page, space.id);
       const placementBefore = {
@@ -485,13 +524,41 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
         observerState,
       );
       await moveThroughUi(observer.page, space.id);
+      const observerReconcileResponse = viewer.page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET'
+          && url.pathname === `/api/spaces/${space.id}/screen-share/active`
+          && url.searchParams.get('presenceSessionId') === viewerIdentity?.presenceSessionId;
+      });
       await observer.context.close();
+      const observerRead = await observerReconcileResponse;
+      const observerBody = await observerRead.json() as {
+        success?: boolean;
+        active?: { presenterUserId?: string; shareId?: string } | null;
+      };
+      expect(observerRead.ok()).toBe(true);
+      expect(observerBody.success).toBe(true);
+      expect(observerBody.active?.presenterUserId).toBe(presenter.user.id);
+      expect(observerBody.active?.shareId).toEqual(expect.any(String));
       const viewerStage = viewer.page.getByTestId('floor-plan-presentation-stage');
       await expect(viewerStage).toBeVisible({ timeout: 30_000 });
 
+      const postReleaseActiveResponse = viewer.page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET'
+          && url.pathname === `/api/spaces/${space.id}/screen-share/active`
+          && url.searchParams.get('presenceSessionId') === viewerIdentity?.presenceSessionId;
+      });
       await presenter.page.getByTestId('floor-plan-presentation-stage')
         .getByRole('button', { name: 'Stop sharing' })
         .click();
+      const postReleaseRead = await postReleaseActiveResponse;
+      const postReleaseBody = await postReleaseRead.json() as {
+        success?: boolean;
+        active?: unknown;
+      };
+      expect(postReleaseRead.ok()).toBe(true);
+      expect(postReleaseBody).toMatchObject({ success: true, active: null });
       await expect(viewerStage).toHaveCount(0, { timeout: 30_000 });
       await expect(presenterCard).toHaveAttribute('data-user-in-space', placementBefore.presenter ?? 'true');
       await expect(viewerCard).toHaveAttribute('data-user-in-space', placementBefore.viewer ?? 'true');
