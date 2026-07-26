@@ -386,15 +386,28 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       .on('broadcast', { event: 'presenter-invalidated' }, ({ payload }) => {
         const parsed = screenSharePresenterInvalidatedPayloadSchema.safeParse(payload);
         if (!parsed.success) return;
-        const ownCommittedInvalidation = (
+        const sameUserInvalidation = parsed.data.sourceUserId === scope.currentUserId;
+        const exactSelfInvalidation = (
           isCurrent()
-          && parsed.data.sourceUserId === scope.currentUserId
+          && sameUserInvalidation
           && parsed.data.sourcePresenceSessionId === scope.presenceSessionId
           && parsed.data.sourceConnectionId === scope.connectionId
           && parsed.data.companyId === scope.companyId
           && parsed.data.spaceId === scope.spaceId
         );
-        if (!ownCommittedInvalidation && !isScopePayload(parsed.data)) return;
+        const distinctSameUserSessionInvalidation = (
+          isCurrent()
+          && sameUserInvalidation
+          && parsed.data.sourcePresenceSessionId !== scope.presenceSessionId
+          && parsed.data.sourceConnectionId !== scope.connectionId
+          && parsed.data.companyId === scope.companyId
+          && parsed.data.spaceId === scope.spaceId
+        );
+        if (
+          !exactSelfInvalidation
+          && !distinctSameUserSessionInvalidation
+          && !isScopePayload(parsed.data)
+        ) return;
         const canonical = activeShareRef.current;
         if (
           !canonical

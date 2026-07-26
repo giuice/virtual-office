@@ -9,6 +9,7 @@ const USER_ID = '33333333-3333-4333-8333-333333333333';
 const PEER_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_USER_ID = '88888888-8888-4888-8888-888888888888';
 const SESSION_ID = '55555555-5555-4555-8555-555555555555';
+const OTHER_SESSION_ID = '99999999-9999-4999-8999-999999999999';
 const SHARE_ID = '66666666-6666-4666-8666-666666666666';
 
 const mocks = vi.hoisted(() => {
@@ -234,7 +235,7 @@ describe('useAudioSignaling private media lifecycle', () => {
     expect(manager.handleHandshake).not.toHaveBeenCalled();
   });
 
-  it('accepts only the exact owned session and connection for self invalidation', async () => {
+  it('accepts the exact self echo but rejects mixed same-user session generations', async () => {
     const handlers = new Map<string, (value: { payload: unknown }) => void>();
     mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
       handlers.set(`${type}:${filter.event}`, handler);
@@ -281,9 +282,76 @@ describe('useAudioSignaling private media lifecycle', () => {
     await act(async () => {});
     expect(fetch).toHaveBeenCalledTimes(1);
 
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({
+      payload: { ...ownedPayload, sourcePresenceSessionId: OTHER_SESSION_ID },
+    }));
+    await act(async () => {});
+    expect(fetch).toHaveBeenCalledTimes(1);
+
     act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: ownedPayload }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.activeShare).toBeNull());
+  });
+
+  it('accepts a distinct same-user session and connection only in the current canonical room scope', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const manager = {
+      setSignalingIdentity: vi.fn(),
+      setSignalingChannel: vi.fn(),
+      renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(SHARE_ID),
+    } as unknown as WebRTCManager;
+    const active = {
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      presenterUserId: USER_ID,
+      presenterName: 'Current presenter',
+      shareId: SHARE_ID,
+      expiresAt: '2026-07-24T00:00:00.000Z',
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(activeResponse(active))
+      .mockResolvedValueOnce(activeResponse(null));
+
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    const connectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!connectionId) throw new Error('local signaling identity was not installed');
+
+    const distinctSessionPayload = {
+      type: 'presenter-invalidated',
+      sourceUserId: USER_ID,
+      sourcePresenceSessionId: OTHER_SESSION_ID,
+      sourceConnectionId: OTHER_USER_ID,
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: SHARE_ID,
+    };
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({
+      payload: { ...distinctSessionPayload, spaceId: PEER_ID },
+    }));
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({
+      payload: { ...distinctSessionPayload, sourceConnectionId: connectionId },
+    }));
+    await act(async () => {});
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({
+      payload: distinctSessionPayload,
+    }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.activeShare).toBeNull());
+    expect(fetch).toHaveBeenLastCalledWith(
+      `/api/spaces/${SPACE_ID}/screen-share/active?presenceSessionId=${SESSION_ID}`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('fences deferred subscribe, fetch, remove, and callbacks from scope A after scope B starts', async () => {

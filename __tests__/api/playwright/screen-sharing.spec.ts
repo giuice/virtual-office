@@ -322,6 +322,34 @@ async function openPairInOneSpace(
   return { presenter, viewer, space };
 }
 
+async function openSameIdentityPairInOneSpace(
+  browser: Browser,
+  environment: PresenceE2EEnvironment,
+): Promise<{ presenter: LoggedInBrowser; viewer: LoggedInBrowser; space: RuntimeSpace }> {
+  const sharedState = await createAuthenticatedState(browser, environment.admin);
+  const presenter = await openLoggedInBrowserFromState(
+    browser,
+    environment.admin,
+    sharedState,
+  );
+  const viewer = await openLoggedInBrowserFromState(
+    browser,
+    environment.admin,
+    sharedState,
+  );
+  expect(presenter.user.id).toBe(viewer.user.id);
+  const space = presenter.spaces.find(
+    (candidate) =>
+      candidate.accessControl?.isPublic !== false
+      && ['active', 'available'].includes(candidate.status)
+      && candidate.capacity >= 2,
+  );
+  if (!space) throw new Error('Screen-sharing fixture needs a shared public space.');
+  await moveThroughUi(presenter.page, space.id);
+  await moveThroughUi(viewer.page, space.id);
+  return { presenter, viewer, space };
+}
+
 async function closeContextsBestEffort(...contexts: BrowserContext[]): Promise<void> {
   await Promise.race([
     Promise.allSettled(contexts.map((context) => context.close())),
@@ -429,6 +457,48 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
       await expect(viewerStage).toHaveCount(0, { timeout: 30_000 });
       expect(await audioSnapshot(presenter.page)).toEqual(presenterAudioBefore);
       expect(await audioSnapshot(viewer.page)).toEqual(viewerAudioBefore);
+    } finally {
+      await closeContextsBestEffort(presenter.context, viewer.context);
+    }
+  });
+
+  test('@same-identity clears a distinct session of the presenter identity without moving its avatar', async ({ browser }) => {
+    const { presenter, viewer, space } = await openSameIdentityPairInOneSpace(browser, environment);
+    try {
+      const presenterCard = spaceCard(presenter.page, space.id);
+      const viewerCard = spaceCard(viewer.page, space.id);
+      const placementBefore = {
+        presenter: await presenterCard.getAttribute('data-user-in-space'),
+        viewer: await viewerCard.getAttribute('data-user-in-space'),
+        presenterAvatarCount: await presenter.page.locator(`[data-user-id="${presenter.user.id}"]`).count(),
+        viewerAvatarCount: await viewer.page.locator(`[data-user-id="${viewer.user.id}"]`).count(),
+      };
+
+      await shareFrom(presenter.page);
+      // A distinct fixture member briefly joins and leaves the room so the
+      // viewer performs its normal presence-leave authoritative reconciliation
+      // without replacing either same-identity presence session.
+      const observerState = await createAuthenticatedState(browser, environment.member);
+      const observer = await openLoggedInBrowserFromState(
+        browser,
+        environment.member,
+        observerState,
+      );
+      await moveThroughUi(observer.page, space.id);
+      await observer.context.close();
+      const viewerStage = viewer.page.getByTestId('floor-plan-presentation-stage');
+      await expect(viewerStage).toBeVisible({ timeout: 30_000 });
+
+      await presenter.page.getByTestId('floor-plan-presentation-stage')
+        .getByRole('button', { name: 'Stop sharing' })
+        .click();
+      await expect(viewerStage).toHaveCount(0, { timeout: 30_000 });
+      await expect(presenterCard).toHaveAttribute('data-user-in-space', placementBefore.presenter ?? 'true');
+      await expect(viewerCard).toHaveAttribute('data-user-in-space', placementBefore.viewer ?? 'true');
+      await expect(presenter.page.locator(`[data-user-id="${presenter.user.id}"]`))
+        .toHaveCount(placementBefore.presenterAvatarCount);
+      await expect(viewer.page.locator(`[data-user-id="${viewer.user.id}"]`))
+        .toHaveCount(placementBefore.viewerAvatarCount);
     } finally {
       await closeContextsBestEffort(presenter.context, viewer.context);
     }
