@@ -1,6 +1,7 @@
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioProvider, useAudio } from '@/contexts/AudioContext';
+import { FloorPlanPresentationStage } from '@/components/floor-plan/FloorPlanPresentationStage';
 import type { ScreenSharePublicShare } from '@/lib/webrtc/screen-share-contract';
 
 const COMPANY_A = '11111111-1111-4111-8111-111111111111';
@@ -192,6 +193,15 @@ function renderProvider(props: { spaceId?: string; userId?: string } = {}) {
   return render(
     <AudioProvider spaceId={props.spaceId ?? SPACE_A} userId={props.userId ?? USER_A}>
       <Probe />
+    </AudioProvider>,
+  );
+}
+
+function renderProviderWithStage() {
+  return render(
+    <AudioProvider spaceId={SPACE_A} userId={USER_A}>
+      <Probe />
+      <FloorPlanPresentationStage currentUserId={USER_A} />
     </AudioProvider>,
   );
 }
@@ -608,5 +618,57 @@ describe('AudioProvider screen-share lifecycle', () => {
     contextState.activeShare = null;
     view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
     await waitFor(() => expect(latestAudio?.displayStream).toBeNull());
+  });
+
+  it.each([
+    'lease expiry',
+    'presenter exit/movement',
+    'presenter revision/session authority change',
+  ])('tears down the exact remote stage for missed %s while preserving room audio', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    contextState.activeShare = {
+      companyId: COMPANY_A,
+      spaceId: SPACE_A,
+      presenterUserId: USER_B,
+      presenterName: 'Presenter B',
+      shareId: SHARE_A,
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    };
+    const view = renderProviderWithStage();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+    const manager = mocks.managers[0];
+    const remoteStream = createStream();
+    act(() => {
+      manager.callbacks.onRemoteDisplay?.({
+        peerId: USER_B,
+        shareId: SHARE_A,
+        stream: remoteStream,
+      });
+    });
+
+    const video = await screen.findByTestId('floor-plan-presentation-video');
+    expect(video).toHaveProperty('srcObject', remoteStream);
+    const mutedBefore = latestAudio?.isMuted;
+    const mutedUsersBefore = latestAudio?.mutedUserIds;
+    const speakingBefore = latestAudio?.speakingUsers;
+
+    contextState.activeShare = null;
+    view.rerender(
+      <AudioProvider spaceId={SPACE_A} userId={USER_A}>
+        <Probe />
+        <FloorPlanPresentationStage currentUserId={USER_A} />
+      </AudioProvider>,
+    );
+
+    await waitFor(() => expect(latestAudio?.activeScreenShare).toBeNull());
+    await waitFor(() => expect(latestAudio?.displayStream).toBeNull());
+    expect(screen.queryByTestId('floor-plan-presentation-stage')).not.toBeInTheDocument();
+    expect(video).toHaveProperty('srcObject', null);
+    expect(manager.cleanup).not.toHaveBeenCalled();
+    expect(manager.initializeLocalStream).not.toHaveBeenCalled();
+    expect(manager.setMuted).not.toHaveBeenCalled();
+    expect(latestAudio?.isMuted).toBe(mutedBefore);
+    expect(latestAudio?.mutedUserIds).toEqual(mutedUsersBefore);
+    expect(latestAudio?.speakingUsers).toEqual(speakingBefore);
   });
 });

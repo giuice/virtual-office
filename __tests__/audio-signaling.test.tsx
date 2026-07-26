@@ -235,6 +235,111 @@ describe('useAudioSignaling private media lifecycle', () => {
     expect(manager.handleHandshake).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'lease expiry',
+    'presenter exit/movement',
+    'presenter revision/session authority change',
+  ])('converges active to null on the 10-second authoritative cadence when %s is never delivered by Realtime', async () => {
+    vi.useFakeTimers();
+    try {
+      const manager = {
+        setSignalingIdentity: vi.fn(),
+        setSignalingChannel: vi.fn(),
+        renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+        broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+        getActiveShareId: vi.fn().mockReturnValue(null),
+      } as unknown as WebRTCManager;
+      const active = {
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        presenterUserId: PEER_ID,
+        presenterName: 'Presenter',
+        shareId: SHARE_ID,
+        expiresAt: '2000-01-01T00:00:00.000Z',
+      };
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(activeResponse(active))
+        .mockResolvedValueOnce(activeResponse(active))
+        .mockResolvedValueOnce(activeResponse(null));
+
+      const { result } = renderHook(() => useAudioSignaling(options(manager)));
+      await act(async () => {});
+      act(() => mocks.statusHandler?.('SUBSCRIBED'));
+      await act(async () => {});
+      expect(result.current.activeShare).toEqual(active);
+      expect(fetch).toHaveBeenCalledTimes(1);
+
+      await act(async () => vi.advanceTimersByTimeAsync(1_000));
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(result.current.activeShare).toEqual(active);
+
+      await act(async () => vi.advanceTimersByTimeAsync(8_999));
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(result.current.activeShare).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replaces periodic ownership on repeated subscription and fences a deferred retired response', async () => {
+    vi.useFakeTimers();
+    try {
+      const stalePeriodic = deferred<Response>();
+      const active = {
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        presenterUserId: PEER_ID,
+        presenterName: 'Presenter',
+        shareId: SHARE_ID,
+        expiresAt: '2030-01-01T00:00:00.000Z',
+      };
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(activeResponse(active))
+        .mockResolvedValueOnce(activeResponse(active))
+        .mockReturnValueOnce(stalePeriodic.promise)
+        .mockResolvedValueOnce(activeResponse(null));
+      const manager = {
+        setSignalingIdentity: vi.fn(),
+        setSignalingChannel: vi.fn(),
+        renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+        broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+        getActiveShareId: vi.fn().mockReturnValue(null),
+      } as unknown as WebRTCManager;
+      const { result, unmount } = renderHook(() => useAudioSignaling(options(manager)));
+      await act(async () => {});
+      act(() => mocks.statusHandler?.('SUBSCRIBED'));
+      await act(async () => {});
+      expect(result.current.activeShare).toEqual(active);
+
+      await act(async () => vi.advanceTimersByTimeAsync(1_000));
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await act(async () => vi.advanceTimersByTimeAsync(9_000));
+      expect(fetch).toHaveBeenCalledTimes(3);
+      const staleSignal = vi.mocked(fetch).mock.calls[2]?.[1]?.signal;
+      expect(staleSignal?.aborted).toBe(false);
+
+      act(() => mocks.statusHandler?.('TIMED_OUT'));
+      expect(staleSignal?.aborted).toBe(true);
+      act(() => mocks.statusHandler?.('SUBSCRIBED'));
+      await act(async () => {});
+      expect(fetch).toHaveBeenCalledTimes(4);
+      expect(result.current.activeShare).toBeNull();
+
+      await act(async () => stalePeriodic.resolve(activeResponse(active)));
+      expect(result.current.activeShare).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(9_999));
+      expect(fetch).toHaveBeenCalledTimes(4);
+
+      unmount();
+      await act(async () => vi.advanceTimersByTimeAsync(20_000));
+      expect(fetch).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('accepts the exact self echo but rejects mixed same-user session generations', async () => {
     const handlers = new Map<string, (value: { payload: unknown }) => void>();
     mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
