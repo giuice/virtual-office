@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 11
 waived_count: 0
-fixed_count: 10
-total_count: 21
-last_updated: 2026-07-26T03:40:54.231Z
+fixed_count: 11
+total_count: 22
+last_updated: 2026-07-26T03:56:36.046Z
 ---
 
 # Broken Windows Ledger
@@ -36,6 +36,7 @@ last_updated: 2026-07-26T03:40:54.231Z
 | 19 | 03 | deviation | src/contexts/AudioContext.tsx |  | Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread. | fixed |  | 2026-07-25T22:13:14.841Z | 2026-07-26T03:40:53.578Z |
 | 20 | 03 | deviation | playwright.config.ts |  | Default reused development server targeted the incompatible online project; the screen-sharing project now starts a fresh loopback-only local-fixture server. | open |  | 2026-07-25T22:13:22.669Z |  |
 | 21 | 03 | unrun-verify | src/hooks/realtime/useAudioSignaling.ts |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review. | fixed |  | 2026-07-25T22:13:35.048Z | 2026-07-26T03:40:54.231Z |
+| 22 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Second Presence Safety blocker fixed: distinct same-user presence sessions now accept exact canonical screen-share invalidation while mixed generations and generic same-user signaling remain fenced. | fixed |  | 2026-07-26T03:56:31.808Z | 2026-07-26T03:56:36.046Z |
 
 ````json
 [
@@ -290,6 +291,18 @@ last_updated: 2026-07-26T03:40:54.231Z
     "reason": "",
     "recorded_at": "2026-07-25T22:13:35.048Z",
     "resolved_at": "2026-07-26T03:40:54.231Z"
+  },
+  {
+    "id": 22,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/hooks/realtime/useAudioSignaling.ts",
+    "line": null,
+    "description": "Second Presence Safety blocker fixed: distinct same-user presence sessions now accept exact canonical screen-share invalidation while mixed generations and generic same-user signaling remain fenced.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-07-26T03:56:31.808Z",
+    "resolved_at": "2026-07-26T03:56:36.046Z"
   }
 ]
 ````
