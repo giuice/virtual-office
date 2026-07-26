@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import {
 	screenShareClaimResponseSchema,
 	screenSharePublicErrorSchema,
+	screenShareReleaseResponseSchema,
 	screenShareRenewResponseSchema,
 	type ScreenSharePublicShare,
 } from '@/lib/webrtc/screen-share-contract';
@@ -388,7 +389,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		if (lifecycle.releaseStarted) return;
 		lifecycle.releaseStarted = true;
 		try {
-			await fetch(`/api/spaces/${encodeURIComponent(lifecycle.spaceId)}/screen-share/release`, {
+			const response = await fetch(`/api/spaces/${encodeURIComponent(lifecycle.spaceId)}/screen-share/release`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -397,12 +398,14 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 					stopReason: reason,
 				}),
 			});
-		} catch {
-			// Release is best effort; server expiry remains the final cleanup fence.
-		} finally {
+			const body: unknown = await response.json().catch(() => null);
+			const released = screenShareReleaseResponseSchema.safeParse(body);
+			if (!response.ok || !released.success) return;
 			// Realtime is invalidation-only: peers re-read the authorized active
 			// route before clearing or accepting any presenter state.
 			await lifecycle.manager.broadcastPresenterInvalidated(shareId);
+		} catch {
+			// Release is best effort; server expiry remains the final cleanup fence.
 		}
 	}, []);
 

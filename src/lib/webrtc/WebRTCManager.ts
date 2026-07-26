@@ -33,9 +33,6 @@ export type SignalingEvent =
   }
   | {
     type: 'presenter-invalidated';
-    targetUserId: string;
-    targetPresenceSessionId: string;
-    targetConnectionId: string;
     shareId: string;
   };
 
@@ -184,21 +181,12 @@ export class WebRTCManager {
   }
 
   async broadcastPresenterInvalidated(shareId: string): Promise<void> {
-    await Promise.allSettled(
-      [...this.peerConnections.values()]
-        .flatMap((peer) => {
-          const presenceSessionId = peer.presenceSessionId;
-          const connectionId = peer.connectionId;
-          if (!presenceSessionId || !connectionId) return [];
-          return [this.sendSignal({
-            type: 'presenter-invalidated',
-            targetUserId: peer.userId,
-            targetPresenceSessionId: presenceSessionId,
-            targetConnectionId: connectionId,
-            shareId,
-          })];
-        }),
-    );
+    // The private room channel is the fan-out boundary. Viewers may have read
+    // the authoritative active share before either side registers a peer.
+    await Promise.allSettled([this.sendSignal({
+      type: 'presenter-invalidated',
+      shareId,
+    })]);
   }
 
   async handleHandshake(senderId: string, presenceSessionId?: string, connectionId?: string): Promise<void> {

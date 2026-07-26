@@ -274,6 +274,53 @@ describe('AudioProvider screen-share lifecycle', () => {
   });
 
   it.each([
+    [
+      '403',
+      () => Promise.resolve(new Response(JSON.stringify({
+        success: false,
+        code: 'ACCESS_DENIED',
+        error: 'Access denied.',
+        retryable: false,
+      }), { status: 403 })),
+    ],
+    [
+      'failed response',
+      () => Promise.resolve(new Response(JSON.stringify({
+        success: false,
+        code: 'INTERNAL_ERROR',
+        error: 'Release failed.',
+        retryable: true,
+      }), { status: 500 })),
+    ],
+    [
+      'aborted request',
+      () => Promise.reject(new DOMException('Release aborted', 'AbortError')),
+    ],
+  ])('does not broadcast successful release invalidation after a %s', async (_label, releaseResult) => {
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return releaseResult();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderProvider();
+    await act(async () => {});
+
+    await act(async () => {
+      expect(await currentAudio().startScreenShare()).toBe(true);
+      await currentAudio().stopScreenShare('user-stop');
+    });
+
+    expect(mocks.managers[0].broadcastPresenterInvalidated).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+    expect(latestAudio?.activeScreenShare).toBeNull();
+    expect(latestAudio?.screenShareStatus).toBe('idle');
+  });
+
+  it.each([
     ['NotAllowedError', 'We couldn’t start screen sharing. Check your browser permission, then try again.'],
     ['InvalidStateError', 'We couldn’t start screen sharing. Check your browser permission, then try again.'],
     ['AbortError', 'Screen sharing was cancelled.'],

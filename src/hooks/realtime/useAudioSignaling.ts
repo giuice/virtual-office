@@ -138,7 +138,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     const supabase = createSupabaseBrowserClient();
     const topic = `company:${scope.companyId}:space:${scope.spaceId}:media`;
     const channel = supabase.channel(topic, {
-      config: { private: true, broadcast: { self: false, ack: true }, presence: { key: `${scope.currentUserId}:${scope.presenceSessionId}` } },
+      config: { private: true, broadcast: { self: true, ack: true }, presence: { key: `${scope.currentUserId}:${scope.presenceSessionId}` } },
     });
     let cancelled = false;
     let retired = false;
@@ -348,9 +348,6 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           ? screenSharePresenterInvalidatedPayloadSchema.parse({
               type: 'presenter-invalidated',
               ...base,
-              targetUserId: event.targetUserId,
-              targetPresenceSessionId: event.targetPresenceSessionId,
-              targetConnectionId: event.targetConnectionId,
               shareId: event.shareId,
             })
         : event.type === 'description'
@@ -388,7 +385,22 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       })
       .on('broadcast', { event: 'presenter-invalidated' }, ({ payload }) => {
         const parsed = screenSharePresenterInvalidatedPayloadSchema.safeParse(payload);
-        if (!parsed.success || !isScopePayload(parsed.data)) return;
+        if (!parsed.success) return;
+        const ownCommittedInvalidation = (
+          isCurrent()
+          && parsed.data.sourceUserId === scope.currentUserId
+          && parsed.data.sourcePresenceSessionId === scope.presenceSessionId
+          && parsed.data.sourceConnectionId === scope.connectionId
+          && parsed.data.companyId === scope.companyId
+          && parsed.data.spaceId === scope.spaceId
+        );
+        if (!ownCommittedInvalidation && !isScopePayload(parsed.data)) return;
+        const canonical = activeShareRef.current;
+        if (
+          !canonical
+          || canonical.shareId !== parsed.data.shareId
+          || canonical.presenterUserId !== parsed.data.sourceUserId
+        ) return;
         enqueue(parsed.data.sourceUserId, reconcileActive);
       })
       .on('broadcast', { event: 'presenter-hint' }, ({ payload }) => {

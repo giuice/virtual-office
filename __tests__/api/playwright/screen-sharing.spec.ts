@@ -92,16 +92,48 @@ declare global {
       endCapture: () => void;
       stoppedTrackCount: () => number;
       peerConnectionCount: () => number;
+      heldSignalingCount: () => number;
     };
   }
 }
 
-async function installDeterministicMedia(context: BrowserContext): Promise<void> {
-  await context.addInitScript(() => {
+async function installDeterministicMedia(
+  context: BrowserContext,
+  options: { holdOutboundSignaling?: boolean } = {},
+): Promise<void> {
+  await context.addInitScript(({ holdOutboundSignaling }) => {
     let captureMode: CaptureMode = 'success';
     let activeTrack: MediaStreamTrack | null = null;
     let stoppedTracks = 0;
     let peerConnections = 0;
+    let heldSignaling = 0;
+
+    if (holdOutboundSignaling) {
+      const nativeSend = WebSocket.prototype.send;
+      const decode = (data: Parameters<WebSocket['send']>[0]): string | null => {
+        if (typeof data === 'string') return data;
+        if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
+        if (ArrayBuffer.isView(data)) {
+          return new TextDecoder().decode(
+            new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+          );
+        }
+        return null;
+      };
+      WebSocket.prototype.send = function send(
+        data: Parameters<WebSocket['send']>[0],
+      ): void {
+        const serialized = decode(data);
+        if (
+          serialized
+          && /"(?:event|type)"\s*:\s*"(?:handshake|description|ice)"/u.test(serialized)
+        ) {
+          heldSignaling += 1;
+          return;
+        }
+        nativeSend.call(this, data);
+      };
+    }
 
     const NativePeerConnection = window.RTCPeerConnection;
     class DeterministicPeerConnection extends NativePeerConnection {
@@ -161,8 +193,9 @@ async function installDeterministicMedia(context: BrowserContext): Promise<void>
       },
       stoppedTrackCount: () => stoppedTracks,
       peerConnectionCount: () => peerConnections,
+      heldSignalingCount: () => heldSignaling,
     };
-  });
+  }, { holdOutboundSignaling: options.holdOutboundSignaling ?? false });
 }
 
 async function login(page: Page, account: PresenceE2EAccount): Promise<void> {
@@ -225,9 +258,10 @@ async function openLoggedInBrowserFromState(
   browser: Browser,
   account: PresenceE2EAccount,
   storageState: AuthStorageState,
+  options: { holdOutboundSignaling?: boolean } = {},
 ): Promise<LoggedInBrowser> {
   const context = await browser.newContext({ storageState });
-  await installDeterministicMedia(context);
+  await installDeterministicMedia(context, options);
   const page = await context.newPage();
   await page.goto('/floor-plan');
   await expect(page.locator('[data-testid^="space-"]').first()).toBeVisible({
@@ -257,6 +291,7 @@ async function moveThroughUi(page: Page, spaceId: string): Promise<void> {
 async function openPairInOneSpace(
   browser: Browser,
   environment: PresenceE2EEnvironment,
+  options: { holdViewerSignaling?: boolean } = {},
 ): Promise<{ presenter: LoggedInBrowser; viewer: LoggedInBrowser; space: RuntimeSpace }> {
   // Build each authenticated state with no other live page. This avoids dev
   // compilation/session-registration churn influencing the second login while
@@ -268,7 +303,12 @@ async function openPairInOneSpace(
     environment.admin,
     presenterState,
   );
-  const viewer = await openLoggedInBrowserFromState(browser, environment.member, viewerState);
+  const viewer = await openLoggedInBrowserFromState(
+    browser,
+    environment.member,
+    viewerState,
+    { holdOutboundSignaling: options.holdViewerSignaling },
+  );
   expect(presenter.user.companyId).toBe(viewer.user.companyId);
   const space = presenter.spaces.find(
     (candidate) =>
@@ -337,23 +377,37 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
   });
 
   test('@smoke shares, collapses, expands, and stops without changing audio', async ({ browser }) => {
-    const { presenter, viewer } = await openPairInOneSpace(browser, environment);
+    const { presenter, viewer } = await openPairInOneSpace(
+      browser,
+      environment,
+      { holdViewerSignaling: true },
+    );
     try {
       const presenterAudioBefore = await audioSnapshot(presenter.page);
       const viewerAudioBefore = await audioSnapshot(viewer.page);
 
       await shareFrom(presenter.page);
+      // Reload after the committed claim so the viewer's subscribe-time
+      // authoritative read cannot race ahead of it. Outbound media signaling
+      // remains held, proving the stage and teardown do not depend on a peer.
+      await viewer.page.reload();
+      await expect(viewer.page.locator('[data-testid^="space-"]').first()).toBeVisible({
+        timeout: 30_000,
+      });
       const presenterStage = presenter.page.getByTestId('floor-plan-presentation-stage');
       const viewerStage = viewer.page.getByTestId('floor-plan-presentation-stage');
       await expect(viewerStage).toBeVisible({ timeout: 30_000 });
+      await expect.poll(() => viewer.page.evaluate(
+        () => window.__screenShareTest?.heldSignalingCount() ?? 0,
+      )).toBeGreaterThan(0);
+      expect(await presenter.page.evaluate(
+        () => window.__screenShareTest?.peerConnectionCount() ?? 0,
+      )).toBe(0);
       await expect(presenterStage.getByText('LIVE', { exact: true })).toBeVisible();
       await expect(presenterStage.getByTestId('presentation-video-region')).toHaveCSS(
         'aspect-ratio',
         '16 / 9',
       );
-      await expect.poll(() => presenter.page.evaluate(
-        () => window.__screenShareTest?.peerConnectionCount() ?? 0,
-      )).toBeGreaterThan(0);
 
       await viewerStage.getByRole('button', { name: 'Collapse presentation' }).click();
       await expect(viewerStage.getByRole('button', { name: 'Expand presentation' }))
@@ -367,12 +421,12 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
       await viewer.page.keyboard.press('Escape');
       await expect(viewerStage.getByRole('button', { name: 'Expand presentation' })).toBeFocused();
 
+      expect(await presenter.page.evaluate(
+        () => window.__screenShareTest?.peerConnectionCount() ?? 0,
+      )).toBe(0);
       await presenterStage.getByRole('button', { name: 'Stop sharing' }).click();
       await expect(presenterStage).toHaveCount(0);
       await expect(viewerStage).toHaveCount(0, { timeout: 30_000 });
-      await expect(presenter.page.getByRole('button', { name: 'Share screen' }).first())
-        .toBeFocused();
-
       expect(await audioSnapshot(presenter.page)).toEqual(presenterAudioBefore);
       expect(await audioSnapshot(viewer.page)).toEqual(viewerAudioBefore);
     } finally {

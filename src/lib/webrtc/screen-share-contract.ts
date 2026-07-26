@@ -271,7 +271,7 @@ export const screenSharePresenterHintPayloadSchema = z.object({
 
 export const screenSharePresenterInvalidatedPayloadSchema = z.object({
   type: z.literal('presenter-invalidated'),
-  ...targetedSignalingScopeSchema,
+  ...signalingScopeSchema,
   shareId: uuidSchema,
 }).strict();
 

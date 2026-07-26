@@ -95,7 +95,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       {
         config: {
           private: true,
-          broadcast: { self: false, ack: true },
+          broadcast: { self: true, ack: true },
           presence: { key: `${USER_ID}:${SESSION_ID}` },
         },
       },
@@ -172,7 +172,7 @@ describe('useAudioSignaling private media lifecycle', () => {
     expect(manager.handleDescription).toHaveBeenCalledWith(PEER_ID, USER_ID, description.description, null, expect.any(String), expect.any(String), SESSION_ID, expect.any(String));
   });
 
-  it('uses the authorized active route after subscribe and invalidation instead of treating hints as presenter authority', async () => {
+  it('reconciles an exact room invalidation before any presenter handshake without treating its payload as authority', async () => {
     const handlers = new Map<string, (value: { payload: unknown }) => void>();
     mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
       handlers.set(`${type}:${filter.event}`, handler);
@@ -183,6 +183,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       setSignalingChannel: vi.fn(),
       renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
       broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      handleHandshake: vi.fn().mockResolvedValue(undefined),
       getActiveShareId: vi.fn().mockReturnValue(null),
     } as unknown as WebRTCManager;
     const active = {
@@ -194,52 +195,94 @@ describe('useAudioSignaling private media lifecycle', () => {
       expiresAt: '2026-07-24T00:00:00.000Z',
     };
     vi.mocked(fetch)
-      .mockResolvedValueOnce(activeResponse(null))
-      .mockResolvedValueOnce(activeResponse(active));
+      .mockResolvedValueOnce(activeResponse(active))
+      .mockResolvedValueOnce(activeResponse(null));
 
     const { result } = renderHook(() => useAudioSignaling(options(manager)));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(handlers.has('broadcast:presenter-hint')).toBe(true);
-    const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
-    if (!localConnectionId) throw new Error('local signaling identity was not installed');
+    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    expect(manager.handleHandshake).not.toHaveBeenCalled();
 
     act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: {
       type: 'presenter-invalidated',
       sourceUserId: PEER_ID,
       sourcePresenceSessionId: SESSION_ID,
       sourceConnectionId: '77777777-7777-4777-8777-777777777777',
-      targetUserId: USER_ID,
-      targetPresenceSessionId: SESSION_ID,
-      targetConnectionId: localConnectionId,
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: OTHER_USER_ID,
+    } }));
+    await act(async () => {});
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: {
+      type: 'presenter-invalidated',
+      sourceUserId: PEER_ID,
+      sourcePresenceSessionId: SESSION_ID,
+      sourceConnectionId: '77777777-7777-4777-8777-777777777777',
       companyId: COMPANY_ID,
       spaceId: SPACE_ID,
       shareId: SHARE_ID,
     } }));
-    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.activeShare).toBeNull());
     expect(fetch).toHaveBeenLastCalledWith(
       `/api/spaces/${SPACE_ID}/screen-share/active?presenceSessionId=${SESSION_ID}`,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(manager.handleHandshake).not.toHaveBeenCalled();
+  });
 
-    vi.mocked(fetch).mockResolvedValueOnce(activeResponse(null));
-    act(() => handlers.get('broadcast:presenter-hint')?.({ payload: {
-      type: 'presenter-hint',
-      sourceUserId: PEER_ID,
+  it('accepts only the exact owned session and connection for self invalidation', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const manager = {
+      setSignalingIdentity: vi.fn(),
+      setSignalingChannel: vi.fn(),
+      renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined),
+      getActiveShareId: vi.fn().mockReturnValue(SHARE_ID),
+    } as unknown as WebRTCManager;
+    const active = {
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      presenterUserId: USER_ID,
+      presenterName: 'Current presenter',
+      shareId: SHARE_ID,
+      expiresAt: '2026-07-24T00:00:00.000Z',
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(activeResponse(active))
+      .mockResolvedValueOnce(activeResponse(null));
+
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    const connectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!connectionId) throw new Error('local signaling identity was not installed');
+
+    const ownedPayload = {
+      type: 'presenter-invalidated',
+      sourceUserId: USER_ID,
       sourcePresenceSessionId: SESSION_ID,
-      sourceConnectionId: '77777777-7777-4777-8777-777777777777',
-      targetUserId: USER_ID,
-      targetPresenceSessionId: SESSION_ID,
-      targetConnectionId: localConnectionId,
+      sourceConnectionId: connectionId,
       companyId: COMPANY_ID,
       spaceId: SPACE_ID,
       shareId: SHARE_ID,
-      presenterUserId: PEER_ID,
-      presenterName: 'Untrusted hint',
-      expiresAt: '2026-07-24T00:00:00.000Z',
-    } }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    };
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({
+      payload: { ...ownedPayload, sourceConnectionId: OTHER_USER_ID },
+    }));
+    await act(async () => {});
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: ownedPayload }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.activeShare).toBeNull());
   });
 
@@ -396,7 +439,7 @@ describe('useAudioSignaling private media lifecycle', () => {
         },
       });
       channelA.handlers.get('broadcast:presenter-invalidated')?.({
-        payload: { type: 'presenter-invalidated', ...source, ...target, shareId: SHARE_ID },
+        payload: { type: 'presenter-invalidated', ...source, shareId: SHARE_ID },
       });
     });
     await act(async () => {
@@ -482,6 +525,25 @@ describe('useAudioSignaling private media lifecycle', () => {
         spaceId: SPACE_ID,
         shareId: SHARE_ID,
         description: { type: 'offer', sdp: 'v=0' },
+      },
+    });
+
+    await sendSignal({
+      type: 'presenter-invalidated',
+      shareId: SHARE_ID,
+    });
+
+    expect(mocks.channelApi.send).toHaveBeenLastCalledWith({
+      type: 'broadcast',
+      event: 'presenter-invalidated',
+      payload: {
+        type: 'presenter-invalidated',
+        sourceUserId: USER_ID,
+        sourcePresenceSessionId: SESSION_ID,
+        sourceConnectionId: expect.any(String),
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        shareId: SHARE_ID,
       },
     });
   });
