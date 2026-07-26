@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
-status: Blocked
-stopped_at: 03-07 revision-required — correção direcionada antes da Wave 11
-last_updated: "2026-07-26T13:28:21.882Z"
+status: In Progress
+stopped_at: Completed 03-14-PLAN.md
+last_updated: "2026-07-26T15:26:59.128Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 24
-  completed_plans: 21
+  total_plans: 25
+  completed_plans: 23
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 03 (video-and-screen-sharing) — BLOCKED
-Plan: 7 of 13 — revision-required before Wave 11
+Phase: 03 (video-and-screen-sharing) — EXECUTING
+Plan: 12 of 14
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Plan: 7 of 13 — revision-required before Wave 11
 | Phase 03-video-and-screen-sharing P11 | 29min | 1 tasks | 5 files |
 | Phase 03-video-and-screen-sharing P05 | 12min | 2 tasks | 10 files |
 | Phase 03-video-and-screen-sharing P06 | 50min | 1 tasks | 7 files |
+| Phase 03-video-and-screen-sharing P14 | 18min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 03-06: Deterministic canvas streams and host-only peers prove UI/lifecycle behavior, not permissions, P2P/TURN, RLS, or concurrency.
 - [Phase ?]: 03-06: Presenter teardown sends targeted invalidation only; viewers re-read the authorized active route.
 - [Phase 03]: 03-07 permanece revision-required; o bloqueio Presence Safety não pode ser dispensado. — Reconciliação autoritativa periódica ausente pode manter activeShare, stage e video.srcObject obsoletos quando invalidações Realtime são perdidas.
+- [Phase ?]: [03-14] A rota autenticada active permanece a única autoridade; Realtime e o timer apenas disparam reconciliação.
+- [Phase ?]: [03-14] Timer e leitura pertencem à assinatura exata e são cercados por identidade, sessão, token, manager, conexão e gerações.
 
 ### Pending Todos
 
@@ -138,7 +141,7 @@ None yet.
 - ~~Design branch broke floor plan space card sizing (STAB-01)~~ -- RESOLVED in 01-01
 - ~~Auth login/signup has undiagnosed issues (STAB-02)~~ -- RESOLVED in 01-02 after human verification
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
-- 03-07 bloqueado antes da Wave 11: adicionar reconciliação autoritativa periódica, cancelável e cercada por identidade/escopo em src/hooks/realtime/useAudioSignaling.ts, com testes de invalidações ausentes e active -> null por expiração, saída/movimento e revisão/sessão.
+- ~~03-07 bloqueado antes da Wave 11~~ — RESOLVIDO em 03-14 com reconciliação autoritativa periódica, matriz active -> null e duas revisões limpas no hash congelado.
 
 ### Quick Tasks Completed
 
@@ -153,9 +156,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-26T13:28:21.860Z
+**Last session:** 2026-07-26T15:26:59.095Z
 
 Last activity: 2026-07-26
-Stopped at: 03-07 revision-required — correção direcionada antes da Wave 11
-Resume file: .planning/phases/03-video-and-screen-sharing/03-07-PLAN.md
+Stopped at: Completed 03-14-PLAN.md
+Resume file: None
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md

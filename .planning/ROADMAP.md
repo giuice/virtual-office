@@ -98,7 +98,7 @@ Plans:
   3. Exactly one participant can share a window, tab, or entire screen at a time, visible to occupants on an integrated stage that each viewer can expand or collapse
   4. Permission denial, cancellation, browser-ended sharing, presenter departure, and space changes restore a stable non-sharing layout without breaking room audio
 
-**Plans**: 10/13 plans executed
+**Plans**: 12/14 plans executed
 
 Plans:
 **Wave 1**
@@ -140,13 +140,17 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 03-07-PLAN.md — BLOCKED (`revision-required`): add periodic authoritative reconciliation in `useAudioSignaling` and prove cleanup after missed invalidations before Wave 11
+- [x] 03-07-PLAN.md — BLOCKED (`revision-required`): add periodic authoritative reconciliation in `useAudioSignaling` and prove cleanup after missed invalidations before Wave 11
 
-**Wave 11** *(blocked on Wave 10 completion)*
+**Wave 11** *(targeted correction required by the Wave 10 review gate)*
+
+- [x] 03-14-PLAN.md — Periodic authoritative active-share reconciliation, complete missed-invalidation teardown proof, and fresh unchanged-diff domain reviews
+
+**Wave 12** *(blocked on successful Wave 11 correction and two clean re-reviews)*
 
 - [ ] 03-12-PLAN.md — Complete unchanged-diff local/database/browser/build gates
 
-**Wave 12** *(blocked on Wave 11 completion)*
+**Wave 13** *(blocked on Wave 12 completion)*
 
 - [ ] 03-13-PLAN.md — Real browser/TURN UAT and exact-target rollout decision
 
@@ -247,7 +251,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Spatial Audio and Screen Sharing | 10/13 | In Progress|  |
+| 3. Spatial Audio and Screen Sharing | 12/14 | In Progress|  |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |
