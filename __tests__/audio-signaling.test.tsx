@@ -329,12 +329,14 @@ describe('useAudioSignaling private media lifecycle', () => {
 
       await act(async () => stalePeriodic.resolve(activeResponse(active)));
       expect(result.current.activeShare).toBeNull();
-      await act(async () => vi.advanceTimersByTimeAsync(9_999));
-      expect(fetch).toHaveBeenCalledTimes(4);
+      await act(async () => vi.advanceTimersByTimeAsync(1_000));
+      expect(fetch).toHaveBeenCalledTimes(5);
+      await act(async () => vi.advanceTimersByTimeAsync(8_999));
+      expect(fetch).toHaveBeenCalledTimes(5);
 
       unmount();
       await act(async () => vi.advanceTimersByTimeAsync(20_000));
-      expect(fetch).toHaveBeenCalledTimes(4);
+      expect(fetch).toHaveBeenCalledTimes(5);
     } finally {
       vi.useRealTimers();
     }

@@ -21,6 +21,7 @@ const MAX_INBOUND_SIGNALS_PER_SOURCE = 32;
 const MAX_INBOUND_SIGNAL_SOURCES = 64;
 const MAX_INBOUND_SIGNALS_TOTAL = 256;
 const RECONCILE_DELAY_MS = 1_000;
+const AUTHORITATIVE_RECONCILE_INTERVAL_MS = 10_000;
 
 interface UseAudioSignalingOptions {
   companyId: string | undefined;
@@ -43,12 +44,14 @@ interface ScopedSignalingInput {
 }
 interface OwnedChannelScope {
   channel: RealtimeChannel;
+  manager: WebRTCManager;
   companyId: string;
   spaceId: string;
   currentUserId: string;
   presenceSessionId: string;
   accessToken: string;
   generation: string | number;
+  connectionId: string;
 }
 type BufferedSignal =
   | { type: 'description'; payload: { sourceUserId: string; sourcePresenceSessionId: string; sourceConnectionId: string; targetUserId: string; targetPresenceSessionId: string; targetConnectionId: string; shareId: string | null; description: RTCSessionDescriptionInit } }
@@ -146,6 +149,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     let activeRequest: AbortController | null = null;
     let delayedReconnectReconcile: ReturnType<typeof setTimeout> | null = null;
     let delayedBufferedReconcile: ReturnType<typeof setTimeout> | null = null;
+    let periodicReconcileTimer: ReturnType<typeof setTimeout> | null = null;
     let bufferedRetryUsed = false;
     let subscriptionGeneration = 0;
     let removalStarted = false;
@@ -156,24 +160,65 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     channelRef.current = channel;
     channelScopeRef.current = {
       channel,
+      manager: scope.manager,
       companyId: scope.companyId,
       spaceId: scope.spaceId,
       currentUserId: scope.currentUserId,
       presenceSessionId: scope.presenceSessionId,
       accessToken: scope.accessToken,
       generation: scope.generation,
+      connectionId: scope.connectionId,
     };
 
-    const isCurrent = (): boolean => !cancelled && !retired && channelRef.current === channel && scopeGenerationRef.current === scope.generation;
+    const isCurrent = (): boolean => {
+      const owned = channelScopeRef.current;
+      return (
+        !cancelled
+        && !retired
+        && channelRef.current === channel
+        && scopeGenerationRef.current === scope.generation
+        && owned?.channel === channel
+        && owned.manager === scope.manager
+        && owned.companyId === scope.companyId
+        && owned.spaceId === scope.spaceId
+        && owned.currentUserId === scope.currentUserId
+        && owned.presenceSessionId === scope.presenceSessionId
+        && owned.accessToken === scope.accessToken
+        && owned.generation === scope.generation
+        && owned.connectionId === scope.connectionId
+      );
+    };
+    const isSubscriptionCurrent = (expectedSubscriptionGeneration: number): boolean => (
+      isCurrent()
+      && subscribed
+      && subscriptionGeneration === expectedSubscriptionGeneration
+    );
     const clearBuffers = (): void => {
       bufferedSignals.clear();
       inboundQueues.clear();
       inboundPendingCounts.clear();
       inboundPendingTotal = 0;
     };
+    const clearOwnedReconciliation = (): void => {
+      activeRequest?.abort();
+      activeRequest = null;
+      if (delayedReconnectReconcile) {
+        clearTimeout(delayedReconnectReconcile);
+        delayedReconnectReconcile = null;
+      }
+      if (delayedBufferedReconcile) {
+        clearTimeout(delayedBufferedReconcile);
+        delayedBufferedReconcile = null;
+      }
+      if (periodicReconcileTimer) {
+        clearTimeout(periodicReconcileTimer);
+        periodicReconcileTimer = null;
+      }
+    };
     const clearTransport = (): void => {
       subscribed = false;
       subscriptionGeneration += 1;
+      clearOwnedReconciliation();
       if (channelRef.current === channel) {
         isConnectedRef.current = false;
         setIsConnected(false);
@@ -189,9 +234,6 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       if (!isCurrent()) return;
       retired = true;
       clearTransport();
-      activeRequest?.abort();
-      if (delayedReconnectReconcile) clearTimeout(delayedReconnectReconcile);
-      if (delayedBufferedReconcile) clearTimeout(delayedBufferedReconcile);
       clearBuffers();
       clearRenderedShare();
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
@@ -270,15 +312,15 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         accepted.forEach((signal) => enqueue(sourceUserId, () => dispatchBuffered(signal)));
       }
     };
-    const scheduleReconnectReconcile = (): void => {
-      if (delayedReconnectReconcile || !isCurrent()) return;
+    const scheduleReconnectReconcile = (expectedSubscriptionGeneration: number): void => {
+      if (delayedReconnectReconcile || !isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
       delayedReconnectReconcile = setTimeout(() => {
         delayedReconnectReconcile = null;
-        void reconcileActive();
+        void reconcileActive(expectedSubscriptionGeneration);
       }, RECONCILE_DELAY_MS);
     };
-    const scheduleBufferedReconcile = (): void => {
-      if (delayedBufferedReconcile || !isCurrent()) return;
+    const scheduleBufferedReconcile = (expectedSubscriptionGeneration: number): void => {
+      if (delayedBufferedReconcile || !isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
       // A buffered batch owns the sole delayed retry. Keep the initial reconnect
       // fallback from issuing a second authoritative read for the same batch.
       if (delayedReconnectReconcile) {
@@ -287,20 +329,35 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       }
       delayedBufferedReconcile = setTimeout(() => {
         delayedBufferedReconcile = null;
-        void reconcileActive();
+        void reconcileActive(expectedSubscriptionGeneration);
       }, RECONCILE_DELAY_MS);
     };
-    const reconcileActive = async (): Promise<void> => {
-      if (activeRequest) return;
+    const schedulePeriodicReconcile = (expectedSubscriptionGeneration: number): void => {
+      if (periodicReconcileTimer) {
+        clearTimeout(periodicReconcileTimer);
+        periodicReconcileTimer = null;
+      }
+      if (!isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
+      periodicReconcileTimer = setTimeout(() => {
+        periodicReconcileTimer = null;
+        if (!isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
+        void reconcileActive(expectedSubscriptionGeneration);
+        schedulePeriodicReconcile(expectedSubscriptionGeneration);
+      }, AUTHORITATIVE_RECONCILE_INTERVAL_MS);
+    };
+    const reconcileActive = async (expectedSubscriptionGeneration: number): Promise<void> => {
+      if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || activeRequest) return;
       const controller = new AbortController();
       activeRequest = controller;
       try {
+        if (!isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
         const response = await fetch(activeRoute(scope.spaceId, scope.presenceSessionId), { signal: controller.signal });
         const body: unknown = await response.json().catch(() => null);
-        if (!isCurrent() || controller.signal.aborted) return;
+        if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || controller.signal.aborted) return;
         if (isTerminalAuthorizationResponse(response.status, body)) { retireForAuthorization(); return; }
         if (!response.ok) return;
         const parsed = screenShareActiveResponseSchema.safeParse(body);
+        if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || controller.signal.aborted) return;
         if (!parsed.success || (parsed.data.active && (parsed.data.active.companyId !== scope.companyId || parsed.data.active.spaceId !== scope.spaceId))) {
           setError('Screen-share reconciliation rejected an invalid response.');
           return;
@@ -312,11 +369,13 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           if (bufferedRetryUsed) bufferedSignals.clear();
           else {
             bufferedRetryUsed = true;
-            scheduleBufferedReconcile();
+            scheduleBufferedReconcile(expectedSubscriptionGeneration);
           }
         }
       } catch (reconcileError) {
-        if (isCurrent() && !controller.signal.aborted) setError(reconcileError instanceof Error ? reconcileError.message : 'Screen-share reconciliation failed.');
+        if (isSubscriptionCurrent(expectedSubscriptionGeneration) && !controller.signal.aborted) {
+          setError(reconcileError instanceof Error ? reconcileError.message : 'Screen-share reconciliation failed.');
+        }
       } finally {
         if (activeRequest === controller) activeRequest = null;
       }
@@ -336,7 +395,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       }
       if (queue.length >= MAX_BUFFERED_SIGNALS_PER_PEER) queue.shift();
       queue.push(signal);
-      void reconcileActive();
+      void reconcileActive(subscriptionGeneration);
     };
     const sendSignal: WebRTCSignalSender = async (event: SignalingEvent): Promise<void> => {
       const sendGeneration = subscriptionGeneration;
@@ -414,34 +473,43 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           || canonical.shareId !== parsed.data.shareId
           || canonical.presenterUserId !== parsed.data.sourceUserId
         ) return;
-        enqueue(parsed.data.sourceUserId, reconcileActive);
+        const expectedSubscriptionGeneration = subscriptionGeneration;
+        enqueue(parsed.data.sourceUserId, () => reconcileActive(expectedSubscriptionGeneration));
       })
       .on('broadcast', { event: 'presenter-hint' }, ({ payload }) => {
         const parsed = screenSharePresenterHintPayloadSchema.safeParse(payload);
         if (!parsed.success || !isScopePayload(parsed.data)) return;
-        enqueue(parsed.data.sourceUserId, reconcileActive);
+        const expectedSubscriptionGeneration = subscriptionGeneration;
+        enqueue(parsed.data.sourceUserId, () => reconcileActive(expectedSubscriptionGeneration));
       })
       .on('presence', { event: 'sync' }, updateMutedUsers)
       .on('presence', { event: 'join' }, updateMutedUsers)
-      .on('presence', { event: 'leave' }, () => { updateMutedUsers(); void reconcileActive(); });
+      .on('presence', { event: 'leave' }, () => {
+        updateMutedUsers();
+        void reconcileActive(subscriptionGeneration);
+      });
 
     void supabase.realtime.setAuth(scope.accessToken).then(() => {
       if (!isCurrent()) return;
       channel.subscribe((status) => {
         if (!isCurrent()) return;
         if (status === 'SUBSCRIBED') {
+          clearOwnedReconciliation();
           subscribed = true;
           subscriptionGeneration += 1;
+          const expectedSubscriptionGeneration = subscriptionGeneration;
           isConnectedRef.current = true;
           setIsConnected(true);
           scope.manager.setSignalingIdentity(scope.presenceSessionId, scope.connectionId);
           scope.manager.setSignalingChannel(channel, sendSignal);
           enqueue(scope.currentUserId, async () => {
             await channel.track({ user_id: scope.currentUserId, is_muted: isMutedRef.current });
-            if (!isCurrent()) return;
-            void reconcileActive();
-            scheduleReconnectReconcile();
+            if (!isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
+            void reconcileActive(expectedSubscriptionGeneration);
+            scheduleReconnectReconcile(expectedSubscriptionGeneration);
+            schedulePeriodicReconcile(expectedSubscriptionGeneration);
             await scope.manager.broadcastHandshake();
+            if (!isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
             await scope.manager.renegotiateExistingPeers();
           });
         } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
@@ -453,9 +521,6 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     return () => {
       cancelled = true;
       clearTransport();
-      activeRequest?.abort();
-      if (delayedReconnectReconcile) clearTimeout(delayedReconnectReconcile);
-      if (delayedBufferedReconcile) clearTimeout(delayedBufferedReconcile);
       clearBuffers();
       if (channelRef.current === channel) channelRef.current = null;
       if (channelScopeRef.current?.channel === channel) channelScopeRef.current = null;
