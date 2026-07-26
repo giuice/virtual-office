@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 11
 waived_count: 0
-fixed_count: 8
+fixed_count: 10
 total_count: 21
-last_updated: 2026-07-25T22:13:35.048Z
+last_updated: 2026-07-26T03:40:54.231Z
 ---
 
 # Broken Windows Ledger
@@ -33,9 +33,9 @@ last_updated: 2026-07-25T22:13:35.048Z
 | 16 | 03 | deviation | src/components/floor-plan/SpaceAudioControls.tsx |  | Hardened the M shortcut for non-HTMLElement event targets | fixed |  | 2026-07-25T21:20:02.825Z | 2026-07-25T21:21:15.653Z |
 | 17 | 03 | deviation | src/components/floor-plan/FloorPlanPresentationStage.tsx |  | Kept mismatched display candidates in connecting state while refusing attachment | fixed |  | 2026-07-25T21:20:03.516Z | 2026-07-25T21:21:16.050Z |
 | 18 | 03 | deviation | __tests__/api/playwright/screen-sharing.spec.ts |  | Plan referenced stale monolithic Presence helper paths; execution reused the live split helper layout. | open |  | 2026-07-25T22:13:09.992Z |  |
-| 19 | 03 | deviation | src/contexts/AudioContext.tsx |  | Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread. | open |  | 2026-07-25T22:13:14.841Z |  |
+| 19 | 03 | deviation | src/contexts/AudioContext.tsx |  | Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread. | fixed |  | 2026-07-25T22:13:14.841Z | 2026-07-26T03:40:53.578Z |
 | 20 | 03 | deviation | playwright.config.ts |  | Default reused development server targeted the incompatible online project; the screen-sharing project now starts a fresh loopback-only local-fixture server. | open |  | 2026-07-25T22:13:22.669Z |  |
-| 21 | 03 | unrun-verify | src/hooks/realtime/useAudioSignaling.ts |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review. | open |  | 2026-07-25T22:13:35.048Z |  |
+| 21 | 03 | unrun-verify | src/hooks/realtime/useAudioSignaling.ts |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review. | fixed |  | 2026-07-25T22:13:35.048Z | 2026-07-26T03:40:54.231Z |
 
 ````json
 [
@@ -262,10 +262,10 @@ last_updated: 2026-07-25T22:13:35.048Z
     "file": "src/contexts/AudioContext.tsx",
     "line": null,
     "description": "Browser smoke exposed stale remote presenter state after release; targeted invalidation now triggers an authoritative active-route reread.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-07-25T22:13:14.841Z",
-    "resolved_at": null
+    "resolved_at": "2026-07-26T03:40:53.578Z"
   },
   {
     "id": 20,
@@ -286,10 +286,10 @@ last_updated: 2026-07-25T22:13:35.048Z
     "file": "src/hooks/realtime/useAudioSignaling.ts",
     "line": null,
     "description": "Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-07-25T22:13:35.048Z",
-    "resolved_at": null
+    "resolved_at": "2026-07-26T03:40:54.231Z"
   }
 ]
 ````
