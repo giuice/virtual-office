@@ -4,10 +4,10 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
-status: Executing
-stopped_at: Completed 03-06-PLAN.md
-last_updated: "2026-07-25T22:12:53.329Z"
-last_activity: 2026-07-25
+status: Blocked
+stopped_at: 03-07 revision-required — correção direcionada antes da Wave 11
+last_updated: "2026-07-26T13:28:21.882Z"
+last_activity: 2026-07-26
 progress:
   total_phases: 4
   completed_phases: 3
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 2 of 13
+Phase: 03 (video-and-screen-sharing) — BLOCKED
+Plan: 7 of 13 — revision-required before Wave 11
 
 ## Performance Metrics
 
@@ -127,6 +127,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 03-06: Screen-sharing browser evidence is loopback-only and requires the disposable local fixture.
 - [Phase ?]: 03-06: Deterministic canvas streams and host-only peers prove UI/lifecycle behavior, not permissions, P2P/TURN, RLS, or concurrency.
 - [Phase ?]: 03-06: Presenter teardown sends targeted invalidation only; viewers re-read the authorized active route.
+- [Phase 03]: 03-07 permanece revision-required; o bloqueio Presence Safety não pode ser dispensado. — Reconciliação autoritativa periódica ausente pode manter activeShare, stage e video.srcObject obsoletos quando invalidações Realtime são perdidas.
 
 ### Pending Todos
 
@@ -137,6 +138,7 @@ None yet.
 - ~~Design branch broke floor plan space card sizing (STAB-01)~~ -- RESOLVED in 01-01
 - ~~Auth login/signup has undiagnosed issues (STAB-02)~~ -- RESOLVED in 01-02 after human verification
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
+- 03-07 bloqueado antes da Wave 11: adicionar reconciliação autoritativa periódica, cancelável e cercada por identidade/escopo em src/hooks/realtime/useAudioSignaling.ts, com testes de invalidações ausentes e active -> null por expiração, saída/movimento e revisão/sessão.
 
 ### Quick Tasks Completed
 
@@ -151,9 +153,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-25T22:12:53.299Z
+**Last session:** 2026-07-26T13:28:21.860Z
 
-Last activity: 2026-07-25
-Stopped at: Completed 03-06-PLAN.md
-Resume file: None
+Last activity: 2026-07-26
+Stopped at: 03-07 revision-required — correção direcionada antes da Wave 11
+Resume file: .planning/phases/03-video-and-screen-sharing/03-07-PLAN.md
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md

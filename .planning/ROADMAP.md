@@ -140,7 +140,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 03-07-PLAN.md — Read-only Presence Safety and Supabase/RLS reviewer gates
+- [ ] 03-07-PLAN.md — BLOCKED (`revision-required`): add periodic authoritative reconciliation in `useAudioSignaling` and prove cleanup after missed invalidations before Wave 11
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
