@@ -21,6 +21,7 @@ tech-stack:
     - deterministic browser media doubles with an explicit evidence boundary
     - invalidation-only Realtime messages followed by authoritative route reads
     - same-user session generations distinguished by the complete presence-session and connection pair
+    - browser evidence synchronized to distinct authoritative route responses rather than stage timing
 
 key-files:
   created:
@@ -105,6 +106,7 @@ status: complete
 2. **Task 1 GREEN: deterministic lifecycle and teardown fix** - `b13cc93` (feat)
 3. **Presence Safety correction: pre-handshake invalidation and success-only release** - `68723b8` (fix)
 4. **Presence Safety correction: same-user multi-session reconciliation** - `9b2e210` (fix)
+5. **Presence Safety evidence: distinct post-release reconciliation** - `67c5b1a` (test)
 
 ## Files Created/Modified
 
@@ -182,6 +184,15 @@ status: complete
 **Total deviations:** 6 auto-fixed (4 Rule 1, 2 Rule 3)
 **Impact on plan:** All fixes were required for correct, isolated lifecycle evidence; no product scope was added.
 
+## Presence Safety Evidence Strengthening
+
+- The same-identity browser scenario asserts both isolated contexts resolve the same application user.
+- Outbound signaling instrumentation proves their Presence session IDs and connection IDs are both distinct.
+- Observer departure is synchronized to a viewer active-route response that still contains the canonical share; the viewer stage is then explicitly confirmed visible.
+- Presenter stop is synchronized to a separate, later viewer active-route response whose parsed body is `{ success: true, active: null }`; only afterward may the stage disappearance assertion pass.
+- Placement flags and exact `data-user-id` avatar counts remain unchanged across the release.
+- **Committed in:** `67c5b1a`
+
 ## Verification
 
 - `npm.cmd run type-check` - passed.
@@ -190,7 +201,7 @@ status: complete
 - `npm.cmd run presence:gate` - passed.
 - `npm.cmd run presence:skill:validate` - passed.
 - Playwright `screen-sharing` project filtered to `@smoke`, one worker - 1 test passed in 37.2 seconds; outbound viewer signaling was held and presenter peer count remained zero through stop.
-- Playwright `screen-sharing` project filtered to `@same-identity`, one worker - 1 test passed in 38.4 seconds; two live sessions shared one app identity, A2 cleared after A1 stopped, and placement/avatar evidence was unchanged.
+- Playwright `screen-sharing` project filtered to `@same-identity`, one worker - 1 test passed in 37.0 seconds; the observer reconciliation returned the active share, the distinct post-release viewer read returned `active: null`, and placement/avatar evidence was unchanged.
 - Full screen-sharing project remains reserved for the Phase 03-12 final gate, as planned.
 
 ## Database and Deployment Boundary
@@ -222,7 +233,7 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - All eight correction implementation/test files exist.
-- TDD commits `a3499b7` and `b13cc93`, plus correction commits `68723b8` and `9b2e210`, exist.
+- TDD commits `a3499b7` and `b13cc93`, correction commits `68723b8` and `9b2e210`, and evidence commit `67c5b1a` exist.
 - No generated artifacts or known blocking stubs are included.
 
 ---
