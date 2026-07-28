@@ -60,7 +60,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Spatial Audio & Screen Sharing
 
-- [x] **VID-01**: Existing peer-to-peer WebRTC media, Supabase Realtime signaling, and STUN/TURN configuration are preserved and extended for room-scoped audio and screen sharing (Story 8.1)
+- [x] **VID-01**: Existing peer-to-peer WebRTC media, Supabase Realtime signaling, and the free default STUN configuration are preserved and extended for room-scoped audio and screen sharing; TURN remains optional and is not a completion requirement (Story 8.1)
 - [x] **VID-02**: User entering a space connects to room audio in listen-only mode and can explicitly enable, mute, or unmute their microphone with speaker indication (Story 8.2)
 - [x] **VID-04**: One participant at a time can share a window, tab, or entire screen on an integrated floor-plan stage that each viewer can expand or collapse (Story 8.4)
 

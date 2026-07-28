@@ -94,11 +94,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. Entering a space connects the user to existing room-scoped P2P audio in listen-only mode; microphone activation remains explicit, with mute/unmute and speaker indication
-  2. Existing Supabase Realtime signaling and STUN/TURN-backed P2P WebRTC are preserved and extended; changing spaces tears down prior media cleanly
+  2. Existing Supabase Realtime signaling and free STUN-backed P2P WebRTC are preserved and extended; TURN is optional, and changing spaces tears down prior media cleanly
   3. Exactly one participant can share a window, tab, or entire screen at a time, visible to occupants on an integrated stage that each viewer can expand or collapse
   4. Permission denial, cancellation, browser-ended sharing, presenter departure, and space changes restore a stable non-sharing layout without breaking room audio
 
-**Plans**: 12/14 plans executed
+**Plans**: 14/14 plans executed
 
 Plans:
 **Wave 1**
@@ -148,11 +148,11 @@ Plans:
 
 **Wave 12** *(blocked on successful Wave 11 correction and two clean re-reviews)*
 
-- [ ] 03-12-PLAN.md — Complete unchanged-diff local/database/browser/build gates
+- [x] 03-12-PLAN.md — Complete unchanged-diff local/database/browser/build gates
 
 **Wave 13** *(blocked on Wave 12 completion)*
 
-- [ ] 03-13-PLAN.md — Real browser/TURN UAT and exact-target rollout decision
+- [x] 03-13-PLAN.md — Zero-cost local evidence closure and explicit local-only/no-spend rollout record
 
 ### Phase 4: Messaging Timeline
 
@@ -251,7 +251,7 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Spatial Audio and Screen Sharing | 12/14 | In Progress|  |
+| 3. Spatial Audio and Screen Sharing | 14/14 | In Progress|  |
 | 4. Messaging Timeline | 0/3 | Not started | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |

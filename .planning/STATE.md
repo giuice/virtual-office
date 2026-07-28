@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
 status: In Progress
-stopped_at: Completed 03-14-PLAN.md
-last_updated: "2026-07-26T15:26:59.128Z"
-last_activity: 2026-07-26
+stopped_at: Completed 03-13-PLAN.md
+last_updated: "2026-07-28T12:08:09.149Z"
+last_activity: 2026-07-28
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 25
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 12 of 14
+Plan: 14 of 14
 
 ## Performance Metrics
 
@@ -71,6 +71,8 @@ Plan: 12 of 14
 | Phase 03-video-and-screen-sharing P05 | 12min | 2 tasks | 10 files |
 | Phase 03-video-and-screen-sharing P06 | 50min | 1 tasks | 7 files |
 | Phase 03-video-and-screen-sharing P14 | 18min | 2 tasks | 3 files |
+| Phase 03-video-and-screen-sharing P12 | ~3h | 1 task | 5 files plus planning metadata |
+| Phase 03-video-and-screen-sharing P13 | 5m | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -132,6 +134,15 @@ Recent decisions affecting current work:
 - [Phase ?]: [03-14] A rota autenticada active permanece a única autoridade; Realtime e o timer apenas disparam reconciliação.
 - [Phase ?]: [03-14] Timer e leitura pertencem à assinatura exata e são cercados por identidade, sessão, token, manager, conexão e gerações.
 
+- [Phase 03]: [03-12] Hourly cutover coverage preserves the observation with the earliest `checked_at`; exact ties favor unhealthy evidence.
+- [Phase 03]: [03-12] The correction is a forward-only migration; Wave 12 changed no online database and performed no deployment.
+- [Phase 03]: [post-03-12] With explicit user authorization, migration `20260727123730` was applied and recorded on production project `vhabpcoyypobgasacsko`; same-target catalog readback passed.
+- [Phase 03]: [post-03-12] Production cutover observation restarted at `2026-07-27T17:06:23.560672Z`; the legacy adapter remains enabled and no cutover/adapter removal may consume evidence from before that timestamp.
+- [Phase ?]: Keep completed Phase 3 work local-only with no paid services, extra equipment, browser matrix, credentials, or online rollout.
+- [Phase ?]: The free public STUN fallback remains the default; TURN is optional and not a Phase 3 completion gate.
+- [Phase ?]: Restrictive-network traversal and Chrome/Firefox/Safari parity remain explicitly unverified.
+- [Phase ?]: Any future production rollout requires a new request, exact-target authorization, provenance reconciliation, and a separate database-first plan.
+
 ### Pending Todos
 
 None yet.
@@ -142,6 +153,8 @@ None yet.
 - ~~Auth login/signup has undiagnosed issues (STAB-02)~~ -- RESOLVED in 01-02 after human verification
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
 - ~~03-07 bloqueado antes da Wave 11~~ — RESOLVIDO em 03-14 com reconciliação autoritativa periódica, matriz active -> null e duas revisões limpas no hash congelado.
+- ~~Wave 12 blocked: first unhealthy current-hour observation lost to a later writer~~ -- RESOLVED in 03-12 by forward migration `20260727123730` and full local gate.
+- Production migration history is divergent: four remote-only historical versions and multiple local-only versions make ordinary `db push` fail closed. Reconcile exact provenance before any further production migration; never use `--include-all` or broad history repair to bypass it.
 
 ### Quick Tasks Completed
 
@@ -156,9 +169,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-26T15:26:59.095Z
+**Last session:** 2026-07-28T12:08:09.130Z
 
-Last activity: 2026-07-26
-Stopped at: Completed 03-14-PLAN.md
+Last activity: 2026-07-28
+Stopped at: Completed 03-13-PLAN.md
 Resume file: None
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md
