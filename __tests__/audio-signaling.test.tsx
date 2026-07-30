@@ -49,6 +49,18 @@ function activeResponse(active: unknown = null): Response {
   return new Response(JSON.stringify({ success: true, code: 'ACTIVE_READ', active }), { status: 200 });
 }
 
+function publicErrorResponse(
+  code: string,
+  status = 409,
+): Response {
+  return new Response(JSON.stringify({
+    success: false,
+    code,
+    error: 'Screen-share authorization failed.',
+    retryable: false,
+  }), { status });
+}
+
 function options(manager: WebRTCManager, overrides: Partial<Parameters<typeof useAudioSignaling>[0]> = {}): Parameters<typeof useAudioSignaling>[0] {
   return {
     companyId: COMPANY_ID,
@@ -618,14 +630,7 @@ describe('useAudioSignaling private media lifecycle', () => {
       });
     });
     await act(async () => {
-      activeA.resolve(activeResponse({
-        companyId: COMPANY_ID,
-        spaceId: SPACE_ID,
-        presenterUserId: PEER_ID,
-        presenterName: 'Late A',
-        shareId: SHARE_ID,
-        expiresAt: '2026-07-24T00:00:00.000Z',
-      }));
+      activeA.resolve(publicErrorResponse('PRESENTER_PROFILE_INVALID'));
       removeA.resolve('ok');
     });
 
@@ -633,6 +638,7 @@ describe('useAudioSignaling private media lifecycle', () => {
     expect(managerA.handleDescription).not.toHaveBeenCalled();
     expect(managerA.handleIceCandidate).not.toHaveBeenCalled();
     expect(result.current.activeShare).toBeNull();
+    expect(result.current.activeShareObservationVersion).toBe(1);
     expect(managerB.setSignalingChannel).toHaveBeenCalledWith(channelB.api, expect.any(Function));
     expect(channelA.api.track).not.toHaveBeenCalledWith(expect.objectContaining({ user_id: OTHER_USER_ID }));
     expect(channelB.api.track).toHaveBeenCalledWith({ user_id: OTHER_USER_ID, is_muted: false });
@@ -856,7 +862,118 @@ describe('useAudioSignaling private media lifecycle', () => {
     );
   });
 
-  it('retires terminal authorized access denial without treating transient failures as authorization', async () => {
+  it('removes only an invalid remote presenter while room audio and signaling stay live', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    const active = {
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      presenterUserId: PEER_ID,
+      presenterName: 'Presenter',
+      shareId: SHARE_ID,
+      expiresAt: '2026-07-24T00:00:00.000Z',
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(activeResponse(active))
+      .mockResolvedValueOnce(publicErrorResponse('PRESENTER_PROFILE_INVALID'));
+    const terminal = vi.fn();
+    const manager = {
+      setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined), handleHandshake: vi.fn().mockResolvedValue(undefined),
+      handleDescription: vi.fn().mockResolvedValue(undefined), cleanup: vi.fn(), getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    const { result } = renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(result.current.activeShare).toEqual(active));
+    expect(result.current.activeShareObservationVersion).toBe(1);
+
+    act(() => handlers.get('broadcast:presenter-invalidated')?.({ payload: {
+      type: 'presenter-invalidated',
+      sourceUserId: PEER_ID,
+      sourcePresenceSessionId: SESSION_ID,
+      sourceConnectionId: '77777777-7777-4777-8777-777777777777',
+      companyId: COMPANY_ID,
+      spaceId: SPACE_ID,
+      shareId: SHARE_ID,
+    } }));
+
+    await waitFor(() => expect(result.current.activeShare).toBeNull());
+    expect(result.current.activeShareObservationVersion).toBe(2);
+    expect(terminal).not.toHaveBeenCalled();
+    expect(manager.cleanup).not.toHaveBeenCalled();
+    expect(manager.setSignalingChannel).not.toHaveBeenCalledWith(null);
+    expect(mocks.client.removeChannel).not.toHaveBeenCalled();
+
+    const localConnectionId = vi.mocked(manager.setSignalingIdentity).mock.calls[0]?.[1];
+    if (!localConnectionId) throw new Error('local signaling identity was not installed');
+    act(() => {
+      handlers.get('broadcast:handshake')?.({ payload: {
+        type: 'handshake',
+        sourceUserId: PEER_ID,
+        sourcePresenceSessionId: SESSION_ID,
+        sourceConnectionId: '77777777-7777-4777-8777-777777777777',
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        shareId: null,
+      } });
+      handlers.get('broadcast:description')?.({ payload: {
+        type: 'description',
+        sourceUserId: PEER_ID,
+        sourcePresenceSessionId: SESSION_ID,
+        sourceConnectionId: '77777777-7777-4777-8777-777777777777',
+        targetUserId: USER_ID,
+        targetPresenceSessionId: SESSION_ID,
+        targetConnectionId: localConnectionId,
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        shareId: null,
+        description: { type: 'offer', sdp: 'room-audio-still-live' },
+      } });
+    });
+    await waitFor(() => expect(manager.handleHandshake).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(manager.handleDescription).toHaveBeenCalledWith(
+      PEER_ID,
+      USER_ID,
+      { type: 'offer', sdp: 'room-audio-still-live' },
+      null,
+      expect.any(String),
+      expect.any(String),
+      SESSION_ID,
+      expect.any(String),
+    ));
+  });
+
+  it('advances the canonical observation version for every validated null read only', async () => {
+    const handlers = new Map<string, (value: { payload: unknown }) => void>();
+    mocks.channelApi.on.mockImplementation((type: string, filter: { event: string }, handler: (value: { payload: unknown }) => void) => {
+      handlers.set(`${type}:${filter.event}`, handler);
+      return mocks.channelApi;
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(activeResponse(null))
+      .mockResolvedValueOnce(activeResponse(null))
+      .mockResolvedValueOnce(new Response('malformed', { status: 200 }));
+    const manager = {
+      setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined), getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    expect(result.current.activeShareObservationVersion).toBe(0);
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(result.current.activeShareObservationVersion).toBe(1));
+    act(() => handlers.get('presence:leave')?.({ payload: {} }));
+    await waitFor(() => expect(result.current.activeShareObservationVersion).toBe(2));
+    act(() => handlers.get('presence:leave')?.({ payload: {} }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(result.current.activeShareObservationVersion).toBe(2);
+  });
+
+  it('does not retire the viewer for an unclassified 409 or a transient failure', async () => {
     const cleanup = vi.fn();
     const terminal = vi.fn(cleanup);
     const manager = {
@@ -867,8 +984,9 @@ describe('useAudioSignaling private media lifecycle', () => {
     const { unmount } = renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
     await waitFor(() => expect(mocks.statusHandler).toBeDefined());
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
-    await waitFor(() => expect(terminal).toHaveBeenCalledTimes(1));
-    expect(manager.setSignalingChannel).toHaveBeenLastCalledWith(null);
+    await waitFor(() => expect(manager.broadcastHandshake).toHaveBeenCalledTimes(1));
+    expect(terminal).not.toHaveBeenCalled();
+    expect(manager.setSignalingChannel).not.toHaveBeenCalledWith(null);
     unmount();
     expect(mocks.client.removeChannel).toHaveBeenCalledTimes(1);
 
@@ -880,5 +998,27 @@ describe('useAudioSignaling private media lifecycle', () => {
     act(() => mocks.statusHandler?.('SUBSCRIBED'));
     await waitFor(() => expect(retryManager.broadcastHandshake).toHaveBeenCalled());
     expect(retryManager.cleanup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['UNAUTHORIZED', 401],
+    ['ACCESS_DENIED', 403],
+    ['SESSION_INVALID', 409],
+    ['MEMBERSHIP_SCOPE_INVALID', 409],
+    ['SPACE_NOT_FOUND', 404],
+    ['SPACE_UNAVAILABLE', 409],
+  ])('retires the viewer for terminal public code %s', async (code, status) => {
+    const terminal = vi.fn();
+    const manager = {
+      setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined), cleanup: vi.fn(), getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    vi.mocked(fetch).mockResolvedValueOnce(publicErrorResponse(code, status));
+    renderHook(() => useAudioSignaling(options(manager, { onTerminalAuthorizationDenied: terminal })));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(terminal).toHaveBeenCalledTimes(1));
+    expect(manager.setSignalingChannel).toHaveBeenLastCalledWith(null);
+    expect(mocks.client.removeChannel).toHaveBeenCalledTimes(1);
   });
 });
