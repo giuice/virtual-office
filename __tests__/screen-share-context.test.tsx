@@ -58,6 +58,7 @@ const contextState = vi.hoisted(() => ({
   presenceSessionId: '55555555-5555-4555-8555-555555555555' as string | null,
   accessToken: 'token-a',
   activeShare: null as ScreenSharePublicShare | null,
+  activeShareObservationVersion: 0,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -73,6 +74,7 @@ const mocks = vi.hoisted(() => ({
     broadcastPresenterInvalidated: ReturnType<typeof vi.fn>;
     initializeLocalStream: ReturnType<typeof vi.fn>;
     setMuted: ReturnType<typeof vi.fn>;
+    getActiveShareId: () => string | null;
   }>,
   getDisplayMedia: vi.fn(),
 }));
@@ -97,6 +99,7 @@ vi.mock('@/hooks/realtime/useAudioSignaling', () => ({
   useAudioSignaling: () => ({
     mutedUserIds: new Set<string>(['remote-muted']),
     activeShare: contextState.activeShare,
+    activeShareObservationVersion: contextState.activeShareObservationVersion,
   }),
 }));
 
@@ -118,6 +121,7 @@ vi.mock('@/lib/webrtc', () => {
     readonly broadcastPresenterInvalidated = vi.fn().mockResolvedValue(undefined);
     readonly renegotiateExistingPeers = vi.fn().mockResolvedValue(undefined);
     private activeShareId: string | null = null;
+    private displayStream: MediaStream | null = null;
 
     constructor(
       _spaceId: string,
@@ -128,8 +132,17 @@ vi.mock('@/lib/webrtc', () => {
         onPeerDisconnected?: (peerId: string) => void;
       },
     ) {
-      this.startScreenShare.mockImplementation(async (_stream: MediaStream, shareId: string) => {
+      this.startScreenShare.mockImplementation(async (stream: MediaStream, shareId: string) => {
         this.activeShareId = shareId;
+        this.displayStream = stream;
+      });
+      this.stopScreenShare.mockImplementation(async (reason: string) => {
+        const shareId = this.activeShareId;
+        const stream = this.displayStream;
+        this.activeShareId = null;
+        this.displayStream = null;
+        stream?.getVideoTracks().forEach((track) => track.stop());
+        if (shareId) this.callbacks.onLocalDisplayStopped?.(shareId, reason);
       });
       mocks.managers.push(this);
     }
@@ -216,6 +229,7 @@ describe('AudioProvider screen-share lifecycle', () => {
     contextState.presenceSessionId = SESSION_A;
     contextState.accessToken = 'token-a';
     contextState.activeShare = null;
+    contextState.activeShareObservationVersion = 0;
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: { getDisplayMedia: mocks.getDisplayMedia },
@@ -588,6 +602,103 @@ describe('AudioProvider screen-share lifecycle', () => {
     await act(async () => {});
     expect(mocks.managers[0].stopScreenShare).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+  });
+
+  it('ignores the claim baseline and stops exactly once on the first later authoritative null', async () => {
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    await act(async () => {
+      expect(await currentAudio().startScreenShare()).toBe(true);
+    });
+    const manager = mocks.managers[0];
+    const audioBefore = {
+      muted: currentAudio().isMuted,
+      enabled: currentAudio().isAudioEnabled,
+      speaking: currentAudio().speakingUsers,
+      mutedUsers: currentAudio().mutedUserIds,
+    };
+
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    contextState.activeShareObservationVersion = 1;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+
+    await waitFor(() => expect(manager.stopScreenShare).toHaveBeenCalledTimes(1));
+    expect(manager.stopScreenShare).toHaveBeenCalledWith('error-cleanup');
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(manager.cleanup).not.toHaveBeenCalled();
+    expect(manager.initializeLocalStream).not.toHaveBeenCalled();
+    expect(manager.setMuted).not.toHaveBeenCalled();
+    expect(currentAudio().isMuted).toBe(audioBefore.muted);
+    expect(currentAudio().isAudioEnabled).toBe(audioBefore.enabled);
+    expect(currentAudio().speakingUsers).toBe(audioBefore.speaking);
+    expect(currentAudio().mutedUserIds).toEqual(audioBefore.mutedUsers);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+
+    contextState.activeShareObservationVersion = 2;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await act(async () => {});
+    expect(manager.stopScreenShare).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+  });
+
+  it.each([
+    ['company', { companyId: COMPANY_B }],
+    ['space', { spaceId: SPACE_B }],
+    ['presenter', { presenterUserId: USER_B }],
+    ['share', { shareId: SESSION_B }],
+  ])('preserves an exact later observation and stops on a later %s mismatch', async (_field, mismatch) => {
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+    await act(async () => {
+      expect(await currentAudio().startScreenShare()).toBe(true);
+    });
+    const manager = mocks.managers[0];
+    const canonical = currentAudio().activeScreenShare;
+    if (!canonical) throw new Error('local canonical share was not published');
+
+    contextState.activeShare = { ...canonical, ...mismatch };
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await act(async () => {});
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    contextState.activeShare = canonical;
+    contextState.activeShareObservationVersion = 1;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await act(async () => {});
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(currentAudio().screenShareStatus).toBe('sharing');
+    expect(track.stop).not.toHaveBeenCalled();
+
+    contextState.activeShare = { ...canonical, ...mismatch };
+    contextState.activeShareObservationVersion = 2;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await waitFor(() => expect(manager.stopScreenShare).toHaveBeenCalledTimes(1));
+    expect(manager.stopScreenShare).toHaveBeenCalledWith('error-cleanup');
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(manager.cleanup).not.toHaveBeenCalled();
   });
 
   it('clears remote display candidates when canonical reconciliation retires or replaces the presenter', async () => {

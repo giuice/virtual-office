@@ -274,6 +274,36 @@ describe('WebRTCManager display and negotiation ownership', () => {
     expect(impolitePeer?.addIceCandidate).not.toHaveBeenCalled();
   });
 
+  it('removes only the display sender on authoritative cleanup and preserves room audio ownership', async () => {
+    const microphone = new FakeTrack('audio');
+    const display = new FakeTrack('video');
+    const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
+    const manager = new WebRTCManager('space-1', 'user-b');
+    manager.setSignalingChannel({ send: vi.fn().mockResolvedValue('ok') } as never);
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new FakeStream([microphone])) },
+    });
+
+    await manager.initializeLocalStream();
+    await manager.handleHandshake('user-a');
+    await manager.startScreenShare(new FakeStream([display]) as never, 'share-1');
+    await flushMicrotasks();
+    const peer = FakePeerConnection.instances[0];
+    const microphoneSender = peer.senders.find((sender) => sender.track === microphone);
+    const displaySender = peer.senders.find((sender) => sender.track === display);
+
+    await manager.stopScreenShare('error-cleanup');
+
+    expect(peer.removeTrack).toHaveBeenCalledTimes(1);
+    expect(peer.removeTrack).toHaveBeenCalledWith(displaySender);
+    expect(peer.removeTrack).not.toHaveBeenCalledWith(microphoneSender);
+    expect(display.stopped).toBe(true);
+    expect(microphone.stopped).toBe(false);
+    expect(manager.getLocalStream()).toEqual(new FakeStream([microphone]));
+    expect(manager.getConnectedPeers()).toEqual(['user-a']);
+    expect(peer.close).not.toHaveBeenCalled();
+  });
+
   it('retains answer ICE received during glare without admitting ICE from the ignored offer', async () => {
     const { WebRTCManager } = await import('@/lib/webrtc/WebRTCManager');
     const manager = new WebRTCManager('space-1', 'user-a');
