@@ -95,6 +95,16 @@ function createChannel() {
 
 let latestAudio: ReturnType<typeof useAudio> | null = null;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function AudioStateProbe() {
   latestAudio = useAudio();
   return null;
@@ -202,6 +212,53 @@ describe('AudioProvider manager ownership', () => {
     expect(latestAudio?.isAudioEnabled).toBe(true);
     expect(latestAudio?.isMuted).toBe(false);
     expect(latestAudio?.error).toBeNull();
+  });
+
+  it('does not resume a deferred permission read after its manager scope is retired', async () => {
+    const permissionRead = deferred<PermissionStatus>();
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      permissions: { query: vi.fn().mockReturnValue(permissionRead.promise) },
+    });
+
+    const { rerender } = render(
+      <AudioProvider spaceId="room-a" userId={USER_ID}>
+        <AudioStateProbe />
+      </AudioProvider>,
+    );
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+    const managerA = mocks.managers[0];
+    const audioA = latestAudio;
+    if (!audioA) throw new Error('room A audio context was not published');
+
+    let initialization!: Promise<boolean>;
+    act(() => {
+      initialization = audioA.initializeAudio();
+    });
+    await waitFor(() => expect(latestAudio?.isInitializing).toBe(true));
+
+    rerender(
+      <AudioProvider spaceId="room-b" userId={USER_ID}>
+        <AudioStateProbe />
+      </AudioProvider>,
+    );
+    await waitFor(() => expect(mocks.managers).toHaveLength(2));
+    const managerB = mocks.managers[1];
+
+    await act(async () => {
+      permissionRead.resolve({ state: 'denied' } as PermissionStatus);
+      await initialization;
+    });
+
+    expect(await initialization).toBe(false);
+    expect(managerA.initializeLocalStream).not.toHaveBeenCalled();
+    expect(managerB.initializeLocalStream).not.toHaveBeenCalled();
+    expect(latestAudio?.webrtcManager).toBe(managerB);
+    expect(latestAudio?.micPermission).toBe('prompt');
+    expect(latestAudio?.error).toBeNull();
+    expect(latestAudio?.isInitializing).toBe(false);
+    expect(latestAudio?.isAudioEnabled).toBe(false);
+    expect(latestAudio?.isMuted).toBe(true);
   });
 
   it('does not substitute the Supabase Auth UUID when the application user ID is unavailable', async () => {
