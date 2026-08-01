@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 12
 waived_count: 0
 fixed_count: 12
-total_count: 23
-last_updated: 2026-07-26T04:04:06.009Z
+total_count: 24
+last_updated: 2026-08-01T13:39:30.562Z
 ---
 
 # Broken Windows Ledger
@@ -38,6 +38,7 @@ last_updated: 2026-07-26T04:04:06.009Z
 | 21 | 03 | unrun-verify | src/hooks/realtime/useAudioSignaling.ts |  | Mandatory presence-safety-reviewer could not spawn because the two-agent thread limit was occupied; local gates passed and parent must schedule the formal read-only review. | fixed |  | 2026-07-25T22:13:35.048Z | 2026-07-26T03:40:54.231Z |
 | 22 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Second Presence Safety blocker fixed: distinct same-user presence sessions now accept exact canonical screen-share invalidation while mixed generations and generic same-user signaling remain fenced. | fixed |  | 2026-07-26T03:56:31.808Z | 2026-07-26T03:56:36.046Z |
 | 23 | 03 | deviation | __tests__/api/playwright/screen-sharing.spec.ts | 486 | Final Presence Safety risk evidence closed: same-identity browser coverage proves distinct session/connection generations and a separate post-release active-null route read before stage teardown. | fixed |  | 2026-07-26T04:04:05.341Z | 2026-07-26T04:04:06.009Z |
+| 24 | 03 | deviation | src/hooks/realtime/useAudioSignaling.ts |  | Fenced claims against authoritative read start order after Presence Safety review found a completion-order race | open |  | 2026-08-01T13:39:30.562Z |  |
 
 ````json
 [
@@ -316,6 +317,18 @@ last_updated: 2026-07-26T04:04:06.009Z
     "reason": "",
     "recorded_at": "2026-07-26T04:04:05.341Z",
     "resolved_at": "2026-07-26T04:04:06.009Z"
+  },
+  {
+    "id": 24,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "src/hooks/realtime/useAudioSignaling.ts",
+    "line": null,
+    "description": "Fenced claims against authoritative read start order after Presence Safety review found a completion-order race",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-01T13:39:30.562Z",
+    "resolved_at": null
   }
 ]
 ````
