@@ -94,6 +94,12 @@ interface OwnedWebRTCManager {
 	identity: string;
 }
 
+interface OwnedAudioInitialization {
+	manager: WebRTCManager;
+	identity: string;
+	promise: Promise<boolean>;
+}
+
 interface OwnedScreenShareLifecycle {
 	generation: number;
 	identity: string;
@@ -169,7 +175,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 	const managerRef = useRef<WebRTCManager | null>(null);
 	const managerIdentityRef = useRef<string | null>(managerIdentity);
 	managerIdentityRef.current = managerIdentity;
-	const initializationPromiseRef = useRef<Promise<boolean> | null>(null);
+	const initializationPromiseRef = useRef<OwnedAudioInitialization | null>(null);
 	const screenShareGenerationRef = useRef(0);
 	const screenShareLifecycleRef = useRef<OwnedScreenShareLifecycle | null>(null);
 	const stopScreenSharePromiseRef = useRef<Promise<void> | null>(null);
@@ -295,40 +301,57 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			}
 			cleanupOwnedManager(manager);
 			if (managerRef.current === manager) managerRef.current = null;
+			if (initializationPromiseRef.current?.manager === manager) initializationPromiseRef.current = null;
 			updateOwnedWebrtcManager((current) => current?.manager === manager ? null : current);
 			updateIsMutedState(true);
 			updateIsAudioEnabled(false);
+			updateIsInitializing(false);
+			updateMicPermission('prompt');
+			updateError(null);
 			updateSpeakingUsers(new Map());
 			updatePeerCount(0);
 			updateOwnedScreenShare(null);
 			updateDisplayStream(null);
 			updateScreenShareStatus('idle');
 		};
-		}, [accessToken, cleanupOwnedManager, company?.id, currentUserId, managerIdentity, presenceSessionId, spaceId, updateDisplayStream, updateOwnedScreenShare, updatePeerCount, updateScreenShareStatus, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsMutedState]);
+		}, [accessToken, cleanupOwnedManager, company?.id, currentUserId, managerIdentity, presenceSessionId, spaceId, updateDisplayStream, updateOwnedScreenShare, updatePeerCount, updateScreenShareStatus, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsInitializing, updateIsMutedState, updateMicPermission]);
 
 	/**
 	 * Initialize audio (must be called from user gesture for Safari)
 	 */
 	const initializeAudio = useCallback((): Promise<boolean> => {
-		if (!webrtcManager) {
+		if (!webrtcManager || !managerIdentity) {
 			updateError('Manager não inicializado');
 			return Promise.resolve(false);
 		}
-		if (initializationPromiseRef.current) return initializationPromiseRef.current;
 
 		const manager = webrtcManager;
-		const initialization = (async (): Promise<boolean> => {
+		const identity = managerIdentity;
+		const existingInitialization = initializationPromiseRef.current;
+		if (existingInitialization?.manager === manager && existingInitialization.identity === identity) {
+			return existingInitialization.promise;
+		}
+		const isCurrent = (): boolean => (
+			managerRef.current === manager
+			&& managerIdentityRef.current === identity
+		);
+		if (!isCurrent()) return Promise.resolve(false);
+
+		let initialization!: Promise<boolean>;
+		initialization = (async (): Promise<boolean> => {
 			updateIsInitializing(true);
 			updateError(null);
 			try {
+				let permissionStatus: PermissionStatus | undefined;
 				try {
-					const permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
-					if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
+					permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
 				} catch {
 					// The Permissions API is informational; media initialization remains authoritative.
 				}
+				if (!isCurrent()) return false;
+				if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
 				await manager.initializeLocalStream();
-				if (managerRef.current !== manager) return false;
+				if (!isCurrent()) return false;
 				manager.resumeRemoteAudio();
 				updateMicPermission('granted');
 				updateIsAudioEnabled(true);
@@ -336,6 +359,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				manager.setMuted(false);
 				return true;
 			} catch (err) {
+				if (!isCurrent()) return false;
 				console.error('[AudioProvider] Failed to initialize audio:', err);
 				if (err instanceof DOMException) {
 					if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') { updateMicPermission('denied'); updateError('Permissão de microfone negada'); }
@@ -344,13 +368,18 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				} else updateError('Erro ao acessar microfone');
 				return false;
 			} finally {
-				if (managerRef.current === manager) updateIsInitializing(false);
+				if (
+					isCurrent()
+					&& initializationPromiseRef.current?.promise === initialization
+				) updateIsInitializing(false);
 			}
 		})();
-		initializationPromiseRef.current = initialization;
-		void initialization.finally(() => { if (initializationPromiseRef.current === initialization) initializationPromiseRef.current = null; });
+		initializationPromiseRef.current = { manager, identity, promise: initialization };
+		void initialization.finally(() => {
+			if (initializationPromiseRef.current?.promise === initialization) initializationPromiseRef.current = null;
+		});
 		return initialization;
-	}, [updateError, updateIsInitializing, updateMicPermission, updateIsAudioEnabled, updateIsMutedState, webrtcManager]);
+	}, [managerIdentity, updateError, updateIsInitializing, updateMicPermission, updateIsAudioEnabled, updateIsMutedState, webrtcManager]);
 
 	/**
 	 * Set mute state
