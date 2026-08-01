@@ -321,8 +321,12 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			updateIsInitializing(true);
 			updateError(null);
 			try {
-				const permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
-				if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
+				try {
+					const permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
+					if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
+				} catch {
+					// The Permissions API is informational; media initialization remains authoritative.
+				}
 				await manager.initializeLocalStream();
 				if (managerRef.current !== manager) return false;
 				manager.resumeRemoteAudio();

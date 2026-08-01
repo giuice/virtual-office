@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     spaceId: string;
     broadcastHandshake: ReturnType<typeof vi.fn>;
     cleanup: ReturnType<typeof vi.fn>;
+    initializeLocalStream: ReturnType<typeof vi.fn>;
     callbacks: {
       onPeerConnected: (peerId: string) => void;
       onPeerSpeaking: (peerId: string, isSpeaking: boolean) => void;
@@ -187,9 +188,11 @@ describe('AudioProvider manager ownership', () => {
 
     await waitFor(() => expect(mocks.managers).toHaveLength(1));
     const manager = mocks.managers[0];
+    const audio = latestAudio;
+    if (!audio) throw new Error('audio context was not published');
     let initialized = false;
     await act(async () => {
-      initialized = await latestAudio!.initializeAudio();
+      initialized = await audio.initializeAudio();
     });
 
     expect(permissionQuery).toHaveBeenCalledWith({ name: 'microphone' });
