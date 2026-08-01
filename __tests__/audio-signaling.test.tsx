@@ -973,6 +973,28 @@ describe('useAudioSignaling private media lifecycle', () => {
     expect(result.current.activeShareObservationVersion).toBe(2);
   });
 
+  it('assigns a read version when the authoritative request starts and preserves it on deferred completion', async () => {
+    const activeRead = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(activeRead.promise);
+    const manager = {
+      setSignalingIdentity: vi.fn(), setSignalingChannel: vi.fn(), renegotiateExistingPeers: vi.fn().mockResolvedValue(undefined),
+      broadcastHandshake: vi.fn().mockResolvedValue(undefined), getActiveShareId: vi.fn().mockReturnValue(null),
+    } as unknown as WebRTCManager;
+    const { result } = renderHook(() => useAudioSignaling(options(manager)));
+    await waitFor(() => expect(mocks.statusHandler).toBeDefined());
+    act(() => mocks.statusHandler?.('SUBSCRIBED'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    const readVersion = (result.current as typeof result.current & {
+      getActiveShareReadVersion: () => number;
+    }).getActiveShareReadVersion();
+    expect(readVersion).toBe(1);
+    expect(result.current.activeShareObservationVersion).toBe(0);
+
+    await act(async () => activeRead.resolve(activeResponse(null)));
+    expect(result.current.activeShareObservationVersion).toBe(readVersion);
+  });
+
   it('does not retire the viewer for an unclassified 409 or a transient failure', async () => {
     const cleanup = vi.fn();
     const terminal = vi.fn(cleanup);

@@ -53,12 +53,21 @@ function createStream(track = createTrack()): MediaStream {
   } as unknown as MediaStream;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 const contextState = vi.hoisted(() => ({
   companyId: '11111111-1111-4111-8111-111111111111',
   presenceSessionId: '55555555-5555-4555-8555-555555555555' as string | null,
   accessToken: 'token-a',
   activeShare: null as ScreenSharePublicShare | null,
   activeShareObservationVersion: 0,
+  activeShareReadVersion: 0,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -100,6 +109,7 @@ vi.mock('@/hooks/realtime/useAudioSignaling', () => ({
     mutedUserIds: new Set<string>(['remote-muted']),
     activeShare: contextState.activeShare,
     activeShareObservationVersion: contextState.activeShareObservationVersion,
+    getActiveShareReadVersion: () => contextState.activeShareReadVersion,
   }),
 }));
 
@@ -230,6 +240,7 @@ describe('AudioProvider screen-share lifecycle', () => {
     contextState.accessToken = 'token-a';
     contextState.activeShare = null;
     contextState.activeShareObservationVersion = 0;
+    contextState.activeShareReadVersion = 0;
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: { getDisplayMedia: mocks.getDisplayMedia },
@@ -651,6 +662,63 @@ describe('AudioProvider screen-share lifecycle', () => {
     view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
     await act(async () => {});
     expect(manager.stopScreenShare).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+  });
+
+  it.each([
+    ['null', null],
+    ['presenter/share mismatch', {
+      companyId: COMPANY_A,
+      spaceId: SPACE_A,
+      presenterUserId: USER_B,
+      presenterName: 'Older presenter',
+      shareId: SESSION_B,
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    } satisfies ScreenSharePublicShare],
+  ])('does not retire a committed share when an earlier %s read completes after claim', async (_label, earlierResult) => {
+    const earlierActiveRead = deferred<ScreenSharePublicShare | null>();
+    const laterActiveRead = deferred<ScreenSharePublicShare | null>();
+    contextState.activeShareReadVersion = 1;
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    await act(async () => {
+      expect(await currentAudio().startScreenShare()).toBe(true);
+    });
+    const manager = mocks.managers[0];
+
+    await act(async () => {
+      earlierActiveRead.resolve(earlierResult);
+      contextState.activeShare = await earlierActiveRead.promise;
+      contextState.activeShareObservationVersion = 1;
+      view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    });
+
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(manager.getActiveShareId()).toBe(SHARE_A);
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(0);
+
+    contextState.activeShareReadVersion = 2;
+    await act(async () => {
+      laterActiveRead.resolve(null);
+      contextState.activeShare = await laterActiveRead.promise;
+      contextState.activeShareObservationVersion = 2;
+      view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    });
+
+    await waitFor(() => expect(manager.stopScreenShare).toHaveBeenCalledTimes(1));
+    expect(manager.stopScreenShare).toHaveBeenCalledWith('error-cleanup');
+    expect(track.stop).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
   });
 
