@@ -37,7 +37,13 @@ interface UseAudioSignalingOptions {
 }
 
 interface AudioPresenceState { [key: string]: Array<{ user_id?: string; is_muted?: boolean }>; }
-interface SignalingState { isConnected: boolean; error: string | null; mutedUserIds: Set<string>; activeShare: ScreenSharePublicShare | null; }
+interface SignalingState {
+  isConnected: boolean;
+  error: string | null;
+  mutedUserIds: Set<string>;
+  activeShare: ScreenSharePublicShare | null;
+  activeShareObservationVersion: number;
+}
 interface ScopedSignalingInput {
   companyId: string; spaceId: string; currentUserId: string; presenceSessionId: string;
   accessToken: string; generation: string | number; manager: WebRTCManager; connectionId: string;
@@ -78,10 +84,23 @@ function createConnectionId(): string {
   throw new Error('crypto.randomUUID is required for media signaling identity');
 }
 
-function isTerminalAuthorizationResponse(status: number, body: unknown): boolean {
-  if (status === 401 || status === 403 || status === 409) return true;
+type ActiveReadErrorDisposition = 'viewer-terminal' | 'presenter-invalid' | 'other';
+
+function classifyActiveReadError(status: number, body: unknown): ActiveReadErrorDisposition {
+  if (status === 401 || status === 403) return 'viewer-terminal';
   const parsed = screenSharePublicErrorSchema.safeParse(body);
-  return parsed.success && ['UNAUTHORIZED', 'ACCESS_DENIED', 'SESSION_INVALID', 'MEMBERSHIP_SCOPE_INVALID', 'SPACE_NOT_FOUND', 'SPACE_UNAVAILABLE', 'PRESENTER_PROFILE_INVALID'].includes(parsed.data.code);
+  if (!parsed.success) return 'other';
+  if (parsed.data.code === 'PRESENTER_PROFILE_INVALID') return 'presenter-invalid';
+  return [
+    'UNAUTHORIZED',
+    'ACCESS_DENIED',
+    'SESSION_INVALID',
+    'MEMBERSHIP_SCOPE_INVALID',
+    'SPACE_NOT_FOUND',
+    'SPACE_UNAVAILABLE',
+  ].includes(parsed.data.code)
+    ? 'viewer-terminal'
+    : 'other';
 }
 
 export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingState {
@@ -96,6 +115,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
   const [isConnected, setIsConnected] = useState(false);
   const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
   const [activeShare, setActiveShare] = useState<ScreenSharePublicShare | null>(null);
+  const [activeShareObservationVersion, setActiveShareObservationVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   scopeGenerationRef.current = generation;
@@ -122,6 +142,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     const clearRenderedShare = (): void => { activeShareRef.current = null; setActiveShare(null); };
     if (!enabled || !companyId || !spaceId || !currentUserId || !presenceSessionId || !accessToken || !webrtcManager) {
       clearRenderedShare();
+      setActiveShareObservationVersion(0);
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
       isConnectedRef.current = false;
       setIsConnected(false);
@@ -132,6 +153,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     // Scope replacement is a security boundary: clear synchronously before any
     // subscription, fetch, removal, or callback from an earlier scope can settle.
     clearRenderedShare();
+    setActiveShareObservationVersion(0);
     setMutedUserIds((current) => current.size === 0 ? current : new Set());
     setError(null);
     const scope: ScopedSignalingInput = {
@@ -312,6 +334,13 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         accepted.forEach((signal) => enqueue(sourceUserId, () => dispatchBuffered(signal)));
       }
     };
+    const discardBufferedDisplayForShare = (canonical: ScreenSharePublicShare): void => {
+      const signals = bufferedSignals.get(canonical.presenterUserId);
+      if (!signals) return;
+      const retained = signals.filter((signal) => signal.payload.shareId !== canonical.shareId);
+      if (retained.length === 0) bufferedSignals.delete(canonical.presenterUserId);
+      else bufferedSignals.set(canonical.presenterUserId, retained);
+    };
     const scheduleReconnectReconcile = (expectedSubscriptionGeneration: number): void => {
       if (delayedReconnectReconcile || !isSubscriptionCurrent(expectedSubscriptionGeneration)) return;
       delayedReconnectReconcile = setTimeout(() => {
@@ -354,7 +383,19 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         const response = await fetch(activeRoute(scope.spaceId, scope.presenceSessionId), { signal: controller.signal });
         const body: unknown = await response.json().catch(() => null);
         if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || controller.signal.aborted) return;
-        if (isTerminalAuthorizationResponse(response.status, body)) { retireForAuthorization(); return; }
+        const errorDisposition = classifyActiveReadError(response.status, body);
+        if (errorDisposition === 'viewer-terminal') {
+          retireForAuthorization();
+          return;
+        }
+        if (errorDisposition === 'presenter-invalid') {
+          const canonical = activeShareRef.current;
+          if (canonical) discardBufferedDisplayForShare(canonical);
+          activeShareRef.current = null;
+          setActiveShare(null);
+          setActiveShareObservationVersion((current) => current + 1);
+          return;
+        }
         if (!response.ok) return;
         const parsed = screenShareActiveResponseSchema.safeParse(body);
         if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || controller.signal.aborted) return;
@@ -364,6 +405,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         }
         activeShareRef.current = parsed.data.active;
         setActiveShare(parsed.data.active);
+        setActiveShareObservationVersion((current) => current + 1);
         flushAuthorizedSignals(parsed.data.active);
         if (!parsed.data.active && bufferedSignals.size > 0) {
           if (bufferedRetryUsed) bufferedSignals.clear();
@@ -530,5 +572,5 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     };
   }, [accessToken, companyId, currentUserId, enabled, generation, presenceSessionId, spaceId, webrtcManager]);
 
-  return { isConnected, error, mutedUserIds, activeShare };
+  return { isConnected, error, mutedUserIds, activeShare, activeShareObservationVersion };
 }
