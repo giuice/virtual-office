@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import {
@@ -43,6 +43,7 @@ interface SignalingState {
   mutedUserIds: Set<string>;
   activeShare: ScreenSharePublicShare | null;
   activeShareObservationVersion: number;
+  getActiveShareReadVersion: () => number;
 }
 interface ScopedSignalingInput {
   companyId: string; spaceId: string; currentUserId: string; presenceSessionId: string;
@@ -111,12 +112,14 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
   const isConnectedRef = useRef(false);
   const isMutedRef = useRef(isMuted);
   const activeShareRef = useRef<ScreenSharePublicShare | null>(null);
+  const activeShareReadVersionRef = useRef(0);
   const onTerminalAuthorizationDeniedRef = useRef(onTerminalAuthorizationDenied);
   const [isConnected, setIsConnected] = useState(false);
   const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
   const [activeShare, setActiveShare] = useState<ScreenSharePublicShare | null>(null);
   const [activeShareObservationVersion, setActiveShareObservationVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const getActiveShareReadVersion = useCallback(() => activeShareReadVersionRef.current, []);
 
   scopeGenerationRef.current = generation;
   isMutedRef.current = isMuted;
@@ -142,6 +145,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     const clearRenderedShare = (): void => { activeShareRef.current = null; setActiveShare(null); };
     if (!enabled || !companyId || !spaceId || !currentUserId || !presenceSessionId || !accessToken || !webrtcManager) {
       clearRenderedShare();
+      activeShareReadVersionRef.current = 0;
       setActiveShareObservationVersion(0);
       setMutedUserIds((current) => current.size === 0 ? current : new Set());
       isConnectedRef.current = false;
@@ -153,6 +157,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     // Scope replacement is a security boundary: clear synchronously before any
     // subscription, fetch, removal, or callback from an earlier scope can settle.
     clearRenderedShare();
+    activeShareReadVersionRef.current = 0;
     setActiveShareObservationVersion(0);
     setMutedUserIds((current) => current.size === 0 ? current : new Set());
     setError(null);
@@ -376,6 +381,8 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     };
     const reconcileActive = async (expectedSubscriptionGeneration: number): Promise<void> => {
       if (!isSubscriptionCurrent(expectedSubscriptionGeneration) || activeRequest) return;
+      const readVersion = activeShareReadVersionRef.current + 1;
+      activeShareReadVersionRef.current = readVersion;
       const controller = new AbortController();
       activeRequest = controller;
       try {
@@ -393,7 +400,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
           if (canonical) discardBufferedDisplayForShare(canonical);
           activeShareRef.current = null;
           setActiveShare(null);
-          setActiveShareObservationVersion((current) => current + 1);
+          setActiveShareObservationVersion(readVersion);
           return;
         }
         if (!response.ok) return;
@@ -405,7 +412,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
         }
         activeShareRef.current = parsed.data.active;
         setActiveShare(parsed.data.active);
-        setActiveShareObservationVersion((current) => current + 1);
+        setActiveShareObservationVersion(readVersion);
         flushAuthorizedSignals(parsed.data.active);
         if (!parsed.data.active && bufferedSignals.size > 0) {
           if (bufferedRetryUsed) bufferedSignals.clear();
@@ -572,5 +579,12 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     };
   }, [accessToken, companyId, currentUserId, enabled, generation, presenceSessionId, spaceId, webrtcManager]);
 
-  return { isConnected, error, mutedUserIds, activeShare, activeShareObservationVersion };
+  return {
+    isConnected,
+    error,
+    mutedUserIds,
+    activeShare,
+    activeShareObservationVersion,
+    getActiveShareReadVersion,
+  };
 }

@@ -65,6 +65,8 @@ vi.mock('@/hooks/realtime/useAudioSignaling', () => ({
   useAudioSignaling: () => ({
     mutedUserIds: new Set<string>(),
     activeShare: mocks.activeShare,
+    activeShareObservationVersion: 0,
+    getActiveShareReadVersion: () => 0,
     error: null,
     isConnected: true,
   }),

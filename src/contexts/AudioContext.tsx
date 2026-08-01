@@ -108,7 +108,7 @@ interface OwnedScreenShareLifecycle {
 	endedListener: (() => void) | null;
 	requestedShareId: string | null;
 	share: ScreenSharePublicShare | null;
-	activeShareObservationVersionAtClaim: number;
+	activeShareReadVersionAtClaim: number;
 	attached: boolean;
 	heartbeatTimer: ReturnType<typeof setTimeout> | null;
 	releaseStarted: boolean;
@@ -200,6 +200,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		mutedUserIds,
 		activeShare: signalingActiveShare,
 		activeShareObservationVersion,
+		getActiveShareReadVersion,
 	} = useAudioSignaling({
 		companyId: company?.id,
 		spaceId,
@@ -212,8 +213,6 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		isMuted,
 		onTerminalAuthorizationDenied,
 	});
-	const activeShareObservationVersionRef = useRef(activeShareObservationVersion);
-	activeShareObservationVersionRef.current = activeShareObservationVersion;
 
 	// A manager is valid only for the complete company/user/session/space/token identity.
 	useEffect(() => {
@@ -506,7 +505,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			endedListener: null,
 			requestedShareId: null,
 			share: null,
-			activeShareObservationVersionAtClaim: 0,
+			activeShareReadVersionAtClaim: 0,
 			attached: false,
 			heartbeatTimer: null,
 			releaseStarted: false,
@@ -637,7 +636,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			}
 
 			lifecycle.share = claimed.data.share;
-			lifecycle.activeShareObservationVersionAtClaim = activeShareObservationVersionRef.current;
+			lifecycle.activeShareReadVersionAtClaim = getActiveShareReadVersion();
 			lifecycle.controller = null;
 			await manager.startScreenShare(stream, shareId);
 			if (!isCurrent()) {
@@ -685,7 +684,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				updateScreenShareStatus('idle');
 			}
 		}
-	}, [company?.id, currentUserId, managerIdentity, presenceSessionId, releaseScreenShareLease, spaceId, updateDisplayStream, updateOwnedScreenShare, updateScreenShareError, updateScreenShareStatus, webrtcManager]);
+	}, [company?.id, currentUserId, getActiveShareReadVersion, managerIdentity, presenceSessionId, releaseScreenShareLease, spaceId, updateDisplayStream, updateOwnedScreenShare, updateScreenShareError, updateScreenShareStatus, webrtcManager]);
 
 	useEffect(() => {
 		const lifecycle = screenShareLifecycleRef.current;
@@ -693,7 +692,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			lifecycle
 			&& lifecycle.manager === webrtcManager
 			&& lifecycle.identity === managerIdentity
-			&& activeShareObservationVersion > lifecycle.activeShareObservationVersionAtClaim
+			&& activeShareObservationVersion > lifecycle.activeShareReadVersionAtClaim
 		) {
 			const isExactOwnedShare = Boolean(
 				signalingActiveShare
@@ -706,7 +705,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				void stopScreenShareRef.current('error-cleanup');
 				return;
 			}
-			lifecycle.activeShareObservationVersionAtClaim = activeShareObservationVersion;
+			lifecycle.activeShareReadVersionAtClaim = activeShareObservationVersion;
 		}
 		updateDisplayStream((current) => {
 			if (!current) return current;
