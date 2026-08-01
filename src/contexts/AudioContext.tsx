@@ -108,6 +108,7 @@ interface OwnedScreenShareLifecycle {
 	endedListener: (() => void) | null;
 	requestedShareId: string | null;
 	share: ScreenSharePublicShare | null;
+	activeShareObservationVersionAtClaim: number;
 	attached: boolean;
 	heartbeatTimer: ReturnType<typeof setTimeout> | null;
 	releaseStarted: boolean;
@@ -195,7 +196,11 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 
 	// Setup signaling only for the currently authoritative company/session/space scope.
 	const signalingGeneration = managerIdentity ?? 'incomplete-media-identity';
-	const { mutedUserIds, activeShare: signalingActiveShare } = useAudioSignaling({
+	const {
+		mutedUserIds,
+		activeShare: signalingActiveShare,
+		activeShareObservationVersion,
+	} = useAudioSignaling({
 		companyId: company?.id,
 		spaceId,
 		currentUserId,
@@ -207,6 +212,8 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		isMuted,
 		onTerminalAuthorizationDenied,
 	});
+	const activeShareObservationVersionRef = useRef(activeShareObservationVersion);
+	activeShareObservationVersionRef.current = activeShareObservationVersion;
 
 	// A manager is valid only for the complete company/user/session/space/token identity.
 	useEffect(() => {
@@ -499,6 +506,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			endedListener: null,
 			requestedShareId: null,
 			share: null,
+			activeShareObservationVersionAtClaim: 0,
 			attached: false,
 			heartbeatTimer: null,
 			releaseStarted: false,
@@ -629,6 +637,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			}
 
 			lifecycle.share = claimed.data.share;
+			lifecycle.activeShareObservationVersionAtClaim = activeShareObservationVersionRef.current;
 			lifecycle.controller = null;
 			await manager.startScreenShare(stream, shareId);
 			if (!isCurrent()) {
@@ -682,16 +691,22 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		const lifecycle = screenShareLifecycleRef.current;
 		if (
 			lifecycle
-			&& signalingActiveShare
-			&& (
-				signalingActiveShare.companyId !== lifecycle.companyId
-				|| signalingActiveShare.spaceId !== lifecycle.spaceId
-				|| signalingActiveShare.presenterUserId !== lifecycle.userId
-				|| signalingActiveShare.shareId !== lifecycle.share?.shareId
-			)
+			&& lifecycle.manager === webrtcManager
+			&& lifecycle.identity === managerIdentity
+			&& activeShareObservationVersion > lifecycle.activeShareObservationVersionAtClaim
 		) {
-			void stopScreenShareRef.current('error-cleanup');
-			return;
+			const isExactOwnedShare = Boolean(
+				signalingActiveShare
+				&& signalingActiveShare.companyId === lifecycle.companyId
+				&& signalingActiveShare.spaceId === lifecycle.spaceId
+				&& signalingActiveShare.presenterUserId === lifecycle.userId
+				&& signalingActiveShare.shareId === lifecycle.share?.shareId
+			);
+			if (!isExactOwnedShare) {
+				void stopScreenShareRef.current('error-cleanup');
+				return;
+			}
+			lifecycle.activeShareObservationVersionAtClaim = activeShareObservationVersion;
 		}
 		updateDisplayStream((current) => {
 			if (!current) return current;
@@ -703,7 +718,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			) return current;
 			return null;
 		});
-	}, [signalingActiveShare, updateDisplayStream]);
+	}, [activeShareObservationVersion, managerIdentity, signalingActiveShare, updateDisplayStream, webrtcManager]);
 
 	// Helper to check if a user is muted
 	const isUserMuted = useCallback((userId: string) => { if (userId === currentUserId) return isMuted;
