@@ -1,6 +1,6 @@
 ---
 phase: 03-video-and-screen-sharing
-reviewed: 2026-08-01T13:47:07Z
+reviewed: 2026-08-01T13:57:46Z
 depth: standard
 files_reviewed: 31
 files_reviewed_list:
@@ -37,46 +37,24 @@ files_reviewed_list:
   - "supabase/migrations/20260727123730_fix_presence_cutover_coverage_first_observation.sql"
 findings:
   critical: 0
-  warning: 1
+  warning: 0
   info: 1
-  total: 2
-status: issues_found
+  total: 1
+status: clean
 ---
 
 # Fase 03: Relatório de revisão de código
 
-**Revisado:** 2026-08-01T13:47:07Z
+**Revisado:** 2026-08-01T13:57:46Z
 **Profundidade:** standard
 **Arquivos revisados:** 31
-**Status:** issues_found
+**Status:** clean
 
 ## Summary
 
-A revisão cobriu as rotas, o contrato SQL/RPC, a autorização Realtime, o ciclo de vida WebRTC e os testes. A migração posterior de contrato do apresentador completa os campos exigidos pelas rotas. Não foi encontrada uma falha de autorização ou RLS comprovada neste escopo. Há uma falha de compatibilidade para áudio e um caminho morto de sinalização.
+A revisão confirmou que a rejeição de `permissions.query()` não bloqueia mais a inicialização. O teste com promise adiada troca o provider e prova que o manager retirado não inicia mídia nem altera o estado do novo escopo. O erro do manager ainda retorna falha e o resultado `denied` continua informativo até o resultado autoritativo de captura. O teste focado passou com cinco testes. Não há blocker ou warning nesta revisão. A nota sobre `presenter-hint` é somente informativa.
 
 ## Narrative Findings (AI reviewer)
-
-## Warnings
-
-### WR-01: A consulta opcional de permissão bloqueia a captura de microfone
-
-**File:** `src/contexts/AudioContext.tsx:324`
-**Issue:** `navigator.permissions.query()` é tratado como pré-requisito. Alguns navegadores expõem `navigator.permissions`, mas rejeitam a consulta `microphone`. Nesse caso, o `catch` externo retorna `false` antes de chamar `manager.initializeLocalStream()`. O navegador pode suportar `getUserMedia`, mas o usuário nunca consegue ativar o áudio.
-
-**Fix:** Trate a consulta como informativa e continue para `getUserMedia` quando ela falhar. Adicione um teste que rejeite `permissions.query()` e confirme a chamada de `initializeLocalStream()`.
-
-```ts
-try {
-  const permissionStatus = await navigator.permissions?.query?.({
-    name: 'microphone' as PermissionName,
-  });
-  if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
-} catch {
-  // Permission API is optional. getUserMedia remains authoritative.
-}
-
-await manager.initializeLocalStream();
-```
 
 ## Info
 
@@ -89,6 +67,6 @@ await manager.initializeLocalStream();
 
 ---
 
-_Revisado: 2026-08-01T13:47:07Z_
+_Revisado: 2026-08-01T13:57:46Z_
 _Revisor: the agent (gsd-code-reviewer)_
 _Profundidade: standard_
