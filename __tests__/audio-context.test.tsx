@@ -172,6 +172,35 @@ describe('AudioProvider manager ownership', () => {
     expect(latestAudio?.error).toBeNull();
   });
 
+  it('initializes microphone audio when the informational permission query rejects', async () => {
+    const permissionQuery = vi.fn().mockRejectedValue(new TypeError('microphone descriptor unsupported'));
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      permissions: { query: permissionQuery },
+    });
+
+    render(
+      <AudioProvider spaceId="room-a" userId={USER_ID}>
+        <AudioStateProbe />
+      </AudioProvider>,
+    );
+
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+    const manager = mocks.managers[0];
+    let initialized = false;
+    await act(async () => {
+      initialized = await latestAudio!.initializeAudio();
+    });
+
+    expect(permissionQuery).toHaveBeenCalledWith({ name: 'microphone' });
+    expect(manager.initializeLocalStream).toHaveBeenCalledTimes(1);
+    expect(initialized).toBe(true);
+    expect(latestAudio?.micPermission).toBe('granted');
+    expect(latestAudio?.isAudioEnabled).toBe(true);
+    expect(latestAudio?.isMuted).toBe(false);
+    expect(latestAudio?.error).toBeNull();
+  });
+
   it('does not substitute the Supabase Auth UUID when the application user ID is unavailable', async () => {
     render(<AudioProvider spaceId="room-a"><AudioStateProbe /></AudioProvider>);
 
