@@ -22,8 +22,13 @@ const { planningDir } = planningWorkspaceMod;
 const phaseLocatorMod = require("./phase-locator.cjs");
 const { findPhaseInternal } = phaseLocatorMod;
 const decisions_cjs_1 = require("./decisions.cjs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const frontmatterMod = require("./frontmatter.cjs");
+const { extractFrontmatter } = frontmatterMod;
 const markdown_sectionizer_cjs_1 = require("./markdown-sectionizer.cjs");
+const security_cjs_1 = require("./security.cjs");
 const ui_safety_gate_cjs_1 = require("./ui-safety-gate.cjs");
+const ui_frontend_evidence_cjs_1 = require("./ui-frontend-evidence.cjs");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const verifyModule = require("./verify.cjs");
 const { cmdVerifySchemaDrift, cmdVerifyCodebaseDrift } = verifyModule;
@@ -41,6 +46,12 @@ const { evaluatePredicate } = gatePredicateEval;
 const apiCoverageMod = require("./api-coverage.cjs");
 const { detectApiIntegration, validateCoverageMatrix } = apiCoverageMod;
 const shell_command_projection_cjs_1 = require("./shell-command-projection.cjs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const planScanMod = require("./plan-scan.cjs");
+const { scanPhasePlans } = planScanMod;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const planningScopeMod = require("./planning-scope.cjs");
+const { SCOPE } = planningScopeMod;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function normalizePhrase(text) {
     // eslint-disable-next-line @typescript-eslint/no-base-to-string
@@ -124,14 +135,13 @@ function gateEnabled(projectDir) {
 function loadPlanContents(phaseDir) {
     if (!node_fs_1.default.existsSync(phaseDir))
         return [];
-    try {
-        return node_fs_1.default.readdirSync(phaseDir)
-            .filter((entry) => /-PLAN\.md$/.test(entry))
-            .map((entry) => readIfExists(node_path_1.default.join(phaseDir, entry)));
-    }
-    catch {
-        return [];
-    }
+    // #3183 (lint-plan-count-drift): source live plan files from the single
+    // owner (scanPhasePlans) instead of a local `-PLAN.md` readdirSync filter
+    // — picks up bare PLAN.md and nested plans/, and excludes plans marked
+    // `status: superseded`, which the prior root-only exact-suffix filter did
+    // neither for.
+    return scanPhasePlans(phaseDir).planFiles
+        .map((entry) => readIfExists(node_path_1.default.join(phaseDir, entry)));
 }
 const DESIGNATED_HEADINGS_RE = /^#{1,6}\s+(?:must[_ ]haves?|truths?|tasks?|objective)\b/i;
 // #2372: scanned-tag set must match the planner-canonical surfaces where a D-NN citation
@@ -260,12 +270,22 @@ function loadDecisionExtraction(contextPath) {
 }
 function cmdDecisionCoveragePlan(projectDir, args, raw) {
     const phaseDir = args[2] ? resolvePath(args[2], projectDir) : '';
-    const contextPath = args[3] ? resolvePath(args[3], projectDir) : '';
+    const contextArg = args[3];
+    const contextPath = contextArg ? resolvePath(contextArg, projectDir) : '';
     if (!gateEnabled(projectDir)) {
         output({ passed: true, skipped: true, reason: 'workflow.context_coverage_gate is false', total: 0, covered: 0, uncovered: [], message: 'Decision coverage gate disabled by config.' }, raw, undefined);
         return;
     }
-    if (!contextPath || !node_fs_1.default.existsSync(contextPath)) {
+    // #2770: an EMPTY/MISSING contextPath argument is a CALLER ERROR (the workflow
+    // forgot to pass the path — e.g. a shell variable lost between Bash blocks), not
+    // evidence the phase has no CONTEXT.md. Fail closed (mirrors #1365 fail-loud) so a
+    // blocking gate cannot silently certify success on a caller mistake.
+    if (!contextArg || contextArg === '') {
+        output({ passed: false, skipped: false, reason: 'missing context path argument', total: 0, covered: 0, uncovered: [], message: 'Decision coverage gate called without a context path argument — the caller (e.g. the plan-phase workflow) must pass the CONTEXT.md path. An empty argument is a caller error, not evidence there is nothing to check (#2770).' }, raw, undefined);
+        return;
+    }
+    // A REAL path whose file genuinely does not exist is the LEGITIMATE green skip.
+    if (!node_fs_1.default.existsSync(contextPath)) {
         output({ passed: true, skipped: true, reason: 'CONTEXT.md missing', total: 0, covered: 0, uncovered: [], message: 'No CONTEXT.md - nothing to check.' }, raw, undefined);
         return;
     }
@@ -323,6 +343,7 @@ function recentCommitMessages(projectDir) {
             encoding: 'utf-8',
             maxBuffer: 4 * 1024 * 1024,
             windowsHide: true,
+            timeout: 15_000,
         });
     }
     catch {
@@ -397,8 +418,11 @@ function cmdDecisionCoverageVerify(projectDir, args, raw) {
         return;
     }
     const planContents = loadPlanContents(phaseDir);
+    // #3183 (lint-plan-count-drift): same single-owner sourcing as
+    // loadPlanContents above — scanPhasePlans's summaryFiles instead of a
+    // local `-SUMMARY.md` readdirSync filter.
     const summaryParts = node_fs_1.default.existsSync(phaseDir)
-        ? node_fs_1.default.readdirSync(phaseDir).filter((entry) => /-SUMMARY\.md$/.test(entry)).map((entry) => readIfExists(node_path_1.default.join(phaseDir, entry)))
+        ? scanPhasePlans(phaseDir).summaryFiles.map((entry) => readIfExists(node_path_1.default.join(phaseDir, entry)))
         : [];
     const haystack = [
         planContents.join('\n\n'),
@@ -428,8 +452,9 @@ function cmdDecisionCoverageVerify(projectDir, args, raw) {
  * ui-plan-gate: given a phase number, checks whether the phase has frontend
  * indicators and whether a *-UI-SPEC.md already exists in the phase directory.
  *
- * Returns JSON: { frontend: boolean, hasUiSpec: boolean, block: boolean }
- *   block = frontend && !hasUiSpec (gate fires when UI work is detected but no spec exists)
+ * Returns JSON: { frontend, hasFrontendEvidence, hasUiSpec, block, uiSpecPath, matchedToken, matchedLine }
+ *   block = frontend && hasFrontendEvidence && !hasUiSpec (#3312: gate fires when
+ *   UI work is detected AND the repo has static frontend evidence but no spec exists)
  *
  * Invocable as: gsd_run check ui-plan-gate <phase>
  *
@@ -463,10 +488,21 @@ function findUiSpecInDir(phaseDir) {
  *   (b) Runs checkUiPresence (frontend detection) — no reimplementation.
  *   (c) Resolves the phase directory via findPhaseInternal (phase-locator.cjs); checks for *-UI-SPEC.md.
  *
- * Returns: { frontend, hasUiSpec, block, uiSpecPath, phaseLookupFailed }
- *   block = frontend && !hasUiSpec
+ * Returns: { frontend, hasFrontendEvidence, hasUiSpec, block, uiSpecPath, matchedToken, matchedLine, phaseLookupFailed }
+ *   block = frontend && hasFrontendEvidence && !hasUiSpec   (#3312)
  *   phaseLookupFailed = ROADMAP.md present but phase header not found (surfaced for
  *                       onError:halt gates so a missing phase doesn't silently bypass)
+ *
+ * #3312 — structural corroboration: `frontend` is a vocabulary signal only. A
+ * hyphen is a word boundary, so a phase naming the repo `dashboard-financeiro`
+ * matches the token `dashboard` exactly like the real compound `micro-frontend`
+ * (the boundary rule of #3718 is intentional and untouched). The gate therefore
+ * blocks only when the token match is corroborated by static frontend evidence
+ * in the repo tree (hasStaticFrontendEvidence: package.json UI-framework dep or
+ * a component-framework file). This mirrors the sibling post-wave gate
+ * computeUiSafetyGate, which requires `hasUiFiles` (git diff) before blocking.
+ * matchedToken/matchedLine surface what tripped the sniffer so an operator can
+ * judge the flag in one second instead of reaching for --skip-ui.
  */
 function computeUiPlanGate(projectDir, phase) {
     // (a) Read the phase section text using the same two-pass lookup as roadmap.get-phase.
@@ -495,6 +531,9 @@ function computeUiPlanGate(projectDir, phase) {
     // (b) Run checkUiPresence (frontend detection) — reuse existing helper; no reimplementation
     const presenceResult = (0, ui_safety_gate_cjs_1.checkUiPresence)(phaseSection);
     const frontend = presenceResult.hasUI;
+    // (b') #3312 — static structural corroboration. Only probed when the sniffer
+    // matched (evidence is irrelevant otherwise); failures degrade to false.
+    const hasFrontendEvidence = frontend ? (0, ui_frontend_evidence_cjs_1.hasStaticFrontendEvidence)(projectDir) : false;
     // (c) Resolve phase directory via findPhaseInternal and check for *-UI-SPEC.md
     let phaseDir = '';
     try {
@@ -514,10 +553,13 @@ function computeUiPlanGate(projectDir, phase) {
     catch { /* phase dir lookup failure → hasUiSpec=false */ }
     const uiSpecPath = findUiSpecInDir(phaseDir);
     const hasUiSpec = uiSpecPath !== '';
-    // block = frontend phase with no UI-SPEC
-    const block = frontend && !hasUiSpec;
+    // block = frontend phase with structural frontend evidence and no UI-SPEC (#3312)
+    const block = frontend && hasFrontendEvidence && !hasUiSpec;
     const result = {
-        frontend, hasUiSpec, block, uiSpecPath: hasUiSpec ? uiSpecPath : null,
+        frontend, hasFrontendEvidence, hasUiSpec, block,
+        uiSpecPath: hasUiSpec ? uiSpecPath : null,
+        matchedToken: presenceResult.matchedToken,
+        matchedLine: presenceResult.matchedLine,
     };
     if (phaseLookupFailed)
         result.phaseLookupFailed = true;
@@ -599,6 +641,7 @@ function computeUiSafetyGate(projectDir, phase) {
             encoding: 'utf-8',
             maxBuffer: 2 * 1024 * 1024,
             windowsHide: true,
+            timeout: 10_000,
         });
         hasUiFiles = changed.split('\n').some((f) => f.trim() && (UI_FILE_EXTENSIONS_RE.test(f) || UI_PATH_PATTERNS_RE.test(f)));
     }
@@ -665,7 +708,9 @@ function cmdTddReviewCheckpoint(projectDir, args, raw) {
     const tddPlanFiles = [];
     if (phaseDir) {
         try {
-            const files = node_fs_1.default.readdirSync(phaseDir).filter(f => f.endsWith('-PLAN.md'));
+            // #3183: canonical plan set (root+nested, superseded-excluded) from the
+            // single owner, rather than a root-only hand-rolled readdirSync filter.
+            const files = scanPhasePlans(phaseDir).planFiles;
             for (const file of files) {
                 const planPath = node_path_1.default.join(phaseDir, file);
                 const content = readIfExists(planPath);
@@ -714,17 +759,17 @@ function cmdTddReviewCheckpoint(projectDir, args, raw) {
         let green = false;
         let refactor = false;
         try {
-            const redCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^test(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true });
+            const redCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^test(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true, timeout: 10_000 });
             red = redCommit.trim().length > 0;
         }
         catch { /* git unavailable or no match */ }
         try {
-            const greenCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^feat(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true });
+            const greenCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^feat(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true, timeout: 10_000 });
             green = greenCommit.trim().length > 0;
         }
         catch { /* git unavailable or no match */ }
         try {
-            const refactorCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^refactor(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true });
+            const refactorCommit = (0, node_child_process_1.execFileSync)('git', ['log', '--oneline', `--grep=^refactor(${planId}):`, '--', '.'], { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1024 * 1024, windowsHide: true, timeout: 10_000 });
             refactor = refactorCommit.trim().length > 0;
         }
         catch { /* git unavailable or no match */ }
@@ -839,9 +884,47 @@ function buildPredicateDeps() {
                 stdout: r.stdout,
                 stderr: r.stderr,
                 signal: r.signal,
-                timedOut: r.signal === 'SIGTERM',
+                timedOut: r.timedOut,
             };
         },
+        findPhaseArtifact(phaseDir, artifactSuffix) {
+            if (!node_fs_1.default.existsSync(phaseDir))
+                return null;
+            if (artifactSuffix === '.' ||
+                artifactSuffix === '..' ||
+                artifactSuffix.includes('\0') ||
+                node_path_1.default.basename(artifactSuffix) !== artifactSuffix ||
+                node_path_1.default.win32.basename(artifactSuffix) !== artifactSuffix) {
+                return null;
+            }
+            const directPath = (0, security_cjs_1.validatePath)(artifactSuffix, phaseDir);
+            if (directPath.safe && node_fs_1.default.existsSync(directPath.resolved) && node_fs_1.default.statSync(directPath.resolved).isFile()) {
+                return directPath.resolved;
+            }
+            const planningPath = (0, security_cjs_1.validatePath)(node_path_1.default.join('.planning', artifactSuffix), phaseDir);
+            if (planningPath.safe && node_fs_1.default.existsSync(planningPath.resolved) && node_fs_1.default.statSync(planningPath.resolved).isFile()) {
+                return planningPath.resolved;
+            }
+            try {
+                const files = node_fs_1.default.readdirSync(phaseDir);
+                for (const f of files) {
+                    if (f.endsWith('-' + artifactSuffix) || f === artifactSuffix) {
+                        const candidate = (0, security_cjs_1.validatePath)(f, phaseDir);
+                        if (candidate.safe && node_fs_1.default.statSync(candidate.resolved).isFile())
+                            return candidate.resolved;
+                    }
+                }
+            }
+            catch { /* ignore */ }
+            return null;
+        },
+        readFrontmatter(filePath) {
+            const content = (0, shell_command_projection_cjs_1.platformReadSync)(filePath);
+            if (content === null)
+                throw new Error(`predicate artifact disappeared before it could be read: ${filePath}`);
+            const parsed = extractFrontmatter(content, filePath);
+            return parsed;
+        }
     };
 }
 /** Parse `--flag value` pairs from an args array into a map (last write wins). */
@@ -1155,12 +1238,26 @@ function isRealReadFailure(err) {
 function readPhaseScope(projectDir, phaseDir, phaseNumber) {
     const chunks = [];
     let readError = null;
-    try {
-        const entries = node_fs_1.default.readdirSync(phaseDir, { withFileTypes: true });
-        const plans = entries
-            .filter((e) => e.isFile() && /-PLAN\.md$/i.test(e.name))
-            .map((e) => e.name)
-            .sort();
+    // A MISSING phase directory is fine (no plans yet → fall through to the
+    // roadmap). Checked up front (rather than via a readdirSync catch) because
+    // #3183 (lint-plan-count-drift) now sources the plan-file list from the
+    // single owner (scanPhasePlans) instead of a local `-PLAN\.md$` readdirSync
+    // filter — picks up bare PLAN.md and nested plans/, and excludes
+    // superseded plans, none of which the prior root-only exact-suffix filter
+    // did.
+    if (node_fs_1.default.existsSync(phaseDir)) {
+        const scan = scanPhasePlans(phaseDir);
+        if (scan.scope === SCOPE.UNREADABLE) {
+            // Directory exists but scanPhasePlans's own readdirSync(phaseDir) call
+            // failed (EACCES/EIO race) — a real read failure the gate must not
+            // silently pass (#2365 review), mirroring the prior isRealReadFailure
+            // branch below for the readdirSync-throws case.
+            return {
+                text: '',
+                readError: 'could not read the phase directory: scanPhasePlans reported scope UNREADABLE',
+            };
+        }
+        const plans = [...scan.planFiles].sort();
         for (const p of plans) {
             try {
                 chunks.push(node_fs_1.default.readFileSync(node_path_1.default.join(phaseDir, p), 'utf8'));
@@ -1172,17 +1269,6 @@ function readPhaseScope(projectDir, phaseDir, phaseNumber) {
                     readError = `could not read ${p}: ${err instanceof Error ? err.message : String(err)}`;
                 }
             }
-        }
-    }
-    catch (err) {
-        // A MISSING phase directory is fine (no plans yet → fall through to the
-        // roadmap). A directory that exists but cannot be enumerated (EACCES/EIO)
-        // is a real read failure the gate must not silently pass (#2365 review).
-        if (isRealReadFailure(err)) {
-            return {
-                text: '',
-                readError: `could not read the phase directory: ${err instanceof Error ? err.message : String(err)}`,
-            };
         }
     }
     if (readError)

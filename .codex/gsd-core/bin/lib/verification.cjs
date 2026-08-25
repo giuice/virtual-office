@@ -40,10 +40,14 @@ const phaseId = require("./phase-id.cjs");
 const frontmatterMod = require("./frontmatter.cjs");
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- plan-scan.cjs is an export= CommonJS module
 const scanPhasePlans = require("./plan-scan.cjs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- planning-scope.cjs is an export= CommonJS module
+const planningScopeMod = require("./planning-scope.cjs");
 const shell_command_projection_cjs_1 = require("./shell-command-projection.cjs");
+const runtime_slash_cjs_1 = require("./runtime-slash.cjs");
 const { output, error } = io;
-const { extractPhaseToken } = phaseId;
+const { extractPhaseToken, scopeToPhase } = phaseId;
 const { extractFrontmatter } = frontmatterMod;
+const { SCOPE } = planningScopeMod;
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** The set of status values that the gsd-verifier agent emits. */
 const VERIFIER_STATUSES = ['passed', 'gaps_found', 'human_needed'];
@@ -61,6 +65,12 @@ const VERIFIER_STATUSES = ['passed', 'gaps_found', 'human_needed'];
  *
  * For 'gaps_found', next_command is built at call time in readVerificationStatus
  * by substituting the phase number — it is NOT stored as a function in the table.
+ *
+ * #2617: `next_command` here holds a BARE command name (`execute-phase`), never a
+ * prefixed one. Every return path projects it through `formatGsdSlash` with the
+ * caller's runtime, so Codex sees `$gsd-execute-phase` and slash-hyphen runtimes
+ * see `/gsd-execute-phase`. Storing a prefixed literal is what leaked the
+ * hard-coded (and deprecated) `/gsd:` colon form to every runtime.
  */
 const VERIFICATION_ROUTING_TABLE = {
     passed: {
@@ -77,7 +87,12 @@ const VERIFICATION_ROUTING_TABLE = {
     human_needed: {
         status: 'human_needed',
         next_action: "Human verification required. Complete the manual tests in the phase's *-UAT.md, then re-run the verify step until status is passed.",
-        next_command: '',
+        // #2617: was '' — next_action told the user to "re-run the verify step" but
+        // named no command, while init.cts's parallel projector emitted
+        // `verify-work <N>` for this same state. The two surfaces disagreed on
+        // whether a next command existed at all; init's answer was the useful one,
+        // and init now delegates here rather than re-deriving it.
+        next_command: 'verify-work',
     },
     stale: {
         status: 'stale',
@@ -88,17 +103,31 @@ const VERIFICATION_ROUTING_TABLE = {
     // the file has no parseable frontmatter status. Never emitted by the verifier.
     missing: {
         status: 'missing',
-        next_action: 'No verification report found — the verify step never completed. Re-run execute-phase.',
-        next_command: '/gsd:execute-phase',
+        next_action: 'No verification report found — the verify step never completed. Running execute-phase is safe here: it resumes at the verification gates and does not re-run plans that already have a SUMMARY.md (see #2868).',
+        next_command: 'execute-phase',
     },
     // INTERNAL SENTINEL: constructed when the file has a status value not in
     // VERIFIER_STATUSES. Never emitted by the verifier.
     unknown: {
         status: 'unknown',
         next_action: '', // filled in dynamically with the raw value
-        next_command: '/gsd:execute-phase',
+        next_command: 'execute-phase',
     },
 };
+/**
+ * Project a BARE command name (plus optional argument tail) into the surface the
+ * given runtime actually installs (#2617).
+ *
+ * `formatGsdSlash` owns the per-runtime shape (`$gsd-<cmd>` for shell-var
+ * runtimes like Codex, `/gsd-<cmd>` otherwise) and is idempotent, so passing an
+ * already-prefixed string is safe. An empty command stays empty — "no next
+ * command" must not become a bare prefix.
+ */
+function projectNextCommand(bare, runtime, tail = '') {
+    if (!bare)
+        return '';
+    return `${(0, runtime_slash_cjs_1.formatGsdSlash)(bare, runtime)}${tail}`;
+}
 /** Normalize separators to posix (git emits `/`; callers may pass `\` on Windows). */
 function toPosix(p) {
     return p.replace(/\\/g, '/');
@@ -177,33 +206,181 @@ function defaultPhaseCleanCommitTimesMs(phaseDir, files, execGitFn = shell_comma
  * Used for two early-return paths: no *-VERIFICATION.md file found, and
  * file present but no parseable frontmatter status.
  */
-function missingResult() {
+function missingResult(runtime, phaseArg) {
     const route = VERIFICATION_ROUTING_TABLE['missing'];
     return {
         status: route.status,
         next_action: route.next_action,
-        next_command: route.next_command,
+        next_command: projectNextCommand(route.next_command, runtime, phaseArg),
     };
+}
+/**
+ * #3518: the shared phase-pinned artifact-selection core BOTH single-pick
+ * resolvers (`resolveVerificationFile` for `*-VERIFICATION.md`,
+ * `resolveUatFile` for `*-UAT.md`) delegate to — one rule, not two grammars
+ * that agree today and drift tomorrow (epic #3473 F2's defect class).
+ *
+ * `bareName` is the artifact filename WITHOUT the leading dash (`'UAT.md'`);
+ * a "dashed" candidate is any entry ending `-${bareName}`.
+ *
+ * Selection order:
+ *   1. `options.phaseToken` given and `<phaseToken>-${bareName}` is among
+ *      the candidates — that exact file always wins: it is THIS phase's own
+ *      artifact, and no other candidate (whichever phase's token it carries)
+ *      can outrank it (#3492 / #3518).
+ *   2. Fallback — no exact phase-token match (or no token given): alphabetically
+ *      first of the dashed candidates that are THIS phase's own, per
+ *      `scopeToPhase(candidates, options.phaseDirName)` (#3511 reconciliation,
+ *      below). Load-bearing: a phase whose only artifact is non-canonically
+ *      named must keep resolving to it, not to null — this fix must not turn
+ *      "found an artifact" into "found nothing" for anyone. A
+ *      non-canonically-named artifact of THIS phase (e.g.
+ *      `03-CORRECTION-VERIFICATION.md` in `03-foo`) still passes
+ *      `isPhaseArtifact` (it names phase 03, same as the directory), so it
+ *      is still returned here.
+ *   3. `options.allowBare` only — a bare `${bareName}`, ranked BELOW both
+ *      of the above. Rationale: a dashed file names its phase, a bare one
+ *      does not, so a dashed file (canonical or not) is always the better
+ *      answer when both exist. Reached when neither (1) nor (2) found any
+ *      candidate — including when (2)'s scoping filtered every dashed
+ *      candidate out as belonging to some OTHER phase.
+ *
+ * #3511 RECONCILIATION with `isPhaseArtifact` (`src/phase-id.cts`): that
+ * predicate's own docblock used to flag this fallback as an open gap — its
+ * aggregate scans exclude a cross-phase stray, but this single-pick resolver
+ * did not, so it could return a stray as THE artifact while the aggregate
+ * scans correctly ignored it. Closed by scoping step (2) above through
+ * `scopeToPhase` (`src/phase-id.cts`, itself built on `isPhaseArtifact`):
+ * `options.phaseDirName` threads the phase directory's basename in, and the
+ * fallback now filters candidates through `scopeToPhase(candidates,
+ * phaseDirName)` before picking alphabetically-first. This does NOT reopen
+ * the #3357 guarantee — that guarantee is "a phase whose only report is
+ * non-canonically named must keep working", and a non-canonically-named
+ * artifact of THIS phase still passes `isPhaseArtifact` (it is membership by
+ * phase number, not by canonical shape), so it is still returned. Only a
+ * file belonging to a DIFFERENT phase is now excluded — and excluding it is
+ * correct: returning another phase's artifact as this phase's own is worse
+ * than reporting none (confidently wrong beats honestly empty).
+ * The fail-safe now lives entirely inside `isPhaseArtifact`, not in
+ * `scopeToPhase` (which is a plain filter with no unfiltered fallback):
+ * (a) when phase-number membership cannot be determined for `phaseDirName` at
+ * all (no reliable token — the zero-token directory case), every candidate is
+ * treated as belonging to the phase; (b) the `firstLetterPrefixed`
+ * bracket-ambiguity case, where a letter-prefixed-decimal dir is
+ * string-indistinguishable from a bracket-dir token, also includes
+ * everything rather than guess; (c) a token-less filename (bare
+ * `${bareName}`) is accepted by directory containment alone. Outside
+ * those cases, when scoping DOES remove every dashed candidate — a real
+ * cross-phase stray, or a phase whose own artifact is genuinely absent — the
+ * fallback below correctly falls through to `allowBare`/`null`: reporting no
+ * artifact, not another phase's. `options.phaseDirName` omitted entirely skips
+ * the filter outright (the ternary below), which is unscoped, pre-#3511
+ * behavior.
+ *
+ * Pure — takes an already-read directory listing and does no I/O of its own,
+ * so every call site keeps its existing `fsImpl` seam and no-throw contract
+ * untouched.
+ */
+function resolvePhaseArtifactFile(entries, bareName, options = {}) {
+    const candidates = entries.filter((f) => f.endsWith(`-${bareName}`)).sort();
+    if (candidates.length > 0) {
+        if (options.phaseToken) {
+            const thisPhaseFile = `${options.phaseToken}-${bareName}`;
+            if (candidates.includes(thisPhaseFile))
+                return thisPhaseFile;
+        }
+        // #3511: scope the fallback to files that belong to THIS phase, so a
+        // stray cross-phase file can no longer outrank a return of null.
+        // `phaseDirName` omitted, or membership undeterminable for it, →
+        // unscoped `candidates` (pre-#3511 behavior); otherwise strays are
+        // filtered out, and if that leaves nothing the code falls through to
+        // `allowBare`/`null` deliberately.
+        const scoped = options.phaseDirName
+            ? scopeToPhase(candidates, options.phaseDirName)
+            : candidates;
+        if (scoped.length > 0)
+            return scoped[0];
+    }
+    if (options.allowBare && entries.includes(bareName))
+        return bareName;
+    return null;
+}
+/**
+ * Resolve which `*-VERIFICATION.md` entry in a phase directory's listing IS
+ * the phase's verification report, when more than one such file exists.
+ *
+ * #3357: a phase dir can legitimately hold more than one `*-VERIFICATION.md`
+ * — the real per-phase report (`03-VERIFICATION.md`) alongside an ad-hoc plan
+ * worksheet (`03-CORRECTION-VERIFICATION.md`). Picking "alphabetically first"
+ * (`'C' < 'V'`) silently chose the worksheet, which usually has no
+ * frontmatter `status:`, so a phase with a PASSING report read as `missing`.
+ * This was two independent hand-rolled `.sort()[0]` picks
+ * (findStaleVerificationSummary and readVerificationStatus) — this is the
+ * single resolver both now call (#3473 F2).
+ *
+ * Selection order: see `resolvePhaseArtifactFile` (the shared core this
+ * delegates to since #3518, itself phase-scoped since #3511) —
+ * phase-token-pinned, then phase-scoped alphabetically-first dashed
+ * fallback, then (allowBare only) a bare `VERIFICATION.md`. #3518 extracted
+ * this into the shared core without changing behavior; #3511's
+ * `phaseDirName` scoping now lives inside that shared core rather than here.
+ */
+function resolveVerificationFile(entries, options = {}) {
+    return resolvePhaseArtifactFile(entries, 'VERIFICATION.md', options);
+}
+/**
+ * #3518: resolve which `*-UAT.md` entry in a phase directory's listing IS
+ * the phase's UAT artifact, when more than one such file exists — the UAT
+ * counterpart of `resolveVerificationFile`, sharing its exact selection rule
+ * via `resolvePhaseArtifactFile`.
+ *
+ * The bug this closes: both `uat_path` projectors in `src/init.cts` picked
+ * with a bare `.find((f) => f.endsWith('-UAT.md') || f === 'UAT.md')` over an
+ * unsorted `readdir` listing — no phase-membership check and no ordering — so
+ * a stray or cross-phase `04-UAT.md` sitting in phase 03's directory could
+ * become phase 03's `uat_path`, and WHICH file won was filesystem-dependent
+ * (creation order on APFS, hash order on ext4/XFS): two machines on the same
+ * commit could emit different `uat_path` values for the same phase. `uat_path`
+ * is consumed downstream by workflows that then read the named file, so a
+ * wrong path routes UAT state from another phase.
+ *
+ * Deterministic by construction: same answer on every machine. Phase-scoped
+ * (#3511): passing `options.phaseDirName` filters the alphabetically-first
+ * fallback (tier 2) to artifacts that belong to THIS phase — see
+ * `resolvePhaseArtifactFile` for the full selection order and scoping
+ * rationale.
+ */
+function resolveUatFile(entries, options = {}) {
+    return resolvePhaseArtifactFile(entries, 'UAT.md', options);
 }
 function findStaleVerificationSummary(phaseDir, fsImpl = node_fs_1.default, phaseCleanCommitTimesMs = defaultPhaseCleanCommitTimesMs) {
     // FS errors (TOCTOU: a SUMMARY listed by scanPhasePlans then removed before statSync;
-    // unreadable dir; broken symlink; file->dir swap) must degrade to "not stale" rather
-    // than throw uncaught into callers that are NOT under the planning lock
-    // (init.manager / init.progress / uat-predicate). Mirrors readVerificationStatus's
-    // no-throw contract; `fsImpl` threads the same injectable-fs seam for parity/testing.
-    // (Review B1 on #1548.)
+    // unreadable dir; broken symlink; file->dir swap) must degrade rather than throw
+    // uncaught into callers that are NOT under the planning lock (init.manager /
+    // init.progress / uat-predicate). Mirrors readVerificationStatus's no-throw
+    // contract; `fsImpl` threads the same injectable-fs seam for parity/testing.
+    // (Review B1 on #1548.) The degraded result is `{determined:false}`, NOT the
+    // same value as a completed "nothing is stale" check — see StaleCheckResult
+    // doc and #3057 B3. The caller decides how to route an indeterminate result;
+    // this function only reports what it actually knows.
     try {
         const phaseFiles = fsImpl.readdirSync(phaseDir);
-        const verificationFile = phaseFiles.filter((f) => f.endsWith('-VERIFICATION.md')).sort()[0];
+        // #3492: pin selection to THIS phase's own token so a stray cross-phase
+        // or sentinel-numbered canonically-shaped file cannot outrank this
+        // phase's own (possibly non-canonical) report. #3511: phaseDirName scopes
+        // the fallback path to this same phase (see resolveVerificationFile docs).
+        const phaseDirName = node_path_1.default.basename(phaseDir);
+        const phaseToken = extractPhaseToken(phaseDirName);
+        const verificationFile = resolveVerificationFile(phaseFiles, { phaseToken, phaseDirName });
         if (!verificationFile)
-            return null;
+            return { determined: true, stale: false };
         const summaryFiles = scanPhasePlans(phaseDir).summaryFiles
             .slice()
             .sort();
         // No summary can be newer than the verification → never stale. Return before
         // touching git so a phase with no summaries costs zero subprocesses. (#2348)
         if (summaryFiles.length === 0)
-            return null;
+            return { determined: true, stale: false };
         // Each file's effective "last changed" time = its commit time when committed
         // AND clean (content-tied and clone-stable), else its filesystem mtime (the
         // uncommitted working-tree edit). Both are real wall-clock change times, so
@@ -218,13 +395,13 @@ function findStaleVerificationSummary(phaseDir, fsImpl = node_fs_1.default, phas
             // The caller only needs whether the phase is stale, not which summary —
             // the first stale summary (in sorted order) is enough. Short-circuit.
             if (effectiveTimeMs(summaryFile) > verificationTimeMs) {
-                return { verificationFile, summaryFile };
+                return { determined: true, stale: true, verificationFile, summaryFile };
             }
         }
-        return null;
+        return { determined: true, stale: false };
     }
     catch {
-        return null;
+        return { determined: false };
     }
 }
 /**
@@ -232,36 +409,59 @@ function findStaleVerificationSummary(phaseDir, fsImpl = node_fs_1.default, phas
  * phaseDir and return the routing result.
  *
  * Behavior:
- * 1. Find the first file matching `*-VERIFICATION.md` (sorted, take first).
- *    If none → status 'missing'.
+ * 1. Find the phase's verification report via `resolveVerificationFile`
+ *    (canonical `<phase-token>-VERIFICATION.md` preferred; falls back to the
+ *    alphabetically-first `*-VERIFICATION.md` that belongs to THIS phase when
+ *    none is canonical — #3357/#3511). If none → status 'missing'.
  * 2. Extract `status` from FRONTMATTER ONLY via the shared extractFrontmatter
  *    parser (DEFECT.FRONTMATTER-SCALAR-BROAD-GREP fix — parser anchors at byte 0).
  *    If no frontmatter block or no `status` key → status 'missing'.
  * 3. Map to routing table. Unknown non-empty value → status 'unknown'.
  *
+ * The internal staleness check can itself fail (fs / scanPhasePlans / clock
+ * error); when it does, `status` is routed as if nothing were stale (the
+ * pre-existing no-throw fail-open contract — unchanged), but the returned
+ * result carries `staleCheckIndeterminate: true` so a caller can distinguish
+ * "checked; nothing is stale" from "could not check" (#3057 B3).
+ *
  * @param phaseDir - Absolute path to the phase directory.
  * @param opts     - Options. `opts.fs` allows test injection (defaults to node:fs).
+ *                   `opts.runtime` selects the command surface `next_command` is
+ *                   projected into (#2617).
  */
 function readVerificationStatus(phaseDir, opts = {}) {
     const fsImpl = opts.fs ?? node_fs_1.default;
     const phaseCleanCommitTimesMs = opts.phaseCleanCommitTimesMs ?? defaultPhaseCleanCommitTimesMs;
+    const runtime = opts.runtime ?? 'claude';
     // Phase token for the gaps_found command
     const baseName = node_path_1.default.basename(phaseDir);
     const phaseToken = extractPhaseToken(baseName);
-    const phaseNumber = phaseToken.length > 0 ? phaseToken : baseName;
+    const derivedPhaseNumber = phaseToken.length > 0 ? phaseToken : baseName;
+    // #2617: the phase number becomes a COMMAND ARGUMENT, so it is appended only
+    // when it is unambiguously one. extractPhaseToken also returns project-code
+    // forms (`PROJ-07`), which are indistinguishable by shape from an ordinary
+    // directory name — `gsd-651-parent` yields `gsd-651` — and emitting
+    // `execute-phase gsd-651` is worse than emitting no argument at all. Callers
+    // that already know the number (init) pass it explicitly and always get it.
+    const phaseArgSource = opts.phaseNumber ?? (/^\d+(\.\d+)*$/.test(derivedPhaseNumber) ? derivedPhaseNumber : '');
+    const phaseArg = phaseArgSource ? ` ${phaseArgSource}` : '';
     // 1. Find *-VERIFICATION.md
     let verificationFile = null;
     try {
         const entries = fsImpl.readdirSync(phaseDir);
-        const candidates = entries.filter((f) => f.endsWith('-VERIFICATION.md')).sort();
-        verificationFile = candidates.length > 0 ? candidates[0] : null;
+        // #3492: pin selection to THIS phase's own token (already derived above
+        // for the routed command argument) so a stray cross-phase or
+        // sentinel-numbered canonically-shaped file cannot outrank this phase's
+        // own (possibly non-canonical) report. #3511: baseName also scopes the
+        // fallback path to this same phase (see resolveVerificationFile docs).
+        verificationFile = resolveVerificationFile(entries, { phaseToken, phaseDirName: baseName });
     }
     catch {
         // Directory unreadable → treat as missing
         verificationFile = null;
     }
     if (!verificationFile) {
-        return missingResult();
+        return missingResult(runtime, phaseArg);
     }
     // 2. Read and parse frontmatter using the shared parser.
     // extractFrontmatter anchors at byte 0, so body `status:` lines are ignored.
@@ -269,7 +469,7 @@ function readVerificationStatus(phaseDir, opts = {}) {
     let rawStatus = null;
     try {
         const content = fsImpl.readFileSync(filePath, 'utf-8');
-        const fm = extractFrontmatter(content);
+        const fm = extractFrontmatter(content, filePath);
         const statusVal = fm['status'];
         // status is always a scalar string in a well-formed VERIFICATION.md frontmatter;
         // only accept string values — arrays and objects are not valid status values.
@@ -282,7 +482,7 @@ function readVerificationStatus(phaseDir, opts = {}) {
         rawStatus = null;
     }
     if (!rawStatus) {
-        return missingResult();
+        return missingResult(runtime, phaseArg);
     }
     // gaps_found takes priority over stale — gap closure is the correct next
     // step regardless of whether summaries are newer than the verification file.
@@ -291,18 +491,24 @@ function readVerificationStatus(phaseDir, opts = {}) {
         return {
             status: entry.status,
             next_action: entry.next_action,
-            next_command: `/gsd:plan-phase ${phaseNumber} --gaps`,
+            next_command: projectNextCommand('plan-phase', runtime, `${phaseArg} --gaps`),
         };
     }
-    const staleVerification = findStaleVerificationSummary(phaseDir, fsImpl, phaseCleanCommitTimesMs);
-    if (staleVerification) {
+    const staleCheck = findStaleVerificationSummary(phaseDir, fsImpl, phaseCleanCommitTimesMs);
+    if (staleCheck.determined && staleCheck.stale) {
         const entry = VERIFICATION_ROUTING_TABLE['stale'];
         return {
             status: entry.status,
             next_action: entry.next_action,
-            next_command: `/gsd:verify-work ${phaseNumber}`,
+            next_command: projectNextCommand('verify-work', runtime, phaseArg),
         };
     }
+    // staleCheck is either {determined:true, stale:false} (checked; nothing
+    // stale) or {determined:false} (could not check — fs/scan/clock failure).
+    // Both fall through to normal routing below (the pre-existing no-throw
+    // fail-open contract is unchanged), but the indeterminate case is flagged
+    // on the returned result so a caller can tell the two apart (#3057 B3).
+    const staleCheckIndeterminate = !staleCheck.determined;
     // 3. Route — exclude internal sentinels from raw-file lookup (they are
     // constructed internally above, never written by the verifier).
     if (rawStatus in VERIFICATION_ROUTING_TABLE &&
@@ -314,15 +520,69 @@ function readVerificationStatus(phaseDir, opts = {}) {
         return {
             status: entry.status,
             next_action: entry.next_action,
-            next_command: entry.next_command,
+            next_command: projectNextCommand(entry.next_command, runtime, phaseArg),
+            ...(staleCheckIndeterminate ? { staleCheckIndeterminate: true } : {}),
         };
     }
     // Unknown value
     const unknownRoute = VERIFICATION_ROUTING_TABLE['unknown'];
     return {
         status: unknownRoute.status,
-        next_action: `Unexpected verification status '${rawStatus}'. Re-run execute-phase verification.`,
-        next_command: unknownRoute.next_command,
+        next_action: `Unexpected verification status '${rawStatus}'. If this is an intentional non-standard marker (e.g. a hand-set failed/superseded state), no action is needed. Otherwise, run execute-phase to regenerate verification — it will not re-run plans that already have a SUMMARY.md.`,
+        next_command: projectNextCommand(unknownRoute.next_command, runtime, phaseArg),
+        ...(staleCheckIndeterminate ? { staleCheckIndeterminate: true } : {}),
+    };
+}
+/**
+ * isPhaseComplete — the single canonical owner of "is phase P complete?"
+ * (ADR-3180 §7.4, Decision 1). Sited beside readVerificationStatus, which it
+ * wraps.
+ *
+ * DISK-STRICT (#2957, maintainer decision 2026-08-08; ADR-3180 §7.4 amended
+ * af92fd4c9): readVerificationStatus is called UNCONDITIONALLY here — plan
+ * count is NOT a precondition. A phase with zero plans and a passing
+ * `*-VERIFICATION.md` is complete (#3168). A ROADMAP checkbox has no machine
+ * authority and is never consulted — this function never reads ROADMAP.md.
+ *
+ * `complete` is exactly `verification.status === 'passed'`. `verification`
+ * carries the FULL routing result (status/next_action/next_command), so a
+ * caller can distinguish a failing verdict (`gaps_found`/`human_needed`/
+ * `stale`/`unknown`) from an absent one (`missing`) — both are "not
+ * complete", but they are not the same non-answer.
+ *
+ * `scope` is UNREADABLE when `phaseDir` itself could not be listed — this is
+ * INDEPENDENT of readVerificationStatus's own no-throw fail-open contract for
+ * a missing `*-VERIFICATION.md` file (a well-formed answer,
+ * `verification.status === 'missing'`, scope COMPLETE): a caller must not
+ * read `value.complete: false` here as a confident "not complete" the way it
+ * can for a genuinely-checked missing file.
+ *
+ * Does NOT import scanPhasePlans / plan-scan.cjs — the owner consumes plan
+ * counts from its caller when a caller needs them for a different question
+ * (e.g. buildPhaseCompletionProjection's own `implementation_complete`); it
+ * never re-derives or requires them itself.
+ */
+function isPhaseComplete(phaseDir, deps = {}) {
+    const fsImpl = deps.fs ?? node_fs_1.default;
+    let readable = true;
+    try {
+        fsImpl.readdirSync(phaseDir);
+    }
+    catch {
+        readable = false;
+    }
+    const verification = readVerificationStatus(phaseDir, {
+        fs: deps.fs,
+        phaseCleanCommitTimesMs: deps.phaseCleanCommitTimesMs,
+        runtime: deps.runtime,
+        phaseNumber: deps.phaseNumber,
+    });
+    return {
+        value: {
+            complete: verification.status === 'passed',
+            verification,
+        },
+        scope: readable ? SCOPE.COMPLETE : SCOPE.UNREADABLE,
     };
 }
 /**
@@ -339,14 +599,58 @@ function cmdVerificationStatus(cwd, phaseDirArg, raw) {
         return;
     }
     const phaseDir = node_path_1.default.resolve(cwd, phaseDirArg);
-    const result = readVerificationStatus(phaseDir);
+    const result = readVerificationStatus(phaseDir, { runtime: (0, runtime_slash_cjs_1.resolveRuntime)(cwd) });
     output(result, raw);
+}
+/**
+ * CLI command handler: resolve which `*-VERIFICATION.md` in `phaseDirArg` is
+ * the phase's own report, via the shared `resolveVerificationFile` seam, and
+ * emit its absolute path.
+ *
+ * #3492 F3: the ONE seam shell callers (verify-work.md's writer, transition.md's
+ * awk reader) route through instead of hand-rolling `ls *-VERIFICATION.md |
+ * head -1` / an awk glob scan — both of which pick alphabetically-first and so
+ * diverge from every JS reader now pinned to the phase's own token.
+ *
+ * Emits `{ verification_file: "<absolute path>" | "" }` (empty when no
+ * candidate resolves, including an unreadable directory). `raw` emits the
+ * bare path string (possibly empty) so `VAR=$(gsd_run query
+ * verification.resolve-file "$PHASE_DIR" --raw)` is directly assignable.
+ *
+ * @param cwd         - Current working directory (used to resolve phaseDirArg).
+ * @param phaseDirArg - Phase directory path (absolute or relative to cwd).
+ * @param raw         - Whether to emit raw (non-JSON) output.
+ */
+function cmdVerificationResolveFile(cwd, phaseDirArg, raw) {
+    if (!phaseDirArg) {
+        error('phase directory required for verification.resolve-file');
+        return;
+    }
+    const phaseDir = node_path_1.default.resolve(cwd, phaseDirArg);
+    let verificationPath = '';
+    try {
+        const entries = node_fs_1.default.readdirSync(phaseDir);
+        const phaseDirName = node_path_1.default.basename(phaseDir);
+        const phaseToken = extractPhaseToken(phaseDirName);
+        const verificationFile = resolveVerificationFile(entries, { allowBare: true, phaseToken, phaseDirName });
+        if (verificationFile) {
+            verificationPath = node_path_1.default.join(phaseDir, verificationFile);
+        }
+    }
+    catch {
+        verificationPath = '';
+    }
+    output({ verification_file: verificationPath }, raw, verificationPath);
 }
 module.exports = {
     VERIFIER_STATUSES,
     VERIFICATION_ROUTING_TABLE,
     defaultPhaseCleanCommitTimesMs,
+    resolveVerificationFile,
+    resolveUatFile,
     findStaleVerificationSummary,
     readVerificationStatus,
+    isPhaseComplete,
     cmdVerificationStatus,
+    cmdVerificationResolveFile,
 };

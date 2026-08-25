@@ -25,66 +25,62 @@ messaging, and company management.
 - Keep changes scoped. Do not add unrelated refactors, weaken tests, suppress
   errors, bypass type safety, or auto-commit.
 - If an approach fails, stop, record why, and re-plan.
-- Never claim success without proportionate verification.
-- Completion is user-gated. End implementation handoffs with
-  Status: Pending user confirmation until the user confirms the real workflow.
 
-## Human communication and operational handoff — critical
+## Operational impact: say it early
 
-Agents must communicate application, database, and deployment state as separate
-facts. A code change is not the same as an applied database change or a deployed
-application.
+A code change, an applied database change, and a deployed application are three
+different facts. Never let the user discover a missing one at the end.
 
-### Before and during work
-
-Inventory whether the task changes or depends on:
+Before starting, inventory whether the task changes or depends on:
 
 - application code;
 - database schema, data, functions, indexes, RLS, grants, or migrations;
 - environment variables, secrets, scheduled jobs, or runtime modes;
 - deployment order, restart, maintenance, backfill, or destructive operations.
 
-In the first progress update, state exactly one of:
+State in the first progress update whether the task needs a change applied to an
+online database. If it does, say in plain language which target (local, test,
+staging, production), why it is required, what stays broken until it is applied,
+whether the user already authorized that target, and whether the application can
+roll out before the database or must wait. If the impact is still unknown, say it
+is being checked and follow up as soon as it is known.
 
-- Mudança online no banco: não.
-- Mudança online no banco: sim — <target and required change>.
-
-When the answer is yes, also explain in plain language:
-
-- why the database change is required;
-- what stops working until it is applied;
-- which target is affected: local, test, staging, or production;
-- whether the user has already authorized that target;
-- whether the application must wait for the database or can roll out compatibly.
-
-If the impact is initially uncertain, say it is being checked and update the user
-as soon as it becomes known. Never hide this information until the final report.
-
-Always distinguish these states:
+Always distinguish these four states, and never blur them:
 
 1. written locally;
 2. applied to a local database;
 3. applied to the named online database;
 4. application deployed against that database.
 
-A migration file in the repository is not an applied migration. Creating or
-editing any migration must be reported even when the agent cannot apply it.
-Never say the application is ready or safe to open when its required online
-database contract is missing.
+A migration file in the repository is not an applied migration. Report every
+created or edited migration even when you cannot apply it. Never say the
+application is ready or safe to open while its required online database contract
+is missing.
 
-Before changing an online database, name the target and obtain explicit
-authorization unless the current request already grants it. Explain backup,
-rollback, maintenance, and destructive-test implications when relevant. After
-the change, read back the migration/catalog state from the same target and run a
-small runtime smoke check.
+Project owner rule: never finish a task with a new migration only in the
+repository or only in a local database. Name the production target and obtain
+authorization before local application. After local validation, apply the exact
+migration to that production target in the same task. Then record its version
+and read back its catalog contract. If production access or authorization is
+missing, stop before local application and report the blocker immediately. Do
+not use `--include-all` or broad migration-history repair to bypass divergence.
 
-Report blockers immediately. If credentials, authorization, or a human-only
-step is missing, say what is blocked, why it matters, and the exact next action.
+Before changing an online database, name the target and get explicit
+authorization unless the current request already grants it. Cover backup,
+rollback, maintenance, and destructive-test implications when they apply. After
+the change, read the migration and catalog state back from that same target and
+run a small runtime smoke check.
 
-### Long-running goal tracker
+Report blockers the moment they appear. If credentials, authorization, or a
+human-only step is missing, say what is blocked, why it matters, and the exact
+next action.
 
-For remediation work or any task spanning multiple phases, maintain a tracker in
-the task's documentation area. Keep it concise and update it during development:
+## Long-running goal tracker
+
+For remediation work or any task spanning multiple phases, keep a tracker in the
+topic folder that owns the work (for example `docs/presence-remediation/` or the
+task's `.planning/` phase folder). Never create a new top-level folder for it.
+Update it during development, not at the end:
 
 - completed change and evidence;
 - database and deployment state;
@@ -93,24 +89,66 @@ the task's documentation area. Keep it concise and update it during development:
 - learning that should affect later work;
 - current blocker and next action.
 
-The tracker holds technical detail and internal machinery. The final report is a
-human summary, not a dump of the tracker.
+The tracker holds the technical detail and the internal machinery. It is an
+input to the final report, never a substitute for it and never pasted into it.
 
-### Required final report
+## Reporting to the user
 
-Use this order for every implementation handoff:
+The person reading the report did not watch the work, does not know the internal
+vocabulary, and needs three things in under a minute: does it work, what do I
+have to do, what can still break. Write in English.
 
-1. Outcome — what the person can or cannot do now.
-2. What changed — separate Application, Database, and Deployment.
-3. What you need to do now — numbered actions, or exactly Nothing.
-4. Verification — concise checks and results.
-5. Remaining risks — only unresolved user-visible, database, or rollout risks.
-6. Status: Pending user confirmation.
 
-Write for a human who did not watch the task. Do not lead with phase numbers,
-runner names, manifests, candidate models, judges, raw logs, test file lists, or
-internal orchestration. If one is relevant, put it in an optional technical note
-and define it in one sentence. Summarize noisy evidence instead of pasting it.
+
+### Reporting Format (applies to every report you produce)
+
+Write all reports, summaries, status updates, and explanations for humans in **ASD-STE100 Simplified Technical English**:
+
+- One idea per sentence. Maximum 20 words for a procedural sentence, 25 for a descriptive one.
+- One topic per paragraph. Maximum 6 sentences.
+- Use the active voice. Write "The service returns the data", not "The data is returned by the service".
+- Use the imperative for instructions. Write "Open the file", not "You should open the file".
+- Use only one meaning per word, and the same word for the same thing every time. Do not use synonyms for variety.
+- Use articles (`the`, `a`) and the full form of verbs. Do not drop words to make text short.
+- Do not use noun clusters of more than 3 words.
+- Avoid idioms, metaphors, jargon, and hedging words.
+- Use vertical lists and tables for steps, conditions, and results.
+- Give facts, not impressions. State clearly what is done, what is not done, and what failed.
+
+End every implementation handoff applying ASD-STE100 with exactly these blocks, in this order:
+
+**What changed** — three labelled one-line entries. Write `None` where nothing
+changed.
+- Application: what behavior is different.
+- Database: what was written locally versus applied to which target.
+- Deployment: what is running where, or that nothing was deployed.
+
+**What you need to do now** — a numbered list of actions only the user can take,
+each with the exact command, URL, or click path. If there is nothing, write
+exactly `Nothing.`
+
+**Verification** — at most five lines: what was checked and what the result was.
+Name the check, not the runner. State plainly what was not checked.
+
+**Remaining risks** — only unresolved risks that are user-visible, touch the
+database, or affect rollout. Write `None known.` when there are none.
+
+**Status: Pending user confirmation** — completion is user-gated. Keep this line
+until the user confirms the real workflow.
+
+Hard rules for that report:
+
+- Fit it on one screen. Length signals confusion, not effort. Hours of work do
+  not earn extra paragraphs.
+- Never open with internal machinery: phase or work-package numbers, agent,
+  runner, or model names, job ids, manifests, judges, raw logs, or test file
+  lists. If one genuinely matters, add a single `Technical note:` line at the
+  end and define the term in that same sentence.
+- Summarize evidence. Do not paste test output, SQL, or logs; reference the file
+  path instead.
+- Never report partial work as done. Say which part of the scope was not
+  finished and why, in the Outcome block.
+- Never claim success without verification proportionate to the risk.
 
 ## Skills
 
@@ -217,25 +255,19 @@ Common commands:
 - npm run build
 - npm test
 
-## Codex delegation (long-running worker jobs)
+## Cross-model delegation
 
-Launching background Codex jobs via the codex-companion script has burned two
-work packages already. Non-negotiable mechanics:
+Delegation mechanics depend on which model family is orchestrating, because each
+family drives the other one through a different runtime. Read the file that
+matches the model you are running as, and follow it completely:
 
-- Long-lived jobs are `task --background --write [--fresh|--resume]
-  --model <model> --effort <effort> "<prompt>"`. There is NO `--detached` flag
-  (it silently becomes prompt text) and no `task --help` (it becomes a job with
-  prompt "--help"). Without `--write` the job is read-only and cannot edit files.
-- Launch the companion directly from the orchestrator's own shell, never from
-  inside a subagent: the subagent's process tree dies when it finishes and kills
-  the job with it.
-- Immediately after launch, verify `status <job-id> --json` shows
-  `"write": true`, its own `pid`, and `"status": "running"`; then wait for a
-  terminal state via a background watcher instead of polling in the foreground.
-- A job record can go stale ("running" with a dead pid). Verify the pid before
-  trusting status. Cancel zombie jobs from PowerShell, not Git Bash (MSYS
-  mangles `/PID` into a path).
-- Delegation floor: Sol at effort high minimum; no silent downgrade.
+- Anthropic model (Claude family) orchestrating: read `delegation-anthropic.md`.
+- OpenAI model (GPT/Codex family) orchestrating: read `delegation-openai.md`.
+
+Both files are at the repository root. Do not improvise a delegation path that
+is not described there; both were written after real incidents. Correctness and
+regression prevention take priority over cost: never silently downgrade the
+model or effort level a delegation file mandates.
 
 ## Git and files
 

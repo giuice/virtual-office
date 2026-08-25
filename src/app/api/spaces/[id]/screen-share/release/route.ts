@@ -6,10 +6,13 @@ import {
   screenShareReleaseRequestSchema,
   screenShareReleaseResponseSchema,
   screenShareReleaseRpcResultSchema,
+  screenSharePresenterInvalidatedPayloadSchema,
   screenShareSpaceParamsSchema,
 } from '@/lib/webrtc/screen-share-contract';
 import { callObservedScreenShareRpc } from '@/lib/webrtc/observed-screen-share-rpc';
+import { broadcastScreenShareSignal } from '@/lib/webrtc/screen-share-signal-broadcast';
 import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
+import { runAfterResponse } from '@/lib/server/after-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +91,28 @@ export async function POST(request: Request, context: ReleaseRouteContext): Prom
       const { code, status, error, retryable } = screenShareErrorContract(rpc.result.code);
       return NextResponse.json({ success: false, code, error, retryable }, { status });
     }
+
+    const invalidationPayload = screenSharePresenterInvalidatedPayloadSchema.parse({
+      type: 'presenter-invalidated',
+      sourceUserId: auth.identity.appUserId,
+      sourcePresenceSessionId: parsedBody.data.presenceSessionId,
+      sourceConnectionId: randomUUID(),
+      companyId: auth.identity.companyId,
+      spaceId: parsedParams.data.spaceId,
+      shareId: parsedBody.data.shareId,
+    });
+    runAfterResponse(async () => {
+      try {
+        await broadcastScreenShareSignal(invalidationPayload);
+      } catch {
+        console.warn('screen_share_route', {
+          correlationId,
+          operation: 'release-invalidation',
+          outcome: 'SIGNALING_SEND_FAILED',
+          retryable: true,
+        });
+      }
+    });
 
     console.info('screen_share_route', {
       correlationId,

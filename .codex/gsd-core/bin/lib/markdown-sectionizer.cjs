@@ -14,6 +14,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.stripFencedCode = stripFencedCode;
 exports.stripInlineCode = stripInlineCode;
 exports.scanInlineCodeSpans = scanInlineCodeSpans;
+exports.scanFencedBlocks = scanFencedBlocks;
 exports.extractFencedBlock = extractFencedBlock;
 exports.tokenizeHeadings = tokenizeHeadings;
 exports.collectSections = collectSections;
@@ -25,6 +26,7 @@ exports.stripTaggedBlocks = stripTaggedBlocks;
 exports.replaceSection = replaceSection;
 exports.withSection = withSection;
 exports.deleteSection = deleteSection;
+const pattern_cjs_1 = require("./pattern.cjs");
 // ─── stripFencedCode ──────────────────────────────────────────────────────────
 /**
  * CommonMark-correct fenced-code-block stripper.
@@ -206,6 +208,11 @@ function stripInlineCodeLine(line) {
  * Tracked duplication (same status as `tokenizeHeadings`'s copy, see its
  * comment above): this is a second independent copy of the fence state
  * machine, pending a T-tier consolidation.
+ *
+ * Exported so `context-predicates.cts` can consume this seam directly for its
+ * line-preserving fenced-line skip detection, instead of carrying a third
+ * independent copy of the fence state machine (see that module's doc
+ * comment).
  */
 function scanFencedBlocks(lines) {
     const delimRe = /^( {0,3})(`{3,}|~{3,})(.*)$/;
@@ -786,7 +793,7 @@ function extractTaggedBlocks(content, tagName, allowAttributes = false) {
  * open>` marks the ACTIVE milestone and must be preserved, not stripped (#557).
  */
 function taggedBlockPattern(tagName, flags, allowAttributes) {
-    const esc = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const esc = (0, pattern_cjs_1.escapeRegex)(tagName);
     const open = allowAttributes ? `<${esc}(?:\\s[^>]{0,1000})?>` : `<${esc}>`;
     const boundary = allowAttributes ? `<${esc}[\\s>]` : `<${esc}>`;
     return new RegExp(`${open}((?:(?!${boundary})[\\s\\S])*?)</${esc}>`, flags);

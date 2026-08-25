@@ -177,6 +177,7 @@ export const screenSharePublicErrorCodeSchema = z.enum([
   'LEASE_NOT_OWNER',
   'LEASE_STALE',
   'SERVICE_UNAVAILABLE',
+  'RATE_LIMITED',
   'MEMBERSHIP_SCOPE_INVALID',
   'PRESENTER_PROFILE_INVALID',
   'DATABASE_CONTRACT_INCOMPATIBLE',
@@ -216,6 +217,11 @@ export const screenShareActiveResponseSchema = z.object({
   active: screenSharePublicShareSchema.nullable(),
 }).strict();
 
+export const screenShareSignalResponseSchema = z.object({
+  success: z.literal(true),
+  code: z.literal('SIGNAL_SENT'),
+}).strict();
+
 const signalingScopeSchema = {
   sourceUserId: uuidSchema,
   sourcePresenceSessionId: uuidSchema,
@@ -225,8 +231,21 @@ const signalingScopeSchema = {
   shareId: uuidSchema.nullable(),
 } as const;
 
+const signalRequestScopeSchema = {
+  presenceSessionId: uuidSchema,
+  connectionId: uuidSchema,
+  shareId: uuidSchema.nullable(),
+} as const;
+
 const targetedSignalingScopeSchema = {
   ...signalingScopeSchema,
+  targetUserId: uuidSchema,
+  targetPresenceSessionId: uuidSchema,
+  targetConnectionId: uuidSchema,
+} as const;
+
+const targetedSignalRequestScopeSchema = {
+  ...signalRequestScopeSchema,
   targetUserId: uuidSchema,
   targetPresenceSessionId: uuidSchema,
   targetConnectionId: uuidSchema,
@@ -275,6 +294,29 @@ export const screenSharePresenterInvalidatedPayloadSchema = z.object({
   shareId: uuidSchema,
 }).strict();
 
+export const screenShareHandshakeRequestSchema = z.object({
+  type: z.literal('handshake'),
+  ...signalRequestScopeSchema,
+}).strict();
+
+export const screenShareDescriptionRequestSchema = z.object({
+  type: z.literal('description'),
+  ...targetedSignalRequestScopeSchema,
+  description: sessionDescriptionSchema,
+}).strict();
+
+export const screenShareIceRequestSchema = z.object({
+  type: z.literal('ice'),
+  ...targetedSignalRequestScopeSchema,
+  candidate: iceCandidateSchema,
+}).strict();
+
+export const screenShareSignalRequestSchema = z.discriminatedUnion('type', [
+  screenShareHandshakeRequestSchema,
+  screenShareDescriptionRequestSchema,
+  screenShareIceRequestSchema,
+]);
+
 export const screenShareSignalingPayloadSchema = z.union([
   screenShareHandshakePayloadSchema,
   screenShareDescriptionPayloadSchema,
@@ -296,6 +338,7 @@ export type ScreenShareClaimRequest = z.infer<typeof screenShareClaimRequestSche
 export type ScreenShareRenewRequest = z.infer<typeof screenShareRenewRequestSchema>;
 export type ScreenShareReleaseRequest = z.infer<typeof screenShareReleaseRequestSchema>;
 export type ScreenShareActiveQuery = z.infer<typeof screenShareActiveQuerySchema>;
+export type ScreenShareSignalRequest = z.infer<typeof screenShareSignalRequestSchema>;
 export type ScreenShareClaimRpcResult = z.infer<typeof screenShareClaimRpcResultSchema>;
 export type ScreenShareRenewRpcResult = z.infer<typeof screenShareRenewRpcResultSchema>;
 export type ScreenShareReleaseRpcResult = z.infer<typeof screenShareReleaseRpcResultSchema>;
@@ -307,7 +350,12 @@ export type ScreenSharePublicResult =
   | z.infer<typeof screenShareRenewResponseSchema>
   | z.infer<typeof screenShareReleaseResponseSchema>
   | z.infer<typeof screenShareActiveResponseSchema>
+  | z.infer<typeof screenShareSignalResponseSchema>
   | ScreenSharePublicError;
+
+export function screenShareMediaTopic(companyId: string, spaceId: string): string {
+  return `company:${companyId}:space:${spaceId}:media:v2`;
+}
 
 export function toPublicScreenShare(share: ScreenSharePublicShare): ScreenSharePublicShare {
   return {
@@ -405,6 +453,12 @@ const SCREEN_SHARE_ERROR_CONTRACTS: Readonly<Record<string, ScreenShareErrorCont
     code: 'SERVICE_UNAVAILABLE',
     status: 503,
     error: 'Screen sharing is temporarily unavailable.',
+    retryable: true,
+  },
+  RATE_LIMITED: {
+    code: 'RATE_LIMITED',
+    status: 429,
+    error: 'Screen-share signaling is temporarily rate limited.',
     retryable: true,
   },
   MEMBERSHIP_SCOPE_INVALID: {

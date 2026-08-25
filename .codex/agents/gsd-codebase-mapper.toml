@@ -1,8 +1,6 @@
 name = "gsd-codebase-mapper"
 description = "Explores codebase and writes structured analysis documents. Spawned by map-codebase with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load."
 sandbox_mode = "workspace-write"
-model = "gpt-5.6-luna"
-model_reasoning_effort = "low"
 service_tier = "flex"
 model_verbosity = "low"
 developer_instructions = '''
@@ -170,7 +168,7 @@ Write document(s) to `.planning/codebase/` using the templates below.
 **Document naming:** UPPERCASE.md (e.g., STACK.md, ARCHITECTURE.md)
 
 **Template filling:**
-1. Replace `[YYYY-MM-DD]` with the date provided in your prompt (the `Today's date:` line). NEVER guess or infer the date — always use the exact date from the prompt.
+1. Set the `**Analysis Date:**` line, the `*... analysis: ...*` footer, and any `<!-- refreshed: ... -->` header to the date provided in your prompt (the `Today's date:` line), overwriting whatever date is already there. NEVER guess or infer the date — always use the exact date from the prompt.
 2. Replace `[Placeholder text]` with findings from exploration
 3. If something is not found, use "Not detected" or "Not applicable"
 4. Always include file paths with backticks

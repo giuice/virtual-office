@@ -295,26 +295,25 @@ Ao terminar:
 
 ---
 
-### Passo 9 — Wave 12 / Plano 03-13
+### Passo 9 — Wave 13 / Plano 03-13
 
 Comando:
 
 ```text
-/gsd-execute-phase 3 --wave 12
+/gsd-execute-phase 3 --wave 13
 ```
 
 Objetivo:
 
-- UAT real de browser/TURN;
-- validar fluxo completo de compartilhamento;
-- produzir decisão explícita de rollout.
+- executar apenas os checks locais focados já disponíveis;
+- registrar que TURN, dispositivos extras, redes extras e matriz de browsers não são requisitos;
+- registrar a decisão local-only/no-spend sem qualquer operação online.
 
-Checkpoint humano final:
+Não existe checkpoint humano de infraestrutura. Nenhuma compra, credencial, dispositivo, rede, perfil ou instalação de browser pode ser exigida para concluir o plano.
 
-- o responsável humano deve confirmar o fluxo real;
-- o agente não pode aprovar o UAT em nome do humano.
+## 4. Smoke manual opcional do produto final
 
-## 4. Checklist humano do produto final
+Esta lista é opcional e pode ser usada somente com o equipamento, navegador e contas já disponíveis. Ela não bloqueia a fase.
 
 A Phase 3 só está funcionalmente concluída quando for possível confirmar:
 
@@ -330,7 +329,7 @@ A Phase 3 só está funcionalmente concluída quando for possível confirmar:
 - [ ] Troca de espaço remove mídia anterior.
 - [ ] Presenter departure não quebra o áudio da sala.
 - [ ] Permissão negada ou cancelamento não deixa estado preso.
-- [ ] Dois contextos reais passam no UAT.
+- [ ] Se houver duas sessões já disponíveis sem custo, o fluxo básico pode ser observado; caso contrário, registrar “não testado” sem bloquear.
 
 ## 5. Banco e rollout
 
@@ -388,10 +387,10 @@ Regras:
 
 ## 8. Próxima ação exata
 
-Abrir uma nova sessão na branch `feature/sharing-screen` e executar somente:
+Executar somente:
 
 ```text
-/gsd-execute-phase 3 --wave 4
+/gsd-execute-phase 3 --wave 13
 ```
 
-Ao concluir a Wave 4, revisar o resultado antes de autorizar a Wave 5.
+O plano deve encerrar com evidência local e estado local-only. Não autorizar nem iniciar rollout online.

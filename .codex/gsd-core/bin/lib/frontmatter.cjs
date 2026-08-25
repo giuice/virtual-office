@@ -15,6 +15,11 @@ const node_path_1 = __importDefault(require("node:path"));
 const ioMod = require("./io.cjs");
 const { output, error } = ioMod;
 const shell_command_projection_cjs_1 = require("./shell-command-projection.cjs");
+const validate_cjs_1 = require("./validate.cjs");
+const text_lines_cjs_1 = require("./text-lines.cjs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const unusableInputMod = require("./unusable-input.cjs");
+const { UNUSABLE_REASON, warnUnusableInput } = unusableInputMod;
 // ─── Parsing engine ───────────────────────────────────────────────────────────
 /**
  * Split a YAML inline array body on commas, respecting quoted strings.
@@ -52,24 +57,138 @@ function splitInlineArray(body) {
         items.push(trimmed);
     return items;
 }
-function extractFrontmatter(content) {
+/**
+ * How many parsed keys an unterminated region must yield before it is reported as a
+ * truncated frontmatter rather than left alone as ordinary Markdown. See the rationale on
+ * `extractFrontmatter`; exported for tests so the boundary is asserted against the constant
+ * rather than a magic number duplicated in the suite.
+ */
+const UNTERMINATED_KEY_THRESHOLD = 2;
+/**
+ * Does every non-empty line of an unterminated region look like frontmatter?
+ *
+ * The key count alone cannot separate a truncated write from ordinary Markdown, because a
+ * thematic break above a short labelled preamble parses as keys too:
+ *
+ *     ---
+ *     Author: Jane Doe
+ *     Reviewed-by: John Smith
+ *
+ *     Ordinary prose, and no second `---` anywhere.
+ *
+ * Raising the threshold only moves that boundary — two labelled lines are as common in prose as
+ * one. What actually distinguishes the two is what follows: a write interrupted part-way through
+ * a frontmatter block ends mid-block, so *every* line in the region is still frontmatter-shaped,
+ * whereas a document merely opening with a rule goes on to prose. So the region must be
+ * uniformly frontmatter-shaped AND carry enough keys to be worth reporting; either test alone
+ * has a false-positive class the other closes.
+ */
+function isFrontmatterShaped(region) {
+    const lines = (0, text_lines_cjs_1.splitLines)(region).filter((line) => line.trim() !== '');
+    if (lines.length === 0)
+        return false;
+    return lines.every((line) => (/^\s*[a-zA-Z0-9_-]+:/.test(line) // key: value
+        || /^\s*-\s+/.test(line) // - list item
+        || /^\s+\S/.test(line) // indented continuation of a nested value
+    ));
+}
+/**
+ * #3257: a Symbol-keyed channel that carries full-line (column-0 `#`) YAML
+ * comments through a parse → reconstruct round-trip. Comments are otherwise
+ * unrepresentable on the Frontmatter object (Record<string, ...>) and were
+ * silently dropped by reconstructFrontmatter. The Symbol is invisible to
+ * Object.entries / Object.keys / JSON.stringify / for-in, so every existing
+ * reader is unchanged; only reconstructFrontmatter reads it. Leading comments
+ * are attached to the top-level key that follows them; comments after the last
+ * key go to `trailing`. Only set when a comment is actually seen, so comment-less
+ * frontmatter parses byte-identically to before.
+ */
+const FULL_LINE_COMMENTS = Symbol('fullLineComments');
+/**
+ * Unescape the interior of a YAML double-quoted scalar — the exact inverse of
+ * `escapeDoubleQuoted` (#3497). The writer has escaped `\`/`"`/`\n`/`\t`/`\r`/
+ * `\xHH` since #1779, but the reader only stripped the delimiters, so
+ * parse(serialize(x)) ≠ x for any quoted scalar carrying a `"` or `\`: each
+ * read-modify-write round-trip doubled the backslashes (b → 2b+1), growing a
+ * repeatedly-synced field — and its document — without bound until tooling
+ * OOMed. Recognized escapes decode per YAML double-quoted semantics; an
+ * unrecognized `\c` is kept literally (backslash + char), matching the
+ * strip-only behavior hand-authored files had before this fix.
+ */
+function unescapeDoubleQuoted(s) {
+    let out = '';
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch !== '\\' || i === s.length - 1) {
+            out += ch;
+            continue;
+        }
+        const next = s[++i];
+        if (next === '\\' || next === '"') {
+            out += next;
+        }
+        else if (next === 'n') {
+            out += '\n';
+        }
+        else if (next === 't') {
+            out += '\t';
+        }
+        else if (next === 'r') {
+            out += '\r';
+        }
+        else if (next === 'x') {
+            const hex = s.slice(i + 1, i + 3);
+            if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                out += String.fromCharCode(parseInt(hex, 16));
+                i += 2;
+            }
+            else {
+                out += '\\x'; // not \xHH — keep literally
+            }
+        }
+        else {
+            out += '\\' + next; // unrecognized escape — keep literally
+        }
+    }
+    return out;
+}
+/**
+ * Strip the quote delimiters off a parsed YAML scalar, un-escaping the interior
+ * when the scalar is double-quoted (#3497 — the parse-side complement of
+ * `escapeDoubleQuoted`). Single-quoted scalars keep the historical strip-only
+ * behavior (the writer never emits them; `''` → `'` folding is out of scope).
+ * A scalar wrapped in double quotes un-escapes; anything else keeps the exact
+ * prior delimiter-strip behavior, including a stray unpaired boundary quote.
+ */
+function parseQuotedScalar(value) {
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+        return unescapeDoubleQuoted(value.slice(1, -1));
+    }
+    return value.replace(/^["']|["']$/g, '');
+}
+/**
+ * Parse one already-delimited YAML region into a Frontmatter object.
+ *
+ * Extracted from `extractFrontmatter` (#1882) so the truncation probe below and the real
+ * parse run the *same* parser. A second, simpler "does this look like YAML?" matcher would
+ * be a parallel surface that drifts — exactly the generative-fix-divergence class.
+ */
+function parseYamlRegion(yaml) {
     const frontmatter = {};
-    // Match frontmatter only at byte 0 — a `---` block later in the document
-    // body (YAML examples, horizontal rules) must never be treated as frontmatter.
-    const headerEnd = content.startsWith('---\r\n') ? 5 : content.startsWith('---\n') ? 4 : -1;
-    if (headerEnd === -1)
-        return frontmatter;
-    const closingLineStart = content.indexOf('\n---', headerEnd);
-    if (closingLineStart === -1)
-        return frontmatter;
-    const yamlEnd = content[closingLineStart - 1] === '\r' ? closingLineStart - 1 : closingLineStart;
-    const yaml = content.slice(headerEnd, yamlEnd);
-    const lines = yaml.split(/\r?\n/);
+    const lines = (0, text_lines_cjs_1.splitLines)(yaml);
+    // #3257: pending column-0 full-line comments, attached to the next top-level key.
+    let pendingComments = [];
+    let commentChannel;
     const stack = [{ obj: frontmatter, key: null, indent: -1 }];
     for (const line of lines) {
         // Skip empty lines
         if (line.trim() === '')
             continue;
+        // #3257: capture column-0 full-line comments; attach them to the next top-level key.
+        if (/^#/.test(line)) {
+            pendingComments.push(line);
+            continue;
+        }
         // Calculate indentation (number of leading spaces)
         const indentMatch = line.match(/^(\s*)/);
         const indent = indentMatch ? indentMatch[1].length : 0;
@@ -82,6 +201,13 @@ function extractFrontmatter(content) {
         const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*(.*)/);
         if (keyMatch) {
             const key = keyMatch[2];
+            // #3257: attach any pending comments to this (top-level) key.
+            if (pendingComments.length) {
+                if (!commentChannel)
+                    commentChannel = { leading: {}, trailing: [] };
+                commentChannel.leading[key] = pendingComments;
+                pendingComments = [];
+            }
             const value = keyMatch[3].trim();
             if (value === '' || value === '[') {
                 // Key with no value or opening bracket — could be nested object or array
@@ -98,13 +224,13 @@ function extractFrontmatter(content) {
             }
             else {
                 // Simple key: value
-                current.obj[key] = value.replace(/^["']|["']$/g, '');
+                current.obj[key] = parseQuotedScalar(value);
                 current.key = null;
             }
         }
         else if (line.trim().startsWith('- ')) {
             // Array item
-            const itemValue = line.trim().slice(2).replace(/^["']|["']$/g, '');
+            const itemValue = parseQuotedScalar(line.trim().slice(2));
             // If current context is an empty object, convert to array
             if (typeof current.obj === 'object' && !Array.isArray(current.obj) && Object.keys(current.obj).length === 0) {
                 // Find the key in parent that points to this object and convert it
@@ -124,7 +250,82 @@ function extractFrontmatter(content) {
             }
         }
     }
+    // #3257: trailing comments (after the last key) + attach the channel if any comment was seen.
+    if (pendingComments.length) {
+        if (!commentChannel)
+            commentChannel = { leading: {}, trailing: [] };
+        commentChannel.trailing = pendingComments;
+    }
+    if (commentChannel) {
+        frontmatter[FULL_LINE_COMMENTS] = commentChannel;
+    }
     return frontmatter;
+}
+/**
+ * Extract frontmatter from a document.
+ *
+ * Returns `{}` when the document has no frontmatter — and, unchanged since #1882, also
+ * returns `{}` when the frontmatter fence was opened and never closed. That return value is
+ * deliberately preserved: ADR-1411's amendment requires the fallback to stay, because
+ * changing it would break callers that treat "absent" and "unusable" identically. What #1882
+ * adds is that the second case is no longer *silent*.
+ *
+ * The discriminator is the reason this is not simply "opened but never closed". A Markdown
+ * document whose first line is a thematic break (`---`) takes that exact branch, so flagging
+ * on the missing fence alone reports corruption on perfectly good Markdown. Instead the
+ * unterminated region is run through this module's own parser and reported only when it
+ * yields **two or more** keys.
+ *
+ * Two, not one, and the extra key is doing real work. A single `key: value` line is genuinely
+ * ambiguous: `---` followed by `Note: this is a paragraph.` — or `Author:`, `TODO:`, `See:` —
+ * is ordinary technical writing, a thematic break above a labelled line, and it parses as
+ * exactly one key. There is no textual signal that separates it from a write interrupted
+ * after its first key, so the threshold is set where the ambiguity ends. The cost is a false
+ * negative on a file truncated after exactly one key; the benefit is silence on a very common
+ * Markdown shape. That direction is deliberate and matches the choice already made at zero
+ * keys: a false positive on valid Markdown is worse than a missed edge, because the
+ * diagnostic is unconditional and cannot be turned off. Every GSD artefact this guards
+ * (STATE.md, PLAN.md, ROADMAP.md, SUMMARY.md, agent/command docs) carries two or more
+ * frontmatter keys, so the realistic interruption window stays covered.
+ *
+ * @param content Raw document text.
+ * @param sourcePath Optional resolved path, used to name the file in the diagnostic and to
+ *   key its deduplication. Optional because this function has 50-odd call sites and several
+ *   hold only an in-memory string; those dedup on a content digest instead.
+ */
+function extractFrontmatter(content, sourcePath) {
+    // #2977: tolerate a single leading UTF-8 BOM (\uFEFF), which Windows tooling
+    // (PowerShell `>`/`Out-File` on PS 5.1, several editors) writes by default. Without this
+    // strip, the byte-0 `startsWith('---')` fence check below fails on the BOM and the whole
+    // parse collapses to {} — every frontmatter field silently disappears, and the engine
+    // proceeds as though the file had no frontmatter at all. The BOM is a single codepoint;
+    // stripping it here restores byte-0 alignment so the rest of the function is unchanged.
+    // Scope: BOM only. Arbitrary non-BOM content before the fence (leading whitespace/blank
+    // line/comment) is a separate product-intent decision (tolerate vs diagnose) left to a
+    // future change — this fix does not broaden the byte-0 fence rule beyond the BOM.
+    if (content.charCodeAt(0) === 0xFEFF) {
+        content = content.slice(1);
+    }
+    // Match frontmatter only at byte 0 — a `---` block later in the document
+    // body (YAML examples, horizontal rules) must never be treated as frontmatter.
+    const headerEnd = content.startsWith('---\r\n') ? 5 : content.startsWith('---\n') ? 4 : -1;
+    if (headerEnd === -1)
+        return {};
+    const closingLineStart = content.indexOf('\n---', headerEnd);
+    if (closingLineStart === -1) {
+        const region = content.slice(headerEnd);
+        const probe = parseYamlRegion(region);
+        if (Object.keys(probe).length >= UNTERMINATED_KEY_THRESHOLD && isFrontmatterShaped(region)) {
+            warnUnusableInput({
+                reason: UNUSABLE_REASON.FRONTMATTER_UNTERMINATED,
+                source: sourcePath,
+                content,
+            });
+        }
+        return {};
+    }
+    const yamlEnd = content[closingLineStart - 1] === '\r' ? closingLineStart - 1 : closingLineStart;
+    return parseYamlRegion(content.slice(headerEnd, yamlEnd));
 }
 /**
  * Escape a string for emission inside a YAML double-quoted scalar (#1779).
@@ -171,9 +372,17 @@ function scalarNeedsDoubleQuoting(s) {
 }
 function reconstructFrontmatter(obj) {
     const lines = [];
+    // #3257: read the full-line-comment channel (set by parseYamlRegion when comments
+    // were present). Object.entries skips the Symbol key, so the data loop is unchanged.
+    const commentChannel = obj[FULL_LINE_COMMENTS];
     for (const [key, value] of Object.entries(obj)) {
         if (value === null || value === undefined)
             continue;
+        // #3257: re-emit this key's leading full-line comments before the key itself.
+        const leading = commentChannel?.leading[key];
+        if (leading)
+            for (const c of leading)
+                lines.push(c);
         if (Array.isArray(value)) {
             if (value.length === 0) {
                 lines.push(`${key}: []`);
@@ -246,7 +455,34 @@ function reconstructFrontmatter(obj) {
             }
         }
     }
+    // #3257: re-emit any trailing full-line comments (those after the last key).
+    if (commentChannel?.trailing?.length) {
+        for (const c of commentChannel.trailing)
+            lines.push(c);
+    }
     return lines.join('\n');
+}
+/**
+ * #3257: copy the full-line-comment channel from `source` onto `target`, filtering
+ * `leading` to keys still present in `target` (a deleted key's annotation goes with
+ * it — AC5). No-op when `source` carries no channel. Consumers that rebuild their
+ * target object fresh (syncStateFrontmatter builds derivedFm via buildStateFrontmatter
+ * and copies keys with Object.keys, which skips the Symbol) MUST call this before
+ * reconstructFrontmatter, or the channel parseYamlRegion attached to the extracted
+ * source is lost.
+ */
+function propagateCommentChannel(source, target) {
+    const channel = source[FULL_LINE_COMMENTS];
+    if (!channel)
+        return;
+    const filtered = { leading: {}, trailing: channel.trailing };
+    for (const [key, comments] of Object.entries(channel.leading)) {
+        if (key in target)
+            filtered.leading[key] = comments;
+    }
+    if (filtered.trailing.length || Object.keys(filtered.leading).length) {
+        target[FULL_LINE_COMMENTS] = filtered;
+    }
 }
 /**
  * Slice a frontmatter YAML body into per-top-level-key raw text segments. Each segment
@@ -257,7 +493,7 @@ function reconstructFrontmatter(obj) {
  * not modify (e.g. must_haves.artifacts / .prohibitions).
  */
 function sliceTopLevelFrontmatterSegments(yaml) {
-    const lines = yaml.split(/\r?\n/);
+    const lines = (0, text_lines_cjs_1.splitLines)(yaml);
     const segments = [];
     let current = null;
     for (const line of lines) {
@@ -321,7 +557,7 @@ function spliceFrontmatter(content, newObj) {
         // unrelated `must_haves` block. Keys absent from the original (genuinely new) are
         // regenerated and appended; keys absent from `newObj` are preserved (never silently
         // deleted by a set/merge).
-        const fmLines = fmBlock.split(/\r?\n/);
+        const fmLines = (0, text_lines_cjs_1.splitLines)(fmBlock);
         const inner = fmLines.slice(1, -1).join('\n'); // drop the opening `---` and closing `---`
         let originalParsed;
         try {
@@ -402,27 +638,27 @@ function parseMustHavesBlock(content, blockName) {
     if (!fmMatch)
         return [];
     const yaml = fmMatch[1];
-    // Find must_haves: first to detect its indentation level
-    const mustHavesMatch = yaml.match(/^(\s*)must_haves:\s*$/m);
-    if (!mustHavesMatch)
+    const yamlLines = (0, text_lines_cjs_1.splitLines)(yaml);
+    // Find must_haves: first to detect its indentation level. Split-then-scan
+    // (rather than a whole-string /m match) so a CRLF or blank-line boundary
+    // can never be absorbed into the indent capture (#3360) — see
+    // .gsd/phase/chore-3413-text-lines-seam/40-design.md.
+    const mustHavesLinePattern = /^(\s*)must_haves:\s*$/;
+    const mustHavesLineIndex = yamlLines.findIndex((line) => mustHavesLinePattern.test(line));
+    if (mustHavesLineIndex === -1)
         return [];
-    const mustHavesIndent = mustHavesMatch[1].length;
+    const mustHavesIndent = yamlLines[mustHavesLineIndex].match(/^(\s*)/)[1].length;
     // Find the block (e.g., "truths:", "artifacts:", "key_links:") under must_haves
     // It must be indented more than must_haves but we detect the actual indent dynamically
-    const blockPattern = new RegExp(`^(\\s+)${blockName}:\\s*$`, 'm');
-    const blockMatch = yaml.match(blockPattern);
-    if (!blockMatch)
+    const blockLinePattern = new RegExp(`^(\\s+)${blockName}:\\s*$`);
+    const blockLineIndex = yamlLines.findIndex((line) => blockLinePattern.test(line));
+    if (blockLineIndex === -1)
         return [];
-    const blockIndent = blockMatch[1].length;
+    const blockIndent = yamlLines[blockLineIndex].match(/^(\s*)/)[1].length;
     // The block must be nested under must_haves (more indented)
     if (blockIndent <= mustHavesIndent)
         return [];
-    // Find where the block starts in the yaml string
-    const blockStart = yaml.indexOf(blockMatch[0]);
-    if (blockStart === -1)
-        return [];
-    const afterBlock = yaml.slice(blockStart);
-    const blockLines = afterBlock.split(/\r?\n/).slice(1); // skip the header line
+    const blockLines = yamlLines.slice(blockLineIndex + 1); // skip the header line
     // List items are indented one level deeper than blockIndent
     // Continuation KVs are indented one level deeper than list items
     const items = [];
@@ -517,29 +753,64 @@ function parseMustHavesBlock(content, blockName) {
     return items;
 }
 // ─── Frontmatter CRUD commands ────────────────────────────────────────────────
+// Shared base for 'plan' and 'plan-gap-closure' below — a plain array reference (not
+// FRONTMATTER_SCHEMAS.plan.required) because the object literal that defines
+// FRONTMATTER_SCHEMAS cannot refer to itself mid-initialization (TDZ).
+const PLAN_REQUIRED_FIELDS = ['phase', 'plan', 'type', 'wave', 'depends_on', 'files_modified', 'autonomous', 'must_haves'];
+// `requiredValues` is optional per schema: when a field name is a key here, the
+// field must be PRESENT AND strictly equal (===) to the given value to satisfy
+// the schema — presence alone is not enough. Every other required field (no
+// entry in requiredValues) keeps the original presence-only contract.
 const FRONTMATTER_SCHEMAS = {
-    plan: { required: ['phase', 'plan', 'type', 'wave', 'depends_on', 'files_modified', 'autonomous', 'must_haves'] },
+    plan: { required: PLAN_REQUIRED_FIELDS },
+    // #2847: gap-closure plans carry every 'plan' field PLUS gap_closure — the flag
+    // execute-phase --gaps-only filters on. A separate schema (not a change to
+    // 'plan') so standard/reviews-mode plans stay unaffected: they validate against
+    // 'plan' and are never required to declare or be checked for gap_closure.
+    // Derived from PLAN_REQUIRED_FIELDS (never hand-duplicated) so the two can't drift.
+    //
+    // requiredValues.gap_closure = true (not just presence): --gaps-only filters
+    // strictly on gap_closure === true (execute-phase.md, partial-wave.md), so a
+    // plan carrying `gap_closure: false` would pass a presence-only check and
+    // still be silently skipped at execute time — the exact symptom #2847
+    // reports, one value away. Presence-only was flagged in review as a live
+    // reproduction of the bug this schema exists to close.
+    'plan-gap-closure': {
+        required: [...PLAN_REQUIRED_FIELDS, 'gap_closure'],
+        // extractFrontmatter parses every scalar as a string (FrontmatterValue has
+        // no boolean member — `gap_closure: true` in YAML becomes the JS string
+        // "true", not the boolean true), so the required value is the string here.
+        requiredValues: { gap_closure: 'true' },
+    },
     summary: { required: ['phase', 'plan', 'subsystem', 'tags', 'duration', 'completed'] },
     verification: { required: ['phase', 'verified', 'status', 'score'] },
 };
 /**
- * Strip ALL frontmatter blocks from the start of `content`.
+ * Strip frontmatter blocks from the start of `content`.
  *
- * Handles CRLF line endings and multiple stacked blocks (corruption
- * recovery): greedily strips consecutive `---...---` blocks separated by
- * optional whitespace, so a doubled/tripled frontmatter header (e.g. from a
- * botched merge) is fully removed, not just the first block.
+ * Handles CRLF line endings and, by default, multiple stacked blocks
+ * (corruption recovery): greedily strips consecutive `---...---` blocks
+ * separated by optional whitespace, so a doubled/tripled frontmatter header
+ * (e.g. from a botched merge) is fully removed, not just the first block.
+ *
+ * Pass `{ once: true }` to stop after the first block. Callers whose input is
+ * an arbitrary user-authored document — rather than a GSD artefact with a
+ * known doubling failure mode — need this: a body that opens with a
+ * thematic-break-delimited section is lexically indistinguishable from a
+ * second frontmatter block, and the greedy loop deletes it silently (#2703).
  *
  * Canonical home for this primitive (#2143 audit dedup): previously
  * duplicated byte-identically in both `state.cts` and `state-transition.cts`.
  */
-function stripFrontmatter(content) {
+function stripFrontmatter(content, opts = {}) {
     let result = content;
     while (true) {
         const stripped = result.replace(/^\s*---\r?\n[\s\S]*?\r?\n---\s*/, '');
         if (stripped === result)
             break;
         result = stripped;
+        if (opts.once)
+            break;
     }
     return result;
 }
@@ -557,7 +828,9 @@ function cmdFrontmatterGet(cwd, filePath, field, raw) {
         output({ error: 'File not found', path: filePath }, raw, undefined);
         return;
     }
-    const fm = extractFrontmatter(content);
+    // Pass the resolved path so a truncated file is named in the diagnostic and deduplicated
+    // per file rather than per content digest (#1882, ADR-1411 wiring clause).
+    const fm = extractFrontmatter(content, fullPath);
     if (field) {
         const value = fm[field];
         if (value === undefined) {
@@ -584,7 +857,9 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
         return;
     }
     const content = node_fs_1.default.readFileSync(fullPath, 'utf-8');
-    const fm = extractFrontmatter(content);
+    // Pass the resolved path so a truncated file is named in the diagnostic and deduplicated
+    // per file rather than per content digest (#1882, ADR-1411 wiring clause).
+    const fm = extractFrontmatter(content, fullPath);
     let parsedValue;
     try {
         parsedValue = JSON.parse(value);
@@ -633,7 +908,9 @@ function cmdFrontmatterMerge(cwd, filePath, data, raw) {
         return;
     }
     const content = node_fs_1.default.readFileSync(fullPath, 'utf-8');
-    const fm = extractFrontmatter(content);
+    // Pass the resolved path so a truncated file is named in the diagnostic and deduplicated
+    // per file rather than per content digest (#1882, ADR-1411 wiring clause).
+    const fm = extractFrontmatter(content, fullPath);
     let mergeData;
     try {
         mergeData = JSON.parse(data);
@@ -651,23 +928,62 @@ function cmdFrontmatterValidate(cwd, filePath, schemaName, raw) {
     if (!filePath || !schemaName) {
         error('file and schema required');
     }
-    const schema = FRONTMATTER_SCHEMAS[schemaName];
-    if (!schema) {
+    if (filePath.includes('\0')) {
+        error('file path contains null bytes');
+    }
+    // Guard against prototype-chain keys (__proto__, constructor, toString, hasOwnProperty,
+    // valueOf, ...): a bare FRONTMATTER_SCHEMAS[schemaName] lookup resolves those to
+    // Object.prototype members instead of undefined, so a `!schema` check on the raw
+    // lookup never fires and the code crashes later on `schema.required.filter` with an
+    // uncaught TypeError instead of the intended "Unknown schema" message. Confirmed live
+    // with --schema __proto__. Now that --schema is agent-bound (agents/gsd-planner.md's
+    // $SCHEMA), this is reachable from prompt state, not just an unreachable literal.
+    // Checked and rejected BEFORE the lookup (rather than `?? undefined`-ing the lookup
+    // itself) so `schema`'s inferred type stays non-optional and needs no assertion below.
+    if (!Object.prototype.hasOwnProperty.call(FRONTMATTER_SCHEMAS, schemaName)) {
         error(`Unknown schema: ${schemaName}. Available: ${Object.keys(FRONTMATTER_SCHEMAS).join(', ')}`);
     }
+    const schema = FRONTMATTER_SCHEMAS[schemaName];
     const fullPath = node_path_1.default.isAbsolute(filePath) ? filePath : node_path_1.default.join(cwd, filePath);
     const content = (0, shell_command_projection_cjs_1.platformReadSync)(fullPath);
     if (!content) {
         output({ error: 'File not found', path: filePath }, raw, undefined);
         return;
     }
-    const fm = extractFrontmatter(content);
-    const missing = schema.required.filter(f => fm[f] === undefined);
-    const present = schema.required.filter(f => fm[f] !== undefined);
-    output({ valid: missing.length === 0, missing, present, schema: schemaName }, raw, missing.length === 0 ? 'valid' : 'invalid');
+    // #2701: fail loud on NUL/binary corruption before schema checks. A structurally
+    // intact-but-NUL-corrupted file otherwise passes as valid:true and is then silently
+    // skipped by recursive/binary-skipping searchers, reading downstream as "absent."
+    const encErr = (0, validate_cjs_1.textEncodingError)(content, filePath);
+    if (encErr) {
+        output({ valid: false, errors: [encErr], schema: schemaName }, raw, 'invalid');
+        return;
+    }
+    // Pass the resolved path so a truncated file is named in the diagnostic and deduplicated
+    // per file rather than per content digest (#1882, ADR-1411 wiring clause).
+    const fm = extractFrontmatter(content, fullPath);
+    const requiredValues = schema.requiredValues || {};
+    // A field satisfies the schema when it is present AND — for fields with a
+    // requiredValues entry — strictly equal to that value. Absent and
+    // wrong-value both surface as `missing` (existing `missing`/`present`
+    // partition of `required` is unchanged — no consumer reads `present` to
+    // mean "physically exists regardless of value," confirmed by searching
+    // every caller before choosing this). But #2847 review: folding silently
+    // made "missing" misleading for a WRONG-valued field the plan author can
+    // plainly see in the file (e.g. `gap_closure: True`) — nothing told them
+    // the field is present but the VALUE is wrong, so they could loop trying
+    // to add a field that is already there. `invalidValue` names exactly that
+    // subset (present, but not the required value) so the message stays
+    // actionable without changing what `missing`/`present` mean.
+    const wrongValue = (f) => fm[f] !== undefined && Object.prototype.hasOwnProperty.call(requiredValues, f) && fm[f] !== requiredValues[f];
+    const satisfies = (f) => fm[f] !== undefined && !wrongValue(f);
+    const missing = schema.required.filter(f => !satisfies(f));
+    const present = schema.required.filter(f => satisfies(f));
+    const invalidValue = schema.required.filter(wrongValue);
+    output({ valid: missing.length === 0, missing, present, invalidValue, schema: schemaName }, raw, missing.length === 0 ? 'valid' : 'invalid');
 }
 module.exports = {
     extractFrontmatter,
+    UNTERMINATED_KEY_THRESHOLD,
     // Additive alias (#644 prohibition-probe schema contract): the probe round-trip seam reads a
     // frontmatter object via `parseFrontmatter` (the name the contract test pins). It is the SAME
     // function as `extractFrontmatter` — a bare-object parse with no behavior change — exposed under
@@ -683,4 +999,5 @@ module.exports = {
     cmdFrontmatterSet,
     cmdFrontmatterMerge,
     cmdFrontmatterValidate,
+    propagateCommentChannel,
 };

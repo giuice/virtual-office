@@ -18,7 +18,14 @@
  *   5. "main"  (last-resort default)
  *
  * Every git subprocess is bounded with a timeout (≤ 30 s); on timeout/error
- * the resolver degrades gracefully to the next tier — it never throws.
+ * the resolver degrades gracefully to the next tier — it never throws. Tier 5
+ * is reachable two ways that `resolveBaseBranch()` alone cannot tell apart: a
+ * repository that genuinely has no candidate branch (every git query on tiers
+ * 2-4 completed and cleanly answered "nothing"), or a total resolution
+ * failure (some query timed out / could not run). `resolveBaseBranchDiagnostics()`
+ * distinguishes the two via `verified`; `cmdGitBaseBranch` surfaces the
+ * unverified case as a stderr diagnostic without changing its stdout contract
+ * (#3057 B4).
  *
  * Pure/testable: all I/O is injectable via the `deps` argument so unit
  * tests can run without touching the real filesystem or spawning real git.
@@ -31,8 +38,11 @@ exports.readConfigBaseBranch = readConfigBaseBranch;
 exports.trySymbolicRef = trySymbolicRef;
 exports.tryRemoteShow = tryRemoteShow;
 exports.tryLocalBranch = tryLocalBranch;
+exports.resolveBaseBranchDiagnostics = resolveBaseBranchDiagnostics;
 exports.resolveBaseBranch = resolveBaseBranch;
 exports.gitWorktreeInfoInternal = gitWorktreeInfoInternal;
+exports.phaseStartCommit = phaseStartCommit;
+exports.changedFilesSince = changedFilesSince;
 exports.cmdGitBaseBranch = cmdGitBaseBranch;
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
@@ -115,7 +125,8 @@ function tryRemoteShow(cwd, execGit) {
         const branch = m[1];
         // git emits "(unknown)" when the remote is offline but the local cache
         // resolved it; treat that as non-authoritative and fall through.
-        if (!branch || branch === '(unknown)')
+        // No `!branch ||` guard: m[1] comes from the `(\S+)` capture group above, so it is never empty.
+        if (branch === '(unknown)')
             return null;
         return branch;
     }
@@ -153,41 +164,70 @@ function tryLocalBranch(cwd, execGit) {
     }
 }
 /**
- * Resolve the default/base branch for the repository at `cwd`.
+ * Resolve the default/base branch for the repository at `cwd`, along with
+ * whether the tier-5 last-resort default (if reached) was verified.
  *
  * Consults the full precedence ladder and always returns a non-empty string.
  * Never throws.
  */
-function resolveBaseBranch(cwd, deps) {
-    const execGit = deps?.execGit ?? shell_command_projection_cjs_1.execGit;
+function resolveBaseBranchDiagnostics(cwd, deps) {
+    const rawExecGit = deps?.execGit ?? shell_command_projection_cjs_1.execGit;
+    // A genuine execGit failure (timeout, or the call could not even spawn —
+    // e.g. git missing, surfaced as exitCode 127 with `error` set) is distinct
+    // from git completing and cleanly reporting a negative answer (non-zero
+    // exit with no useful output, or exit 0 with empty stdout). Only the former
+    // means a tier's answer was never actually obtained. Wrapping execGit here
+    // observes every tier's calls uniformly without changing trySymbolicRef /
+    // tryRemoteShow / tryLocalBranch's own return contracts.
+    let anyGitFailure = false;
+    const execGit = (args, opts) => {
+        const r = rawExecGit(args, opts);
+        if (r.timedOut || r.error)
+            anyGitFailure = true;
+        return r;
+    };
     // Derive .planning dir relative to cwd (mirrors planningDir() in planning-workspace.cjs)
     const planningDir = node_path_1.default.join(cwd, '.planning');
     // 1. Config override
     const configured = readConfigBaseBranch(planningDir, deps);
     if (configured)
-        return configured;
+        return { branch: configured, verified: true };
     // 2. symbolic-ref (fast, no network)
     const symref = trySymbolicRef(cwd, execGit);
     if (symref)
-        return symref;
+        return { branch: symref, verified: true };
     // 3. git remote show origin (authoritative when origin/HEAD unset)
     const remoteShow = tryRemoteShow(cwd, execGit);
     if (remoteShow)
-        return remoteShow;
+        return { branch: remoteShow, verified: true };
     // 4. Local branch existence
     const local = tryLocalBranch(cwd, execGit);
     if (local)
-        return local;
-    // 5. Last-resort default
-    return 'main';
+        return { branch: local, verified: true };
+    // 5. Last-resort default. `verified:false` when at least one tier-2/3/4
+    // execGit call timed out or failed to run — the default was never actually
+    // checked against this repository, it is just what's left after git could
+    // not answer (#3057 B4).
+    return { branch: 'main', verified: !anyGitFailure };
+}
+/**
+ * Resolve the default/base branch for the repository at `cwd`.
+ *
+ * Consults the full precedence ladder and always returns a non-empty string.
+ * Never throws. See {@link resolveBaseBranchDiagnostics} for a caller that
+ * needs to distinguish a verified answer from an unverified fallback.
+ */
+function resolveBaseBranch(cwd, deps) {
+    return resolveBaseBranchDiagnostics(cwd, deps).branch;
 }
 /**
  * Detect whether `cwd` sits inside a git worktree, and if so, return the
  * absolute path of the worktree root.
  */
-function gitWorktreeInfoInternal(cwd) {
+function gitWorktreeInfoInternal(cwd, deps) {
+    const execGit = deps?.execGit ?? shell_command_projection_cjs_1.execGit;
     try {
-        const insideResult = (0, shell_command_projection_cjs_1.execGit)(['rev-parse', '--is-inside-work-tree'], { cwd, timeout: 5000 });
+        const insideResult = execGit(['rev-parse', '--is-inside-work-tree'], { cwd, timeout: 5000 });
         if (insideResult.exitCode !== 0) {
             return { inside: false, worktreeRoot: null };
         }
@@ -195,7 +235,7 @@ function gitWorktreeInfoInternal(cwd) {
         if (insideStdout !== 'true') {
             return { inside: false, worktreeRoot: null };
         }
-        const rootResult = (0, shell_command_projection_cjs_1.execGit)(['rev-parse', '--show-toplevel'], { cwd, timeout: 5000 });
+        const rootResult = execGit(['rev-parse', '--show-toplevel'], { cwd, timeout: 5000 });
         if (rootResult.exitCode !== 0) {
             return { inside: true, worktreeRoot: null };
         }
@@ -206,6 +246,106 @@ function gitWorktreeInfoInternal(cwd) {
         return { inside: false, worktreeRoot: null };
     }
 }
+// ─── Adapter 3: phase-start anchor + touched-file listing (issue #1953) ───────
+/**
+ * Resolve the commit that ADDED `<phaseDir>/*-PLAN.md` — the anchor commit
+ * marking when the phase began (see `.gsd/phase/feat-1953-complexity-triggered-
+ * refactor/42-router-contract.md`, "Touched-file anchor"). `phaseDir` is a
+ * project-relative path (backslashes are normalized unconditionally before
+ * building the pathspec, never via `path.sep` — matches the repo's
+ * cross-platform path-normalization convention).
+ *
+ * Bounded (`timeout: 15_000`), degrades to `null` on any failure or when no
+ * such commit exists (a phase never planned through git, a shallow clone).
+ * Never throws.
+ */
+function phaseStartCommit(cwd, phaseDir, execGit) {
+    const git = execGit ?? shell_command_projection_cjs_1.execGit;
+    try {
+        const normalizedPhaseDir = phaseDir.replace(/\\/g, '/');
+        const pathspec = `${normalizedPhaseDir}/*-PLAN.md`;
+        const r = git(['log', '--format=%H', '--diff-filter=A', '-1', '--', pathspec], { cwd, timeout: 15_000 });
+        if (r.exitCode !== 0 || !r.stdout)
+            return null;
+        const sha = r.stdout.trim();
+        return sha || null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Reject characters/sequences that have no legitimate use in a git revision
+ * expression reaching this module (a ref name, SHA, or `<ref>~N` / `<ref>^N`
+ * / `<ref>@{...}` navigation) but that a hostile `--since` value could use to
+ * confuse either the shell-out or a downstream reader: whitespace, ASCII
+ * control characters, and the option-shaped `?`, `*`, `[`, `\` characters
+ * that `git check-ref-format` also disallows in ref *names*. A leading `-`
+ * is rejected outright — that is the actual option-injection vector `--end-
+ * of-options` (below) already neutralizes, so this is belt-and-suspenders
+ * for older git. `..` is rejected because `sinceRef` is a single revision
+ * that this function itself turns into a range (`sinceRef..HEAD`); a
+ * `sinceRef` that already contains `..` can only produce a malformed or
+ * misleading range. A trailing `.lock` is rejected per `check-ref-format`.
+ *
+ * Deliberately NOT rejected: `~`, `^`, `:`, `@`, `{`, `}` — `check-ref-
+ * format` disallows these in a bare ref *name*, but this value is a git
+ * *revision expression*, and rejecting them would break entirely ordinary
+ * user input such as `HEAD~1`, `HEAD^`, or `main@{yesterday}`. None of
+ * these characters can reintroduce option parsing once `--end-of-options`
+ * is in effect, so allowing them costs nothing security-wise.
+ */
+function isSafeRevisionRef(ref) {
+    if (ref === '')
+        return false;
+    if (ref.startsWith('-'))
+        return false;
+    if (/[\x00-\x1f\x7f ?*[\\]/.test(ref))
+        return false;
+    if (ref.includes('..'))
+        return false;
+    if (ref.endsWith('.lock'))
+        return false;
+    return true;
+}
+/**
+ * List files changed between `sinceRef` and `HEAD`, NUL-delimited and
+ * quotepath-safe. Load-bearing details (see the router contract):
+ *   - `-z` and `-c core.quotepath=false` avoid git's lossy quote-and-escape
+ *     round-trip for non-ASCII paths;
+ *   - splitting on `NUL` (never `\n`) tolerates a filename containing a real
+ *     newline (git permits it);
+ *   - `sinceRef` is validated by `isSafeRevisionRef` AND the revision-range
+ *     argument is preceded by `--end-of-options`. A trailing `--` alone does
+ *     NOT stop git from option-parsing an argument that appears BEFORE it —
+ *     it only stops PATHSPEC interpretation of arguments AFTER it — so
+ *     `--since '--output=/tmp/pwn'` would otherwise become the argument
+ *     `--output=/tmp/pwn..HEAD`, which git accepts as an option and uses to
+ *     redirect diff output to an attacker-chosen path. `--end-of-options`
+ *     (git >= 2.24) is the correct fix: everything after it is parsed as a
+ *     revision or path, never as an option, regardless of leading `-`.
+ *
+ * Bounded (`timeout: 15_000`), degrades to `null` when `sinceRef` fails
+ * validation or the underlying git call fails (non-zero exit, timeout, or
+ * spawn error) — never throws. An empty result set (no files changed
+ * between the two revisions) is a valid, non-null answer: `[]`.
+ */
+function changedFilesSince(cwd, sinceRef, execGit) {
+    if (!isSafeRevisionRef(sinceRef))
+        return null;
+    const git = execGit ?? shell_command_projection_cjs_1.execGit;
+    try {
+        const r = git(['-c', 'core.quotepath=false', 'diff', '--name-only', '-z', '--end-of-options', `${sinceRef}..HEAD`, '--'], { cwd, timeout: 15_000 });
+        if (r.exitCode !== 0)
+            return null;
+        if (!r.stdout)
+            return [];
+        return r.stdout.split('\0').filter((f) => f.length > 0);
+    }
+    catch {
+        return null;
+    }
+}
 // ─── CLI entry point ──────────────────────────────────────────────────────────
 /**
  * CLI command: `gsd-tools git base-branch`
@@ -213,7 +353,12 @@ function gitWorktreeInfoInternal(cwd) {
  * Called by workflows via `gsd_run query git.base-branch`.
  */
 function cmdGitBaseBranch(cwd, _args, deps) {
-    const branch = resolveBaseBranch(cwd, deps);
+    const { branch, verified } = resolveBaseBranchDiagnostics(cwd, deps);
+    if (!verified) {
+        const writeDiagnostic = deps?.writeDiagnostic ?? ((s) => process.stderr.write(s));
+        writeDiagnostic(`⚠ git-base-branch: defaulted to 'main' WITHOUT verifying against this repository — ` +
+            `a git query timed out or could not run. See #3057.\n`);
+    }
     const write = deps?.write ?? ((s) => process.stdout.write(s));
     write(branch + '\n');
     return branch;

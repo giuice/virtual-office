@@ -158,24 +158,6 @@ describe('WebRTCManager display and negotiation ownership', () => {
     });
   });
 
-  it('broadcasts presenter invalidation once before any peer is registered', async () => {
-    const signalSender = vi.fn().mockResolvedValue(undefined);
-    const manager = new (await import('@/lib/webrtc/WebRTCManager')).WebRTCManager(
-      'space-1',
-      'user-a',
-    );
-    manager.setSignalingChannel({} as never, signalSender);
-
-    await manager.broadcastPresenterInvalidated('share-1');
-
-    expect(FakePeerConnection.instances).toHaveLength(0);
-    expect(signalSender).toHaveBeenCalledTimes(1);
-    expect(signalSender).toHaveBeenCalledWith({
-      type: 'presenter-invalidated',
-      shareId: 'share-1',
-    });
-  });
-
   it('renegotiates one existing peer and a later peer with a distinct display sender without touching microphone ownership', async () => {
     const send = vi.fn().mockResolvedValue('ok');
     const microphone = new FakeTrack('audio');

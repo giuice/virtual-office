@@ -12,6 +12,7 @@ import {
   screenSharePublicShareSchema,
   screenShareReleaseRequestSchema,
   screenShareRenewRequestSchema,
+  screenShareSignalRequestSchema,
   screenShareSignalingPayloadSchema,
 } from '@/lib/webrtc/screen-share-contract';
 
@@ -182,12 +183,33 @@ describe('screen-share contract boundaries', () => {
     expect(screenShareSignalingPayloadSchema.safeParse(payload).success).toBe(true);
     expect(screenShareSignalingPayloadSchema.safeParse({ ...payload, revision: 7 }).success).toBe(false);
   });
+
+  it('accepts signal intent without client-selected sender authority', () => {
+    const intent = {
+      type: 'description',
+      presenceSessionId: PRESENCE_SESSION_ID,
+      connectionId: '99999999-9999-4999-8999-999999999999',
+      targetUserId: TARGET_ID,
+      targetPresenceSessionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      targetConnectionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      shareId: SHARE_ID,
+      description: { type: 'offer', sdp: 'v=0' },
+    };
+    expect(screenShareSignalRequestSchema.safeParse(intent).success).toBe(true);
+    expect(screenShareSignalRequestSchema.safeParse({
+      ...intent,
+      sourceUserId: PRESENTER_ID,
+    }).success).toBe(false);
+  });
 });
 
 const AUTH_USER_ID = '77777777-7777-4777-8777-777777777777';
 
 const mocks = vi.hoisted(() => ({
   requireVerifiedPresenceAuth: vi.fn(),
+  broadcastScreenShareSignal: vi.fn(),
+  runAfterResponse: vi.fn(),
+  afterResponseTasks: [] as Array<() => Promise<void>>,
   rpc: vi.fn(),
   from: vi.fn(),
   select: vi.fn(),
@@ -197,6 +219,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/presence/verified-session', () => ({
   requireVerifiedPresenceAuth: mocks.requireVerifiedPresenceAuth,
+}));
+
+vi.mock('@/lib/webrtc/screen-share-signal-broadcast', () => ({
+  broadcastScreenShareSignal: mocks.broadcastScreenShareSignal,
+}));
+
+vi.mock('@/lib/server/after-response', () => ({
+  runAfterResponse: mocks.runAfterResponse,
 }));
 
 function routeContext(id: string): { params: Promise<{ id: string }> } {
@@ -210,6 +240,14 @@ function postRequest(body: unknown, signal?: AbortSignal): Request {
     body: JSON.stringify(body),
     signal,
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 function activeRequest(sessionId = PRESENCE_SESSION_ID): Request {
@@ -279,7 +317,12 @@ function noCompanyAuth() {
 describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.afterResponseTasks.length = 0;
+    mocks.runAfterResponse.mockImplementation((task: () => Promise<void>) => {
+      mocks.afterResponseTasks.push(task);
+    });
     primeAuth();
+    mocks.broadcastScreenShareSignal.mockResolvedValue(undefined);
   });
 
   it('rejects unauthenticated claims without invoking the RPC', async () => {
@@ -679,6 +722,38 @@ describe('screen-share routes (mocked HTTP boundary evidence only)', () => {
       p_space_id: SPACE_ID,
       p_share_id: SHARE_ID,
     });
+    expect(mocks.broadcastScreenShareSignal).not.toHaveBeenCalled();
+    expect(mocks.afterResponseTasks).toHaveLength(1);
+    await mocks.afterResponseTasks[0]();
+    expect(mocks.broadcastScreenShareSignal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'presenter-invalidated',
+        sourceUserId: PRESENTER_ID,
+        sourcePresenceSessionId: PRESENCE_SESSION_ID,
+        companyId: COMPANY_ID,
+        spaceId: SPACE_ID,
+        shareId: SHARE_ID,
+      }),
+    );
+  });
+
+  it('returns a successful release before a delayed invalidation broadcast settles', async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: { ok: true, code: 'RELEASED', alreadyReleased: false },
+      error: null,
+    });
+    const delayedBroadcast = deferred<void>();
+    mocks.broadcastScreenShareSignal.mockReturnValueOnce(delayedBroadcast.promise);
+
+    const response = await releaseScreenShare(postRequest(claimBody()), routeContext(SPACE_ID));
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toEqual({ success: true, code: 'RELEASED', alreadyReleased: false });
+    expect(mocks.afterResponseTasks).toHaveLength(1);
+    const backgroundTask = mocks.afterResponseTasks[0]();
+    expect(mocks.broadcastScreenShareSignal).toHaveBeenCalledTimes(1);
+    delayedBroadcast.resolve();
+    await backgroundTask;
   });
 
   it('renews only the exact verified owner scope and returns the committed expiry', async () => {

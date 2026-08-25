@@ -14,9 +14,14 @@ const eslintConfig = [
     ignores: [
       ".next/**/*",
       ".next-auth-metrics*/**/*",
+      ".next-screen-sharing/**/*",
       "node_modules/**/*",
       "playwright-report/**/*",
       "test-results/**/*",
+      ".claude/gsd-core/**/*",
+      ".claude/worktrees/**/*",
+      ".codex/gsd-core/**/*",
+      ".pi/gsd-core/**/*",
     ],
   },
   {

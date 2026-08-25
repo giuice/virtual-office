@@ -60,19 +60,15 @@ created: 2026-07-22
 - [ ] `__tests__/space-audio-controls.test.tsx` — 03-05 owns explicit microphone enable/mute/unmute and speaker indication regressions.
 - [ ] `__tests__/presence-db/screen-share-lease.test.ts` — 03-02 owns real Postgres claim races, identity/session/occupancy fences, idempotent release, and expiry.
 - [ ] `__tests__/presence-db/screen-share-realtime-policy.test.ts` — 03-02 owns real private Broadcast/Presence policies scoped by company, space, application user, and session.
-- [ ] `__tests__/api/playwright/screen-sharing.spec.ts` — 03-06 owns deterministic two-context UI lifecycle only; 03-12 runs the complete project, and 03-13 separately proves real media.
+- [ ] `__tests__/api/playwright/screen-sharing.spec.ts` — 03-06 owns deterministic two-context UI lifecycle; 03-12 runs the complete project, and 03-13 records the zero-cost evidence boundary without adding user setup.
 
 ---
 
-## Manual-Only Verifications
+## Optional Non-Blocking Manual Smoke
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Two authenticated occupants hear room audio while each microphone remains off until explicitly enabled | VID-02 | Mocks cannot prove real browser permissions, peer delivery, or multi-user isolation | Use two separate authenticated browser identities in one space; verify listen-only entry, then enable/mute/unmute one microphone and observe remote audio plus speaking indication |
-| One real display track reaches the other occupant and ends cleanly | VID-01, VID-04 | Browser screen picker and end-to-end WebRTC/TURN behavior require real identities and media devices | Share a tab/window/screen from one identity; expand/collapse on the viewer; stop from browser chrome, leave the space, and close the presenter tab; verify audio survives and the stage resets |
-| Concurrent presenter attempt has exactly one winner | VID-04 | Real client timing plus database serialization cannot be proven by component mocks | Trigger sharing from two identities as concurrently as practical; verify one canonical presenter, visible conflict for the loser, and immediate local-track cleanup for the loser |
-| P2P connectivity works across restrictive networks using configured TURN | VID-01 | Local tests cannot prove NAT traversal or deployed TURN credentials | Place the two identities on different real networks, record redacted ICE connection state/candidate type, and verify audio plus screen delivery; treat missing/invalid TURN as a rollout blocker |
-| Supported-browser matrix handles picker availability and cancellation | VID-04 | `getDisplayMedia` behavior differs by browser and platform | Run the acceptance flow in company-supported Chrome, Firefox, and Safari versions; where unsupported, verify the CTA is disabled with a clear explanation |
+If the development machine already has a usable browser and test account, a single-browser smoke may be recorded at no cost. It is optional and must not require TURN, paid services, another device, another network, another profile, additional browser installations, or new credentials.
+
+The phase does not claim restrictive-network relay reliability or cross-browser parity. Those are explicitly unverified future concerns, not missing Phase 3 work.
 
 ---
 
@@ -83,9 +79,9 @@ created: 2026-07-22
 - [ ] Every planned missing test artifact has an owning plan and executable command
 - [ ] No watch-mode flags
 - [ ] Focused-test feedback latency is below 120s
-- [ ] Real database tests run from a clean disposable local reset; Docker unavailability is reported as a blocker, never a skip
-- [ ] Target migration/policy catalog readback and smoke check are recorded before private-channel application rollout
-- [ ] Multi-user browser/TURN UAT is completed before claiming VID-01 or VID-04 reliability
+- [x] Existing 03-02 and 03-12 evidence records the completed disposable local database proof; 03-13 does not require Docker installation or a rerun
+- [ ] Any future online rollout remains a separate request with target migration/policy readback before deploying compatible application code
+- [ ] Evidence wording limits VID-01 and VID-04 claims to automated/local coverage and does not imply restrictive-network or cross-browser guarantees
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending

@@ -332,6 +332,30 @@ exports.INIT_COMMAND_ALIASES = [
         "mutation": false
     },
     {
+        "canonical": "init.code-review",
+        "aliases": [
+            "init code-review"
+        ],
+        "subcommand": "code-review",
+        "mutation": false
+    },
+    {
+        "canonical": "init.review",
+        "aliases": [
+            "init review"
+        ],
+        "subcommand": "review",
+        "mutation": false
+    },
+    {
+        "canonical": "init.discuss-phase-assumptions",
+        "aliases": [
+            "init discuss-phase-assumptions"
+        ],
+        "subcommand": "discuss-phase-assumptions",
+        "mutation": false
+    },
+    {
         "canonical": "init.todos",
         "aliases": [
             "init todos"
@@ -369,6 +393,54 @@ exports.INIT_COMMAND_ALIASES = [
             "init manager"
         ],
         "subcommand": "manager",
+        "mutation": false
+    },
+    {
+        "canonical": "init.complete-milestone",
+        "aliases": [
+            "init complete-milestone"
+        ],
+        "subcommand": "complete-milestone",
+        "mutation": false
+    },
+    {
+        "canonical": "init.autonomous",
+        "aliases": [
+            "init autonomous"
+        ],
+        "subcommand": "autonomous",
+        "mutation": false
+    },
+    {
+        "canonical": "init.docs-update",
+        "aliases": [
+            "init docs-update"
+        ],
+        "subcommand": "docs-update",
+        "mutation": false
+    },
+    {
+        "canonical": "init.update",
+        "aliases": [
+            "init update"
+        ],
+        "subcommand": "update",
+        "mutation": false
+    },
+    {
+        "canonical": "init.transition",
+        "aliases": [
+            "init transition"
+        ],
+        "subcommand": "transition",
+        "mutation": false
+    },
+    {
+        "canonical": "init.debug",
+        "aliases": [
+            "init debug"
+        ],
+        "subcommand": "debug",
         "mutation": false
     },
     {
@@ -540,6 +612,14 @@ exports.ROADMAP_COMMAND_ALIASES = [
         "mutation": false
     },
     {
+        "canonical": "roadmap.milestone-scope",
+        "aliases": [
+            "roadmap milestone-scope"
+        ],
+        "subcommand": "milestone-scope",
+        "mutation": false
+    },
+    {
         "canonical": "roadmap.get-phase",
         "aliases": [
             "roadmap get-phase"
@@ -610,6 +690,20 @@ exports.NON_FAMILY_COMMAND_ALIASES = [
     {
         "canonical": "commit",
         "aliases": [],
+        "mutation": true
+    },
+    {
+        "canonical": "commit-docs-guard.disable",
+        "aliases": [
+            "commit-docs-guard disable"
+        ],
+        "mutation": true
+    },
+    {
+        "canonical": "commit-docs-guard.enable",
+        "aliases": [
+            "commit-docs-guard enable"
+        ],
         "mutation": true
     },
     {

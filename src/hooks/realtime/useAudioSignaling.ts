@@ -8,11 +8,14 @@ import {
   screenShareDescriptionPayloadSchema,
   screenShareHandshakePayloadSchema,
   screenShareIcePayloadSchema,
+  screenShareMediaTopic,
   screenSharePresenterHintPayloadSchema,
   screenSharePresenterInvalidatedPayloadSchema,
   screenSharePublicErrorSchema,
+  screenShareSignalRequestSchema,
   type ScreenSharePublicShare,
 } from '@/lib/webrtc/screen-share-contract';
+import { sendScreenShareSignalRequest } from '@/lib/webrtc/screen-share-signal-client';
 import { WebRTCManager, type SignalingEvent, type WebRTCSignalSender } from '@/lib/webrtc';
 
 const MAX_BUFFERED_SIGNALS_PER_PEER = 32;
@@ -34,6 +37,7 @@ interface UseAudioSignalingOptions {
   enabled?: boolean;
   isMuted: boolean;
   onTerminalAuthorizationDenied?: () => void;
+  onSignalDelivered?: () => void;
 }
 
 interface AudioPresenceState { [key: string]: Array<{ user_id?: string; is_muted?: boolean }>; }
@@ -105,7 +109,7 @@ function classifyActiveReadError(status: number, body: unknown): ActiveReadError
 }
 
 export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingState {
-  const { companyId, spaceId, currentUserId, presenceSessionId, accessToken, generation, webrtcManager, enabled = true, isMuted, onTerminalAuthorizationDenied } = options;
+  const { companyId, spaceId, currentUserId, presenceSessionId, accessToken, generation, webrtcManager, enabled = true, isMuted, onTerminalAuthorizationDenied, onSignalDelivered } = options;
   const channelRef = useRef<RealtimeChannel | null>(null);
   const channelScopeRef = useRef<OwnedChannelScope | null>(null);
   const scopeGenerationRef = useRef<string | number>(generation);
@@ -114,6 +118,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
   const activeShareRef = useRef<ScreenSharePublicShare | null>(null);
   const activeShareReadVersionRef = useRef(0);
   const onTerminalAuthorizationDeniedRef = useRef(onTerminalAuthorizationDenied);
+  const onSignalDeliveredRef = useRef(onSignalDelivered);
   const [isConnected, setIsConnected] = useState(false);
   const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
   const [activeShare, setActiveShare] = useState<ScreenSharePublicShare | null>(null);
@@ -124,6 +129,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
   scopeGenerationRef.current = generation;
   isMutedRef.current = isMuted;
   onTerminalAuthorizationDeniedRef.current = onTerminalAuthorizationDenied;
+  onSignalDeliveredRef.current = onSignalDelivered;
 
   useEffect(() => {
     const owned = channelScopeRef.current;
@@ -166,7 +172,7 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
       manager: webrtcManager, connectionId: createConnectionId(),
     };
     const supabase = createSupabaseBrowserClient();
-    const topic = `company:${scope.companyId}:space:${scope.spaceId}:media`;
+    const topic = screenShareMediaTopic(scope.companyId, scope.spaceId);
     const channel = supabase.channel(topic, {
       config: { private: true, broadcast: { self: true, ack: true }, presence: { key: `${scope.currentUserId}:${scope.presenceSessionId}` } },
     });
@@ -449,23 +455,33 @@ export function useAudioSignaling(options: UseAudioSignalingOptions): SignalingS
     const sendSignal: WebRTCSignalSender = async (event: SignalingEvent): Promise<void> => {
       const sendGeneration = subscriptionGeneration;
       if (!isCurrent() || !subscribed) throw new MediaSignalingError('SIGNALING_UNAVAILABLE');
-      const base = { sourceUserId: scope.currentUserId, sourcePresenceSessionId: scope.presenceSessionId, sourceConnectionId: scope.connectionId, companyId: scope.companyId, spaceId: scope.spaceId, shareId: scope.manager.getActiveShareId() };
+      const base = {
+        presenceSessionId: scope.presenceSessionId,
+        connectionId: scope.connectionId,
+        shareId: scope.manager.getActiveShareId(),
+      };
       const payload = event.type === 'handshake'
-        ? screenShareHandshakePayloadSchema.parse({ type: 'handshake', ...base })
-        : event.type === 'presenter-invalidated'
-          ? screenSharePresenterInvalidatedPayloadSchema.parse({
-              type: 'presenter-invalidated',
-              ...base,
-              shareId: event.shareId,
-            })
+        ? { type: 'handshake' as const, ...base }
         : event.type === 'description'
-          ? screenShareDescriptionPayloadSchema.parse({ type: 'description', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, description: event.description })
-          : screenShareIcePayloadSchema.parse({ type: 'ice', ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, candidate: event.candidate });
-      const result = await channel.send({ type: 'broadcast', event: payload.type, payload });
+          ? { type: 'description' as const, ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, description: event.description }
+          : { type: 'ice' as const, ...base, targetUserId: event.targetUserId, targetPresenceSessionId: event.targetPresenceSessionId, targetConnectionId: event.targetConnectionId, candidate: event.candidate };
+      try {
+        await sendScreenShareSignalRequest(
+          scope.spaceId,
+          screenShareSignalRequestSchema.parse(payload),
+        );
+      } catch (error) {
+        if (isCurrent()) setError('SIGNALING_SEND_FAILED');
+        throw new MediaSignalingError(
+          'SIGNALING_SEND_FAILED',
+          error instanceof Error ? error.message : undefined,
+        );
+      }
       if (!isCurrent() || !subscribed || sendGeneration !== subscriptionGeneration) {
         throw new MediaSignalingError('SIGNALING_UNAVAILABLE');
       }
-      if (result !== 'ok') throw new MediaSignalingError('SIGNALING_SEND_FAILED', result);
+      setError((current) => current === 'SIGNALING_SEND_FAILED' ? null : current);
+      onSignalDeliveredRef.current?.();
     };
 
     channel

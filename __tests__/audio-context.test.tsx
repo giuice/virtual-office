@@ -136,7 +136,7 @@ describe('AudioProvider manager ownership', () => {
     );
 
     await waitFor(() => expect(mocks.channel).toHaveBeenCalledWith(
-      `company:${COMPANY_ID}:space:room-a:media`,
+      `company:${COMPANY_ID}:space:room-a:media:v2`,
       expect.any(Object),
     ));
     const managerA = mocks.managers.find((manager) => manager.spaceId === 'room-a');
@@ -157,14 +157,14 @@ describe('AudioProvider manager ownership', () => {
     );
 
     await waitFor(() => expect(mocks.channel).toHaveBeenCalledWith(
-      `company:${COMPANY_ID}:space:room-b:media`,
+      `company:${COMPANY_ID}:space:room-b:media:v2`,
       expect.any(Object),
     ));
     const managerB = mocks.managers.find((manager) => manager.spaceId === 'room-b');
     if (!managerB) throw new Error('room B manager was not created');
     await waitFor(() => expect(managerB.broadcastHandshake).toHaveBeenCalledTimes(1));
 
-    expect(mocks.channel.mock.calls.filter(([name]) => name === `company:${COMPANY_ID}:space:room-b:media`)).toHaveLength(1);
+    expect(mocks.channel.mock.calls.filter(([name]) => name === `company:${COMPANY_ID}:space:room-b:media:v2`)).toHaveLength(1);
     expect(managerA.broadcastHandshake).toHaveBeenCalledTimes(1);
     expect(managerA.cleanup).toHaveBeenCalledTimes(1);
     await waitFor(() => {

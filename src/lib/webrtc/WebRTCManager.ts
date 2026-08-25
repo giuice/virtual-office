@@ -30,10 +30,6 @@ export type SignalingEvent =
     targetConnectionId: string;
     senderId: string;
     candidate: RTCIceCandidateInit;
-  }
-  | {
-    type: 'presenter-invalidated';
-    shareId: string;
   };
 
 export type WebRTCSignalSender = (event: SignalingEvent) => Promise<void>;
@@ -178,15 +174,6 @@ export class WebRTCManager {
 
   async renegotiateExistingPeers(): Promise<void> {
     await Promise.all([...this.peerConnections.values()].map((peer) => this.negotiate(peer)));
-  }
-
-  async broadcastPresenterInvalidated(shareId: string): Promise<void> {
-    // The private room channel is the fan-out boundary. Viewers may have read
-    // the authoritative active share before either side registers a peer.
-    await Promise.allSettled([this.sendSignal({
-      type: 'presenter-invalidated',
-      shareId,
-    })]);
   }
 
   async handleHandshake(senderId: string, presenceSessionId?: string, connectionId?: string): Promise<void> {

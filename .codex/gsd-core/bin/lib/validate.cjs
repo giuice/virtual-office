@@ -37,26 +37,40 @@ exports.canonicalPlanStem = canonicalPlanStem;
 exports.phaseVariants = phaseVariants;
 exports.buildRoadmapPhaseVariants = buildRoadmapPhaseVariants;
 exports.buildNotStartedPhaseVariants = buildNotStartedPhaseVariants;
+exports.textEncodingError = textEncodingError;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const phaseIdMod = require("./phase-id.cjs");
-const { OPTIONAL_PROJECT_CODE_PREFIX_SOURCE, PHASE_NUMBER_TOKEN_SOURCE, PHASE_CONTINUATION_SEGMENT_SOURCE, } = phaseIdMod;
+const { OPTIONAL_PROJECT_CODE_PREFIX_SOURCE, 
+// #2528 review: taken from the owner rather than derived here by
+// `replaceAll('A-Z', 'A-Za-z')` — that derivation silently no-ops (and narrows
+// this module to uppercase-only) the day phase-id.cts renders the class any
+// other way. See the constants' doc comment in phase-id.cts.
+CASE_FLEXIBLE_PROJECT_CODE_PREFIX_SOURCE, CASE_FLEXIBLE_PHASE_NUMBER_TOKEN_SOURCE, PHASE_CONTINUATION_SEGMENT_SOURCE, } = phaseIdMod;
 // ── Issue #26: regex constants (W005, W006-archived) ────────────────────────
 // Matches legacy numeric dirs (01-setup), milestone-prefixed dirs (02-01-setup),
 // deep dirs (02-04-01-deep), and project-code-prefixed variants (GSD-02-01-setup).
 exports.phaseDirNameRe = new RegExp(`^${OPTIONAL_PROJECT_CODE_PREFIX_SOURCE}\\d{2,}(?:-\\d+)*(?:\\.\\d+)*-[\\w-]+$`, 'i');
-// Extracts the full phase token from a directory name, including milestone-prefixed
-// multi-segment tokens like "02-01" from "02-01-setup" or "GSD-02-01-setup".
+// Extracts the full phase token from a directory name, including project-code and
+// milestone prefixes plus multi-segment tokens like "02-01" from "02-01-setup"
+// or "GSD-02-01" from "GSD-02-01-setup". The capture intentionally matches
+// extractPhaseToken() exactly; health-validation consumers strip the project code
+// only where their historical disk/roadmap comparison requires a numeric token.
 // #2043: a *continuation* sub-phase segment must be zero-padded, so a
 // single-digit slug word after a phase number (e.g. "46-6-rs-…", slug "6 Rs …") is
 // NOT absorbed — it captures "46", not "46-6". #2232: the continuation width is
 // exactly 2 (PHASE_CONTINUATION_SEGMENT_SOURCE), so a ≥3-digit slug word (a year:
 // "14-2026-photos-…") is not absorbed either — it captures "14", not "14-2026".
-// The first component stays "\d+"
+// #2528: this regex stays the LITERAL reading of the name and does NOT try to
+// re-classify an absorbed 2-digit continuation as a slug word — see the
+// extractPhaseToken doc comment for why that is a resolution-layer job
+// (matchPhaseDirs), not a tokenizer one. The two surfaces must agree, and they
+// agree on the literal reading. The first component stays "\d+"
 // (with the "[A-Z]?" suffix) so single-digit letter-suffixed phase ids ("1A") and
 // milestone-prefixed single-digit sub-phases ("M1-2" → prefix "M1-" stripped, then
 // "2") still match. The trailing boundary "(?:-|$)" (was "(?:-[a-z]|$)") lets a slug
 // that starts with a digit terminate the token.
-exports.PHASE_TOKEN_FROM_DIR_RE = new RegExp(`^${OPTIONAL_PROJECT_CODE_PREFIX_SOURCE}(\\d+(?:-${PHASE_CONTINUATION_SEGMENT_SOURCE})*[A-Z]?(?:\\.\\d+)*)(?:-|$)`, 'i');
+exports.PHASE_TOKEN_FROM_DIR_RE = new RegExp(`^(${CASE_FLEXIBLE_PROJECT_CODE_PREFIX_SOURCE}` +
+    `\\d+[A-Za-z]?(?:-${PHASE_CONTINUATION_SEGMENT_SOURCE}[A-Z]?)*(?:\\.\\d+)*)(?:-|$)`);
 exports.MILESTONE_ARCHIVE_DIR_RE = /^v\d+.*-phases$/i;
 // ── Issue #26: I001 canonicalization ────────────────────────────────────────
 function canonicalPlanStem(stem) {
@@ -64,7 +78,8 @@ function canonicalPlanStem(stem) {
     // so a digit-leading slug word (e.g. "46-6-rs-…") is not mistaken
     // for a "46-6" phase/plan pair. #2232: exactly 2 digits, so a year-leading
     // slug ("14-2026-photos-…") is not mistaken for a "14-2026" pair either.
-    const m = stem.match(new RegExp(`^(${PHASE_NUMBER_TOKEN_SOURCE}-${PHASE_CONTINUATION_SEGMENT_SOURCE})`, 'i'));
+    const m = stem.match(new RegExp(`^(${CASE_FLEXIBLE_PHASE_NUMBER_TOKEN_SOURCE}-${PHASE_CONTINUATION_SEGMENT_SOURCE})` +
+        `(?=[A-Z](?:-|$)|-|$)`));
     return m ? m[1] : stem;
 }
 // ── Issue #6: phase variant helpers (W006/W007) ──────────────────────────────
@@ -136,4 +151,35 @@ function buildNotStartedPhaseVariants(roadmapContent) {
             notStartedPhases.add(variant);
     }
     return notStartedPhases;
+}
+/**
+ * Detect binary corruption (embedded NUL bytes) in a text artifact's bytes.
+ *
+ * #2701: the plan/summary/verification/state validators must FAIL LOUD on a
+ * NUL-corrupted file instead of reporting `valid: true`. A NUL byte is the
+ * unambiguous signal — UTF-8 text never contains 0x00 — and a file carrying one
+ * is binary-classified by `file(1)`, then silently OMITTED from recursive /
+ * binary-skipping search results (`rg -l`, `grep -rI`, exit 0), so the corruption
+ * reads downstream as "file absent" rather than "file corrupt." The error message
+ * names that consequence so the next investigator is not misdirected.
+ *
+ * This is a pure, opt-in check called explicitly by each validator at its own
+ * entry point. It is deliberately NOT placed inside the shared `platformReadSync`
+ * read primitive (which dozens of best-effort, tolerant reads flow through and
+ * which must not start hard-failing on encoding). It does NOT strip, sanitize, or
+ * repair the NUL bytes — corruption is a signal of an upstream authoring-tool bug
+ * and must stay visible.
+ *
+ * @param buf   the file bytes (Buffer or string; a string is searched char-wise)
+ * @param relPath  a path/label for the diagnostic message
+ * @returns an error string when NUL is found, or `null` when the bytes are clean text
+ */
+function textEncodingError(buf, relPath) {
+    const nul = typeof buf === 'string' ? buf.indexOf('\0') : buf.indexOf(0x00);
+    if (nul === -1)
+        return null;
+    return (`${relPath}: file contains NUL bytes (first at offset ${nul}). ` +
+        'Artifact files must be UTF-8 text. A NUL-corrupted file is binary-classified ' +
+        'and silently skipped by recursive / binary-skipping search tools (rg, grep -I), ' +
+        'so downstream verification reports its contents as missing rather than corrupt.');
 }

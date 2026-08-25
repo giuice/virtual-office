@@ -22,7 +22,7 @@ The phase is intentionally not a Zoom/Meet replacement. Basic camera video may b
 - **D-02:** Preserve and extend the existing P2P WebRTC audio transport and Supabase Realtime signaling for this phase. Do not migrate to LiveKit or another SFU now. — **Reversibility:** costly — a future migration replaces `WebRTCManager` and signaling internals, although the product UI and space behavior can remain.
 - **D-03:** Do not build a general-purpose Zoom/Meet equivalent. Faces are secondary to clearly seeing the content being presented.
 - **D-04:** Basic camera video is optional only when it can reuse the chosen implementation safely; it must not delay or weaken audio or screen sharing and is not a completion gate.
-- **D-05:** Research and planning must validate the current P2P approach with realistic multi-user screen-sharing tests before claiming support at larger room sizes. LiveKit or another SFU remains the expansion path if observed performance, recording, or advanced video later requires it.
+- **D-05:** Support claims are limited to the environments covered by the existing automated and local evidence. Paid TURN, extra devices, extra networks, and a manual browser matrix are not Phase 3 requirements; restrictive-network or larger-room guarantees require a separately funded future validation effort. LiveKit or another SFU remains a future expansion path if observed demand justifies it.
 
 ### Meeting model
 - **D-06:** The space itself is the meeting. There is no separate call session to create, invite everyone into, or end globally.
@@ -87,7 +87,7 @@ The phase is intentionally not a Zoom/Meet replacement. Basic camera video may b
 - The active space owns the media lifecycle; changing `spaceId` recreates and cleans the manager.
 - Users join media transport in listen-only mode and transmit only after an explicit browser gesture.
 - Supabase Realtime carries signaling while media remains peer-to-peer.
-- STUN has a default and TURN is operator-configurable through environment variables.
+- STUN has a free default. TURN is optional operator infrastructure and must never become an implicit purchase, credential, rollout, or phase-completion requirement.
 - Existing cleanup stops local tracks and removes remote media elements, which screen tracks must also respect.
 
 ### Integration Points

@@ -24,6 +24,15 @@ type RpcResult = Readonly<Record<string, unknown>> & {
   readonly code?: string;
 };
 
+type RuntimeControlSnapshot = {
+  readonly mode: "legacy" | "maintenance" | "atomic";
+  readonly cutover_id: string | null;
+  readonly changed_at: Date;
+  readonly changed_by: string;
+  readonly legacy_adapter_enabled: boolean;
+  readonly legacy_adapter_disabled_at: Date | null;
+};
+
 function sessionIdFromAccessToken(token: string): string {
   const encodedPayload = token.split(".")[1];
   if (!encodedPayload) throw new Error("Local Auth token was malformed");
@@ -44,7 +53,77 @@ describe("presence-db screen-share lease authority", () => {
   let spaceAccessRevision: string;
   let owner: Occupant;
   let viewer: Occupant;
+  let runtimeControlSnapshot: RuntimeControlSnapshot | undefined;
   const companyIds = new Set<string>();
+
+  async function enableLegacyFixtureMode(): Promise<RuntimeControlSnapshot> {
+    await fixtures.sql("grant presence_maintenance_owner to postgres");
+    try {
+      await fixtures.sql("set role presence_maintenance_owner");
+      try {
+        const [snapshot] = await fixtures.sql<RuntimeControlSnapshot>(
+          `select mode, cutover_id, changed_at, changed_by,
+                  legacy_adapter_enabled, legacy_adapter_disabled_at
+             from private.presence_runtime_control
+            where singleton_id`,
+        );
+        if (!snapshot) throw new Error("Missing presence_runtime_control row");
+
+        await fixtures.sql(
+          `update private.presence_runtime_control
+           set mode = 'legacy',
+               cutover_id = null,
+               changed_at = pg_catalog.clock_timestamp(),
+               changed_by = 'screen-share-lease-test',
+               legacy_adapter_enabled = true,
+               legacy_adapter_disabled_at = null
+           where singleton_id`,
+        );
+        return snapshot;
+      } finally {
+        await fixtures.sql("reset role").catch(() => undefined);
+      }
+    } finally {
+      await fixtures.sql(
+        "revoke presence_maintenance_owner from postgres",
+      ).catch(() => undefined);
+    }
+  }
+
+  async function restoreRuntimeControl(
+    snapshot: RuntimeControlSnapshot,
+  ): Promise<void> {
+    await fixtures.sql("grant presence_maintenance_owner to postgres");
+    try {
+      await fixtures.sql("set role presence_maintenance_owner");
+      try {
+        await fixtures.sql(
+          `update private.presence_runtime_control
+           set mode = $1,
+               cutover_id = $2,
+               changed_at = $3,
+               changed_by = $4,
+               legacy_adapter_enabled = $5,
+               legacy_adapter_disabled_at = $6
+           where singleton_id`,
+          [
+            snapshot.mode,
+            snapshot.cutover_id,
+            snapshot.changed_at,
+            snapshot.changed_by,
+            snapshot.legacy_adapter_enabled,
+            snapshot.legacy_adapter_disabled_at,
+          ],
+        );
+      } finally {
+        await fixtures.sql("reset role").catch(() => undefined);
+      }
+    } finally {
+      await fixtures.sql(
+        "revoke presence_maintenance_owner from postgres",
+      ).catch(() => undefined);
+    }
+  }
 
   async function createScenario(key: string): Promise<LeaseScenario> {
     const [company] = await fixtures.sql<{ id: string }>(
@@ -482,6 +561,10 @@ describe("presence-db screen-share lease authority", () => {
 
   beforeAll(async () => {
     fixtures = await PresenceFixtures.connect(NS);
+    // Other serialized Presence DB files intentionally exercise atomic mode.
+    // This suite uses trusted direct placement SQL as fixture setup, so own
+    // the singleton prerequisite instead of depending on file execution order.
+    runtimeControlSnapshot = await enableLegacyFixtureMode();
     const [company] = await fixtures.sql<{ id: string }>(
       `insert into public.companies (name, settings) values ($1, '{}'::jsonb) returning id`,
       [`Screen share company::${NS}`],
@@ -507,12 +590,21 @@ describe("presence-db screen-share lease authority", () => {
 
   afterAll(async () => {
     if (fixtures) {
-      await fixtures.sql(
-        `delete from public.users where company_id = any($1::uuid[])`,
-        [[...companyIds]],
-      );
-      await fixtures.cleanup();
-      await fixtures.end();
+      try {
+        await fixtures.sql(
+          `delete from public.users where company_id = any($1::uuid[])`,
+          [[...companyIds]],
+        );
+        await fixtures.cleanup();
+      } finally {
+        try {
+          if (runtimeControlSnapshot) {
+            await restoreRuntimeControl(runtimeControlSnapshot);
+          }
+        } finally {
+          await fixtures.end();
+        }
+      }
     }
   });
 
@@ -861,7 +953,7 @@ describe("presence-db screen-share lease authority", () => {
   });
 
   it("enforces media-topic RLS for a mapped Auth UID rather than the application UUID", async () => {
-    const topic = `company:${companyId}:space:${spaceId}:media`;
+    const topic = `company:${companyId}:space:${spaceId}:media:v2`;
     await fixtures.sql("begin");
     try {
       await fixtures.sql(
@@ -884,12 +976,12 @@ describe("presence-db screen-share lease authority", () => {
       ).toEqual([{ extension: "broadcast" }]);
       await fixtures.sql(
         `select pg_catalog.set_config('realtime.topic', $1, true)`,
-        [`company:${companyId}:space:${randomUUID()}:media`],
+        [`company:${companyId}:space:${randomUUID()}:media:v2`],
       );
       await expect(
         fixtures.sql(
           `insert into realtime.messages (topic, extension) values ($1, 'broadcast')`,
-          [`company:${companyId}:space:${randomUUID()}:media`],
+          [`company:${companyId}:space:${randomUUID()}:media:v2`],
         ),
       ).rejects.toMatchObject({ code: "42501" });
     } finally {

@@ -375,14 +375,14 @@ displayTrack.addEventListener('ended', () => {
    - Restrição de planejamento: criar a migration de lease/policies, aplicá-la em Supabase/Postgres local descartável e ler de volta histórico, catálogo, grants, FORCE RLS e as quatro policies privadas antes do tracer. Essa prova local não autoriza nem descreve staging/produção.
    - Gate de rollout: antes de qualquer cliente privado depender de um banco online, uma decisão separada deve nomear o alvo e autorizar explicitamente backup/rollback/manutenção; o rollout é database-first, com aplicação e readback no mesmo alvo, smoke de duas identidades e só então deploy compatível. Sem esse gate, a fase permanece local-only. [CITED: https://supabase.com/docs/guides/realtime/authorization]
 
-2. **TURN — resolvido como configuração preservada e gate de confiabilidade em rede real.**
+2. **TURN — resolvido como configuração opcional, sem custo ou gate nesta fase.**
    - Estado conhecido: o código mantém STUN e só inclui TURN quando `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USERNAME` e `NEXT_PUBLIC_TURN_CREDENTIAL` existem; esta pesquisa não verificou credenciais, operador nem travessia entre NATs. [VERIFIED: `src/lib/webrtc/ice-config.ts`]
    - Restrição de planejamento: preservar `getIceServers()` e as variáveis atuais sem criar fallback de transporte ou migrar para SFU, per D-02; automação cobre somente configuração/branching.
-   - Gate de aceite: UAT real com duas identidades em redes distintas deve registrar apenas estado ICE/tipo de candidato redigido e comprovar relay quando necessário. TURN ausente ou não funcional bloqueia qualquer alegação ampla de confiabilidade fora de redes permissivas; não pode ser aceito silenciosamente. [VERIFIED: `src/lib/webrtc/WebRTCManager.ts`]
+   - Limite de aceite: a fase usa o fallback STUN gratuito e não exige conta, credencial ou serviço TURN. Confiabilidade em redes restritivas permanece explicitamente não verificada e não alegada; uma futura validação de TURN só pode existir em trabalho separado, com orçamento e autorização próprios. [VERIFIED: `src/lib/webrtc/WebRTCManager.ts`]
 
-3. **Matriz de browsers — resolvida com baseline automatizado e UAT feature-detected.**
+3. **Matriz de browsers — resolvida com baseline automatizado e sem obrigação manual.**
    - Baseline automatizado: Chromium é o projeto suportado para Playwright de UI/lifecycle; mídia injetada nessa suíte não prova picker, entrega P2P, TURN ou isolamento multiusuário real. [VERIFIED: `playwright.config.ts`]
-   - Matriz manual acordada: UAT executa as versões desktop suportadas pela empresa de Chrome, Firefox e Safari, com aba/janela/tela inteira apenas onde cada browser/plataforma expõe a fonte. [CITED: https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia]
+   - Limite de suporte: a fase não exige instalação nem teste manual em Chrome, Firefox e Safari. O baseline automatizado Chromium é a evidência disponível; paridade entre browsers permanece não verificada e não alegada. [CITED: https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia]
    - Disposição de incompatibilidade: feature detection deve desabilitar o CTA e exibir `Screen sharing isn’t supported in this browser. Use a current supported browser.` quando captura não existir; ausência de suporte não pode iniciar picker nem oferecer fallback falso. [VERIFIED: `.planning/phases/03-video-and-screen-sharing/03-UI-SPEC.md`]
 
 ## Environment Availability
@@ -393,12 +393,12 @@ displayTrack.addEventListener('ended', () => {
 | npm | dependência direta Zod e comandos de teste | ✓ | 12.0.1 | — [VERIFIED: `npm --version`] |
 | Next.js local | floor-plan/stage | ✓ | 16.2.10 | — [VERIFIED: `node_modules/.bin/next --version`] |
 | Playwright local | testes UI simulados | ✓ | 1.61.1 | — [VERIFIED: `node_modules/.bin/playwright --version`] |
-| Docker daemon | testes locais reais de RLS/lease | ✗ | client 29.6.1, daemon indisponível | iniciar Docker Desktop antes de `test:presence:db`. [VERIFIED: `docker info --format '{{.ServerVersion}}'`] |
+| Docker daemon | repetição opcional da prova local de RLS/lease | ✗ | client 29.6.1, daemon indisponível | a prova já foi concluída nos planos anteriores; 03-13 não exige instalar ou iniciar Docker. [VERIFIED: summaries de 03-02 e 03-12] |
 | Supabase CLI global | reset/readback local | ✗ | — | usar CLI devDependency via scripts após Docker, ou MCP/CLI autorizada; não há binário global. [VERIFIED: command availability audit] |
-| Browser binário no PATH | smoke manual direto | ✗ | — | Playwright local para teste automatizado; navegador corporativo instalado/perfil separado para UAT multiusuário. [VERIFIED: command availability audit] |
-| TURN configurado | P2P fora de NAT permissivo | ? | — | não há fallback equivalente para confiabilidade; provisionar/validar TURN. [VERIFIED: `src/lib/webrtc/ice-config.ts`] |
+| Browser binário no PATH | smoke manual opcional | ✗ | — | Playwright local cobre o baseline automatizado; nenhuma instalação, perfil separado ou matriz manual é exigida. [VERIFIED: command availability audit] |
+| TURN configurado | melhoria futura opcional para NAT restritivo | ? | — | não provisionar nesta fase; usar STUN gratuito e limitar as alegações ao ambiente coberto. [VERIFIED: `src/lib/webrtc/ice-config.ts`] |
 
-**Missing dependencies with no fallback:** Docker daemon para a prova de RLS/claim concorrente e TURN funcional para alegação de conectividade confiável em redes restritivas. [VERIFIED: `docker info --format '{{.ServerVersion}}'`; VERIFIED: `src/lib/webrtc/ice-config.ts`]
+**Missing dependencies with no fallback para 03-13:** nenhuma. Docker e TURN não precisam ser instalados ou provisionados para fechar a fase; repetir a prova de banco ou validar redes restritivas exige uma futura solicitação separada. [VERIFIED: summaries de 03-02 e 03-12; VERIFIED: `src/lib/webrtc/ice-config.ts`]
 
 **Missing dependencies with fallback:** Supabase CLI global e browser no PATH não bloqueiam os testes de unidade; Playwright local existe. [VERIFIED: command availability audit; VERIFIED: `node_modules/.bin/playwright --version`]
 
@@ -420,10 +420,10 @@ displayTrack.addEventListener('ended', () => {
 | VID-01 | Perfect negotiation em add/remove screen, isolamento de tracks e cleanup por peer | unit | `npm test -- __tests__/webrtc-manager.test.ts` | ❌ Wave 0 |
 | VID-01 | Canal privado só permite empresa/espaço correto para Broadcast e Presence | real DB/RLS | `npm run test:presence:db -- __tests__/presence-db/screen-share-realtime-policy.test.ts` | ❌ Wave 0 |
 | VID-02 | Entrar listen-only, microfone só por gesto, mute e speaking continuam | unit/component | `npm test -- __tests__/audio-context.test.tsx __tests__/space-audio-controls.test.tsx` | ⚠️ somente provider existe; controle específico a confirmar/adicionar |
-| VID-02 | Dois usuários em sala ouvem áudio sem mic automático | manual multi-user browser | não automatizável como prova suficiente com mocks | ❌ UAT obrigatório |
+| VID-02 | Entrada listen-only, ativação explícita, mute e speaking | unit/component + browser determinístico | `npm test -- __tests__/screen-share-context.test.tsx __tests__/space-audio-controls.test.tsx` | ✅ evidência local; smoke real opcional |
 | VID-04 | `NotAllowedError`, cancelamento, conflito, `ended`, saída e troca de espaço restauram stage/layout | unit/component | `npm test -- __tests__/screen-share-context.test.tsx __tests__/floor-plan-presentation-stage.test.tsx` | ❌ Wave 0 |
 | VID-04 | Dois claims concorrentes retornam exatamente um vencedor; TTL libera abandono | real DB/concurrency | `npm run test:presence:db -- __tests__/presence-db/screen-share-lease.test.ts` | ❌ Wave 0 |
-| VID-04 | Uma tela real chega ao segundo usuário e desaparece em browser-ended/departure/space change | manual multi-user browser | UAT em duas identidades e duas redes quando possível | ❌ UAT obrigatório |
+| VID-04 | Stage, busy loser e teardown de display permanecem estáveis | unit/component + Playwright determinístico | `npm test -- __tests__/screen-share-context.test.tsx __tests__/floor-plan-presentation-stage.test.tsx` | ✅ evidência local; rede/browser real não alegados |
 
 ### Sampling Rate
 

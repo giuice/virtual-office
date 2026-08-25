@@ -62,13 +62,13 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 
 Parse `project_exists`, `planning_exists`, `has_git`, `git_worktree_root`, `in_nested_subdir`, `project_path` from INIT.
 
-**Absolute path fields (#2376):** INIT also carries `requirements_path`, `roadmap_path`, `state_path`, `intel_dir`, and `conflicts_path` — all anchored on `project_root`, not the orchestrator's own cwd. Use these (not bare `.planning/...` literals) whenever building `<files_to_read>`/output paths for a spawned subagent, since that subagent's own cwd may differ from the orchestrator's.
+**Absolute path fields (#2376):** INIT also carries `requirements_path`, `roadmap_path`, `state_path`, `intel_dir`, and `conflicts_path` — all anchored on `project_root`, not the orchestrator's own cwd. Use these (not bare `.planning/...` literals) whenever building `<required_reading>`/output paths for a spawned subagent, since that subagent's own cwd may differ from the orchestrator's.
 
 **Auto-detect MODE** if not set:
 - `planning_exists: true` → `MODE=merge`
 - `planning_exists: false` → `MODE=new`
 
-If user passed `--mode new` but `.planning/` already exists: display warning and require explicit confirm via `AskUserQuestion` (approve-revise-abort from `references/gate-prompts.md`) before overwriting.
+If user passed `--mode new` but `.planning/` already exists: display warning and require explicit confirm via `AskUserQuestion` (approve-revise-abort from `gsd-core/references/gate-prompts.md`) before overwriting.
 
 Git initialisation (Bug #3491 — never create a nested `.git` inside an existing worktree):
 
@@ -84,9 +84,10 @@ git init
 - execution_context path `/.codex/` → `RUNTIME=codex`
 - `/.gemini/` → `RUNTIME=gemini`
 - `/.opencode/` or `/.config/opencode/` → `RUNTIME=opencode`
+- `/.trae/` → `RUNTIME=trae`
 - else → `RUNTIME=claude`
 
-Fall back to env vars (`CODEX_HOME`, `GEMINI_CONFIG_DIR`, `OPENCODE_CONFIG_DIR`) if execution_context is unavailable.
+Fall back to env vars (`CODEX_HOME`, `GEMINI_CONFIG_DIR`, `OPENCODE_CONFIG_DIR`, `TRAE_CONFIG_DIR`) if execution_context is unavailable.
 
 </step>
 
@@ -139,7 +140,7 @@ GSD > Discovered {N} docs, which exceeds the v1 cap of 50.
 
 Exit without proceeding.
 
-**Display discovered set** and request approval (see `references/gate-prompts.md` — `yes-no-pick` pattern works; or `approve-revise-abort`):
+**Display discovered set** and request approval (see `gsd-core/references/gate-prompts.md` — `yes-no-pick` pattern works; or `approve-revise-abort`):
 
 ```
 Discovered {N} documents:
@@ -188,6 +189,10 @@ Collect the one-line confirmations from each classifier. If any classifier error
 
 Spawn `gsd-doc-synthesizer` once (runs in a subagent — no output until it returns, ~1–5 min; expected, not a freeze):
 
+<!-- #2508 runtime-aware-dispatch -->
+
+> **Runtime-aware dispatch (#2508 Phase 4).** GSD workflows dispatch specialized subagents by role. Before dispatching on a built-in-only runtime (kimi-code — three built-ins only), resolve the role to a built-in via `gsd_run query resolve-dispatch-type --requested <role> --raw`. On named-dispatch runtimes (the agent/OpenCode/…) the role is returned unchanged; on kimi-code it maps to `coder`/`explore`/`plan` by role-suffix. The persona rides `${AGENT_SKILLS_<ROLE>}` (Phase 3) regardless. See @gsd-core/references/runtime-aware-dispatch.md.
+
 ```
 Agent({
   subagent_type: "gsd-doc-synthesizer",
@@ -220,7 +225,7 @@ The synthesizer writes:
 
 Read `.planning/INGEST-CONFLICTS.md`. Count entries in each bucket (the synthesizer always writes the three-bucket header; parse the `### BLOCKERS ({N})`, `### WARNINGS ({N})`, `### INFO ({N})` lines).
 
-Apply the safety semantics from `references/doc-conflict-engine.md`. Operation noun: `ingest`.
+Apply the safety semantics from `gsd-core/references/doc-conflict-engine.md`. Operation noun: `ingest`.
 
 **If BLOCKERS > 0:**
 
@@ -335,7 +340,7 @@ Show:
 ## Anti-Patterns
 
 Do NOT:
-- Violate the shared conflict-engine contract in `references/doc-conflict-engine.md` (no markdown tables, no new severity labels, no bypass of the BLOCKER gate)
+- Violate the shared conflict-engine contract in `gsd-core/references/doc-conflict-engine.md` (no markdown tables, no new severity labels, no bypass of the BLOCKER gate)
 - Write PROJECT.md, REQUIREMENTS.md, ROADMAP.md, or STATE.md when BLOCKERs exist in the conflict report
 - Skip the 50-doc cap — larger sets must use `--manifest` to narrow the scope
 - Auto-resolve LOCKED-vs-LOCKED ADR contradictions — those are BLOCKERs in both modes

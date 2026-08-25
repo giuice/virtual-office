@@ -15,6 +15,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PATH_ACTION_REASON = void 0;
 exports.toPosixPath = toPosixPath;
 exports.toNativePath = toNativePath;
 exports.posixNormalize = posixNormalize;
@@ -35,11 +36,15 @@ exports.projectCodexHookTomlCommand = projectCodexHookTomlCommand;
 exports.escapePowerShellSingleQuoted = escapePowerShellSingleQuoted;
 exports.escapePosixDoubleQuoted = escapePosixDoubleQuoted;
 exports.escapeSingleQuotedShellLiteral = escapeSingleQuotedShellLiteral;
+exports.projectPathExportLine = projectPathExportLine;
 exports.renderShellActionLines = renderShellActionLines;
 exports.projectPathActionProjection = projectPathActionProjection;
 exports.projectPersistentPathExportActions = projectPersistentPathExportActions;
+exports.isSpawnTimeout = isSpawnTimeout;
 exports.execGit = execGit;
 exports.execNpm = execNpm;
+exports.resolveExecutableBinary = resolveExecutableBinary;
+exports.projectSpawnInvocation = projectSpawnInvocation;
 exports.execTool = execTool;
 exports.resolveGsdToolsPath = resolveGsdToolsPath;
 exports.dispatchGsdCommand = dispatchGsdCommand;
@@ -55,6 +60,7 @@ const node_fs_1 = __importDefault(require("node:fs"));
 // can intercept calls from this seam — destructured imports capture references
 // at load time and become un-mockable.
 const node_child_process_1 = __importDefault(require("node:child_process"));
+const pattern_cjs_1 = require("./pattern.cjs");
 /**
  * Convert a filesystem path to POSIX form (forward slashes) by translating the
  * platform-native separator. Single seam for native→POSIX conversion.
@@ -303,7 +309,7 @@ function isManagedHookCommand(commandText, opts = {}) {
             return false;
     }
     for (const basename of managedBasenames) {
-        const escapedBasename = basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedBasename = (0, pattern_cjs_1.escapeRegex)(basename);
         const pattern = new RegExp(`(^|[\\\\/\\s"'` + '`' + `])${escapedBasename}(?=$|[\\s"'` + '`' + `])`);
         if (pattern.test(normalizedCommand))
             return true;
@@ -351,8 +357,34 @@ function projectLegacySettingsHookCommand({ absoluteRunner, scriptPath, scriptTo
         platform,
     });
 }
+// Implements the TOML v1.0.0 basic-string escaping grammar (toml.md, "Basic
+// strings" section, https://toml.io/en/v1.0.0#string): a basic string must
+// escape the quotation mark, backslash, and control characters other than
+// tab (U+0000-U+0008, U+000A-U+001F, U+007F). Compact escapes are used where
+// TOML defines them (\b \t \n \f \r \" \\); every other character in the
+// required ranges falls back to \uXXXX. See #3118 — an earlier version
+// escaped only backslash and quote, so a raw newline/CR/NUL in a value
+// produced an unparseable config.toml.
+const TOML_COMPACT_ESCAPES = {
+    '\x08': '\\b',
+    '\x09': '\\t',
+    '\x0A': '\\n',
+    '\x0C': '\\f',
+    '\x0D': '\\r',
+};
+// U+0000-U+0008, U+000A-U+001F, U+007F — control characters other than tab
+// (U+0009), which the grammar permits unescaped.
+const TOML_MUST_ESCAPE_CONTROL_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/g;
 function escapeTomlDoubleQuotedString(value) {
-    return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return String(value)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(TOML_MUST_ESCAPE_CONTROL_CHARS, (ch) => {
+        const compact = TOML_COMPACT_ESCAPES[ch];
+        if (compact)
+            return compact;
+        return `\\u${ch.codePointAt(0).toString(16).padStart(4, '0')}`;
+    });
 }
 function projectCodexHookTomlCommand({ absoluteRunner, scriptPath, platform = process.platform }) {
     const command = projectManagedHookCommand({
@@ -372,6 +404,27 @@ function escapePosixDoubleQuoted(value) {
 function escapeSingleQuotedShellLiteral(value) {
     return String(value).replace(/'/g, "'\\''");
 }
+/**
+ * The `export PATH="<dir>:$PATH"` line every persistence lane appends, plus the escaped directory
+ * token it embeds. One builder because three lanes emit this line: a lane that re-escapes it
+ * locally is how #3118 shipped a `$(…)` into ~/.bashrc, where it ran on every new shell. The
+ * escaping is for the line's FINAL context — a double-quoted string in an rc file — not for
+ * whatever transport (an `echo`, a paste) it passes through on the way there.
+ */
+function projectPathExportLine(targetDir) {
+    const escapedDir = escapePosixDoubleQuoted(String(targetDir));
+    return { escapedDir, line: `export PATH="${escapedDir}:$PATH"` };
+}
+/**
+ * Why a PATH suggestion produced no actions. An empty `shellActions` alone folds two different
+ * facts together — "no target directory was given" and "this target directory cannot be
+ * expressed as a shell command" — and a caller that cannot tell them apart prints a header with
+ * nothing under it (#3118).
+ */
+exports.PATH_ACTION_REASON = Object.freeze({
+    NO_TARGET_DIR: 'no_target_dir',
+    WIN32_RESERVED_QUOTE: 'win32_reserved_quote',
+});
 function renderShellActionLines(shellActions = []) {
     return shellActions.map((action) => {
         if (!action || !action.command)
@@ -381,12 +434,18 @@ function renderShellActionLines(shellActions = []) {
 }
 function projectPathActionProjection({ mode = 'repair', targetDir, platform = process.platform, }) {
     if (!targetDir)
-        return { shellActions: [], actionLines: [] };
+        return { shellActions: [], actionLines: [], reason: exports.PATH_ACTION_REASON.NO_TARGET_DIR };
+    // #3118: `"` is reserved on Windows, so a path containing one cannot exist — and it would close
+    // cmd's quoted region in the `powershell -Command "…"` lane below, turning the rest into cmd
+    // input. There is no correct command to suggest for an impossible path: fail closed rather than
+    // emit one whose quoting can be broken.
+    if (platform === 'win32' && String(targetDir).includes('"'))
+        return { shellActions: [], actionLines: [], reason: exports.PATH_ACTION_REASON.WIN32_RESERVED_QUOTE };
     const isWin32 = platform === 'win32';
     let shellActions;
     if (isWin32) {
         const psTargetDir = escapePowerShellSingleQuoted(targetDir);
-        const bashTargetDir = escapeSingleQuotedShellLiteral(posixNormalize(String(targetDir)));
+        const bashExportLine = escapeSingleQuotedShellLiteral(projectPathExportLine(posixNormalize(String(targetDir))).line);
         shellActions = [
             {
                 label: 'PowerShell',
@@ -401,42 +460,51 @@ function projectPathActionProjection({ mode = 'repair', targetDir, platform = pr
             {
                 label: 'Git Bash',
                 shell: 'bash',
-                command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.bashrc`,
+                command: `echo '${bashExportLine}' >> ~/.bashrc`,
             },
         ];
     }
     else if (mode === 'persist') {
-        const bashTargetDir = escapeSingleQuotedShellLiteral(String(targetDir));
+        const exportLine = escapeSingleQuotedShellLiteral(projectPathExportLine(targetDir).line);
+        const fishTargetDir = escapeSingleQuotedShellLiteral(String(targetDir));
         shellActions = [
             {
                 label: 'zsh',
                 shell: 'zsh',
-                command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.zshrc`,
+                command: `echo '${exportLine}' >> ~/.zshrc`,
             },
             {
                 label: 'bash',
                 shell: 'bash',
-                command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.bashrc`,
+                command: `echo '${exportLine}' >> ~/.bashrc`,
             },
             // #323: fish has no `export`/`$PATH`-list syntax. `fish_add_path` is the
             // fish-native API (>= fish 3.2, 2021) that persists to the universal
             // variable store and de-duplicates. The directory is single-quoted with
             // the same POSIX literal escaping as the zsh/bash siblings — `'\''` is
             // also a valid escaped single quote in fish between quote spans.
+            //
+            // #3118 review MINOR: a `targetDir` with a leading `-` (e.g. `-v`) is a
+            // legal directory name, but fish's argparse-based option scanning
+            // treats a leading-dash token as a flag REGARDLESS of quoting, so
+            // `fish_add_path '-v'` misparses it and prints "No paths to add, not
+            // setting anything." (exit 1) instead of adding the path. `--` is
+            // fish's standard end-of-options separator; verified empirically
+            // against a real fish 4.8.1 install that `fish_add_path -- '-v'`
+            // succeeds where the unseparated form fails.
             {
                 label: 'fish',
                 shell: 'fish',
-                command: `fish_add_path '${bashTargetDir}'`,
+                command: `fish_add_path -- '${fishTargetDir}'`,
             },
         ];
     }
     else {
-        const posixTargetDir = escapePosixDoubleQuoted(targetDir);
         shellActions = [
             {
                 label: null,
                 shell: 'posix',
-                command: `export PATH="${posixTargetDir}:$PATH"`,
+                command: projectPathExportLine(targetDir).line,
             },
         ];
     }
@@ -451,18 +519,46 @@ function projectPersistentPathExportActions({ targetDir, platform = process.plat
         targetDir,
         platform,
     });
-    return { shellActions: projected.shellActions };
+    return projected.reason === undefined
+        ? { shellActions: projected.shellActions }
+        : { shellActions: projected.shellActions, reason: projected.reason };
+}
+/**
+ * Returns true when a spawn/exec result indicates the subprocess was killed
+ * by a timeout, i.e. it never completed and reported a real answer. This is
+ * the single shared definition of "did this subprocess time out" — worktree
+ * safety (src/worktree-safety.cts) and worktree base-ref detection
+ * (src/worktree-base-ref.cts) both call this instead of maintaining their
+ * own copies (#3050 — "Generative Fix Divergence").
+ *
+ * Only `error.code === 'ETIMEDOUT'` is checked. Node.js guarantees this
+ * cross-platform when `spawnSync`'s `timeout` option fires. The `signal ===
+ * 'SIGTERM'` check some earlier code paired with it is platform-fragile —
+ * Windows does not necessarily report SIGTERM the same way — and pairing it
+ * in as a REQUIRED conjunct risks a false NEGATIVE (a timeout that silently
+ * fails to trip the guard) on that platform. There is no false-positive risk
+ * from dropping it: an externally-delivered SIGTERM (not a timeout) leaves
+ * `error` null, so `error.code === 'ETIMEDOUT'` alone still won't match it.
+ */
+function isSpawnTimeout(result) {
+    return result.error?.code === 'ETIMEDOUT';
 }
 function _spawnResult(result, program) {
     if (result.error && result.error.code === 'ENOENT') {
-        return { exitCode: 127, stdout: '', stderr: `${program}: not found`, signal: null, error: result.error };
+        return { exitCode: 127, stdout: '', stderr: `${program}: not found`, signal: null, error: result.error, timedOut: false };
     }
+    const signal = result.signal ?? null;
+    const error = result.error ?? null;
     return {
         exitCode: result.status ?? 1,
         stdout: (result.stdout ?? '').toString().trim(),
         stderr: (result.stderr ?? '').toString().trim(),
-        signal: result.signal ?? null,
-        error: result.error ?? null,
+        signal,
+        error,
+        // Reuse the single shared timeout predicate (isSpawnTimeout, below) rather
+        // than re-deriving it here — see that function's docstring for why only
+        // error.code === 'ETIMEDOUT' is checked (not signal === 'SIGTERM').
+        timedOut: isSpawnTimeout({ error }),
     };
 }
 function execGit(args, opts = {}) {
@@ -496,15 +592,283 @@ function execNpm(args, opts = {}) {
     });
     return _spawnResult(result, 'npm');
 }
+/**
+ * Default PATHEXT when Windows does not supply one. Matches the value
+ * `gsd-tools.cjs`'s `resolveSpawnBinary` shipped in #3275; kept identical so the
+ * delegation is a behavior-preserving move rather than a redefinition.
+ */
+const DEFAULT_PATHEXT = '.EXE;.CMD;.BAT;.COM';
+/** Windows extensions that must be mediated through cmd.exe rather than spawned. */
+const CMD_MEDIATED_EXT = /\.(cmd|bat)$/i;
+function _isFile(candidate, requireExecutable = false, platform = process.platform) {
+    try {
+        if (!node_fs_1.default.statSync(candidate).isFile())
+            return false;
+        if (requireExecutable && platform !== 'win32')
+            node_fs_1.default.accessSync(candidate, node_fs_1.default.constants.X_OK);
+        return true;
+    }
+    catch {
+        // Missing, unreadable (EACCES), a broken link, or (when requireExecutable
+        // is set) not executable — all mean "not this one".
+        return false;
+    }
+}
+/**
+ * Read an environment variable by name, case-insensitively.
+ *
+ * Windows environment variable names are case-insensitive and conventionally
+ * cased `Path` / `ComSpec`, and `process.env` is a case-insensitive proxy that
+ * hides the difference. Spreading it (`{ ...process.env, ...opts.env }`, which
+ * `execTool` does whenever a caller supplies `opts.env`) produces a PLAIN object
+ * that keeps the OS's actual casing and loses the proxy — so an exact-case
+ * `env['PATH']` lookup returns undefined there and the PATH scan silently sees
+ * nothing. Caught by the Windows CI lane on #3617; the #3445 tests never hit it
+ * because they pass uppercase keys explicitly.
+ *
+ * Exact match wins when present, so a caller who sets the canonical name pays
+ * no scan.
+ */
+function _envGet(env, name) {
+    const exact = env[name];
+    if (exact !== undefined)
+        return exact;
+    const lower = name.toLowerCase();
+    for (const key of Object.keys(env)) {
+        if (key.toLowerCase() === lower)
+            return env[key];
+    }
+    return undefined;
+}
+/** cmd.exe's own quoting rule inside a `/c` string: a literal quote is doubled. */
+function _cmdQuoteToken(token) {
+    return `"${token.replace(/"/g, '""')}"`;
+}
+/**
+ * Build a single verbatim command-line string for `cmd.exe /c` where every
+ * token is force-quoted, then wrap the whole thing in one more outer pair.
+ * cmd.exe strips exactly one outer quote pair when the string begins with a
+ * quote and contains at least two — so the outer wrap disappears and what's
+ * left is a sequence of individually-quoted tokens. Force-quoting is the
+ * point: an unquoted `a&b` is split by cmd's own metacharacter parsing, but a
+ * quoted `"a&b"` is one literal argument.
+ */
+function _buildVerbatimCmdLine(target, args) {
+    return `"${[target, ...args].map(_cmdQuoteToken).join(' ')}"`;
+}
+/**
+ * #3411: resolve a DECLARED command name to the file a spawn can actually start.
+ * The single canonical answer to "where is this binary?" for the whole tree.
+ *
+ * This is the seam `CONTEXT.md` declares as "All OS-facing I/O; single platform
+ * seam". Four divergent implementations of this logic existed (#3411): `execNpm`'s
+ * `shell:true`, `execTool`'s absence of any handling, `gsd-tools.cjs`'s private
+ * scan, and `fallow-runner.cts`'s own candidate array. #3275 folded two of them
+ * together in `bin/`; this lifts that resolver into the seam so `bin/` delegates
+ * instead of owning a copy.
+ *
+ * **win32** tries PATHEXT entries ONLY — never the bare name. npm global installs
+ * drop an EXTENSIONLESS POSIX sh shim (`...\npm\codex`) next to `codex.CMD`; a
+ * bare-name-first scan resolves to it, the cmd.exe mediation gate sees no `.cmd`,
+ * and the ENOENT returns unchanged (field-reported on Windows 11 — see #3275).
+ * A name that ALREADY carries a PATHEXT-listed extension is tried as-is first, so
+ * `foo.exe` resolves to `foo.exe` rather than being probed as `foo.exe.EXE`; a
+ * suffix that is not in PATHEXT (`foo.txt`) is not an extension and only feeds the
+ * append loop.
+ *
+ * **POSIX** answers EXISTENCE by scanning PATH for the bare name. `execTool` does
+ * NOT consult this on POSIX — the bare name goes to spawnSync unchanged and Node's
+ * own PATH search does the work, so macOS/Linux behavior is untouched (#3275
+ * acceptance contract).
+ *
+ * Path-like names (any `/` or `\`) bypass the PATH scan: the name is already an
+ * address, so it passes through when it names an existing file.
+ *
+ * **`opts.prependPaths`** — directories searched BEFORE `env.PATH`, in array
+ * order (e.g. a project-local `node_modules/.bin`). Defaults to `[]`, so
+ * Phase 1's callers (`execTool`, and `gsd-tools.cjs`'s `resolveSpawnBinary` /
+ * `deps.spawn` / `hasBinary`), which set neither new option, are byte-identical
+ * to today. The existing per-directory candidate logic (win32 as-is-then-append-
+ * PATHEXT; POSIX bare name) applies to prepended directories exactly as it does
+ * to `PATH` segments — there is no special-casing.
+ *
+ * **`opts.requireExecutable`** — when `true` and the platform is not `win32`,
+ * a candidate must additionally pass `fs.accessSync(candidate, fs.constants.X_OK)`
+ * to count as a match. On `win32` this is a no-op (mode bits do not mean
+ * execute on Windows — the same carve-out `fallow-runner`'s prior private
+ * resolver already had). Defaults to `false`, so `accessSync` is never called
+ * unless a caller opts in. It is opt-in rather than the default because making
+ * `X_OK` unconditional would break #3445's suite: those tests stage candidates
+ * with plain `fs.writeFileSync` and never set an exec bit (the repo bans
+ * `chmod` in tests), so every one of them would resolve to `null` on POSIX.
+ *
+ * **`opts.pathOverride`** — "search THIS PATH, but read everything else —
+ * PATHEXT included — from the ambient environment." When set (`!== undefined`),
+ * the PATH search segments come from splitting `pathOverride` on `path.delimiter`
+ * instead of from `env.PATH`; `pathOverride: ''` means an explicit EMPTY search
+ * path (zero segments), never a fallback to `env.PATH` — use `!== undefined`,
+ * not truthiness, to tell "caller supplied a PATH string" apart from "caller
+ * supplied nothing". `opts.prependPaths` still comes first. PATHEXT resolution
+ * is UNAFFECTED by this option — it still reads from `env` (which defaults to
+ * `process.env`) exactly as it does when `pathOverride` is omitted. This exists
+ * so a caller that already has its own search path in hand (e.g.
+ * `resolveFallowBinary`'s `envPath`) does not have to hand-thread PATHEXT
+ * alongside it — a private PATHEXT read is the very shape
+ * `local/no-private-binary-resolution` forbids outside this seam.
+ *
+ * @returns the resolved path, or `null` when nothing matched. Callers fall back to
+ *   the declared name on `null` so a genuine ENOENT still surfaces (#3086).
+ */
+function resolveExecutableBinary(name, opts = {}) {
+    if (!name)
+        return null;
+    const requireExecutable = opts.requireExecutable ?? false;
+    const platform = opts.platform ?? process.platform;
+    if (name.includes('/') || name.includes('\\')) {
+        return _isFile(name, requireExecutable, platform) ? name : null;
+    }
+    const env = opts.env ?? process.env;
+    const rawPath = opts.pathOverride !== undefined ? opts.pathOverride : (_envGet(env, 'PATH') || '');
+    const pathSegments = String(rawPath).split(node_path_1.default.delimiter).filter(Boolean);
+    const segments = [...(opts.prependPaths ?? []), ...pathSegments];
+    if (platform !== 'win32') {
+        for (const dir of segments) {
+            const candidate = node_path_1.default.join(dir, name);
+            if (_isFile(candidate, requireExecutable, platform))
+                return candidate;
+        }
+        return null;
+    }
+    const exts = String(_envGet(env, 'PATHEXT') || DEFAULT_PATHEXT).split(';').filter(Boolean);
+    // A name already ending in a PATHEXT-listed extension is an address, not a stem:
+    // probing `foo.exe` as `foo.exe.EXE` would miss the file sitting right there.
+    // Compared case-insensitively because PATHEXT casing is not guaranteed.
+    const lower = name.toLowerCase();
+    const carriesKnownExt = exts.some((ext) => lower.endsWith(ext.toLowerCase()));
+    for (const dir of segments) {
+        if (carriesKnownExt) {
+            const asIs = node_path_1.default.join(dir, name);
+            if (_isFile(asIs, requireExecutable, platform))
+                return asIs;
+        }
+        for (const ext of exts) {
+            const candidate = node_path_1.default.join(dir, name + ext);
+            if (_isFile(candidate, requireExecutable, platform))
+                return candidate;
+        }
+    }
+    return null;
+}
+/**
+ * #3411: project a declared `(command, args)` into the pair `spawnSync` can
+ * actually execute on this platform.
+ *
+ * Resolution alone does not make Windows work: `CreateProcess` cannot execute a
+ * `.cmd`/`.bat` at all, so the cmd.exe mediation is inseparable from the lookup.
+ * Exporting only the resolver would leave every caller to re-derive that half —
+ * which is precisely how #3411's four copies accumulated.
+ *
+ * cmd.exe is invoked as an ordinary program with an EXPLICIT argv array, never via
+ * `shell: true`. `shell:true` on Windows is the mechanism behind CVE-2024-27980
+ * (argument injection through `.bat`/`.cmd`), and Node 26 deprecates it with an
+ * args array (DEP0190) because arguments are concatenated rather than escaped.
+ *
+ * Mediation fires when the target — the resolved path, or the declared name when
+ * resolution found nothing — carries a `.cmd`/`.bat` extension. A BARE name that
+ * resolved to nothing is passed through verbatim so the spawn fails with ENOENT;
+ * mediating it would turn `{exitCode:127, 'foo: not found'}` into cmd.exe's exit
+ * 9009 and silently change the not-found contract callers depend on.
+ *
+ * POSIX is a strict no-op: the declared command is returned unchanged and the
+ * environment is never consulted.
+ *
+ * The mediated command line is built VERBATIM rather than left to libuv: libuv's
+ * `quote_cmd_arg` only force-quotes an argument that contains a space, tab, or
+ * quote — it does not know about cmd.exe metacharacters (`&`, `|`, `>`, `<`,
+ * `^`, ...) at all, so an argument like `a&calc` reaches cmd.exe unquoted and
+ * gets re-parsed as two commands (the CVE-2024-27980 argument-injection class).
+ * Node's own CVE-2024-27980 escaping does not help here because it only fires
+ * when the spawned FILE itself is a `.bat`/`.cmd` — in this seam the spawned
+ * file is `cmd.exe`, not the target. Building the line ourselves and passing
+ * `windowsVerbatimArguments: true` (the shape Rust's std uses for the sibling
+ * CVE-2024-24576) means every token is force-quoted inside one outer pair, so
+ * a metacharacter inside a quoted token can never split the command line.
+ *
+ * KNOWN LIMIT: `%VAR%` still expands inside a cmd `/c` string, and there is no
+ * escape for `%` outside a batch file — an argument containing `%FOO%` is
+ * substituted with the environment value regardless of quoting. That is an
+ * information-disclosure limit, not arbitrary execution, and it's the same
+ * limit Rust's std documents for its own `CommandExt::raw_arg` escape hatch.
+ *
+ * CALLER CHOICE: this function's return value carries two independently
+ * adoptable pieces of information, and a caller may take either, both, or
+ * neither. `windowsVerbatimArguments: true` marks the cases where mediation
+ * was REQUIRED — the caller MUST adopt `command`+`args` together, since a
+ * `.cmd`/`.bat` genuinely cannot be spawned any other way. A merely-resolved
+ * `.exe` path (no mediation flag set) is only an OFFER: a caller may decline
+ * it and keep spawning the declared name instead, to hold its own observable
+ * contract stable. `execTool` (this file, below) is exactly such a caller —
+ * it adopts the mediated pair when `windowsVerbatimArguments` is set, but
+ * otherwise passes the declared `program`/`args` through untouched.
+ */
+function projectSpawnInvocation(command, args = [], opts = {}) {
+    const platform = opts.platform ?? process.platform;
+    if (platform !== 'win32')
+        return { command, args, resolved: null };
+    const env = opts.env ?? process.env;
+    const resolved = resolveExecutableBinary(command, { platform, env });
+    // Mediate against the resolved path when we have one, else against the declared
+    // name. An unresolved name is mediated ONLY when it already declares .cmd/.bat:
+    // PATH-only resolution misses a batch file sitting in the current directory,
+    // which `cmd.exe /c` still finds — the behavior gsd-tools.cjs shipped before
+    // this consolidation, preserved here rather than silently narrowed.
+    const target = resolved ?? command;
+    if (!CMD_MEDIATED_EXT.test(node_path_1.default.basename(target))) {
+        // A BARE name that resolved to nothing is passed through untouched so the
+        // spawn fails with ENOENT. Mediating it would turn {exitCode:127,
+        // '<name>: not found'} into cmd.exe's exit 9009 and silently change the
+        // not-found contract `_spawnResult` and its 53 dependent files rely on.
+        return resolved ? { command: resolved, args, resolved } : { command, args, resolved: null };
+    }
+    // A CR/LF cannot be represented inside a Windows command line at all — cmd.exe
+    // treats it as a line terminator, so mediating it would silently truncate the
+    // argument rather than pass it through. Fail visibly instead: fall back to the
+    // unmediated shape so the spawn either fails with ENOENT (bare unresolved name)
+    // or hands the raw string to CreateProcess, whichever the caller was already
+    // prepared to see for a non-.cmd/.bat target.
+    if (/[\r\n]/.test(target) || args.some((a) => /[\r\n]/.test(a))) {
+        return resolved ? { command: resolved, args, resolved } : { command, args, resolved: null };
+    }
+    return {
+        command: String(_envGet(env, 'ComSpec') || 'cmd.exe'),
+        args: ['/d', '/s', '/c', _buildVerbatimCmdLine(target, args)],
+        resolved,
+        windowsVerbatimArguments: true,
+    };
+}
 function execTool(program, args, opts = {}) {
-    const result = node_child_process_1.default.spawnSync(program, args, {
+    // #3411: Windows cannot spawn a .cmd/.bat at all — CreateProcess refuses it —
+    // so those are mediated through cmd.exe. Everything else keeps the DECLARED
+    // program name: libuv's CreateProcess path already performs PATH + PATHEXT
+    // search, so resolving a .exe here would buy nothing and would change what
+    // this seam's 167 dependents observe being spawned. `tests/graphify.test.cjs`
+    // pins that contract by spying on spawnSync's first argument. POSIX never
+    // reaches the mediation branch at all.
+    const spawnEnv = opts.env ? { ...process.env, ...opts.env } : undefined;
+    const invocation = projectSpawnInvocation(program, args, { env: spawnEnv ?? process.env });
+    const mediated = invocation.windowsVerbatimArguments === true;
+    const result = node_child_process_1.default.spawnSync(mediated ? invocation.command : program, mediated ? invocation.args : args, {
         cwd: opts.cwd,
-        env: opts.env ? { ...process.env, ...opts.env } : undefined,
+        env: spawnEnv,
         encoding: 'utf-8',
         stdio: 'pipe',
         timeout: opts.timeout ?? 30_000,
         windowsHide: true,
+        ...(mediated ? { windowsVerbatimArguments: true } : {}),
     });
+    // Stamp the DECLARED name, never the resolved path: `_spawnResult` renders
+    // `${program}: not found`, and callers across 53 files match on the string they
+    // passed. Resolution must not leak an absolute path into that message.
     return _spawnResult(result, program);
 }
 /**
@@ -549,9 +913,9 @@ function resolveGsdToolsPath() {
  * NEVER throws. Degrades to `{ ok:false, ... }` on:
  *   - a missing/invalid "family" (validated locally, no subprocess spawned)
  *   - ENOENT / a missing gsd-tools.cjs (via the injectable `gsdToolsPath`)
- *   - a wall-clock timeout (`timedOut:true`, mirroring the
- *     `signal === 'SIGTERM' && error.code === 'ETIMEDOUT'` idiom already used
- *     by worktree-safety.cts)
+ *   - a wall-clock timeout (`timedOut:true`, via the shared `isSpawnTimeout`
+ *     predicate defined above in this file — also used by worktree-safety.cts
+ *     and worktree-base-ref.cts)
  *   - any other unanticipated throw from the underlying spawn (defensive
  *     try/catch — execTool itself is spawnSync-based and does not throw).
  */
@@ -592,16 +956,9 @@ function dispatchGsdCommand({ family, subcommand, args = [], cwd, timeout = 30_0
             timedOut: false,
         };
     }
-    // Mirrors the established `result.error && (result.error as
-    // NodeJS.ErrnoException).code === ...` idiom (graphify.cts, worktree-safety.cts):
-    // narrow away null via `!== null` FIRST, then cast — asserting `Error | null`
-    // to `NodeJS.ErrnoException | null` directly (paired with optional chaining)
-    // trips a typescript-eslint no-unnecessary-type-assertion false positive for
-    // this exact narrowing shape (all of ErrnoException's extra fields over Error
-    // are optional).
-    const timedOut = result.signal === 'SIGTERM'
-        && result.error !== null
-        && result.error.code === 'ETIMEDOUT';
+    // Delegates to the single shared predicate defined above in this file
+    // (#3050 — "Generative Fix Divergence") instead of a local inline copy.
+    const timedOut = isSpawnTimeout(result);
     return {
         ok: result.exitCode === 0 && !timedOut,
         stdout: result.stdout,
@@ -618,6 +975,7 @@ function probeTty(opts = {}) {
         const ttyPath = node_child_process_1.default.execFileSync('tty', [], {
             encoding: 'utf-8',
             stdio: ['inherit', 'pipe', 'ignore'],
+            timeout: 5_000,
         }).trim();
         if (!ttyPath || ttyPath === 'not a tty')
             return null;

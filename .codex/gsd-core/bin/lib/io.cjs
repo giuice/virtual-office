@@ -118,6 +118,22 @@ function writeAllSync(fd, data) {
         }
     }
 }
+/**
+ * The wire form of a JSON result: the exact bytes `output()` emits for it.
+ *
+ * Exported because a caller that has to reason about the size of its own
+ * response — graphify's `--budget` accounting (#2738) — must measure the string
+ * this function produces rather than a second, privately-maintained
+ * serialization that can drift from it. One definition, so estimator and
+ * emitter cannot disagree about indentation or shape.
+ *
+ * The `@file:` redirection in `output()` is a transport detail, not a payload
+ * change: the caller still consumes these bytes, so these are the right ones to
+ * measure.
+ */
+function serializeForOutput(result) {
+    return JSON.stringify(result, null, 2);
+}
 function output(result, raw, rawValue) {
     let data;
     if (raw && rawValue !== undefined) {
@@ -125,7 +141,7 @@ function output(result, raw, rawValue) {
         data = String(rawValue);
     }
     else {
-        const json = JSON.stringify(result, null, 2);
+        const json = serializeForOutput(result);
         // Large payloads exceed Claude Code's Bash tool buffer (~50KB).
         // Write to tmpfile and output the path prefixed with @file: so callers can detect it.
         if (json.length > 50000) {
@@ -168,12 +184,23 @@ const ERROR_REASON = Object.freeze({
     // workflow / phase
     PHASE_NOT_FOUND: 'phase_not_found',
     PHASE_VERIFICATION_INCOMPLETE: 'phase_verification_incomplete',
+    PHASE_PLAN_COVERAGE_INCOMPLETE: 'phase_plan_coverage_incomplete',
     SUMMARY_NO_PLANNING: 'summary_no_planning',
+    // #3579: workstream-mode fail-safe guards (init.progress, phase.complete) —
+    // distinguishes "no marker/pointer anywhere" from "a marker exists but
+    // didn't resolve" so a JSON-error-mode caller can branch on `reason`
+    // instead of regexing the human message.
+    WORKSTREAM_MODE_NONE_ACTIVE: 'workstream_mode_none_active',
+    WORKSTREAM_MODE_MARKER_UNRESOLVED: 'workstream_mode_marker_unresolved',
     // graphify
     GRAPHIFY_NO_GRAPH: 'graphify_no_graph',
     GRAPHIFY_INVALID_QUERY: 'graphify_invalid_query',
     // hooks
     HOOKS_OPT_OUT: 'hooks_opt_out',
+    // commit-docs-guard (#3588)
+    COMMIT_DOCS_GUARD_NOT_A_REPO: 'commit_docs_guard_not_a_repo',
+    COMMIT_DOCS_GUARD_FOREIGN_HOOK: 'commit_docs_guard_foreign_hook',
+    COMMIT_DOCS_GUARD_HOOKS_PATH_SET: 'commit_docs_guard_hooks_path_set',
     // security-scan
     SECURITY_SCAN_FAILED: 'security_scan_failed',
     // generic
@@ -198,10 +225,17 @@ function getJsonErrorMode() { return _jsonErrorMode; }
  * process is in JSON-error mode, stderr receives `{ ok: false, reason,
  * message }` so callers can parse it; otherwise stderr keeps the plain
  * text form for human operators.
+ *
+ * `extra` (optional) lets a caller attach additional structured fields
+ * (e.g. `{ verification_stale_check_indeterminate: true }`) onto the
+ * JSON-error-mode payload, spread alongside `ok`/`reason`/`message`, so a
+ * test can assert on the value directly instead of regexing `message`'s
+ * human-readable text. Ignored entirely in plain-text mode — the human
+ * message is the only thing an operator sees there.
  */
-function error(message, reason = ERROR_REASON.UNKNOWN) {
+function error(message, reason = ERROR_REASON.UNKNOWN, extra) {
     if (_jsonErrorMode) {
-        const payload = JSON.stringify({ ok: false, reason, message }) + '\n';
+        const payload = JSON.stringify({ ok: false, reason, message, ...(extra || {}) }) + '\n';
         writeAllSync(2, payload);
     }
     else {
@@ -214,6 +248,7 @@ module.exports = {
     ensureGsdTempDir,
     reapStaleTempFiles,
     output,
+    serializeForOutput,
     ERROR_REASON,
     setJsonErrorMode,
     getJsonErrorMode,

@@ -68,6 +68,7 @@ const contextState = vi.hoisted(() => ({
   activeShare: null as ScreenSharePublicShare | null,
   activeShareObservationVersion: 0,
   activeShareReadVersion: 0,
+  signalingError: null as string | null,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -76,6 +77,7 @@ const mocks = vi.hoisted(() => ({
       onLocalDisplayStopped?: (shareId: string, reason: string) => void;
       onRemoteDisplay?: (event: { peerId: string; shareId: string | null; stream: MediaStream }) => void;
       onPeerDisconnected?: (peerId: string) => void;
+      onError?: (error: Error) => void;
     };
     cleanup: ReturnType<typeof vi.fn>;
     startScreenShare: ReturnType<typeof vi.fn>;
@@ -86,6 +88,7 @@ const mocks = vi.hoisted(() => ({
     getActiveShareId: () => string | null;
   }>,
   getDisplayMedia: vi.fn(),
+  signalingOptions: null as { onSignalDelivered?: () => void } | null,
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -105,12 +108,16 @@ vi.mock('@/contexts/PresenceContext', () => ({
 }));
 
 vi.mock('@/hooks/realtime/useAudioSignaling', () => ({
-  useAudioSignaling: () => ({
-    mutedUserIds: new Set<string>(['remote-muted']),
-    activeShare: contextState.activeShare,
-    activeShareObservationVersion: contextState.activeShareObservationVersion,
-    getActiveShareReadVersion: () => contextState.activeShareReadVersion,
-  }),
+  useAudioSignaling: (options: { onSignalDelivered?: () => void }) => {
+    mocks.signalingOptions = options;
+    return {
+      mutedUserIds: new Set<string>(['remote-muted']),
+      error: contextState.signalingError,
+      activeShare: contextState.activeShare,
+      activeShareObservationVersion: contextState.activeShareObservationVersion,
+      getActiveShareReadVersion: () => contextState.activeShareReadVersion,
+    };
+  },
 }));
 
 vi.mock('@/lib/webrtc', () => {
@@ -140,6 +147,7 @@ vi.mock('@/lib/webrtc', () => {
         onLocalDisplayStopped?: (shareId: string, reason: string) => void;
         onRemoteDisplay?: (event: { peerId: string; shareId: string | null; stream: MediaStream }) => void;
         onPeerDisconnected?: (peerId: string) => void;
+        onError?: (error: Error) => void;
       },
     ) {
       this.startScreenShare.mockImplementation(async (stream: MediaStream, shareId: string) => {
@@ -241,6 +249,8 @@ describe('AudioProvider screen-share lifecycle', () => {
     contextState.activeShare = null;
     contextState.activeShareObservationVersion = 0;
     contextState.activeShareReadVersion = 0;
+    contextState.signalingError = null;
+    mocks.signalingOptions = null;
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: { getDisplayMedia: mocks.getDisplayMedia },
@@ -300,12 +310,33 @@ describe('AudioProvider screen-share lifecycle', () => {
       await latestAudio?.stopScreenShare('user-stop');
     });
     expect(manager.stopScreenShare).toHaveBeenCalledTimes(1);
-    expect(manager.broadcastPresenterInvalidated).toHaveBeenCalledWith(SHARE_A);
+    expect(manager.broadcastPresenterInvalidated).not.toHaveBeenCalled();
     expect(track.removeEventListener).toHaveBeenCalledWith('ended', expect.any(Function));
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
     expect(latestAudio?.activeScreenShare).toBeNull();
     expect(latestAudio?.displayStream).toBeNull();
     expect(latestAudio?.screenShareStatus).toBe('idle');
+  });
+
+  it('clears a presenter signaling warning after a later signal is delivered', async () => {
+    mocks.getDisplayMedia.mockResolvedValue(createStream());
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    renderProvider();
+    await act(async () => {});
+    expect(await currentAudio().startScreenShare()).toBe(true);
+
+    act(() => mocks.managers[0].callbacks.onError?.(new Error('SIGNALING_SEND_FAILED')));
+    expect(currentAudio().screenShareError).toBe(
+      'Screen sharing could not connect to other participants. Stop sharing, then try again.',
+    );
+
+    act(() => mocks.signalingOptions?.onSignalDelivered?.());
+    expect(currentAudio().screenShareError).toBeNull();
   });
 
   it.each([

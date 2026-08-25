@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 03
 current_phase_name: video-and-screen-sharing
 status: In Progress
-stopped_at: Completed 03-13-PLAN.md
-last_updated: "2026-07-28T12:08:09.149Z"
-last_activity: 2026-07-28
+stopped_at: Completed 03-15-PLAN.md
+last_updated: "2026-08-01T13:28:51.200Z"
+last_activity: 2026-08-01
 progress:
   total_phases: 4
   completed_phases: 4
-  total_plans: 25
-  completed_plans: 25
+  total_plans: 26
+  completed_plans: 26
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 14 of 14
+Plan: 15 of 15
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Plan: 14 of 14
 | Phase 03-video-and-screen-sharing P14 | 18min | 2 tasks | 3 files |
 | Phase 03-video-and-screen-sharing P12 | ~3h | 1 task | 5 files plus planning metadata |
 | Phase 03-video-and-screen-sharing P13 | 5m | 2 tasks | 1 files |
+| Phase 03-video-and-screen-sharing P15 | 14min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,8 @@ Recent decisions affecting current work:
 - [Phase ?]: The free public STUN fallback remains the default; TURN is optional and not a Phase 3 completion gate.
 - [Phase ?]: Restrictive-network traversal and Chrome/Firefox/Safari parity remain explicitly unverified.
 - [Phase ?]: Any future production rollout requires a new request, exact-target authorization, provenance reconciliation, and a separate database-first plan.
+- [Phase 03-video-and-screen-sharing]: PRESENTER_PROFILE_INVALID retires only canonical display while viewer audio and signaling remain active. — Presenter-profile failure does not invalidate the authorized viewer identity or room media scope.
+- [Phase 03-video-and-screen-sharing]: Post-claim teardown requires a greater validated canonical observation version. — This separates unobserved state from authoritative null without browser time or Realtime payload authority.
 
 ### Pending Todos
 
@@ -154,7 +157,11 @@ None yet.
 - Brownfield codebase: must verify existing code before implementing to avoid duplication
 - ~~03-07 bloqueado antes da Wave 11~~ — RESOLVIDO em 03-14 com reconciliação autoritativa periódica, matriz active -> null e duas revisões limpas no hash congelado.
 - ~~Wave 12 blocked: first unhealthy current-hour observation lost to a later writer~~ -- RESOLVED in 03-12 by forward migration `20260727123730` and full local gate.
-- Production migration history is divergent: four remote-only historical versions and multiple local-only versions make ordinary `db push` fail closed. Reconcile exact provenance before any further production migration; never use `--include-all` or broad history repair to bypass it.
+- Screen-share migrations `20260723104902` and `20260723224547` were applied and read back on production project `vhabpcoyypobgasacsko` on 2026-08-01.
+- Screen-share signaling migration `20260801155137` was applied and recorded on production project `vhabpcoyypobgasacsko` on 2026-08-01. Browser Broadcast INSERT is removed, corrected clients use `media:v2`, and the production Realtime HTTP smoke returned 202.
+- Screen-share signaling sender authority now belongs to the authenticated server route; clients submit strict intent and cannot choose source user, company, or space fields.
+- Multi-user screen delivery was corrected on 2026-08-04 by matching the server Realtime send timeout to the ten-second client default. A real two-user test reached connected peers and delivered a live remote video track. Release invalidation now runs after the response, and a later acknowledged signal clears stale transport feedback. No database change was required.
+- Production migration history remains divergent: four remote-only historical versions and nine June local-only versions make ordinary `db push` fail closed. Reconcile exact provenance before any broad production migration; never use `--include-all` or broad history repair.
 
 ### Quick Tasks Completed
 
@@ -169,9 +176,9 @@ None yet.
 
 ## Session Continuity
 
-**Last session:** 2026-07-28T12:08:09.130Z
+**Last session:** 2026-08-01T13:28:51.178Z
 
-Last activity: 2026-07-28
-Stopped at: Completed 03-13-PLAN.md
+Last activity: 2026-08-01
+Stopped at: Completed 03-15-PLAN.md
 Resume file: None
 Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md

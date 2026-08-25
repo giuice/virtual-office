@@ -15,6 +15,8 @@ import {
 
 interface UseMessageSubscriptionOptions {
   isActive?: boolean;
+  companyId?: string;
+  currentUserId?: string;
   onInsert?: (message: Message) => void;
   ignoreSenderId?: string;
 }
@@ -23,6 +25,16 @@ const CHANNEL_NAME = 'messaging-db-changes';
 const FAILURE_STATUSES = new Set(['TIMED_OUT', 'CHANNEL_ERROR', 'CLOSED']);
 const RETRY_BASE_DELAY_MS = 250;
 const RETRY_MAX_DELAY_MS = 5000;
+const RETRY_STABLE_AFTER_MS = 30_000;
+let channelTopicSequence = 0;
+
+function createChannelTopic(companyId: string, currentUserId: string): string {
+  channelTopicSequence += 1;
+  const entropy = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${channelTopicSequence}`;
+  return `${CHANNEL_NAME}:${companyId}:${currentUserId}:${channelTopicSequence}:${entropy}`;
+}
 
 const mapRowToMessage = (row: any): Message => ({
   id: row.id,
@@ -164,6 +176,8 @@ const removeMessageFromAllCaches = (queryClient: QueryClient, messageId: string)
  */
 export function useMessageSubscription(options?: UseMessageSubscriptionOptions) {
   const isActive = options?.isActive ?? true;
+  const companyId = options?.companyId;
+  const currentUserId = options?.currentUserId;
   const queryClient = useQueryClient();
   const statusRef = useRef<string | null>(null);
   const statusListenersRef = useRef<Set<() => void> | null>(null);
@@ -199,14 +213,17 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
   }, [options?.ignoreSenderId]);
 
   useEffect(() => {
-    if (!isActive) {
+    publishStatus(null);
+    if (!isActive || !companyId || !currentUserId) {
       return;
     }
 
     let isMounted = true;
     let channel: RealtimeChannel | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let stableSubscriptionTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
+    let channelGeneration = 0;
 
     const handleMessageChange = (
       payload: RealtimePostgresChangesPayload<Record<string, unknown>>
@@ -279,27 +296,44 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       }
     };
 
-    const cleanup = () => {
+    const clearRetryTimer = () => {
       if (retryTimer) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
-      if (channel) {
+    };
+
+    const clearStableSubscriptionTimer = () => {
+      if (stableSubscriptionTimer) {
+        clearTimeout(stableSubscriptionTimer);
+        stableSubscriptionTimer = null;
+      }
+    };
+
+    const retireChannel = (ownedChannel: RealtimeChannel) => {
+      if (channel === ownedChannel) {
+        channel = null;
+        channelGeneration += 1;
+        clearStableSubscriptionTimer();
         if (debugLogger.messaging.enabled()) {
           debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
             channel: CHANNEL_NAME,
           });
         }
-        void channel.unsubscribe();
-        supabase.removeChannel(channel);
-        channel = null;
       }
+      void supabase.removeChannel(ownedChannel).then((status) => {
+        if (status !== 'ok') ownedChannel.teardown();
+      }).catch(() => {
+        ownedChannel.teardown();
+      });
     };
 
     const subscribeChannel = () => {
       if (!isMounted) return;
 
-      cleanup();
+      clearRetryTimer();
+      clearStableSubscriptionTimer();
+      if (channel) retireChannel(channel);
       attempt += 1;
 
       if (debugLogger.messaging.enabled()) {
@@ -309,26 +343,45 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
         });
       }
 
-      channel = supabase
-        .channel(CHANNEL_NAME)
+      const generation = channelGeneration + 1;
+      channelGeneration = generation;
+      let nextChannel: RealtimeChannel;
+      const isOwnedChannel = (): boolean => (
+        isMounted
+        && channel === nextChannel
+        && channelGeneration === generation
+      );
+      nextChannel = supabase
+        .channel(createChannelTopic(companyId, currentUserId))
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'messages' },
-          handleMessageChange
+          (payload) => {
+            if (isOwnedChannel()) handleMessageChange(payload);
+          }
         )
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
-          handleReceiptInsert
+          (payload) => {
+            if (isOwnedChannel()) handleReceiptInsert(payload);
+          }
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'message_reactions' },
-          handleReactionChange
+          (payload) => {
+            if (isOwnedChannel()) handleReactionChange(payload);
+          }
         );
+      channel = nextChannel;
 
-      channel.subscribe((channelStatus) => {
-        if (!isMounted) return;
+      nextChannel.subscribe((channelStatus) => {
+        if (
+          !isMounted
+          || channel !== nextChannel
+          || channelGeneration !== generation
+        ) return;
 
         publishStatus(channelStatus);
 
@@ -340,11 +393,23 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
         }
 
         if (channelStatus === 'SUBSCRIBED') {
-          attempt = 0;
+          clearRetryTimer();
+          clearStableSubscriptionTimer();
+          stableSubscriptionTimer = setTimeout(() => {
+            stableSubscriptionTimer = null;
+            if (
+              !isMounted
+              || channel !== nextChannel
+              || channelGeneration !== generation
+            ) return;
+            attempt = 0;
+          }, RETRY_STABLE_AFTER_MS);
           return;
         }
 
         if (FAILURE_STATUSES.has(channelStatus)) {
+          clearStableSubscriptionTimer();
+          if (retryTimer) return;
           const delay = Math.min(
             RETRY_MAX_DELAY_MS,
             RETRY_BASE_DELAY_MS * Math.pow(2, Math.max(attempt - 1, 0))
@@ -359,7 +424,15 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
             });
           }
 
-          retryTimer = setTimeout(subscribeChannel, delay);
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            if (
+              !isMounted
+              || channel !== nextChannel
+              || channelGeneration !== generation
+            ) return;
+            subscribeChannel();
+          }, delay);
         }
       });
     };
@@ -368,9 +441,12 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
 
     return () => {
       isMounted = false;
-      cleanup();
+      clearRetryTimer();
+      clearStableSubscriptionTimer();
+      if (channel) retireChannel(channel);
+      publishStatus(null);
     };
-  }, [isActive, queryClient, publishStatus]);
+  }, [companyId, currentUserId, isActive, queryClient, publishStatus]);
 
-  return { status: isActive ? status : null };
+  return { status: isActive && companyId && currentUserId ? status : null };
 }

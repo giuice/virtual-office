@@ -52,7 +52,6 @@ describe("presence-db Phase 6 private company Realtime", () => {
       { policyname: "phase6_company_presence_receive", cmd: "SELECT" },
       { policyname: "phase6_company_presence_track", cmd: "INSERT" },
       { policyname: "phase8_media_broadcast_receive", cmd: "SELECT" },
-      { policyname: "phase8_media_broadcast_send", cmd: "INSERT" },
       { policyname: "phase8_media_presence_receive", cmd: "SELECT" },
       { policyname: "phase8_media_presence_track", cmd: "INSERT" },
     ]);
@@ -75,7 +74,6 @@ describe("presence-db Phase 6 private company Realtime", () => {
 
     const mediaPolicyExtensions = new Map([
       ["phase8_media_broadcast_receive", "broadcast"],
-      ["phase8_media_broadcast_send", "broadcast"],
       ["phase8_media_presence_receive", "presence"],
       ["phase8_media_presence_track", "presence"],
     ]);

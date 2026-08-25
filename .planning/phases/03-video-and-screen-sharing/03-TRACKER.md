@@ -153,3 +153,66 @@
 - Workflow proof: the losing display track is stopped exactly once before busy feedback, and `manager.startScreenShare` remains uncalled. RED `8ba5d5a` failed the schema-alignment and feedback cases; GREEN `ef15859` passed the tracer 7/7.
 - Regression evidence: related tracer/route/context/signaling suites passed 129/129; full Vitest passed 105 files / 1,192 tests; type-check, focused ESLint, Next production build, Presence movement gate, Presence skill validation, and diff check passed.
 - Database/deployment state: no migration, local/online database action, environment change, production boundary change, or deployment occurred. Formal Presence/Supabase re-reviews remain orchestrator-owned for the earlier production correction, not this test-fixture-only update.
+
+## 2026-07-27 — Production cutover-audit correction follow-up
+
+- Authorization and target: the user explicitly authorized immediate production application; `.env.local` and the Supabase link both resolved to project `vhabpcoyypobgasacsko`.
+- Preflight: production contained Presence migrations `20260718203921`, `20260719140658`, and `20260720131318`; runtime was `atomic`, the legacy adapter remained enabled, the audit was active since `2026-07-20T13:45:09.615151Z`, the hourly cron was active/healthy, and the old `ON CONFLICT DO NOTHING` writer was live.
+- History boundary: production also had four old remote-only migration versions, while several unrelated local migrations were absent remotely. Normal `db push --dry-run` stopped. No `--include-all` or broad/fictitious history repair was used.
+- Backup: captured a pre-change logical dump of schema `private` at `C:\tmp\virtual-office-production-private-schema-pre-20260727123730.sql`; SHA-256 `b81e0f9d2a682d2527068d89438da8d613473c23464ef5a007c4e167299a51e2`. Migration SHA-256 was `5c72f79fdfea0b9ec1b210e662db8aff71dfce9f5820a64b2bc2042990b5812c`.
+- Application: executed only the reviewed transaction in `20260727123730_fix_presence_cutover_coverage_first_observation.sql`, then recorded only version `20260727123730` as applied. No other pending migration was executed.
+- Same-target readback: migration name/version and 25 statements are recorded; the old writer contract is absent; earliest-observation and exact-tie unhealthy behavior are present; both narrow FORCE-RLS maintenance policies match; fingerprint/catalog health are true; cron remains `5 * * * *`; temporary role/schema authority is removed; the immutable trigger is enabled.
+- Observation consequence: production observation restarted at `2026-07-27T17:06:23.560672Z` with one healthy matching current-hour row. Evidence before that timestamp cannot authorize cutover. Runtime remains `atomic`, the legacy adapter remains enabled, and no application deployment occurred.
+- Transient external issue: one post-apply readback received a Supabase Management API/Cloudflare 502; the required backoff was respected and the repeated same-target readback passed.
+- Next waves: 03-13 must treat this audit correction as already applied and must not reapply it. No legacy disable/removal may proceed until seven complete UTC days after the new baseline and a fresh live gate/readback pass.
+
+## 2026-07-28 — Phase 3 zero-cost acceptance correction
+
+- User impact correction: the prior 03-13 plan incorrectly converted optional TURN infrastructure, two devices/profiles, two networks, and a Chrome/Firefox/Safari matrix into blocking user prerequisites without first explaining their cost or purpose.
+- Planning decision: Phase 3 now closes with existing focused automated/local evidence. TURN remains optional, the free STUN fallback remains the configured baseline, and restrictive-network/cross-browser guarantees are explicitly unverified rather than imposed on the user.
+- Cost boundary: no purchase, paid service, new credential, extra device, extra network, additional browser profile, or browser installation is required.
+- Rollout decision: local-only/no-spend. No online database action or deployment is authorized by this correction.
+
+## 2026-08-01 - Production screen-share database rollout
+
+- Authorization and target: the user explicitly authorized production correction. `.env.local` and the Supabase link both resolved to project `vhabpcoyypobgasacsko`.
+- Backup and rollback boundary: Supabase reported a completed physical backup from `2026-08-01T10:56:30.708Z`. Both migration files use transactions. The preflight proved that the lease table, RPCs, and four Realtime policies were absent.
+- Database application: executed only `20260723104902_screen_share_lease_and_media_realtime.sql`, followed by `20260723224547_screen_share_atomic_presenter_contract.sql`. Both completed successfully.
+- Migration history: recorded only versions `20260723104902` and `20260723224547` after catalog validation. Both now appear in local and remote history.
+- Same-target readback: the lease table has forced RLS. Four media policies exist. The observed RPCs have the expected signatures, isolated owner, fixed search path, and service-role-only public execution.
+- Contract readback: claim and active-read definitions include `presenterName`. An invalid request returns the expected typed result. Focused screen-share tests passed 142 of 142.
+- Runtime limit: no matching active Presence session existed for space `72681540-6bc7-4e4c-ba4d-0293c5007e65`, so a real authenticated claim and release still require user confirmation.
+- Remaining history concern: nine June migrations remain local-only and four older versions remain remote-only. Do not run a broad push or fictitious repair. Reconcile their exact provenance separately.
+
+## 2026-08-01 - Production screen-share signaling security correction
+
+- Root cause: the original private Realtime channel authorized browser Broadcast at join time. Because Realtime caches that authorization and does not validate sender fields inside each payload, an authorized occupant could forge screen-share signaling identity.
+- Application correction: browser signaling now posts strict intent to the authenticated server route. The server derives user/company/space authority, checks the exact Presence session and active presenter/share, rate-limits sends, and publishes through the private Realtime HTTP endpoint with a two-second timeout.
+- Database correction: applied only `20260801155137_require_server_media_broadcast.sql` to production project `vhabpcoyypobgasacsko`, then recorded only version `20260801155137` as applied. The transaction changed the helper to `media:v2` and removed authenticated browser Broadcast INSERT.
+- Same-target readback: browser Broadcast INSERT policies are zero; one Broadcast receive and two Presence policies remain; the helper is owned by `presence_maintenance_owner`, is `SECURITY DEFINER`, and fixes `search_path=pg_catalog`. Rate-limit execution is service-role-only (`service_role=true`, `authenticated=false`, `anon=false`).
+- Runtime evidence: the production Realtime HTTP endpoint accepted a private `media:v2` smoke event with HTTP 202. Focused application coverage passed 198/198; TypeScript and diff checks passed. Presence Safety and Supabase/RLS reviews found no blockers.
+- Rollout boundary: the database cutover is complete. The corrected application code is present in this workspace but was not deployed to a hosted application. Existing browser tabs must reload so they join `media:v2`; old `media` clients cannot communicate with corrected clients.
+- History concern remains unchanged: nine June migrations are local-only and four older versions are remote-only. Do not use broad push, `--include-all`, or fictitious history repair.
+
+## 2026-08-04 - Multi-user screen delivery timeout correction
+
+- Reported behavior: two different users occupied the same Virtual Office space from separate Windows virtual desktops. The share claim showed no error, but the viewer received no presentation.
+- Real reproduction: the claim returned HTTP 200, then the first media description signal returned HTTP 500. The two-second server-to-Realtime timeout expired before the offer reached the viewer. The existing browser suite only proved the presentation shell and intentionally held signaling, so it did not cover live remote delivery.
+- Application correction: the private Realtime HTTP send now uses the Realtime client's ten-second default window. Screen-share signaling failures now show an actionable message. A later acknowledged signal or a received live remote track clears that message.
+- Stop-path correction: the successful release response no longer waits for the best-effort Realtime invalidation. Next.js schedules that notification after the response, while the existing authoritative reconciliation remains the fallback if delivery fails.
+- Regression correction: the deterministic browser harness now intercepts the server-mediated signal route instead of obsolete direct WebSocket sends. A new two-user scenario requires both peer connections to exist and the viewer video to own a live track.
+- Runtime evidence: after the correction, claim, handshake, description, ICE, active read, and renewal returned HTTP 200. Both peers reached `connected`; the viewer received a live video track. The diagnostic restored both users to their original spaces and removed its temporary server, script, and log.
+- Verification: focused coverage passed 219/219, including a five-second acknowledgement, non-blocking release, and failure-to-success recovery; TypeScript, focused ESLint, the production build, Presence movement gate, Presence skill validation, and diff check passed. Final Presence Safety and Supabase/RLS reviews found no blockers and require no additional migration.
+- Database/deployment state: no schema, migration, RLS, grant, data contract, or migration history changed. A fresh linked production migration-list readback shows `20260723104902`, `20260723224547`, and `20260801155137` present both locally and remotely. The production database remains compatible. No hosted application deployment occurred.
+
+## 2026-08-04 - Messaging Realtime retry containment and same-host confirmation
+
+- Reported behavior: `useMessageSubscription` emitted an unbounded stream of `CLOSED` retries with attempts repeatedly returning to zero or one. Restarting the development server stopped the accumulated timers but did not remove the retry race.
+- Root cause: retry cleanup called both `channel.unsubscribe()` and `supabase.removeChannel()`. The intentional close reached the old status callback, while repeated failure callbacks could overwrite the single timer reference. Supabase also reuses an existing channel topic until removal completes.
+- Application correction: each effect and retry owns a unique company/user-scoped topic. Channel-identity and generation fences ignore retired status callbacks and database events. Only one retry timer can exist, unstable channels back off to five seconds, and the retry attempt resets only after 30 stable seconds. Cleanup uses `removeChannel()` once and forces local teardown when removal fails.
+- Identity correction: changing or removing company/user scope immediately clears the reported Realtime status. The new account cannot inherit a stale `SUBSCRIBED` readiness marker from the previous account.
+- Regression evidence: eight deterministic tests cover repeated failures, unstable-channel backoff, a late retired-channel close, unmount, effect replacement during asynchronous removal, an old database event after an account switch, non-`ok` removal teardown, and missing identity scope. The final full unit suite passed 111 files and 1,284 tests. The Presence suite passed 61 files and 577 tests. TypeScript, the production build, Presence movement gate, Presence skill validation, focused lint, and full lint completed with zero errors. Full lint retains 495 existing warnings.
+- Review evidence: the mandatory Presence Safety reviewer first found unfenced database handlers, failed-removal cleanup, identity scope, and stale-status gaps. All were corrected and the final review approved with no blocker or risk.
+- Browser evidence: a linked production smoke used two configured accounts in two isolated Chromium contexts on this computer. Both users entered one space. The viewer received a live display track. The test stopped the share and closed both contexts. The temporary remote-test opt-in was removed immediately after the single scenario.
+- Failed approach: Vitest does not support Jest's `--runInBand` flag. The first full-suite command failed before tests started. The standard `npm test` command then passed.
+- Database/deployment state: the smoke created ordinary presence sessions and one temporary screen-share lease in production project `vhabpcoyypobgasacsko`. It changed no schema, migration, RLS, grant, or migration history. A final read-only production catalog check confirmed conversation-member SELECT policies and `supabase_realtime` publication membership for `messages`, `message_read_receipts`, and `message_reactions`. The Supabase/RLS reviewer approved the lifecycle diff and confirmed that it requires no migration. No application deployment occurred.

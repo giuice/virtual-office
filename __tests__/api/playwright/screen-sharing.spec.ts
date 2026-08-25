@@ -155,6 +155,51 @@ async function installDeterministicMedia(
       nativeSend.call(this, data);
     };
 
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (...args): Promise<Response> => {
+      const input = args[0];
+      const init = args[1];
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (
+        /\/api\/spaces\/[^/]+\/screen-share\/signal$/.test(new URL(url, location.origin).pathname)
+        && typeof init?.body === 'string'
+      ) {
+        try {
+          const body = JSON.parse(init.body) as {
+            type?: string;
+            presenceSessionId?: string;
+            connectionId?: string;
+          };
+          if (body.presenceSessionId && body.connectionId) {
+            signalingIdentities.set(
+              `${body.presenceSessionId}:${body.connectionId}`,
+              {
+                presenceSessionId: body.presenceSessionId,
+                connectionId: body.connectionId,
+              },
+            );
+          }
+          if (
+            holdOutboundSignaling
+            && ['handshake', 'description', 'ice'].includes(body.type ?? '')
+          ) {
+            heldSignaling += 1;
+            return new Response(JSON.stringify({ success: true, code: 'SIGNAL_SENT' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        } catch {
+          // The real route remains authoritative for malformed requests.
+        }
+      }
+      return nativeFetch(...args);
+    };
+
     const NativePeerConnection = window.RTCPeerConnection;
     class DeterministicPeerConnection extends NativePeerConnection {
       constructor(configuration?: RTCConfiguration) {
@@ -209,7 +254,11 @@ async function installDeterministicMedia(
         captureMode = mode;
       },
       endCapture: () => {
-        activeTrack?.stop();
+        if (!activeTrack) return;
+        activeTrack.stop();
+        // MediaStreamTrack.stop() is synchronous and intentionally does not
+        // emit `ended`; dispatch it to model browser/user initiated teardown.
+        activeTrack.dispatchEvent(new Event('ended'));
       },
       stoppedTrackCount: () => stoppedTracks,
       peerConnectionCount: () => peerConnections,
@@ -279,9 +328,12 @@ async function openLoggedInBrowserFromState(
   browser: Browser,
   account: PresenceE2EAccount,
   storageState: AuthStorageState,
-  options: { holdOutboundSignaling?: boolean } = {},
+  options: { holdOutboundSignaling?: boolean; hasTouch?: boolean } = {},
 ): Promise<LoggedInBrowser> {
-  const context = await browser.newContext({ storageState });
+  const context = await browser.newContext({
+    storageState,
+    hasTouch: options.hasTouch,
+  });
   await installDeterministicMedia(context, options);
   const page = await context.newPage();
   await page.goto('/floor-plan');
@@ -312,7 +364,7 @@ async function moveThroughUi(page: Page, spaceId: string): Promise<void> {
 async function openPairInOneSpace(
   browser: Browser,
   environment: PresenceE2EEnvironment,
-  options: { holdViewerSignaling?: boolean } = {},
+  options: { holdViewerSignaling?: boolean; viewerHasTouch?: boolean } = {},
 ): Promise<{ presenter: LoggedInBrowser; viewer: LoggedInBrowser; space: RuntimeSpace }> {
   // Build each authenticated state with no other live page. This avoids dev
   // compilation/session-registration churn influencing the second login while
@@ -328,7 +380,10 @@ async function openPairInOneSpace(
     browser,
     environment.member,
     viewerState,
-    { holdOutboundSignaling: options.holdViewerSignaling },
+    {
+      holdOutboundSignaling: options.holdViewerSignaling,
+      hasTouch: options.viewerHasTouch,
+    },
   );
   expect(presenter.user.companyId).toBe(viewer.user.companyId);
   const space = presenter.spaces.find(
@@ -483,6 +538,40 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
     }
   });
 
+  test('@delivery sends a live display track to a second user in the same space', async ({ browser }) => {
+    const { presenter, viewer } = await openPairInOneSpace(browser, environment);
+    try {
+      await shareFrom(presenter.page);
+
+      await expect(viewer.page.getByTestId('floor-plan-presentation-stage')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect.poll(() => viewer.page.evaluate(() => {
+        const video = document.querySelector<HTMLVideoElement>(
+          '[data-testid="presentation-video-region"] video',
+        );
+        const stream = video?.srcObject;
+        return stream instanceof MediaStream
+          && stream.getVideoTracks().some((track) => track.readyState === 'live');
+      }), { timeout: 30_000 }).toBe(true);
+      await expect.poll(() => presenter.page.evaluate(
+        () => window.__screenShareTest?.peerConnectionCount() ?? 0,
+      )).toBeGreaterThan(0);
+      await expect.poll(() => viewer.page.evaluate(
+        () => window.__screenShareTest?.peerConnectionCount() ?? 0,
+      )).toBeGreaterThan(0);
+
+      await presenter.page.getByTestId('floor-plan-presentation-stage')
+        .getByRole('button', { name: 'Stop sharing' })
+        .click();
+      await expect(viewer.page.getByTestId('floor-plan-presentation-stage')).toHaveCount(0, {
+        timeout: 30_000,
+      });
+    } finally {
+      await closeContextsBestEffort(presenter.context, viewer.context);
+    }
+  });
+
   test('@same-identity clears a distinct session of the presenter identity without moving its avatar', async ({ browser }) => {
     const { presenter, viewer, space } = await openSameIdentityPairInOneSpace(browser, environment);
     try {
@@ -581,7 +670,7 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
       const cases: Array<{ mode: CaptureMode; copy: string; alert: boolean }> = [
         {
           mode: 'denied',
-          copy: 'We couldnâ€™t start screen sharing. Check your browser permission, then try again.',
+          copy: 'We couldn’t start screen sharing. Check your browser permission, then try again.',
           alert: true,
         },
         {
@@ -612,11 +701,26 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
   test('stops a busy loser capture and clears browser-ended and departure state', async ({ browser }) => {
     const { presenter, viewer, space } = await openPairInOneSpace(browser, environment);
     try {
-      await shareFrom(presenter.page);
-      await viewer.page.getByRole('button', { name: 'Share screen' }).first().click({ force: true });
-      await expect(viewer.page.getByRole('alert')).toContainText(
-        'Another participant is already sharing their screen.',
+      // Model a stale viewer deterministically: its canonical read has not seen
+      // the winner yet, so it can capture and race the already-committed lease.
+      // The claim route remains real and must reject the loser server-side.
+      await viewer.page.route(
+        `**/api/spaces/${space.id}/screen-share/active?**`,
+        (route) => route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, active: null }),
+        }),
       );
+      await shareFrom(presenter.page);
+      const viewerShareButton = viewer.page.getByRole('button', { name: 'Share screen' }).first();
+      await expect(viewerShareButton).toBeEnabled();
+      await viewerShareButton.click();
+      await expect(
+        viewer.page.getByRole('alert').filter({
+          hasText: 'Another participant is already sharing their screen.',
+        }),
+      ).toBeVisible();
       await expect.poll(() => viewer.page.evaluate(
         () => window.__screenShareTest?.stoppedTrackCount() ?? 0,
       )).toBeGreaterThan(0);
@@ -678,12 +782,16 @@ test.describe('deterministic two-context screen-sharing lifecycle', () => {
   });
 
   test('keeps responsive, long-text, focus, live, alert, and empty-layout contracts', async ({ browser }) => {
-    const { presenter, viewer } = await openPairInOneSpace(browser, environment);
+    const { presenter, viewer } = await openPairInOneSpace(
+      browser,
+      environment,
+      { viewerHasTouch: true },
+    );
     try {
-      const emptyFloorPlanBox = await viewer.page.locator('[data-testid="modern-floor-plan-background"]')
-        .boundingBox();
       await viewer.page.setViewportSize({ width: 390, height: 844 });
       await viewer.page.emulateMedia({ reducedMotion: 'reduce' });
+      const emptyFloorPlanBox = await viewer.page.locator('[data-testid="modern-floor-plan-background"]')
+        .boundingBox();
       await shareFrom(presenter.page);
       const stage = viewer.page.getByTestId('floor-plan-presentation-stage');
       await expect(stage).toBeVisible({ timeout: 30_000 });

@@ -52,12 +52,19 @@ Verify the work is ready to ship:
 
 1. **Verification passed?**
    ```bash
-   VERIFICATION=$(gsd_run query verification.status "${PHASE_DIR}" 2>/dev/null)
-   STATUS=$(printf '%s' "$VERIFICATION" | jq -r '.status' 2>/dev/null || echo "")
-   NEXT_ACTION=$(printf '%s' "$VERIFICATION" | jq -r '.next_action' 2>/dev/null || echo "")
-   NEXT_COMMAND=$(printf '%s' "$VERIFICATION" | jq -r '.next_command' 2>/dev/null || echo "")
+   # The gate decides on ONE read. --pick takes a single field, so the two
+   # human-facing fields are read only on the blocking path below — never on the
+   # passing path — rather than issuing three queries up front (#2589).
+   STATUS=$(gsd_run query verification.status "${PHASE_DIR}" --pick status 2>/dev/null)
    ```
-   Only `passed` may ship. If `$STATUS` is `passed`, verification is complete — continue to the next preflight check. Any other value (including `gaps_found`, `human_needed`, `missing`, and `unknown`) blocks with `PHASE_VERIFICATION_INCOMPLETE`: present `$NEXT_ACTION` to the user and, when `$NEXT_COMMAND` is non-empty, show it as the command to run next. The query already handles missing files and unexpected values, so no per-status arm is needed.
+   Only `passed` may ship. If `$STATUS` is `passed`, verification is complete — continue to the next preflight check; do not read any further verification field.
+
+   Any other value (including `gaps_found`, `human_needed`, `missing`, and `unknown`) blocks with `PHASE_VERIFICATION_INCOMPLETE`. Only then, read the two message fields:
+   ```bash
+   NEXT_ACTION=$(gsd_run query verification.status "${PHASE_DIR}" --pick next_action 2>/dev/null)
+   NEXT_COMMAND=$(gsd_run query verification.status "${PHASE_DIR}" --pick next_command 2>/dev/null)
+   ```
+   Present `$NEXT_ACTION` to the user and, when `$NEXT_COMMAND` is non-empty, show it as the command to run next. These two are message text only — the block/allow decision has already been made from `$STATUS`, so a concurrent write between the reads cannot change the gate's verdict. The query already handles missing files and unexpected values, so no per-status arm is needed.
 
 2. **Clean working tree?**
    ```bash
@@ -84,9 +91,9 @@ Verify the work is ready to ship:
    ```
    If `gh` not found or not authenticated: provide setup instructions and exit.
 
-6. **Security ship gate (capability-driven).**
+6. **Capability ship gates (generic dispatch).**
 
-   Resolve active `ship:pre` gate hooks from the capability registry — the registry evaluates each hook's `when` condition, so do **not** read `workflow.security_enforcement` directly:
+   Resolve active `ship:pre` gate hooks from the capability registry — the registry evaluates each hook's `when` condition, so do **not** read `workflow.security_enforcement` or `workflow.windows_enforce` directly:
 
    ```bash
    SHIP_PRE_HOOKS_JSON=$(gsd_run loop render-hooks ship:pre --raw)
@@ -95,57 +102,83 @@ Verify the work is ready to ship:
 
    Read the `activeHooks` array from `SHIP_PRE_HOOKS_JSON` in-context (do NOT pipe it through a shell parser).
 
-   If an active entry exists with `kind == "gate"`, `capId == "security"`, and `blocking == true`, enforce its predicate (`SECURITY.md` frontmatter `threats_open == 0`) before shipping:
+   **If `activeHooks` is empty or absent:** skip this check silently and continue to the next preflight step. A capability whose `when` is off contributes no entry, and one that failed to load fails OPEN with its own warning from the resolver — neither is a block.
 
-   - **`SECURITY_FILE` is empty** → block with `SECURITY_SHIP_GATE_NO_REVIEW`:
-     ```
-     ⚠ Security enforcement is enabled but no SECURITY.md exists for this phase.
-     Run $gsd-secure-phase {phase} and resolve findings before shipping.
-     ```
-   - **`SECURITY_FILE` exists** → read its frontmatter `threats_open`. The gate passes **only** when `threats_open` is exactly `0`. For any other value — `threats_open` > 0, or a missing / non-numeric / unparsable field — **fail closed and block** with `SECURITY_SHIP_GATE_OPEN_THREATS` (the predicate is strict equality to `0`; never ship on an ambiguous value):
-     ```
-     ⚠ Security ship gate: SECURITY.md does not assert threats_open == 0 (found: {threats_open|unset}).
-     Resolve open threats (or re-run $gsd-secure-phase {phase}) before shipping.
-     ```
+   **For each active entry where `kind == "gate"`** (process in array order), following `gsd-core/references/loop-hook-dispatch.md`. Entries of any other `kind` are not gates and are not enforced here. Every gate is visited exactly once by this loop — the named branches below are specializations *within* it, never a separate pass, so no gate is evaluated twice.
 
-   If no active security `ship:pre` gate hook is present (security enforcement off), skip this check silently.
+   **Step 1 — evaluate the gate's `check`.** Dispatch by check shape; read the hook's `check` object in-context to pick the branch (the registry validates exactly one of `query`/`predicate`/`agentVerdict`). Two capability IDs carry a bespoke evaluation whose fail-closed semantics the declared predicate alone does not reproduce — take their branch, then rejoin at step 2:
 
-7. **Broken-windows ship gate (capability-driven, issue #1950).**
+   - **`capId == "security"`** — enforce against `SECURITY_FILE`:
+     - **`SECURITY_FILE` is empty** → `block: true`, `SECURITY_SHIP_GATE_NO_REVIEW`:
+       ```
+       ⚠ Security enforcement is enabled but no SECURITY.md exists for this phase.
+       Run $gsd-secure-phase {phase} and resolve findings before shipping.
+       ```
+     - **`SECURITY_FILE` exists** → read its frontmatter `threats_open`. The gate passes **only** when `threats_open` is exactly `0`. For any other value — `threats_open` > 0, or a missing / non-numeric / unparsable field — **fail closed** with `block: true` and `SECURITY_SHIP_GATE_OPEN_THREATS` (the predicate is strict equality to `0`; never ship on an ambiguous value):
+       ```
+       ⚠ Security ship gate: SECURITY.md does not assert threats_open == 0 (found: {threats_open|unset}).
+       Resolve open threats (or re-run $gsd-secure-phase {phase}) before shipping.
+       ```
 
-   The `SHIP_PRE_HOOKS_JSON` resolved in step 6 already includes any `broken-windows` gate. Inspect `activeHooks` for an entry with `capId == "broken-windows"` and `kind == "gate"`:
+   - **`capId == "broken-windows"`** (issue #1950) — enforce against the ledger's typed status. The ledger lives at the **project root** (cross-phase, not phase-scoped):
 
-   ```bash
-   WINDOWS_GATE_ACTIVE=$(printf '%s' "$SHIP_PRE_HOOKS_JSON" | jq -r \
-     '.activeHooks[]? | select(.capId == "broken-windows" and .kind == "gate" and .blocking == true) | .capId' \
-     2>/dev/null | head -1)
-   ```
-
-   If `$WINDOWS_GATE_ACTIVE` is non-empty, enforce the gate by reading the ledger's typed status. The ledger lives at the **project root** (cross-phase, not phase-scoped):
-
-   ```bash
-   WINDOWS_STATUS_JSON=$(gsd_run windows status --raw 2>/dev/null || echo '')
-   WINDOWS_OPEN_COUNT=$(printf '%s' "$WINDOWS_STATUS_JSON" | jq -r '.ledger.open_count // "?"' 2>/dev/null || echo '?')
-   ```
-
-   - **`WINDOWS_OPEN_COUNT == "0"`** → gate passes; continue to the next preflight check.
-   - **`WINDOWS_OPEN_COUNT` is a positive integer** → block with `WINDOWS_SHIP_GATE_OPEN`:
-     ```
-     ⚠ Broken-windows ship gate: WINDOWS.md has {WINDOWS_OPEN_COUNT} open window(s).
-     Resolve each entry before shipping, or explicitly waive with a recorded reason:
-       node "$HOME/.codex/gsd-core/bin/gsd-tools.cjs" windows fixed <id>      # defect resolved
-       node "$HOME/.codex/gsd-core/bin/gsd-tools.cjs" windows waive <id> "<reason>"   # justified deferral (reason required)
-     Then re-run $gsd-ship.
-     ```
-   - **`WINDOWS_OPEN_COUNT` is `"?"`, empty, or non-numeric** → **fail closed and block** with `WINDOWS_SHIP_GATE_READ_FAILED` (the gate is strict equality to `0`; never ship on an unreadable ledger):
-     ```
-     ⚠ Broken-windows ship gate: could not read open_count from .planning/WINDOWS.md.
-     Inspect the file or run `node "$HOME/.codex/gsd-core/bin/gsd-tools.cjs" windows status --raw` to diagnose. The ledger
-     may be malformed; fix it before shipping (an unparseable ledger is a broken window).
+     ```bash
+     WINDOWS_STATUS_JSON=$(gsd_run windows status --raw 2>/dev/null || echo '')
+     WINDOWS_OPEN_COUNT=$(printf '%s' "$WINDOWS_STATUS_JSON" | jq -r '.ledger.open_count // "?"' 2>/dev/null || echo '?')
      ```
 
-   The ledger is **optional and backward-compatible**: on a project where `gsd_run windows status` returns `open_count: 0` (no `.planning/WINDOWS.md` yet, or an empty ledger), the gate passes silently. The gate only blocks when at least one entry is `open`.
+     - **`WINDOWS_OPEN_COUNT == "0"`** → `block: false`; the gate passes.
+     - **`WINDOWS_OPEN_COUNT` is a positive integer** → `block: true`, `WINDOWS_SHIP_GATE_OPEN`:
+       ```
+       ⚠ Broken-windows ship gate: WINDOWS.md has {WINDOWS_OPEN_COUNT} open window(s).
+       Resolve each entry before shipping, or explicitly waive with a recorded reason:
+         gsd_run windows fixed <id>      # defect resolved
+         gsd_run windows waive <id> "<reason>"   # justified deferral (reason required)
+       Then re-run $gsd-ship.
+       ```
+     - **`WINDOWS_OPEN_COUNT` is `"?"`, empty, or non-numeric** → **fail closed** with `block: true` and `WINDOWS_SHIP_GATE_READ_FAILED` (the gate is strict equality to `0`; never ship on an unreadable ledger):
+       ```
+       ⚠ Broken-windows ship gate: could not read open_count from .planning/WINDOWS.md.
+       Inspect the file or run `gsd_run windows status --raw` to diagnose. The ledger
+       may be malformed; fix it before shipping (an unparseable ledger is a broken window).
+       ```
 
-   If no active `broken-windows` `ship:pre` gate hook is present (gate disabled via `workflow.windows_enforce=false`, the default — tracking continues but the gate is opt-in), skip this check silently.
+     The ledger is **optional and backward-compatible**: on a project where `gsd_run windows status` returns `open_count: 0` (no `.planning/WINDOWS.md` yet, or an empty ledger), the gate passes silently. It only blocks when at least one entry is `open`.
+
+   - **Every other `capId`** — run the gate's own declared check through the generic evaluator. This arm is what makes a third-party capability's declared gate enforceable at all (#3559); before it existed, a gate whose `capId` was not named above was resolved and then silently dropped.
+
+     ⚠ **Validate `check` before shell use** (third-party manifest input) — `loop-hook-dispatch.md` § `gate`.
+
+     For a named-query gate (only a value that has passed validation is run):
+     ```bash
+     GATE_RESULT=$(gsd_run check ${hook.check.query} "${PHASE_DIR}" --raw)
+     CHECK_EXIT=$?
+     ```
+
+     (The named-query argument convention — a single `"${PHASE_DIR}"` positional — mirrors `verify-work.md`'s `verify:pre` arm verbatim. No capability declares a `check.query` gate at `ship:pre` today; the arm exists so the documented check contract is complete rather than half-implemented.)
+
+     For a `predicate` gate (ADR-2008 / #2008), serialize `hook.check.predicate` to compact JSON and pass it as a **single argv element**:
+     ```bash
+     GATE_RESULT=$(gsd_run check predicate --predicate '<hook.check.predicate as JSON>' --phase-dir "${PHASE_DIR}" --phase-number "${PHASE_NUMBER}" --raw)
+     CHECK_EXIT=$?
+     ```
+     A gate carrying neither — including an `agentVerdict` check, which has no runner at `ship:pre` — cannot be evaluated here. Record a warning naming the `capId` and treat it as a check-command failure routed per step 1a, **never** as a silent pass.
+
+   **Step 1a — did the CHECK COMMAND itself fail?** (non-zero `CHECK_EXIT`, empty output, or unparseable JSON). The two named branches above cannot reach this state — their failure modes are already folded into a fail-closed `block: true`.
+   - **`onError == "halt"`** → stop the ship. Do NOT push, do NOT create a PR. Surface: `⚠ Gate check command failed ({hook.capId}): command error. Resolve before shipping.`
+   - **`onError == "skip"`** → record a warning naming the `capId`, then continue to the next gate. Do NOT read `GATE_RESULT.block`.
+
+   **Step 2 — read the gate's `block` decision.** Only reached when the check produced a verdict.
+
+   - **`blocking == true` and `block == true`** → HALT the ship — do NOT push, do NOT create a PR — surfacing that gate's own message:
+     ```
+     ⚠ Ship blocked by capability gate ({hook.capId}): {message}
+     ```
+     This halt is **not** bypassed by `onError` — `onError` covers check-command failure (step 1a), never the gate's block decision.
+   - **`blocking == false`** (advisory) → never halts. If `block == true` or the result carries a non-empty message, print `⚠ {hook.capId} advisory: {message}`, then continue.
+   - **`blocking == true` and `block == false`** → continue silently.
+
+   **When every active gate has been processed without a halt:** continue to the next preflight check.
 </step>
 
 <step name="push_branch">
@@ -346,7 +379,7 @@ Report: "PR #{number} created: {url}"
 Before prompting the user, check if an external review command is configured:
 
 ```bash
-REVIEW_CMD=$(gsd_run query config-get workflow.code_review_command 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
+REVIEW_CMD=$(gsd_run query config-get workflow.code_review_command --raw 2>/dev/null || echo "")
 ```
 
 If `REVIEW_CMD` is non-empty and not `"null"`, run the external review:
@@ -409,7 +442,6 @@ If `REVIEW_CMD` is non-empty and not `"null"`, run the external review:
 
 Ask if user wants to trigger a code review:
 
-
 **Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `{{GSD_ARGS}}` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 
 ```
@@ -449,7 +481,41 @@ would otherwise trigger (GitHub honors `[ci skip]` / `[skip ci]`):
 
 ```bash
 gsd_run query commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER} [ci skip]" --files .planning/STATE.md
+SHIP_NOTE_SHA=$(git rev-parse HEAD)
 git push origin ${CURRENT_BRANCH} 2>&1 || echo "⚠ track_shipping: ship-note push failed — it is local-only; rerun: git push origin ${CURRENT_BRANCH}"
+
+# Preserve the skip-token optimization for repositories without a required-check
+# wedge; only synthesize a second CI-triggering commit when GitHub reports one (#2783).
+# Poll mergeStateStatus with backoff to avoid racing GitHub's async state computation.
+# Note: Skip tokens recognized by GitHub Actions are [skip ci], [ci skip], [no ci], [skip actions], [actions skip], and skip-checks:true.
+# The recovery commit message MUST NOT contain any of these tokens.
+
+STATUS="UNKNOWN"
+CHECKS=0
+REVIEW_DECISION=""
+for i in {1..5}; do
+  PR_STATE=$(gh pr view ${PR_NUMBER} --json headRefOid,mergeStateStatus,statusCheckRollup,reviewDecision -q '{head: .headRefOid, status: .mergeStateStatus, checks: ((.statusCheckRollup // []) | length), review: (.reviewDecision // "")}' 2>/dev/null || echo '{"head":"","status":"UNKNOWN","checks":0,"review":""}')
+  HEAD_OID=$(echo "$PR_STATE" | jq -r .head)
+  if [ "$HEAD_OID" = "$SHIP_NOTE_SHA" ]; then
+    STATUS=$(echo "$PR_STATE" | jq -r .status)
+    CHECKS=$(echo "$PR_STATE" | jq -r .checks)
+    REVIEW_DECISION=$(echo "$PR_STATE" | jq -r .review)
+  fi
+  if [ "$HEAD_OID" = "$SHIP_NOTE_SHA" ] && [ "$STATUS" != "UNKNOWN" ]; then
+    break
+  fi
+  sleep 3
+done
+
+if [ "$STATUS" = "BLOCKED" ] && [ "$CHECKS" = "0" ] && [ "$REVIEW_DECISION" != "REVIEW_REQUIRED" ] && [ "$REVIEW_DECISION" != "CHANGES_REQUESTED" ] && git log -1 --format=%B "$SHIP_NOTE_SHA" | grep -q '\[ci skip\]'; then
+  echo "⚠ PR is BLOCKED with zero checks. The [ci skip] trailer wedged the PR due to required checks."
+  echo "Pushing an empty commit to trigger the required pipelines..."
+  # gsd_run query commit requires a file list; use git directly for this intentionally empty commit.
+  git commit --allow-empty -m "chore: trigger CI (recover from ship-note skip-token)"
+  git push origin ${CURRENT_BRANCH} 2>&1 || echo "⚠ track_shipping: recovery push failed — rerun: git push origin ${CURRENT_BRANCH}"
+elif [ "$STATUS" = "UNKNOWN" ]; then
+  echo "⚠ track_shipping: PR mergeStateStatus is UNKNOWN after polling; PR may require manual check re-trigger."
+fi
 ```
 </step>
 
@@ -473,7 +539,31 @@ Read the `activeHooks` array directly from `SHIP_POST_HOOKS_JSON` in-context (do
   ◆ Spawning ship:post capability agent... (runs in a subagent — no output until it returns, ~1–2 min; expected, not a freeze)
   ```
 
-  `Agent(subagent_type=ref.agent, prompt="Ship-time capability hook for phase ${PHASE_NUMBER}. Phase dir: ${PHASE_DIR}. Consume: ${consumed_files}. Follow your agent instructions.", model="{balanced_model}")`
+<!-- #2508 runtime-aware-dispatch -->
+
+> **Runtime-aware dispatch (#2508 Phase 4).** GSD workflows dispatch specialized subagents by role. Before dispatching on a built-in-only runtime (kimi-code — three built-ins only), resolve the role to a built-in via `gsd_run query resolve-dispatch-type --requested <role> --raw`. On named-dispatch runtimes (the agent/OpenCode/…) the role is returned unchanged; on kimi-code it maps to `coder`/`explore`/`plan` by role-suffix. The persona rides `${AGENT_SKILLS_<ROLE>}` (Phase 3) regardless. See @gsd-core/references/runtime-aware-dispatch.md.
+
+  **#2684 model resolution.** `init.phase-op` emits no model field, and `ref.agent` is only known at runtime, so resolve it per hook before dispatching.
+
+  **Input validation (defense-in-depth) — do this IN-CONTEXT, before any shell use.** `ref.agent` originates in a capability manifest, which may be third-party. Check the value you read from `activeHooks` against `^[A-Za-z0-9][A-Za-z0-9._-]*$` yourself, the same way you read `activeHooks` itself — **never** by pasting it into a shell command to be tested there. A value carrying a quote, `;`, `` ` ``, `$(`, or a newline would terminate the assignment and run as its own statement *before* any shell-side check could execute, so a shell-side check is no protection at all.
+
+  A value that fails the check is a malformed manifest: record a warning, **skip that hook entirely**, and move to the next `activeHooks` entry. Do not dispatch it and do not place it in a command line.
+
+  Only once the value has passed, resolve its model — substituting the validated value for `<agent>`:
+
+  ```bash
+  HOOK_AGENT_MODEL=$(gsd_run query resolve-model "<agent>" --raw 2>/dev/null || true)
+  ```
+
+  **#2517: omit the `model=` parameter entirely when `HOOK_AGENT_MODEL` is `inherit` or empty** — a capability may name an agent absent from the model-profile table, which resolves to the empty string, and passing an empty model 404s on non-the agent runtimes. Omitting inherits the orchestrator's model.
+
+  With a resolved model (`{HOOK_AGENT_MODEL}` is the value the command above printed; `${…}` are bound shell variables):
+
+  `Agent(subagent_type=ref.agent, prompt="Ship-time capability hook for phase ${PHASE_NUMBER}. Phase dir: ${PHASE_DIR}. Consume: ${consumed_files}. Follow your agent instructions.", model="{HOOK_AGENT_MODEL}")`
+
+  When it resolved to `inherit` or empty, drop the parameter:
+
+  `Agent(subagent_type=ref.agent, prompt="Ship-time capability hook for phase ${PHASE_NUMBER}. Phase dir: ${PHASE_DIR}. Consume: ${consumed_files}. Follow your agent instructions.")`
 - If `ref.skill` is set, dispatch with `Skill(skill="gsd-${ref.skill}", args="${PHASE_NUMBER} --auto ${GSD_WS}")` (prepend `gsd-` to `ref.skill`).
 
 Each dispatch is best-effort: if it errors, record a warning and continue — never re-raise (`onError: skip`).

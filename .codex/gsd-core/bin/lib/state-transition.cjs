@@ -17,6 +17,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.STATE_MD_SECTIONS = exports.FIELD_CLASSIFICATION = void 0;
 exports.getFieldClassification = getFieldClassification;
+exports.applyPreserveWhenUnchanged = applyPreserveWhenUnchanged;
 exports.applyStatePreservation = applyStatePreservation;
 exports.transitionCore = transitionCore;
 exports.sliceCurrentPositionSection = sliceCurrentPositionSection;
@@ -26,10 +27,8 @@ const state_document_cjs_1 = require("./state-document.cjs");
 const state_document_cjs_2 = require("./state-document.cjs");
 const markdown_sectionizer_cjs_1 = require("./markdown-sectionizer.cjs");
 const phase_lifecycle_cjs_1 = require("./phase-lifecycle.cjs");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const phaseIdMod = require("./phase-id.cjs");
+const pattern_cjs_1 = require("./pattern.cjs");
 const { extractFrontmatter, reconstructFrontmatter, stripFrontmatter } = frontmatter;
-const { escapeRegex } = phaseIdMod;
 // Stop predicate for section-body slicing: a level-2+ heading ends the section.
 const STOP_H2_PLUS = (lv) => lv >= 2;
 /**
@@ -54,18 +53,31 @@ exports.FIELD_CLASSIFICATION = Object.freeze(Object.assign(Object.create(null), 
     milestone_name: { source: 'external', preservation: 'preserve-if-placeholder' },
     // Phase / plan position (body-derived)
     current_phase: { source: 'body', preservation: 'preserve-when-unchanged' },
-    current_phase_name: { source: 'curated', preservation: 'preserve-always' }, // #1743, #1695
+    // #1743, #1695. #3468: row corrected to match its long-standing behavior
+    // — was declared preserve-always, has always been delta-gated (only
+    // restores when the body `Phase:` source is unchanged this write).
+    current_phase_name: { source: 'curated', preservation: 'preserve-when-unchanged' },
     current_plan: { source: 'body', preservation: 'preserve-when-unchanged' },
     // Status / lifecycle (body-derived; #1230 delta heuristic applies)
-    status: { source: 'body', preservation: 'preserve-when-unchanged' },
+    // guard: the 'unknown' sentinel is the ONLY true executor-side guard in
+    // this table (stopped_at's `## Session` scoping is caller-side delta
+    // extraction, not an executor condition) — ADR-3408 Decision 1.
+    status: { source: 'body', preservation: 'preserve-when-unchanged', guard: 'non-sentinel-unknown' },
     stopped_at: { source: 'body', preservation: 'preserve-when-unchanged' },
     paused_at: { source: 'body', preservation: 'preserve-when-unchanged' },
     // Activity log
     last_updated: { source: 'free', preservation: 'derive' }, // realClock.nowIso()
     last_activity: { source: 'body', preservation: 'derive' }, // always refresh on transition
     last_activity_desc: { source: 'body', preservation: 'preserve-when-unchanged' },
+    // Commit provenance (#2573) — ambient git read, recomputed on every write,
+    // exactly like last_updated. Never preserved: a stale stamp would claim
+    // STATE.md was written against a commit it wasn't.
+    state_head: { source: 'free', preservation: 'derive' }, // #2573
     // Progress block (disk-derived, except the curated progress ratchet)
-    progress: { source: 'curated', preservation: 'preserve-always' }, // #3242, #1446
+    // mergeStrategy: 'progress-ratchet' — completed_plans/completed_phases
+    // only ever ratchet UP toward the derived value (#2969); everything
+    // else in the merge is either always-derived (#2440) or always-curated.
+    progress: { source: 'curated', preservation: 'preserve-always', mergeStrategy: 'progress-ratchet' }, // #3242, #1446
     'progress.total_phases': { source: 'disk', preservation: 'derive' },
     'progress.completed_phases': { source: 'disk', preservation: 'derive' },
     'progress.total_plans': { source: 'disk', preservation: 'derive' },
@@ -82,83 +94,216 @@ function getFieldClassification(field) {
     return exports.FIELD_CLASSIFICATION[field];
 }
 /**
- * Pure, table-driven post-sync preservation. Mutates `postFm` in place to
- * mirror the pre-consolidation inline block (which also mutated in place) and
- * returns whether any field was restored.
+ * ADR-3408 §8.2: an unenforced `preserve-when-unchanged` row throws. Both
+ * ends of this invariant are gsd-core's own source — a declared row the
+ * *caller code* forgot to wire via `bodyDeltas` — so it is a programming
+ * error, unreachable from any user document. The bright line, stated because
+ * conflating its two sides would be severe: a drifted, malformed, or
+ * unparseable user STATE.md NEVER reaches this throw (§8.5 governs that case
+ * with preserve-and-warn); this fires only when the *caller* omitted a
+ * `bodyDeltas` entry for a row the table itself declares. Getting this
+ * backwards turns every desynced project's `phase.complete` into a hard
+ * failure.
  */
-function applyStatePreservation(input) {
-    const { preFm, postFm, preFmSnapshot, resync } = input;
-    let mutated = false;
-    // Curated progress ratchet (#3242/#1446; closes the #1264 class by routing
-    // the policy through the table). Restored only when the table says preserve-
-    // always AND this transition is not re-deriving from disk (!resync). sync and
-    // the lifecycle transitions pass resync=true and recompute; patch/update and
-    // body-only writes pass resync=false and keep the curated counters.
-    const progressCls = getFieldClassification('progress');
-    if (progressCls !== null &&
-        progressCls.preservation === 'preserve-always' &&
-        !resync &&
-        preFm &&
-        preFm['progress']) {
-        // #2440: when the caller opts in (deriveProgressKeys), total_plans and
-        // total_phases always take the derived (post-sync) value even under !resync.
-        // This is used by cmdStatePlannedPhase where total_plans must correct upward
-        // after plans are added. For body-only writes (state.update/patch without
-        // the flag), the wholesale restore preserves everything as before — the
-        // #3242 Bug A protection stays fully in force.
-        if (input.deriveProgressKeys && postFm['progress']) {
-            const curated = preFm['progress'];
-            const derived = (postFm['progress'] ?? {});
-            const merged = { ...derived };
-            if (curated) {
-                for (const [key, value] of Object.entries(curated)) {
-                    if (key !== 'total_plans' && key !== 'total_phases') {
-                        merged[key] = value;
-                    }
+function throwUnwiredRow(field) {
+    const err = new Error(`applyStatePreservation: preserve-when-unchanged row ${JSON.stringify(field)} reached the ` +
+        'executor with no wired ctx.bodyDeltas entry. This is an internal invariant violation (ADR-3408 ' +
+        '§8.2) — the caller (readModifyWriteStateMd) forgot to supply this field\'s body-source delta. ' +
+        'Add a bodyDeltas entry for this field per ADR-3408 §8.3, or remove the row from ' +
+        'FIELD_CLASSIFICATION if the field no longer needs this policy.');
+    err.code = 'STATE_PRESERVATION_UNWIRED_ROW';
+    err.field = field;
+    throw err;
+}
+/**
+ * Executor for `preservation: 'preserve-when-unchanged'` (ADR-3408 §8.1). The
+ * #1230 delta heuristic: restore the pre-write frontmatter snapshot when this
+ * write did not change the field's body source, and the snapshot is a real
+ * (non-empty-after-trim) curated value the derived value should not clobber.
+ *
+ * Every row carrying this policy — status, stopped_at, current_phase_name,
+ * current_phase, current_plan, paused_at, last_activity_desc — is honored by
+ * this ONE executor; `cls.guard` is the only field-specific variation (the
+ * closed vocabulary of ADR-3408 Decision 1).
+ *
+ * Exported (ADR-3408 §8.5 / D3) so `cmdStateJson` (state.cts) — a read-only
+ * path with no transform of its own — can route its stale-vs-fresh decision
+ * through the SAME executor the write path uses, rather than maintaining a
+ * third private copy of this policy. `cmdStateJson` calls this directly
+ * (not the full `applyStatePreservation` dispatch loop) so its read stays
+ * scoped to exactly the fields it has always governed and never touches
+ * `progress` or `milestone*`, which are different policies with their own
+ * read-path rules (`shouldPreserveExistingProgress`, `preserve-if-placeholder`).
+ */
+function applyPreserveWhenUnchanged(field, cls, ctx) {
+    // 1. A declared row with no wired delta is an internal invariant violation
+    // — throw (ADR-3408 §8.2). Never reached for a user-document defect: the
+    // production caller (readModifyWriteStateMd) wires every preserve-when-
+    // unchanged row unconditionally.
+    const delta = ctx.bodyDeltas ? ctx.bodyDeltas[field] : undefined;
+    if (!delta)
+        throwUnwiredRow(field);
+    // 2. Only a real, non-whitespace-only curated string is worth restoring
+    // (#3468: tightened from `.length > 0` to a trimmed check — a whitespace-
+    // only snapshot is not a real curated value).
+    const snapshot = ctx.preFmSnapshot[field];
+    if (typeof snapshot !== 'string' || snapshot.trim().length === 0)
+        return;
+    // 3. Closed-vocabulary guard: status's 'unknown' sentinel is never restored.
+    // Exact-match, case-sensitive — 'Unknown' is a real value and IS restored.
+    if (cls.guard === 'non-sentinel-unknown' && snapshot === 'unknown')
+        return;
+    // 4. The body source changed this write → the freshly-derived value wins.
+    if (delta.pre !== delta.post)
+        return;
+    // 5. Already correct → no-op (avoid a spurious `mutated=true`).
+    if (ctx.postFm[field] === snapshot)
+        return;
+    // 6. Restore.
+    ctx.postFm[field] = snapshot;
+    ctx.mutated = true;
+}
+/**
+ * Executor for `preservation: 'preserve-always'` (ADR-3408 §8.1). Only
+ * `progress` carries this policy today. Preserves #3242/#1446/#2440/#2969
+ * semantics byte-for-byte: gated on `!resync` and a truthy `preFm[field]`;
+ * the `mergeStrategy: 'progress-ratchet'` per-key merge only fires when the
+ * caller opts in via `deriveProgressKeys`, else the whole curated block wins
+ * wholesale.
+ */
+function applyPreserveAlways(field, cls, ctx) {
+    if (ctx.resync || !ctx.preFm || !ctx.preFm[field])
+        return;
+    if (cls.mergeStrategy === 'progress-ratchet' && ctx.deriveProgressKeys && ctx.postFm[field]) {
+        // #2440: total_plans and total_phases always take the derived (post-sync)
+        // value even under !resync. This is used by cmdStatePlannedPhase where
+        // total_plans must correct upward after plans are added. For body-only
+        // writes (state.update/patch without the flag), the wholesale restore
+        // below preserves everything as before — the #3242 Bug A protection
+        // stays fully in force.
+        const curated = ctx.preFm[field];
+        const derived = (ctx.postFm[field] ?? {});
+        const merged = { ...derived };
+        if (curated) {
+            // #2440: total_plans and total_phases always take the derived value.
+            // #2969: completed_plans and completed_phases take the derived value
+            // when it is GREATER than the curated value (gap-closure plans that
+            // completed after the plan count grew) — ratcheting UP only, never
+            // deriving downward (preserves the #3242 curated-progress protection
+            // for cases unrelated to plan-count growth, e.g. a deleted SUMMARY).
+            // percent also takes the derived value — the resync recomputed it from
+            // disk counts, and a stale curated percent would be incoherent against
+            // the ratcheted-up completed counts (e.g. 54/54 at 93%).
+            const ratchetUpKeys = new Set(['completed_plans', 'completed_phases']);
+            for (const [key, value] of Object.entries(curated)) {
+                if (key === 'total_plans' || key === 'total_phases' || key === 'percent')
+                    continue;
+                if (ratchetUpKeys.has(key)) {
+                    const derivedNum = typeof derived[key] === 'number' ? derived[key] : -Infinity;
+                    const curatedNum = typeof value === 'number' ? value : -Infinity;
+                    // Take the derived value only when it ratchets up (strictly
+                    // greater — #2969's `>` not `>=`); else keep curated.
+                    if (derivedNum > curatedNum)
+                        continue;
+                    merged[key] = value;
+                }
+                else {
+                    merged[key] = value;
                 }
             }
-            postFm['progress'] = merged;
         }
-        else {
-            postFm['progress'] = preFm['progress'];
+        ctx.postFm[field] = merged;
+    }
+    else {
+        ctx.postFm[field] = ctx.preFm[field];
+    }
+    ctx.mutated = true;
+}
+/**
+ * Executor for `preservation: 'preserve-if-placeholder'` (ADR-3408 §8.1).
+ * `milestone` and `milestone_name` both carry this policy in the table, and
+ * both rows dispatch into this SAME executor body — no branch is selected by
+ * field name (ADR-3408 §8.1). The body always restores the name+version pair
+ * together (#948/#2135), ignoring which of the two rows triggered the call;
+ * this is deliberately safe because the executor is idempotent: whichever
+ * row fires first either performs the restore (after which the second row's
+ * call recomputes against already-restored state and finds nothing left to
+ * do) or finds no placeholder to restore (in which case the second row's
+ * call, seeing the same unchanged inputs, reaches the same conclusion). Two
+ * dispatches per write converge to the identical single-pass result, so the
+ * field argument itself is unused here — it exists only to satisfy the
+ * shared executor signature every policy branch in the dispatch loop shares.
+ */
+function applyPreserveIfPlaceholder(_field, _cls, ctx) {
+    const MILESTONE_PLACEHOLDER = 'milestone';
+    const derivedName = ctx.postFm['milestone_name'];
+    const derivedLooksLikeName = typeof derivedName === 'string'
+        && derivedName.length > 0
+        && derivedName !== MILESTONE_PLACEHOLDER
+        && !/^[\s—–:-]/.test(derivedName);
+    const snapshotName = ctx.preFmSnapshot['milestone_name'];
+    const snapshotNameIsReal = typeof snapshotName === 'string'
+        && snapshotName.length > 0
+        && snapshotName !== MILESTONE_PLACEHOLDER;
+    if (derivedLooksLikeName || !snapshotNameIsReal)
+        return;
+    if (ctx.postFm['milestone_name'] !== snapshotName) {
+        ctx.postFm['milestone_name'] = snapshotName;
+        ctx.mutated = true;
+    }
+    const snapshotVersion = ctx.preFmSnapshot['milestone'];
+    if (typeof snapshotVersion === 'string' && snapshotVersion.length > 0 &&
+        ctx.postFm['milestone'] !== snapshotVersion) {
+        ctx.postFm['milestone'] = snapshotVersion;
+        ctx.mutated = true;
+    }
+}
+/**
+ * Executor for `preservation: 'derive'`. Explicit no-op — the sync's
+ * freshly-derived value stands untouched. Naming this executor (rather than
+ * skipping `derive` rows by omission) is what makes ADR-3408 §8.2's throw
+ * decidable: "policy says do nothing" is now distinguishable from "nobody
+ * wired this", because every member of `FieldPreservation` reaches an
+ * executor.
+ */
+function applyDerive(_field, _cls, _ctx) {
+    // No-op by design — see docstring.
+}
+/**
+ * Pure, table-driven post-sync preservation (ADR-3408 §8.1). One loop over
+ * `FIELD_CLASSIFICATION`, dispatching on the row's `preservation` value —
+ * never on the field name. Mutates `postFm` in place to mirror the
+ * pre-#3468 inline block (which also mutated in place) and returns whether
+ * any field was restored.
+ */
+function applyStatePreservation(input) {
+    const ctx = {
+        preFm: input.preFm,
+        postFm: input.postFm,
+        preFmSnapshot: input.preFmSnapshot,
+        resync: input.resync,
+        deriveProgressKeys: input.deriveProgressKeys === true,
+        bodyDeltas: input.bodyDeltas,
+        mutated: false,
+    };
+    for (const field of Object.keys(exports.FIELD_CLASSIFICATION)) {
+        const cls = getFieldClassification(field);
+        if (!cls)
+            continue;
+        if (cls.preservation === 'preserve-when-unchanged') {
+            applyPreserveWhenUnchanged(field, cls, ctx);
         }
-        mutated = true;
+        else if (cls.preservation === 'preserve-always') {
+            applyPreserveAlways(field, cls, ctx);
+        }
+        else if (cls.preservation === 'preserve-if-placeholder') {
+            applyPreserveIfPlaceholder(field, cls, ctx);
+        }
+        else if (cls.preservation === 'derive') {
+            applyDerive(field, cls, ctx);
+        }
     }
-    // status — #1230 body-delta heuristic. Table: preserve-when-unchanged.
-    const statusCls = getFieldClassification('status');
-    if (statusCls !== null &&
-        statusCls.preservation === 'preserve-when-unchanged' &&
-        input.postBodyStatus === input.preBodyStatus &&
-        typeof preFmSnapshot['status'] === 'string' &&
-        preFmSnapshot['status'].length > 0 &&
-        preFmSnapshot['status'] !== 'unknown' &&
-        postFm['status'] !== preFmSnapshot['status']) {
-        postFm['status'] = preFmSnapshot['status'];
-        mutated = true;
-    }
-    // stopped_at — same #1230 body-delta heuristic. Table: preserve-when-unchanged.
-    const stoppedCls = getFieldClassification('stopped_at');
-    if (stoppedCls !== null &&
-        stoppedCls.preservation === 'preserve-when-unchanged' &&
-        input.postBodyStoppedAt === input.preBodyStoppedAt &&
-        typeof preFmSnapshot['stopped_at'] === 'string' &&
-        preFmSnapshot['stopped_at'].length > 0 &&
-        postFm['stopped_at'] !== preFmSnapshot['stopped_at']) {
-        postFm['stopped_at'] = preFmSnapshot['stopped_at'];
-        mutated = true;
-    }
-    // current_phase_name — curated (#1743/#1695). Table: preserve-always.
-    const phaseNameCls = getFieldClassification('current_phase_name');
-    if (phaseNameCls !== null &&
-        phaseNameCls.preservation === 'preserve-always' &&
-        input.postBodyPhaseSource === input.preBodyPhaseSource &&
-        typeof preFmSnapshot['current_phase_name'] === 'string' &&
-        preFmSnapshot['current_phase_name'].length > 0 &&
-        postFm['current_phase_name'] !== preFmSnapshot['current_phase_name']) {
-        postFm['current_phase_name'] = preFmSnapshot['current_phase_name'];
-        mutated = true;
-    }
-    return { postFm, mutated };
+    return { postFm: ctx.postFm, mutated: ctx.mutated };
 }
 // ----------------------------------------------------------------------------
 // Body section constants (ADR-1769 §6 — single writer after migration)
@@ -241,7 +386,7 @@ function beginPhaseCore(content, intent, deps) {
     // #1255: body-field replacements operate on body only (frontmatter stripped),
     // not on the full content. The YAML `status:` key matches `^Status:\s*`
     // before the body pipe-table row if full content is passed.
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const hasFrontmatter = Object.keys(existingFm).length > 0;
     let body = stripFrontmatter(content);
     const reassemble = (b) => hasFrontmatter
@@ -279,7 +424,7 @@ function beginPhaseCore(content, intent, deps) {
     // Extract from body (not full content) so the YAML `status:` key cannot
     // shadow the body Status field (#1255).
     const currentStatus = (0, state_document_cjs_1.stateExtractField)(body, 'Status') || '';
-    const isAlreadyExecuting = new RegExp(`Executing Phase\\s+${escapeRegex(String(intent.phaseNumber))}\\b`, 'i').test(currentStatus);
+    const isAlreadyExecuting = new RegExp(`Executing Phase\\s+${(0, pattern_cjs_1.escapeRegex)(String(intent.phaseNumber))}\\b`, 'i').test(currentStatus);
     // Status update (applies on both first-time and resume — Status is always refreshed).
     tryField('Status', `Executing Phase ${intent.phaseNumber}`);
     // Last Activity date — safe to refresh on resume (tracks when execute-phase ran).
@@ -314,7 +459,11 @@ function beginPhaseCore(content, intent, deps) {
         // (do not touch Plan:, Phase:, Status:, stopped_at, progress.percent).
         body = mutateCurrentPositionResume(body, intent, today, updated);
     }
-    return { content: reassemble(body), updated };
+    // #2736: surface the #3127 resume decision so the adapter can drop its
+    // intent-first current_phase_name override on a resume — the core just
+    // preserved the mid-flight name, and an override would drift frontmatter
+    // away from the preserved body value.
+    return { content: reassemble(body), updated, data: { resumed: isAlreadyExecuting } };
 }
 /**
  * Find the `## Current Position` section, return its `{start, end}` byte
@@ -335,7 +484,24 @@ function locateCurrentPosition(body) {
     let end = body.length;
     for (let j = idx + 1; j < hs.length; j++) {
         if (STOP_H2_PLUS(hs[j].level)) {
-            end = hs[j].offset - 1;
+            // Exclude the newline that separates this section from the next
+            // heading. Walk back over a bare `\n`, then over a `\r` if one
+            // immediately precedes it (CRLF), so a CRLF document's slice does not
+            // retain a stray unpaired trailing `\r` (#3118).
+            let e = hs[j].offset;
+            if (e > 0 && body[e - 1] === '\n') {
+                e -= 1;
+                if (e > 0 && body[e - 1] === '\r')
+                    e -= 1;
+            }
+            // Clamp so the span can never invert (#3118 review): when the section
+            // is empty and the next heading follows with no blank line between,
+            // walking back over the newline(s) can land `e` before `start`. An
+            // inverted span makes every mutator's `body.slice(0, start) +
+            // sectionBody + body.slice(end)` reassembly duplicate the bytes in
+            // `[end, start)`. A zero-length span (`end === start`) is the correct
+            // representation of an empty-but-present section.
+            end = Math.max(e, start);
             break;
         }
     }
@@ -466,6 +632,25 @@ function mutateCurrentPositionForAdvance(content, fields, statusDefaults, lastAc
         return content;
     let sectionBody = content.slice(span.start, span.end);
     let mutated = false;
+    // #3395: Phase is always replaced when a caller passes it — system-derived,
+    // not executor-authored (same rule as Plan below). plannedPhaseCore uses
+    // this so the transition that declares phase N planned also owns the `Phase:`
+    // line the frontmatter resync and `state json` re-derive current_phase from;
+    // before, the line survived stale from a previous phase and every
+    // body-derived consumer kept reading it (#948 class).
+    if (fields.phase) {
+        if (/^Phase:/m.test(sectionBody)) {
+            sectionBody = sectionBody.replace(/^Phase:.*$/m, `Phase: ${fields.phase}`);
+            mutated = true;
+        }
+        else {
+            const replaced = (0, state_document_cjs_1.stateReplaceField)(sectionBody, 'Phase', fields.phase);
+            if (replaced !== null) {
+                sectionBody = replaced;
+                mutated = true;
+            }
+        }
+    }
     if (fields.status) {
         const replaced = (0, state_document_cjs_1.stateReplaceFieldIfTemplate)(sectionBody, 'Status', statusDefaults, fields.status);
         if (replaced !== null && replaced !== sectionBody) {
@@ -523,7 +708,7 @@ function advancePlanCore(content, deps) {
     // not on the full content. The YAML `status:` key matches `^Status:\s*`
     // before the body field if full content is passed (codex Phase 2 review:
     // HIGH blocking finding — same pattern beginPhaseCore already handles).
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const hasFrontmatter = Object.keys(existingFm).length > 0;
     let body = stripFrontmatter(content);
     const reassemble = (b) => hasFrontmatter
@@ -635,6 +820,7 @@ function completePhaseCore(content, intent, deps) {
         'current_plan',
         'last_activity',
         'last_activity_desc',
+        'stopped_at',
         'progress',
     ]) {
         const cls = getFieldClassification(fmKey);
@@ -645,7 +831,7 @@ function completePhaseCore(content, intent, deps) {
     }
     // #1255: body-field replacements operate on body only (frontmatter stripped),
     // so the YAML `status:` / `current_phase:` keys cannot shadow the body fields.
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const hasFrontmatter = Object.keys(existingFm).length > 0;
     let body = stripFrontmatter(content);
     const reassemble = (b) => hasFrontmatter
@@ -679,8 +865,8 @@ function completePhaseCore(content, intent, deps) {
         updated.push('Current Phase');
     }
     // Current Phase Name — only written when a next-phase display name is known
-    // (#1743/#1695: classified curated/preserve-always, so an absent name does
-    // NOT clear an existing curated value).
+    // (#1743/#1695: classified curated/preserve-when-unchanged, so an absent
+    // name does NOT clear an existing curated value).
     if (nextPhaseDisplayName) {
         const after = (0, state_document_cjs_1.stateReplaceField)(body, 'Current Phase Name', nextPhaseDisplayName);
         if (after) {
@@ -725,6 +911,28 @@ function completePhaseCore(content, intent, deps) {
         body = ladAfter;
         updated.push('Last Activity Description');
     }
+    // Stopped At — #3374: write the continuity line this transition implies.
+    // The frontmatter `stopped_at` is a projection of this body line
+    // (source: 'body' in FIELD_CLASSIFICATION), and phase completion is exactly
+    // the event the line describes — leaving it stale made the post-sync harvest
+    // overwrite a fresher frontmatter value with pre-completion prose on every
+    // completion (#3374), and left the workflow's later prose refresh as a
+    // divergence source. Session-SCOPED replace (stateReplaceFieldInSession):
+    // the harvest reads only the session section, so the write must target the
+    // same scope — a whole-body replace let a decoy `**Stopped at:**` line in an
+    // unrelated section absorb the refresh. Replace-only (no insertion): a
+    // STATE.md with no session continuity line keeps its shape, and the
+    // unchanged body source then lets the preservation delta keep an existing
+    // frontmatter value. Last-phase wording reuses the ADR-2207 status phrase;
+    // milestone termination wording stays owned by milestoneCompleteCore.
+    const stoppedAtLine = intent.isLastPhase
+        ? `Phase ${intent.phaseNum} complete — all phases complete`
+        : `Phase ${intent.phaseNum} complete${intent.nextPhaseNum ? `, ready to plan Phase ${intent.nextPhaseNum}` : ''}`;
+    const stoppedAfter = (0, state_document_cjs_1.stateReplaceFieldInSession)(body, 'Stopped At', 'Stopped at', stoppedAtLine);
+    if (stoppedAfter !== body) {
+        body = stoppedAfter;
+        updated.push('Stopped At');
+    }
     // Progress block — re-derive completed/total phases from the roadmap when
     // available (milestone-wide source of truth), then recompute the percent.
     // Only runs when a Completed Phases field exists (the existing guard).
@@ -740,8 +948,17 @@ function completePhaseCore(content, intent, deps) {
             if (derived.totalPhases !== null)
                 derivedTotalPhases = derived.totalPhases;
         }
+        // #3057 B9: only mark 'Completed Phases' updated when the text actually
+        // changed. `stateReplaceField` returns the full (re-)substituted content
+        // whenever the field pattern matches, REGARDLESS of whether newCompleted
+        // differs from the value already in `body` — so a truthy-only check here
+        // marked the field 'updated' even when the roadmap was unavailable and
+        // newCompleted is just completedRaw parsed back to itself. That collapsed
+        // "recomputed from roadmap" and "left as-is" into the same `updated`
+        // signal. Comparing to `body` (the idiom every other field in this
+        // function already uses) restores the distinction.
         const completedAfter = (0, state_document_cjs_1.stateReplaceField)(body, 'Completed Phases', String(newCompleted));
-        if (completedAfter) {
+        if (completedAfter !== null && completedAfter !== body) {
             body = completedAfter;
             updated.push('Completed Phases');
         }
@@ -749,8 +966,9 @@ function completePhaseCore(content, intent, deps) {
         const totalPhases = derivedTotalPhases || (totalRaw ? parseInt(totalRaw, 10) : null);
         if (totalPhases && totalPhases > 0) {
             const newPercent = (0, phase_lifecycle_cjs_1.clampPercent)(newCompleted, totalPhases);
+            // Same guard as 'Completed Phases' above, and for the same reason.
             const progAfter = (0, state_document_cjs_1.stateReplaceField)(body, 'Progress', `${newPercent}%`);
-            if (progAfter) {
+            if (progAfter !== null && progAfter !== body) {
                 body = progAfter;
                 updated.push('Progress');
             }
@@ -770,7 +988,10 @@ function completePhaseCore(content, intent, deps) {
  * per-phase body fields after plan-phase runs: Status (template-aware — only
  * replaces handler-generated values, preserving executor-authored ones),
  * Total Plans in Phase, Last Activity (template-aware), Last Activity
- * Description, and the ## Current Position section. The adapter wraps this in
+ * Description, and the ## Current Position section — including its `Phase:`
+ * line, which this transition owns (#3395: the line is the body source
+ * `current_phase` re-derives from, so it must not survive stale from a
+ * previous phase). The adapter wraps this in
  * `readModifyWriteStateMd({ resync: false })` so the milestone-wide progress.*
  * frontmatter is NOT re-derived from a half-planned disk snapshot (#500 RC1).
  *
@@ -789,7 +1010,7 @@ function plannedPhaseCore(content, intent, deps) {
         }
     }
     // #1255: body-field replacements operate on body only.
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const hasFrontmatter = Object.keys(existingFm).length > 0;
     let body = stripFrontmatter(content);
     const reassemble = (b) => hasFrontmatter
@@ -823,14 +1044,37 @@ function plannedPhaseCore(content, intent, deps) {
         body = ladResult;
         updated.push('Last Activity Description');
     }
-    // ## Current Position section — Status + Last activity (template-aware).
+    // ## Current Position section — Phase + Status + Last activity.
+    // #3395: plannedPhaseCore owns the `Phase:` line for the same reason
+    // beginPhaseCore/completePhaseCore do — it is the body source the frontmatter
+    // resync and `state json` re-derive `current_phase` from. Before, a stale
+    // line from a previous phase survived this transition and every
+    // body-derived consumer kept reading it (the write path was already
+    // protected by the #3258 preserve-when-unchanged row; the source itself was
+    // never refreshed). The label mirrors beginPhaseCore's `N (Name) — EXECUTING`
+    // convention with this transition's status vocabulary ("Ready to execute").
+    // Phase is system-derived, always replaced (Knuth invariant does not apply);
+    // Status / Last activity stay template-aware.
     const beforePos = body;
     body = mutateCurrentPositionForAdvance(body, {
+        phase: `${intent.phaseNumber}${intent.phaseName ? ` (${intent.phaseName})` : ''} — READY TO EXECUTE`,
         status: 'Ready to execute',
         lastActivity: `${today} — Phase ${intent.phaseNumber} planning complete`,
     }, statusDefaults, lastActivityDefaults);
     if (body !== beforePos)
         updated.push('Current Position');
+    // #2400 Bug B: sync progress.total_plans to the frontmatter when a plan count
+    // is given. This writes the explicitly-provided count — it is NOT a re-derivation
+    // from disk (#500 RC1 is about deriving from a half-planned snapshot, not about
+    // refusing to write an explicitly-passed argument).
+    if (intent.planCount !== null && intent.planCount !== undefined && hasFrontmatter) {
+        const fmProgress = existingFm['progress'] || {};
+        if (fmProgress['total_plans'] !== intent.planCount) {
+            fmProgress['total_plans'] = intent.planCount;
+            existingFm['progress'] = fmProgress;
+            updated.push('progress.total_plans');
+        }
+    }
     return { content: reassemble(body), updated };
 }
 // ----------------------------------------------------------------------------
@@ -848,10 +1092,11 @@ function plannedPhaseCore(content, intent, deps) {
  * preserved.
  *
  * This is a destructive reset intent: it intentionally overwrites the curated
- * `progress` / `current_phase_name` fields (classified preserve-always) because
- * a new milestone starts from zero. That is the intent's contract, not a
- * violation of the field-classification table — the table governs the steady-
- * state RMW transitions; a milestone boundary is an explicit reset.
+ * `progress` (preserve-always) / `current_phase_name` (preserve-when-unchanged)
+ * fields because a new milestone starts from zero. That is the intent's
+ * contract, not a violation of the field-classification table — the table
+ * governs the steady-state RMW transitions; a milestone boundary is an
+ * explicit reset.
  *
  * The adapter wraps this in `acquireStateLock` + `platformWriteSync` (NOT
  * `readModifyWriteStateMd`) because milestoneSwitch rebuilds frontmatter
@@ -868,7 +1113,7 @@ function milestoneSwitchCore(content, intent, deps) {
         'progress',
         'Current Position',
     ];
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const body = stripFrontmatter(content);
     const resolvedName = (intent.name && intent.name.trim()) || 'milestone';
     // ## Current Position reset body (mirrors state.cts:2371-2375).
@@ -1013,7 +1258,7 @@ function milestoneCompleteCore(content, intent, deps) {
         }
     }
     // #1255: body-field replacements operate on body only.
-    const existingFm = extractFrontmatter(content);
+    const existingFm = extractFrontmatter(content, deps.sourcePath);
     const hasFrontmatter = Object.keys(existingFm).length > 0;
     let body = stripFrontmatter(content);
     const reassemble = (b) => hasFrontmatter
@@ -1069,13 +1314,49 @@ function milestoneCompleteCore(content, intent, deps) {
  * Apply a `patch` transition to STATE.md content.
  *
  * Migrates `cmdStatePatch` (state.cts) onto the substrate. Applies each
- * caller-supplied `{field: value}` pair via `stateReplaceField` over the full
- * content (body + frontmatter — patch can target either), tracking which fields
- * were updated vs. not found.
+ * caller-supplied `{field: value}` pair, resolved BODY-FIRST:
+ *
+ * - A key that resolves against the STRIPPED body (via `stateReplaceField`,
+ *   case-insensitive on the field name) is applied there and reported
+ *   `updated` — this is the legitimate, documented case (display-cased body
+ *   fields — Status, Current Plan, Phase — which are never frontmatter
+ *   keys). It wins deterministically even when the same key also happens to
+ *   exist as a parsed frontmatter key (e.g. `status` matches both the
+ *   frontmatter key and a `Status:` body line) — frontmatter is inert for
+ *   that key.
+ * - Only when the body has no match is the key checked against parsed
+ *   frontmatter (determined structurally, never by a naming heuristic), and
+ *   routed through the seam: `FIELD_CLASSIFICATION` governs it. A CLASSIFIED
+ *   key (has a row, e.g. `current_phase`, `current_phase_name`) is NOT
+ *   writable by an arbitrary patch — policy owns it — and is reported
+ *   `failed`. An UNCLASSIFIED key (no row, e.g. a custom `risk_level`) is a
+ *   pass-through per Phase 1 behavior-table row 19 ("field absent from
+ *   FIELD_CLASSIFICATION → untouched pass-through"): it is applied directly
+ *   to the frontmatter object before reassembly and reported `updated`.
+ * - A key matching neither the body nor the frontmatter is reported `failed`.
+ *
+ * ADR-3408 §8.3(b): this used to run `stateReplaceField` over the FULL
+ * document (body + frontmatter), which — because `field` is an arbitrary,
+ * caller-supplied string, unlike every other `stateReplaceField` call site in
+ * this file, which passes a fixed Title-Case string literal that can never
+ * collide with a lowercase/snake_case YAML key — let a frontmatter-shaped
+ * patch key (e.g. `status`, `current_phase`) match and rewrite the YAML
+ * frontmatter block directly via `stateReplaceField`'s case-insensitive
+ * `^field:` line pattern, entirely outside `FIELD_CLASSIFICATION` and the
+ * write-seam preservation policy: a second, undeclared writer. The fix is
+ * that a CLASSIFIED frontmatter key no longer writes outside the declared
+ * policy table — not that every frontmatter-shaped key stops working.
+ * `.gsd/phase/refactor-3469-one-write-seam/40-design.md` row 9 requires
+ * frontmatter changes to route through the seam (still work, governed by
+ * FIELD_CLASSIFICATION), not to stop working outright. Body-shaped keys
+ * (`Status`, `Current Plan`, `Phase`, ...) are the LEGITIMATE case and are
+ * unaffected — they were always matched against the body text, and still are.
  *
  * The curated-field preservation that fixes #1743/#1695 is NOT in this core —
- * it lives in `readModifyWriteStateMd`'s post-sync delta (table-driven via
- * `getFieldClassification('current_phase_name').preservation === 'preserve-always'`).
+ * it lives in the write seam's post-sync delta (table-driven via
+ * `current_phase_name`'s `preserve-when-unchanged` row, ADR-3408 §8.1 —
+ * reclassified from `preserve-always` in #3468 to match its long-standing,
+ * delta-gated behavior).
  * `patch` consulting the table "refuses to overwrite" curated fields implicitly:
  * when the patch does not change a curated field's body source line, the
  * existing frontmatter value wins over the sync re-derivation. The adapter
@@ -1084,19 +1365,55 @@ function milestoneCompleteCore(content, intent, deps) {
  * `data.updated` / `data.failed` mirror the pre-migration CLI output shape.
  */
 function patchCore(content, intent) {
+    const existingFm = extractFrontmatter(content);
+    const hasFrontmatter = Object.keys(existingFm).length > 0;
+    let body = stripFrontmatter(content);
+    const fm = { ...existingFm };
     const updated = [];
     const failed = [];
-    let result = content;
     for (const [field, value] of Object.entries(intent.patches)) {
-        const replaced = (0, state_document_cjs_1.stateReplaceField)(result, field, value);
+        // Body-first: a key that resolves against a body field is the
+        // legitimate, documented case (display-cased body fields — Status,
+        // Current Plan, Phase — are never frontmatter keys) and wins
+        // deterministically even when the same key also happens to exist as a
+        // frontmatter key (case-insensitively, via stateReplaceField's
+        // `^field:` pattern — e.g. `status` matching both the frontmatter key
+        // and a `Status:` body line). Frontmatter is only consulted when the
+        // body has no match for this key.
+        const replaced = (0, state_document_cjs_1.stateReplaceField)(body, field, value);
         if (replaced !== null) {
-            result = replaced;
+            body = replaced;
             updated.push(field);
+            continue;
         }
-        else {
-            failed.push(field);
+        if (Object.prototype.hasOwnProperty.call(existingFm, field)) {
+            // Frontmatter-shaped key: route through the seam. A classified field
+            // is policy-owned — a raw patch may not bypass it. An unclassified
+            // field is an untouched pass-through (behavior-table row 19).
+            if (getFieldClassification(field) !== null) {
+                failed.push(field);
+            }
+            else {
+                fm[field] = value;
+                updated.push(field);
+            }
+            continue;
         }
+        failed.push(field);
     }
+    if (updated.length === 0) {
+        // No field matched — return `content` VERBATIM (mirrors `updateCore`'s
+        // null-result branch): reassembling via stripFrontmatter/
+        // reconstructFrontmatter even when nothing changed can round-trip the
+        // frontmatter block to different bytes than the original (key order,
+        // formatting), which would falsely defeat `readModifyWriteStateMd`'s
+        // #948 no-op write guard for every patch that updates nothing, not just
+        // a frontmatter-shaped one.
+        return { content, updated, data: { updated, failed } };
+    }
+    const result = hasFrontmatter
+        ? `---\n${reconstructFrontmatter(fm)}\n---\n\n${body}`
+        : body;
     return { content: result, updated, data: { updated, failed } };
 }
 // ----------------------------------------------------------------------------
@@ -1336,11 +1653,14 @@ function truncateForLog(s) {
 function rebuildCore(content, _intent, deps) {
     const timestamp = deps.clock.nowIso();
     const log = [];
+    const phaseInventoryScan = { failed: false, reason: null };
     let modified = content;
     // §2 Decision: re-derive derived sections, preserve others. Order is
     // oldest-section-first so log entries appear in body order.
-    modified = reconcileCurrentPosition(modified, timestamp, log);
-    modified = reconcileByPhaseTable(modified, deps, timestamp, log);
+    // sourcePath threaded so `state rebuild --dry-run` names the file: that branch reads STATE.md
+    // directly rather than through readModifyWriteStateMd, so nothing upstream has named it yet.
+    modified = reconcileCurrentPosition(modified, timestamp, log, deps.sourcePath);
+    modified = reconcileByPhaseTable(modified, deps, timestamp, log, phaseInventoryScan);
     modified = stripTemplatePlaceholders(modified, timestamp, log);
     modified = deduplicateSessionArchive(modified, timestamp, log);
     // §3 + §4: append the audit log ONLY when mutations occurred. The
@@ -1357,6 +1677,11 @@ function rebuildCore(content, _intent, deps) {
             mutated: log.length > 0,
             mutations: log.length,
             log,
+            // #3057 B1: distinguishable from a clean "nothing to reconcile" — a
+            // failed phase-inventory scan means the by-phase table was NOT
+            // verified against disk, even though `mutated` may still be false.
+            phase_inventory_scan_failed: phaseInventoryScan.failed,
+            ...(phaseInventoryScan.reason !== null ? { phase_inventory_scan_reason: phaseInventoryScan.reason } : {}),
         },
     };
 }
@@ -1373,8 +1698,8 @@ function rebuildCore(content, _intent, deps) {
  * the key (Leaky-Abstractions guard — don't synthesize values the canonical
  * source doesn't have).
  */
-function reconcileCurrentPosition(content, timestamp, log) {
-    const fm = extractFrontmatter(content);
+function reconcileCurrentPosition(content, timestamp, log, sourcePath) {
+    const fm = extractFrontmatter(content, sourcePath);
     if (!fm || typeof fm !== 'object')
         return content;
     let modified = content;
@@ -1433,12 +1758,24 @@ function reconcileCurrentPosition(content, timestamp, log) {
  * Leaky-Abstractions guard (ADR-1817 §1): when `phaseInventoryProvider` is
  * absent (no disk scan wired), this step is a no-op. The core stays pure and
  * testable without disk I/O.
+ *
+ * A DIFFERENT case is a scan that ran but failed (`ok:false`): that is NOT a
+ * no-op-equivalent "nothing to reconcile" — the table is left untouched (we
+ * have no trustworthy inventory to reconcile against) but the failure is
+ * recorded into `meta` so the caller (`rebuildCore`) can surface it instead
+ * of reporting a clean, fully-reconciled rebuild (#3057 B1).
  */
-function reconcileByPhaseTable(content, deps, timestamp, log) {
+function reconcileByPhaseTable(content, deps, timestamp, log, meta) {
     if (!deps.phaseInventoryProvider)
         return content;
-    const inventory = deps.phaseInventoryProvider();
-    if (!inventory || inventory.length === 0)
+    const result = deps.phaseInventoryProvider();
+    if (!result.ok) {
+        meta.failed = true;
+        meta.reason = result.reason;
+        return content; // cannot reconcile without a trustworthy inventory — leave the table as-is
+    }
+    const inventory = result.phases;
+    if (inventory.length === 0)
         return content;
     // The canonical table shape (from gsd-core/templates/state.md):
     //   | Phase | Plans | Total | Avg/Plan |

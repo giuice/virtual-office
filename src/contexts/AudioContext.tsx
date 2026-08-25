@@ -129,6 +129,7 @@ const SCREEN_SHARE_COPY = {
 	failed: 'We couldn’t start screen sharing. Try again. If the problem continues, rejoin the space.',
 	busy: 'Another participant is already sharing their screen. Wait for them to stop, then try again.',
 	ended: 'Screen sharing ended in your browser. Floor plan restored.',
+	signaling: 'Screen sharing could not connect to other participants. Stop sharing, then try again.',
 } as const;
 
 export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { session } = useAuth();
@@ -200,10 +201,17 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		updateScreenShareStatus('idle');
 	}, [cleanupOwnedManager, managerIdentity, updateDisplayStream, updateIsAudioEnabled, updateIsMutedState, updateOwnedScreenShare, updateOwnedWebrtcManager, updatePeerCount, updateScreenShareStatus, updateSpeakingUsers, webrtcManager]);
 
+	const onSignalDelivered = useCallback(() => {
+		updateScreenShareError((current) => (
+			current === SCREEN_SHARE_COPY.signaling ? null : current
+		));
+	}, [updateScreenShareError]);
+
 	// Setup signaling only for the currently authoritative company/session/space scope.
 	const signalingGeneration = managerIdentity ?? 'incomplete-media-identity';
 	const {
 		mutedUserIds,
+		error: signalingError,
 		activeShare: signalingActiveShare,
 		activeShareObservationVersion,
 		getActiveShareReadVersion,
@@ -218,7 +226,16 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		enabled: !!webrtcManager,
 		isMuted,
 		onTerminalAuthorizationDenied,
+		onSignalDelivered,
 	});
+
+	useEffect(() => {
+		if (
+			!signalingError
+			|| (!screenShareLifecycleRef.current && !signalingActiveShare)
+		) return;
+		updateScreenShareError(SCREEN_SHARE_COPY.signaling);
+	}, [signalingActiveShare, signalingError, updateScreenShareError]);
 
 	// A manager is valid only for the complete company/user/session/space/token identity.
 	useEffect(() => {
@@ -260,6 +277,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				if (managerRef.current !== manager || !shareId) return;
 				const track = stream.getVideoTracks()[0];
 				if (!track || track.readyState !== 'live') return;
+				updateScreenShareError(null);
 				updateDisplayStream({ presenterUserId: peerId, shareId, stream });
 			},
 			onLocalDisplayStopped: (shareId) => {
@@ -276,6 +294,9 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			onError: (err) => {
 				if (managerRef.current !== manager) return;
 				console.error('[AudioProvider] Error:', err);
+				if (err.message === 'SIGNALING_SEND_FAILED' || err.message === 'SIGNALING_UNAVAILABLE') {
+					updateScreenShareError(SCREEN_SHARE_COPY.signaling);
+				}
 				if (err.message === 'AUTOPLAY_BLOCKED') {
 					updateError('Clique para habilitar o áudio');
 				} else {
@@ -314,7 +335,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			updateDisplayStream(null);
 			updateScreenShareStatus('idle');
 		};
-		}, [accessToken, cleanupOwnedManager, company?.id, currentUserId, managerIdentity, presenceSessionId, spaceId, updateDisplayStream, updateOwnedScreenShare, updatePeerCount, updateScreenShareStatus, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsInitializing, updateIsMutedState, updateMicPermission]);
+		}, [accessToken, cleanupOwnedManager, company?.id, currentUserId, managerIdentity, presenceSessionId, spaceId, updateDisplayStream, updateOwnedScreenShare, updatePeerCount, updateScreenShareError, updateScreenShareStatus, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsInitializing, updateIsMutedState, updateMicPermission]);
 
 	/**
 	 * Initialize audio (must be called from user gesture for Safari)
@@ -440,9 +461,6 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			const body: unknown = await response.json().catch(() => null);
 			const released = screenShareReleaseResponseSchema.safeParse(body);
 			if (!response.ok || !released.success) return;
-			// Realtime is invalidation-only: peers re-read the authorized active
-			// route before clearing or accepting any presenter state.
-			await lifecycle.manager.broadcastPresenterInvalidated(shareId);
 		} catch {
 			// Release is best effort; server expiry remains the final cleanup fence.
 		}

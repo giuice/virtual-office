@@ -126,7 +126,7 @@ Acceptance Criteria:[score 0.0–1.0]
 Ambiguity: [score] ([calculate])
 ```
 
-**If `--auto` and initial ambiguity already ≤ 0.20 with all minimums met:** Skip interview — derive SPEC.md directly from roadmap + requirements. Log: `[auto] Phase requirements are already sufficiently clear — generating SPEC.md from existing context.` Jump to Step 6.
+**If `--auto` and initial ambiguity already ≤ 0.20 with all minimums met:** Skip interview — derive SPEC.md directly from roadmap + requirements. Log: `[auto] Phase requirements are already sufficiently clear — generating SPEC.md from existing context.` Jump to Step 5.5.
 
 **Otherwise:** Continue to Step 4.
 
@@ -159,15 +159,15 @@ After round [N]:
 
 If gate passes (ambiguity ≤ 0.20 AND all minimums met):
 
-**If `--auto`:** Jump to Step 6.
+**If `--auto`:** Jump to Step 5.5.
 
 **Otherwise:** AskUserQuestion:
 - header: "Spec Gate Passed"
 - question: "Ambiguity is [score] — requirements are clear enough to write SPEC.md. Proceed?"
 - options:
-  - "Yes — write SPEC.md" → Jump to Step 6
+  - "Yes — write SPEC.md" → Jump to Step 5.5
   - "One more round" → Continue interview
-  - "Done talking — write it" → Jump to Step 6
+  - "Done talking — write it" → Jump to Step 5.5
 
 **If max rounds reached (6) and gate not passed:**
 
@@ -251,8 +251,11 @@ if ! node -e 'const a=require(process.argv[1]);if(!Array.isArray(a)||a.length===
   exit 1
 fi
 # Invoke the compiled engine and CAPTURE its report — it computes which categories apply per
-# requirement. The covered/backstop/dismissed/unresolved rows in $COVERAGE drive the
-# resolution loop below (canonical taxonomy compute, NOT LLM re-derivation from prose).
+# requirement. The report is RENDERED into context below (#3102); its resolved/dismissed/
+# unresolved rows (resolved items carry verification: explicit|backstop) are the deterministic
+# FLOOR the resolution loop consumes and unions with its own classification — the loop no longer
+# re-derives the taxonomy from prose unaided. Floor, never ceiling: the classifier has a measured
+# recall gap (ADR-857 §98 / ADR-550 D7b), so the model still ADDS any category the engine missed.
 # The engine FAILS CLOSED (exit 2) on an invalid authored shape or bad input — so the capture
 # MUST be exit-checked. A bare `COVERAGE=$(node …)` swallows that exit code, leaves $COVERAGE
 # empty, and lets the workflow fall through to prose re-derivation: fail-OPEN at the boundary
@@ -269,6 +272,16 @@ if ! printf '%s' "$COVERAGE" | node -e 'let s="";process.stdin.on("data",d=>s+=d
   echo "ERROR: edge-probe produced an unparseable or malformed coverage report — refusing to proceed with the resolution loop." >&2
   exit 1
 fi
+# Render the validated report into the model's visible context (#3102). Until here $COVERAGE was
+# captured, shape-checked, and reduced to coverage.applicable — the engine's per-requirement
+# items[] never reached the model, so the resolution loop below re-derived edge categories from
+# requirement PROSE (the data-flow twin of #2733's control-flow discard). These rows are the
+# deterministic FLOOR the resolution loop consumes. Printed RAW (not a bespoke table) so this
+# step holds NO knowledge of the item schema: an ADR-550 D7a-style re-cut of the item/coverage
+# shape cannot silently desync a hand-rolled renderer here — the engine stays the single source.
+echo "### Edge-probe coverage report (deterministic proposals — the FLOOR for the resolution loop below):"
+printf '%s\n' "$COVERAGE"
+echo "### (end edge-probe coverage report)"
 # Zero-applicable guard: a report where the engine proposed NO applicable edge across ANY
 # requirement is far more likely a shape-classification miss (or malformed requirements) than
 # a genuinely edge-free spec — the same fail-open shape as an invalid shape yielding
@@ -286,23 +299,29 @@ edge-free spec, or should we revisit the requirement wording / authored shapes?"
 an empty `## Edge Coverage` section after explicit confirmation.
 
 For each Requirement gathered so far:
-1. Classify its shape and raise only applicable edge categories (relevance filter — see
-   the taxonomy in the reference). Reuse any edges the Round-4 Failure Analyst already
-   surfaced as pre-`covered`.
+1. Start from the edge-probe rows RENDERED above — the deterministic `items[]` are the FLOOR:
+   every proposed `(requirement_id, category)` MUST be resolved below (Specify / Dismiss-with-
+   reason / Backstop / Defer), none silently dropped. Then raise any applicable category the
+   engine MISSED — the rows are a floor, never a ceiling: the classifier has a measured recall
+   gap on terse prose (ADR-857 §98 / ADR-550 D7b), e.g. a CSV-export requirement whose
+   `encoding` edge the shape cue under-fires. Union the engine's rows with your own
+   classification (relevance filter — see the taxonomy in the reference); do not narrow to them.
+   Reuse any edges the Round-4 Failure Analyst already surfaced as pre-resolved.
 2. For each raised category, propose a CONCRETE candidate edge (not "consider
    boundaries" — e.g. "R2 merges intervals; what about `[[1,2],[2,3]]` that only touch?").
 3. Resolve each with the user (AskUserQuestion; text mode → numbered list):
    - **Specify it** → write a new pass/fail line into Acceptance Criteria AND mark the
-     edge `covered`.
+     edge `resolved` with `verification: explicit`.
    - **Dismiss (reason)** → mark `dismissed` with a required non-empty reason.
-   - **Backstop with a test** → mark `backstop`; note "held-out edge test" for plan-phase.
+   - **Backstop with a test** → mark `resolved` with `verification: backstop`; note
+     "held-out edge test" for plan-phase.
    - **Defer** → leave `unresolved`.
    - An `unclassified` row (probe `unclassified — review manually`) means the requirement's
      prose matched no shape cue (#1110) — treat it like any other candidate (**Specify**,
      **Dismiss (reason)**, or **Defer**). A manual-review nudge, not a hard block.
 
 **Soft gate (after resolving):**
-- All applicable edges resolved → proceed to Step 6.
+- All applicable edges resolved → proceed to Step 5.6.
 - Any `unresolved` → AskUserQuestion:
   - header: "Edge Coverage"
   - question: "[N] edge(s) are unresolved: [list]. What do you want to do?"
@@ -311,13 +330,16 @@ For each Requirement gathered so far:
   - On "anyway": write SPEC.md with those rows marked `⚠ Edge unresolved — planner must
     treat as assumption`.
 
-**`--auto` mode:** auto-`covered` where a defensible acceptance criterion can be written;
-otherwise auto-`backstop` (never auto-dismiss — a wrong dismissal is the exact silent
-failure being eliminated). Log: `[auto] edge coverage: C covered, B backstop, U unresolved`.
+**`--auto` mode:** resolve over the **same rendered floor** (#3102) — every engine-proposed row
+from Step 5.5's report (step 1) plus any category the classifier missed, never a narrower set.
+For each: auto-`resolved` (verification: explicit) where a defensible acceptance criterion can be
+written; otherwise auto-`resolved` (verification: backstop) (never auto-dismiss — a wrong
+dismissal is the exact silent failure being eliminated). Log:
+`[auto] edge coverage: E explicit, B backstop, U unresolved`.
 
 **`unclassified` exception (#1110):** `--auto` leaves an `unclassified` candidate
 **`unresolved`** (the soft gate surfaces it as a flagged planner assumption) — it never
-auto-`backstop`s it. A missing shape is not evidence an edge exists, so minting a held-out
+auto-resolves it with `verification: backstop`. A missing shape is not evidence an edge exists, so minting a held-out
 edge obligation on a requirement that may be genuinely edge-free would be a false claim and
 risks a vacuous edge test. Leaving it `unresolved` keeps the zero-cue requirement visible
 (never a silent drop) without fabricating an edge — which is exactly #1110's purpose: surface
@@ -425,7 +447,7 @@ downstream rather than blocking authoring.
 
 Use the SPEC.md template from @E:/projects/virtual-office/.codex/gsd-core/templates/spec.md.
 
-- Populate the **Edge Coverage** section from Step 5.5 (covered/dismissed/backstop/unresolved rows).
+- Populate the **Edge Coverage** section from Step 5.5 (resolved/dismissed/unresolved rows; resolved items carry `verification: explicit|backstop`).
 - Populate the **Prohibitions** section from Step 5.6 (resolved/dismissed/unresolved rows with the test|judgment tier).
 
 **Requirements for every requirement entry:**
@@ -455,11 +477,10 @@ Write to: `{phase_dir}/{padded_phase}-SPEC.md`
 ## Step 7: Commit
 
 ```bash
-git add "${phase_dir}/${padded_phase}-SPEC.md"
-git commit -m "spec(phase-${phase_number}): add SPEC.md for ${phase_name} — ${requirement_count} requirements (#2213)" -- "${phase_dir}/${padded_phase}-SPEC.md"
+gsd_run query commit "spec(phase-${phase_number}): add SPEC.md for ${phase_name} — ${requirement_count} requirements (#2213)" --files "${phase_dir}/${padded_phase}-SPEC.md"
 ```
 
-If `commit_docs` is false: Skip commit. Note that SPEC.md was written but not committed.
+If `commit_docs` is false the CLI returns `skipped`; SPEC.md is written, not committed.
 
 ## Step 8: Wrap Up
 

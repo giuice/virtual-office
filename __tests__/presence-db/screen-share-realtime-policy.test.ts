@@ -29,7 +29,7 @@ function sessionIdFromAccessToken(token: string): string {
 }
 
 function mediaTopic(companyId: string, spaceId: string): string {
-  return `company:${companyId}:space:${spaceId}:media`;
+  return `company:${companyId}:space:${spaceId}:media:v2`;
 }
 
 describe("presence-db private screen-share Realtime authorization", () => {
@@ -206,7 +206,7 @@ describe("presence-db private screen-share Realtime authorization", () => {
     );
   }
 
-  it("allows exactly broadcast/presence read and write on the occupant's own private media topic", async () => {
+  it("allows broadcast and presence reads but denies direct browser broadcasts", async () => {
     await fixtures.sql("begin");
     try {
       const inserted = await seedMessages();
@@ -229,14 +229,15 @@ describe("presence-db private screen-share Realtime authorization", () => {
         "presence",
       ]);
 
+      await expectInsertDenied(ownTopic, "broadcast");
       expect(
         await fixtures.sql<{ extension: string }>(
           `insert into realtime.messages (topic, extension)
-           values ($1, 'broadcast'), ($1, 'presence')
+           values ($1, 'presence')
            returning extension`,
           [ownTopic],
         ),
-      ).toEqual([{ extension: "broadcast" }, { extension: "presence" }]);
+      ).toEqual([{ extension: "presence" }]);
       await expectInsertDenied(ownTopic, "postgres_changes");
     } finally {
       await fixtures.sql("rollback");
@@ -250,9 +251,9 @@ describe("presence-db private screen-share Realtime authorization", () => {
       const cases = [
         mediaTopic(media.companyId, media.wrongSpaceId),
         mediaTopic(media.otherCompanyId, media.otherSpaceId),
-        `company:${media.companyId}:space:not-a-uuid:media`,
+        `company:${media.companyId}:space:not-a-uuid:media:v2`,
         `company:${media.companyId}:space:${media.spaceId}`,
-        `company:${media.companyId}:space:${media.spaceId}:media:extra`,
+        `company:${media.companyId}:space:${media.spaceId}:media:v2:extra`,
         "",
       ];
       for (const topic of cases) {
@@ -356,7 +357,7 @@ describe("presence-db private screen-share Realtime authorization", () => {
     }
   });
 
-  it("reads back the exact four media policies, helper boundary, and migration history", async () => {
+  it("reads back the exact server-broadcast policy boundary and migration history", async () => {
     const policies = await fixtures.sql<{
       policyname: string;
       cmd: string;
@@ -384,11 +385,6 @@ describe("presence-db private screen-share Realtime authorization", () => {
         roles: ["authenticated"],
       },
       {
-        policyname: "phase8_media_broadcast_send",
-        cmd: "INSERT",
-        roles: ["authenticated"],
-      },
-      {
         policyname: "phase8_media_presence_receive",
         cmd: "SELECT",
         roles: ["authenticated"],
@@ -401,7 +397,6 @@ describe("presence-db private screen-share Realtime authorization", () => {
     ]);
     const expectedExtensions = new Map([
       ["phase8_media_broadcast_receive", "broadcast"],
-      ["phase8_media_broadcast_send", "broadcast"],
       ["phase8_media_presence_receive", "presence"],
       ["phase8_media_presence_track", "presence"],
     ]);
@@ -449,13 +444,14 @@ describe("presence-db private screen-share Realtime authorization", () => {
     const migrations = await fixtures.sql<{ version: string; copies: string }>(
       `select version, pg_catalog.count(*)::text as copies
          from supabase_migrations.schema_migrations
-        where version in ('20260723104902', '20260723224547')
+        where version in ('20260723104902', '20260723224547', '20260801155137')
         group by version
         order by version`,
     );
     expect(migrations).toEqual([
       { version: "20260723104902", copies: "1" },
       { version: "20260723224547", copies: "1" },
+      { version: "20260801155137", copies: "1" },
     ]);
   });
 
