@@ -1,5 +1,25 @@
 # State model
 
+## Current implementation map
+
+- PresenceContext composes the subsystem; it is not a second state machine.
+- usePresenceSession registers, heartbeats, and disconnects leases through
+  /api/presence/sessions.
+- usePresenceSnapshot and useUserPresence expose the authoritative,
+  company-scoped snapshot.
+- usePresenceRealtime listens on a private company topic and only invalidates or
+  refetches the snapshot. Realtime payloads do not directly become authority.
+- useLocationTransition and the transition coordinator own movement requests.
+- useLastSpace may request automatic placement only through that coordinator
+  and uses company-and-user-scoped hints.
+- /api/presence/location calls the observed atomic location transition.
+- /api/users/location remains a gated legacy writer. Never call or extend it;
+  new feature movement uses /api/presence/location.
+- Browser storage keys must use the vo:presence:<company>:<user>:... namespace.
+
+Inspect the relevant source before relying on this map. Reconcile discrepancies
+before changing the affected contract; continue independent work meanwhile.
+
 ## Authority hierarchy
 
 The authoritative snapshot is produced by one database operation at one server

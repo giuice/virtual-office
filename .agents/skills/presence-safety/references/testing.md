@@ -23,38 +23,50 @@
 Mocks can validate branching but cannot prove database authorization,
 concurrency, browser isolation, or deployed state.
 
-## Required local commands
+## Select checks by the affected layer
 
-Run the subset appropriate to the change and retain exact results:
+Combine applicable rows when a change crosses layers. Inspect the package
+scripts and test configuration before running them; a local command name does
+not prove that its target is disposable or that it has no production access.
 
-```text
-npm run presence:gate
-npm run test:presence
-npm run test:presence:db
-npm run test:presence:e2e
-npm run type-check
-npm run lint
-npm run build
-npm run presence:skill:validate
-```
+| Change | Required evidence |
+| --- | --- |
+| Instructions or documentation only | Inspect the diff, metadata, links, host forwarding entries, and preserved invariants. Run `npm run presence:skill:validate` when the Presence skill changes. Exercise representative scenarios when authority, authorization, routing, or verification instructions change. Application suites are needed only if runtime files also change. |
+| Pure derivation or client ordering | Run the affected tests through `npm run test:presence`, plus `npm run type-check`, lint for touched TypeScript, and `npm run presence:gate`. |
+| API, RPC, schema, authorization, leases, or database locks | Run affected Presence/API tests, `npm run test:presence:db` against a disposable Postgres target, and `npm run presence:gate`. Add typecheck/lint for touched TypeScript and real concurrency cases for affected ordering, locking, capacity, or lifecycle behavior. |
+| User-visible presence, movement, Realtime, or Knock workflow | Run the affected `npm run test:presence:e2e` scenarios with the distinct authenticated users/tabs needed to prove the workflow, plus the relevant client/API/database checks above. |
+| Framework boundaries or production output | Run `npm run build` in addition to the affected-layer checks. |
+| Deployment, live contract compatibility, or legacy cutover | Verify the named target's migrations/catalog and runtime behavior, following CLAUDE.md and the active-limitations reference. Local tests do not establish deployed readiness. |
+
+Inspect the final diff and run `git diff --check` for every change. Select checks
+before claiming completion, retain exact results, and rerun affected checks
+after corrections. Broaden coverage when shared contracts change, a failure
+reveals wider impact, or an unresolved risk warrants it; do not repeat a full
+suite solely because another review pass finished.
 
 The critical Presence suite must contain zero skipped or TODO tests. The DB
 suite must run from a clean disposable reset and important concurrency cases run
-repeatedly. A missing Docker/Postgres runtime, browser identity, or staging
-authority is a blocker, not a reason to skip.
+repeatedly. Missing Docker/Postgres, browser identities, or target authorization
+blocks the checks that require them. Record those checks as unverified and
+continue independent work; do not silently skip or report them as passing.
 
 ## Review gates
 
-After editing Presence, Realtime, placement, Knock, membership lifecycle, or a
-related migration/route:
+After changing runtime behavior in Presence, Realtime, placement, Knock,
+membership lifecycle, or a related migration/route:
 
 1. Run the mandatory read-only Presence reviewer.
 2. Run the Supabase/RLS reviewer for every database or service-role boundary.
-3. Resolve all blocker/risk findings and request re-review.
-4. Run the full safe local suite, type-check, lint, build, movement gate, diff
-   check, and zero-skip guard after the last correction.
-5. Run real Postgres and browser gates when they are required; record blockers
-   verbatim if prerequisites are unavailable.
+3. Resolve blocker/risk findings with a correction or evidence, then request
+   re-review of affected findings and paths.
+4. Rerun checks affected by the corrections using the layer table above; retain
+   zero-skip enforcement for the critical Presence suite. Real Postgres and
+   browser gates remain required for behavior that depends on those layers.
+
+For instruction-only changes, verify preserved contracts and scenario routing.
+Use an independent read-only pass when changes to authority, authorization, or
+verification rules warrant behavioral validation. Do not run application or
+database review gates solely because a documentation file mentions Presence.
 
 ## Evidence reporting
 

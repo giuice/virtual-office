@@ -8,125 +8,107 @@ in skills; do not duplicate them here.
 Virtual Office is a digital workspace with floor plans, rooms, presence,
 messaging, and company management.
 
-- Next.js 15 App Router, React 19, TypeScript strict
+- Next.js App Router, React, TypeScript strict
 - Supabase Postgres, Auth, Realtime, and RLS
 - TanStack Query, React Context, Tailwind, shadcn/ui, and Radix
 - Vitest, Testing Library, and Playwright
 
+Use package.json and the lockfile for declared and resolved dependency versions.
+
 ## Working principles
 
-- Inspect the current implementation before planning or editing.
-- Do not guess. Establish behavior from source, runtime evidence, tests, logs,
-  network responses, and actual database state.
-- Debug reported failures before changing production code.
-- Fix the root cause and the complete user workflow, not only the first symptom.
+- Inspect the implementation relevant to the task. Establish behavior from
+  source and evidence at the affected layer; reproduce or characterize reported
+  failures before editing.
+- Fix the root cause and complete the requested workflow, including relevant
+  verification and corrections caused by the change.
 - Search for existing components, hooks, types, RPCs, and migrations first.
   Reuse or extend them instead of creating parallel implementations.
 - Keep changes scoped. Do not add unrelated refactors, weaken tests, suppress
   errors, bypass type safety, or auto-commit.
-- If an approach fails, stop, record why, and re-plan.
-- Never claim success without proportionate verification.
-- Completion is user-gated. End implementation handoffs with
-  Status: Pending user confirmation until the user confirms the real workflow.
+- If an approach fails, use the evidence to adjust it rather than repeat it.
+- Continue local implementation and verification within the authorized scope
+  without asking for approval at each step. Infer routine details from context.
+- Technical completion requires the requested work and proportionate evidence.
+  Report any pending product acceptance separately; do not make every handoff
+  wait for user confirmation.
+- When a prerequisite is missing, stop only the dependent action or claim and
+  continue independent work. State the limitation and the exact next action.
 
-## Human communication and operational handoff — critical
+## Database and deployment operations
 
-Agents must communicate application, database, and deployment state as separate
-facts. A code change is not the same as an applied database change or a deployed
-application.
+When work changes or depends on schema, data, RPCs, RLS, grants, runtime modes,
+environment variables, secrets, jobs, or deployment order, explain that impact
+early. State whether an online database change is required, the named target,
+what depends on it, and the compatible rollout order. If impact is uncertain,
+say it is being checked and update the user when it is known.
 
-### Before and during work
-
-Inventory whether the task changes or depends on:
-
-- application code;
-- database schema, data, functions, indexes, RLS, grants, or migrations;
-- environment variables, secrets, scheduled jobs, or runtime modes;
-- deployment order, restart, maintenance, backfill, or destructive operations.
-
-In the first progress update, state exactly one of:
-
-- Mudança online no banco: não.
-- Mudança online no banco: sim — <target and required change>.
-
-When the answer is yes, also explain in plain language:
-
-- why the database change is required;
-- what stops working until it is applied;
-- which target is affected: local, test, staging, or production;
-- whether the user has already authorized that target;
-- whether the application must wait for the database or can roll out compatibly.
-
-If the impact is initially uncertain, say it is being checked and update the user
-as soon as it becomes known. Never hide this information until the final report.
-
-Always distinguish these states:
+Distinguish these states whenever reporting migration or deployment progress:
 
 1. written locally;
 2. applied to a local database;
 3. applied to the named online database;
 4. application deployed against that database.
 
-A migration file in the repository is not an applied migration. Creating or
-editing any migration must be reported even when the agent cannot apply it.
-Never say the application is ready or safe to open when its required online
-database contract is missing.
+Report every migration created or edited and whether it was applied. Do not
+claim the application is ready against a target whose required database
+contract is missing or unverified.
 
 Before changing an online database, name the target and obtain explicit
-authorization unless the current request already grants it. Explain backup,
-rollback, maintenance, and destructive-test implications when relevant. After
-the change, read back the migration/catalog state from the same target and run a
-small runtime smoke check.
+authorization unless the conversation already authorizes that action and
+target. Explain backup, rollback, maintenance, and destructive-test implications
+when relevant. After the change, read back the migration/catalog state from the
+same target and run a small runtime smoke check.
 
-Report blockers immediately. If credentials, authorization, or a human-only
-step is missing, say what is blocked, why it matters, and the exact next action.
+## Long-running work
 
-### Long-running goal tracker
+For long-running remediation or work requiring a handoff across phases or
+sessions, maintain a concise tracker in the existing documentation area. Record
+completed work and evidence, database/deployment state, decisions, failed
+approaches that affect the next step, blockers, and next actions.
 
-For remediation work or any task spanning multiple phases, maintain a tracker in
-the task's documentation area. Keep it concise and update it during development:
+When using codex-companion background jobs, read
+[the companion operations reference](docs/codex-companion.md). Other delegation
+mechanisms use their own tool contract.
 
-- completed change and evidence;
-- database and deployment state;
-- decision or assumption;
-- error or failed approach;
-- learning that should affect later work;
-- current blocker and next action.
+## Handoff
 
-The tracker holds technical detail and internal machinery. The final report is a
-human summary, not a dump of the tracker.
+Lead with the outcome, then summarize changes, verification, and real remaining
+limitations or user actions. Small changes need only a short report.
 
-### Required final report
+For work involving database or deployment state, report in this order:
 
-Use this order for every implementation handoff:
+1. Outcome: which affected workflows are usable and which remain unverified.
+2. Changes: distinguish application changes, migration/data state on the named
+   database, and deployment compatibility.
+3. Required user actions, if any.
+4. Verification: evidence and limits of the checks performed.
+5. Unresolved user-visible, database, or rollout risks, if any.
 
-1. Outcome — what the person can or cannot do now.
-2. What changed — separate Application, Database, and Deployment.
-3. What you need to do now — numbered actions, or exactly Nothing.
-4. Verification — concise checks and results.
-5. Remaining risks — only unresolved user-visible, database, or rollout risks.
-6. Status: Pending user confirmation.
-
-Write for a human who did not watch the task. Do not lead with phase numbers,
-runner names, manifests, candidate models, judges, raw logs, test file lists, or
-internal orchestration. If one is relevant, put it in an optional technical note
-and define it in one sentence. Summarize noisy evidence instead of pasting it.
+Keep raw logs and orchestration details in the tracker or an optional technical
+note. Use a pending status only for a specific outstanding step or acceptance.
 
 ## Skills
 
-Use the smallest matching set of available skills and follow each selected
-SKILL.md completely.
+Use the smallest matching set of available skills. Read each selected SKILL.md
+and follow its applicable workflow, loading supporting references only when
+needed. The request determines scope and deliverables; a skill's examples or
+optional patterns do not authorize extra features, dependencies, or operations.
 
-- Presence, Realtime, sessions, placement, movement, occupancy, private access,
-  Knock, or related rollout: presence-safety is mandatory.
+- Presence, its Realtime/session lifecycle, placement, movement, occupancy,
+  private access, Knock, or their database/rollout contracts: presence-safety is
+  mandatory.
 - Any Supabase task: supabase is mandatory.
 - SQL, schema, RLS, or Postgres performance: also use the applicable database
   best-practice skill.
 - Browser workflow verification: use the available browser or Playwright skill.
 - React/Next.js implementation or refactor: use the applicable Vercel skill.
 
-Domain architecture belongs in those skills. This file keeps only
-repository-wide rules.
+Preserve third-party skills. Apply their relevant guidance through this
+project's contracts: users.id/supabase_uid identity, canonical Presence
+authority, and existing TanStack Query/repository boundaries. Generic examples
+do not replace those contracts. Keep Presence architecture in its canonical
+skill and host entries as forwarding files.
 
 ## Supabase, authentication, and RLS
 
@@ -138,8 +120,10 @@ repository-wide rules.
 - Browser session reads may use auth.getSession().
 - Never expose SUPABASE_SERVICE_ROLE_KEY to client code.
 - Service-role access never replaces application authorization checks.
-- Verify the actual schema and policies before writing SQL. Repository
-  documentation may lag behind an online target.
+- Ground SQL in schema and policy evidence. Local drafts may use source and
+  migrations with assumptions recorded; verify the actual schema and policies
+  on the named target before applying SQL or claiming compatibility. Repository
+  documentation may lag behind that target.
 - Every migration, RLS policy, repository, or database API change requires the
   Supabase/RLS review gate.
 
@@ -190,6 +174,8 @@ navigation.
 
 Choose evidence proportional to risk:
 
+- documentation-only changes: check affected instructions, links, metadata,
+  and any applicable document/skill validator;
 - focused tests for the changed behavior;
 - regression tests for the reported failure;
 - typecheck and lint for touched TypeScript;
@@ -197,6 +183,11 @@ Choose evidence proportional to risk:
 - database/RLS checks against the named target when database behavior is claimed;
 - browser smoke tests for user-visible workflows;
 - final diff inspection and diff check.
+
+Use meaningful regression coverage for changed behavior; do not add tests that
+only mirror trivial edits. After checks pass, rerun or broaden them only for
+new changes, failures, or unresolved risk. A required runtime check without its
+prerequisites remains unverified; it does not block unrelated local checks.
 
 Do not weaken assertions or treat skipped critical tests as passing. Mocks do not
 prove database concurrency, RLS, Realtime delivery, or multi-user behavior.
@@ -208,26 +199,6 @@ Common commands:
 - npm run lint
 - npm run build
 - npm test
-
-## Codex delegation (long-running worker jobs)
-
-Launching background Codex jobs via the codex-companion script has burned two
-work packages already. Non-negotiable mechanics:
-
-- Long-lived jobs are `task --background --write [--fresh|--resume]
-  --model <model> --effort <effort> "<prompt>"`. There is NO `--detached` flag
-  (it silently becomes prompt text) and no `task --help` (it becomes a job with
-  prompt "--help"). Without `--write` the job is read-only and cannot edit files.
-- Launch the companion directly from the orchestrator's own shell, never from
-  inside a subagent: the subagent's process tree dies when it finishes and kills
-  the job with it.
-- Immediately after launch, verify `status <job-id> --json` shows
-  `"write": true`, its own `pid`, and `"status": "running"`; then wait for a
-  terminal state via a background watcher instead of polling in the foreground.
-- A job record can go stale ("running" with a dead pid). Verify the pid before
-  trusting status. Cancel zombie jobs from PowerShell, not Git Bash (MSYS
-  mangles `/PID` into a path).
-- Delegation floor: Sol at effort high minimum; no silent downgrade.
 
 ## Git and files
 
