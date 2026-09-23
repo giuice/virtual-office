@@ -1,5 +1,20 @@
 # Phase 03 Remediation Tracker
 
+## 2026-09-23 - Screen-share startup reconciliation investigation
+
+- Report: Edge normal and InPrivate windows, separate Whim workspaces, two users in one room. The native picker opens, but selecting a window, tab, or display produces a brief sharing indicator and no presentation.
+- Previous correction: the August 4 ten-second signaling timeout remains present. This investigation identified a separate startup ordering defect.
+- Reproduction: two temporary deterministic provider tests delivered an authoritative null while capture or claim was pending. Both returned false, stopped the captured track once, published nothing, and left no screen-share error. Temporary diagnostic files were removed after the analysis.
+- Cause: canonical reconciliation evaluates the lifecycle before a committed share exists. Its initial read baseline is zero, so a normal active read can retire an unclaimed startup as if it had lost a committed lease.
+- Baseline: focused provider and broadcast tests passed 32/33. The failing initial-active-read test modeled observation version 1 with a claim baseline of 0, which represents a later read, not its intended earlier read. The corrected fixture starts read version 1 before claim and retains the no-stop assertions. Existing later-read loss tests remain intact.
+- Correction: canonical lease-loss reconciliation now requires an accepted `lifecycle.share`. Pending capture/claim cannot lose a lease it has not acquired. Committed-share loss, scope/auth changes, track end, explicit stop, and renewal failure retain their existing cleanup paths.
+- Regression evidence: permanent deferred tests cover null observations while the picker or claim is pending. Focused provider/broadcast coverage passed 35/35. Full unit coverage passed 111 files / 1,292 tests; Presence coverage passed 61 files / 577 tests, with no skips. TypeScript, focused lint, production build, movement gate, skill validation, and diff check passed. Repository lint has zero errors and 495 existing warnings.
+- Review: independent Opus adversarial review approved the production guard and the corrected fixture chronology. Its integrated later-null stop/release assertion is implemented; final read-only re-review approved both follow-ups. Presence Safety and Supabase/RLS scoped reviews also approved. The agent system rejected a separate reviewer with `agent thread limit reached`, so these latter audits reused the implementation agent and are not independent evidence.
+- Final test follow-up: the picker regression now proves that a later null retires the committed share, stops capture once, clears local display state, and releases the exact session/share once. TypeScript found that the newly inspected fetch-mock call omitted its optional RequestInit parameter. The mock now includes that parameter and narrows its body before parsing. Final focused suites passed 35/35, and TypeScript, focused lint, and diff checks passed again.
+- Scope: application lifecycle and regression tests only. No database contract change or migration is expected. No local or online database action, environment change, or deployment has occurred.
+- Browser limitation: the deterministic two-context browser suite requires a disposable loopback Supabase stack. Docker reports its engine pipe unavailable. No remote opt-in or online mutation was used to bypass this requirement. Native Edge normal/InPrivate sharing across Whim workspaces remains unverified.
+- Status: local correction and required code checks complete. Await the user's real Edge/Whim confirmation against this updated application. No database change, deployment, or commit occurred. Temporary diagnostics and review processes were removed.
+
 ## 2026-07-23 — Screen-share lease review remediation
 
 - Completed: rewrote the local-only screen-share lease migration to use scalar/narrow reads, explicit lookup flags, claim-time placement/access fences, deterministic Presence-compatible locking, stale-owner release, and strict foreign-release denial. Added disposable real-Postgres lease and media-topic RLS regressions.

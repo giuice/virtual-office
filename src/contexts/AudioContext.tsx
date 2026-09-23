@@ -741,6 +741,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		const lifecycle = screenShareLifecycleRef.current;
 		if (
 			lifecycle
+			&& lifecycle.share
 			&& lifecycle.manager === webrtcManager
 			&& lifecycle.identity === managerIdentity
 			&& activeShareObservationVersion > lifecycle.activeShareReadVersionAtClaim

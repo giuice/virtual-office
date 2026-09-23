@@ -579,6 +579,119 @@ describe('AudioProvider screen-share lifecycle', () => {
     expect(latestAudio?.displayStream).toBeNull();
   });
 
+  it('keeps a pending picker alive across a null active observation', async () => {
+    let resolveCapture!: (stream: MediaStream) => void;
+    const track = createTrack();
+    const stream = createStream(track);
+    mocks.getDisplayMedia.mockReturnValue(new Promise<MediaStream>((resolve) => {
+      resolveCapture = resolve;
+    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    let startPromise!: Promise<boolean>;
+    act(() => {
+      startPromise = currentAudio().startScreenShare();
+    });
+    contextState.activeShareReadVersion = 1;
+    contextState.activeShareObservationVersion = 1;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await act(async () => {});
+
+    const manager = mocks.managers[0];
+    expect(currentAudio().screenShareStatus).toBe('opening-picker');
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCapture(stream);
+      expect(await startPromise).toBe(true);
+    });
+
+    expect(manager.startScreenShare).toHaveBeenCalledWith(stream, SHARE_A);
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(currentAudio().screenShareStatus).toBe('sharing');
+    expect(currentAudio().activeScreenShare?.shareId).toBe(SHARE_A);
+    expect(currentAudio().displayStream?.stream).toBe(stream);
+
+    contextState.activeShareReadVersion = 2;
+    contextState.activeShareObservationVersion = 2;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+
+    await waitFor(() => expect(manager.stopScreenShare).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
+    });
+    expect(manager.stopScreenShare).toHaveBeenCalledWith('error-cleanup');
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(currentAudio().screenShareStatus).toBe('idle');
+    expect(currentAudio().activeScreenShare).toBeNull();
+    expect(currentAudio().displayStream).toBeNull();
+    const releaseCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/release'));
+    const releaseBody = releaseCall?.[1]?.body;
+    if (typeof releaseBody !== 'string') throw new Error('Screen-share release request body was missing.');
+    expect(JSON.parse(releaseBody)).toEqual({
+      presenceSessionId: SESSION_A,
+      shareId: SHARE_A,
+      stopReason: 'error-cleanup',
+    });
+  });
+
+  it('keeps a pending claim alive across a null active observation', async () => {
+    const claimResponse = deferred<Response>();
+    const track = createTrack();
+    const stream = createStream(track);
+    mocks.getDisplayMedia.mockResolvedValue(stream);
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimResponse.promise;
+      if (url.endsWith('/release')) return Promise.resolve(released());
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    let startPromise!: Promise<boolean>;
+    act(() => {
+      startPromise = currentAudio().startScreenShare();
+    });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/claim'))).toBe(true));
+
+    contextState.activeShareReadVersion = 1;
+    contextState.activeShareObservationVersion = 1;
+    view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    await act(async () => {});
+
+    const manager = mocks.managers[0];
+    expect(currentAudio().screenShareStatus).toBe('claiming');
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    await act(async () => {
+      claimResponse.resolve(claimed());
+      expect(await startPromise).toBe(true);
+    });
+
+    expect(manager.startScreenShare).toHaveBeenCalledWith(stream, SHARE_A);
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(currentAudio().screenShareStatus).toBe('sharing');
+    expect(currentAudio().activeScreenShare?.shareId).toBe(SHARE_A);
+    expect(currentAudio().displayStream?.stream).toBe(stream);
+
+    await act(async () => {
+      await currentAudio().stopScreenShare('user-stop');
+    });
+  });
+
   it.each([
     ['far ahead', '2035-01-01T00:00:00.000Z'],
     ['far behind', '2020-01-01T00:00:00.000Z'],
@@ -753,9 +866,10 @@ describe('AudioProvider screen-share lifecycle', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
   });
 
-  it('keeps the local display when the initial active read starts after the claim and later returns its pre-claim null', async () => {
+  it('keeps the local display when a pre-claim active read returns null after the claim', async () => {
     const preClaimActiveRead = deferred<ScreenSharePublicShare | null>();
     const track = createTrack();
+    contextState.activeShareReadVersion = 1;
     mocks.getDisplayMedia.mockResolvedValue(createStream(track));
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
