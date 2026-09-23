@@ -1,0 +1,133 @@
+import { randomUUID } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import {
+  screenShareErrorContract,
+  screenShareRpcContractError,
+  screenShareReleaseRequestSchema,
+  screenShareReleaseResponseSchema,
+  screenShareReleaseRpcResultSchema,
+  screenSharePresenterInvalidatedPayloadSchema,
+  screenShareSpaceParamsSchema,
+} from '@/lib/webrtc/screen-share-contract';
+import { callObservedScreenShareRpc } from '@/lib/webrtc/observed-screen-share-rpc';
+import { broadcastScreenShareSignal } from '@/lib/webrtc/screen-share-signal-broadcast';
+import { requireVerifiedPresenceAuth } from '@/lib/presence/verified-session';
+import { runAfterResponse } from '@/lib/server/after-response';
+
+export const dynamic = 'force-dynamic';
+
+interface ReleaseRouteContext {
+  params: Promise<{ id: string }>;
+}
+
+function internalError(correlationId: string): NextResponse {
+  const { code, error, retryable } = screenShareErrorContract('INTERNAL_ERROR');
+  console.warn('screen_share_route', {
+    correlationId,
+    operation: 'release',
+    outcome: code,
+    retryable,
+  });
+  return NextResponse.json({
+    success: false,
+    code,
+    error,
+    retryable,
+    correlationId,
+  }, { status: 500 });
+}
+
+export async function POST(request: Request, context: ReleaseRouteContext): Promise<NextResponse> {
+  const correlationId = randomUUID();
+
+  try {
+    const { id } = await context.params;
+    const parsedParams = screenShareSpaceParamsSchema.safeParse({ spaceId: id });
+    const body = await request.json().catch(() => null);
+    const parsedBody = screenShareReleaseRequestSchema.safeParse(body);
+    if (!parsedParams.success || !parsedBody.success) {
+      return NextResponse.json({
+        success: false,
+        code: 'INVALID_REQUEST',
+        error: 'Invalid screen share request.',
+        retryable: false,
+      }, { status: 400 });
+    }
+
+    const auth = await requireVerifiedPresenceAuth();
+    if (!auth.ok) {
+      const { code, status, error, retryable } = screenShareErrorContract(auth.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
+
+    if (!auth.identity.companyId) {
+      const { code, status, error, retryable } = screenShareErrorContract('MEMBERSHIP_SCOPE_INVALID');
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
+
+    const rpc = await callObservedScreenShareRpc(
+      () => auth.admin.rpc('release_screen_share_observed', {
+        p_auth_subject: auth.identity.authSubject,
+        p_auth_session_id: auth.identity.authSessionId,
+        p_presence_session_id: parsedBody.data.presenceSessionId,
+        p_space_id: parsedParams.data.spaceId,
+        p_share_id: parsedBody.data.shareId,
+      }),
+      screenShareReleaseRpcResultSchema,
+    );
+    if (rpc.kind === 'provider-error') {
+      const compatibilityError = screenShareRpcContractError(rpc.error);
+      if (compatibilityError) {
+        const { code, status, error, retryable } = compatibilityError;
+        return NextResponse.json({ success: false, code, error, retryable }, { status });
+      }
+      return internalError(correlationId);
+    }
+    if (rpc.kind === 'malformed') {
+      const { code, status, error, retryable } = screenShareErrorContract('DATABASE_CONTRACT_INCOMPATIBLE');
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
+    if (!rpc.result.ok) {
+      const { code, status, error, retryable } = screenShareErrorContract(rpc.result.code);
+      return NextResponse.json({ success: false, code, error, retryable }, { status });
+    }
+
+    const invalidationPayload = screenSharePresenterInvalidatedPayloadSchema.parse({
+      type: 'presenter-invalidated',
+      sourceUserId: auth.identity.appUserId,
+      sourcePresenceSessionId: parsedBody.data.presenceSessionId,
+      sourceConnectionId: randomUUID(),
+      companyId: auth.identity.companyId,
+      spaceId: parsedParams.data.spaceId,
+      shareId: parsedBody.data.shareId,
+    });
+    runAfterResponse(async () => {
+      try {
+        await broadcastScreenShareSignal(invalidationPayload);
+      } catch {
+        console.warn('screen_share_route', {
+          correlationId,
+          operation: 'release-invalidation',
+          outcome: 'SIGNALING_SEND_FAILED',
+          retryable: true,
+        });
+      }
+    });
+
+    console.info('screen_share_route', {
+      correlationId,
+      operation: 'release',
+      outcome: rpc.result.code,
+      retryable: false,
+      stopReason: parsedBody.data.stopReason ?? 'user-stop',
+    });
+
+    return NextResponse.json(screenShareReleaseResponseSchema.parse({
+      success: true,
+      code: 'RELEASED',
+      alreadyReleased: rpc.result.alreadyReleased,
+    }));
+  } catch {
+    return internalError(correlationId);
+  }
+}

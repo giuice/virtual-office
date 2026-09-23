@@ -200,6 +200,20 @@ Common commands:
 - npm run build
 - npm test
 
+## Cross-model delegation
+
+Delegation mechanics depend on which model family is orchestrating, because each
+family drives the other one through a different runtime. Read the file that
+matches the model you are running as, and follow it completely:
+
+- Anthropic model (Claude family) orchestrating: read `delegation-anthropic.md`.
+- OpenAI model (GPT/Codex family) orchestrating: read `delegation-openai.md`.
+
+Both files are at the repository root. Do not improvise a delegation path that
+is not described there; both were written after real incidents. Correctness and
+regression prevention take priority over cost: never silently downgrade the
+model or effort level a delegation file mandates.
+
 ## Git and files
 
 - Preserve unrelated user changes in a dirty worktree.

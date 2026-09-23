@@ -2,12 +2,34 @@
   "mode": "interactive",
   "parallelization": true,
   "commit_docs": true,
-  "model_profile": "quality",
+  "model_profile": "balanced",
+  "model_overrides": {
+    "gsd-doc-writer": "gpt-5.6-luna",
+    "gsd-doc-verifier": "gpt-5.6-luna",
+    "gsd-executor": "gpt-5.6-sol"
+  },
+  "effort": {
+    "agent_overrides": {
+      "gsd-doc-writer": "max",
+      "gsd-doc-verifier": "max",
+      "gsd-executor": "medium"
+    }
+  },
+  "response_language": "Brazilian Portuguese",
   "workflow": {
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "nyquist_validation": true,
+    "ai_integration_phase": true
+  },
+  "agent_skills": {
+    "gsd-phase-researcher": "presence-safety",
+    "gsd-planner": "presence-safety",
+    "gsd-executor": "presence-safety",
+    "gsd-verifier": "presence-safety",
+    "gsd-code-reviewer": "presence-safety"
   },
   "granularity": "standard"
 }

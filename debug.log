@@ -4,3 +4,26 @@
 [0722/085118.344:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
 [0722/090704.131:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
 [0722/090704.272:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
+[0804/081000.269:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
+[0804/081001.564:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
+[0804/081327.562:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
+[0804/081329.255:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:941] Running WebRTC with a combined Network and Worker thread.
+[0804/081329.290:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081329.291:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081332.446:WARNING:third_party\webrtc\media\engine\webrtc_video_engine.cc:1386] Attempting to get RTP send parameters for stream with ssrc 3046746640 which doesn't exist.
+[0804/081332.446:ERROR:third_party\webrtc\media\engine\webrtc_video_engine.cc:1556] No sending stream on ssrc 3046746640
+[0804/081332.447:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081332.447:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081335.571:ERROR:third_party\webrtc\pc\sdp_offer_answer.cc:5796] Mid 0 specified but no media section with that mid found. (INVALID_PARAMETER)
+[0804/081335.571:ERROR:third_party\webrtc\pc\sdp_offer_answer.cc:5732] ReadyToUseRemoteCandidate: Invalid candidate. Mid 0 specified but no media section with that mid found.
+[0804/081336.965:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081336.965:INFO:third_party\blink\renderer\platform\p2p\ipc_socket_factory.cc:575] Setting new p2p socket buffer limit to 262144
+[0804/081340.230:WARNING:net\base\net_errors_win.cc:121] Unknown error 1168 mapped to net::ERR_FAILED
+[0804/081340.231:WARNING:net\base\net_errors_win.cc:121] Unknown error 1168 mapped to net::ERR_FAILED
+[0804/081340.232:ERROR:third_party\webrtc\p2p\base\port.cc:541] Port[ef29080:1:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Received STUN BINDING error response: class=4 number=87 reason='Role Conflict' from 03bfa351-fbb9-4033-ac15-8f8ba6871bed.local:54313
+[0804/081340.232:WARNING:third_party\webrtc\p2p\base\connection.cc:1612] Conn[c8dac00:1:Net[any:0.0.0.x/0:Wildcard:id=0]:t8m545c9:1:0:host:udp:80db564d-a284-40ef-9d64-ff2e7154ea65.local:60650->J9mG788G:1:2113937151:host:udp:03bfa351-fbb9-4033-ac15-8f8ba6871bed.local:54313|C--I|-|0|0|9079290933572287998|-]: Received STUN BINDING error response id=477476644c584b506f6b554a code=487 rtt=2728 us
+[0804/081340.232:INFO:third_party\blink\renderer\modules\peerconnection\adapters\ice_transport_adapter_impl.cc:193] Got role conflict; switching to controlled role.
+[0804/081340.232:ERROR:third_party\webrtc\p2p\base\port.cc:541] Port[ef29080:1:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Received STUN BINDING error response: class=4 number=87 reason='Role Conflict' from 03bfa351-fbb9-4033-ac15-8f8ba6871bed.local:54313
+[0804/081340.232:INFO:third_party\blink\renderer\modules\peerconnection\adapters\ice_transport_adapter_impl.cc:193] Got role conflict; switching to controlling role.
+[0804/081340.314:WARNING:third_party\webrtc\modules\pacing\pacing_controller.cc:301] Elapsed time (12748641 us) longer than expected, limiting to 2 s
+[0804/081340.314:WARNING:third_party\webrtc\modules\pacing\pacing_controller.cc:301] Elapsed time (11055640 us) longer than expected, limiting to 2 s

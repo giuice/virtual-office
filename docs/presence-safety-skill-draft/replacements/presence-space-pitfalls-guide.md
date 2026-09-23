@@ -20,7 +20,7 @@ Common unsafe shortcuts:
 - using mocked tests as database concurrency proof; or
 - probing production with service-role mutation.
 
-Start with `SKILL.md`, then read the matching state, transition,
+Start with [the presence-safety skill](../../../.agents/skills/presence-safety/SKILL.md), then read the matching state, transition,
 access/capacity, Realtime/debugging, and testing reference. If this guide ever
 conflicts with those references or current verified implementation evidence,
 the guide is stale and must be corrected.

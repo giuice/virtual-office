@@ -1,474 +1,591 @@
 /**
- * WebRTC Manager for P2P Audio Communication
- * 
- * Manages peer-to-peer connections using WebRTC with full mesh topology.
- * Each client connects directly to all other clients in the same space.
- * 
- * Key features:
- * - P2P mesh topology for direct audio streaming
- * - Automatic peer discovery via Supabase Realtime signaling
- * - Voice Activity Detection (VAD) integration
- * - Clean resource management on disconnect
+ * Room-scoped P2P media manager.
+ *
+ * One RTCPeerConnection is retained per application user. Microphone and display
+ * media are separate owned roles on that same connection; the manager never uses
+ * display activity to initialize or alter microphone state.
  */
 
 import { getIceServers, ROOM_LIMITS } from './ice-config';
 import { VoiceActivityDetector } from '@/lib/audio/VoiceActivityDetector';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-export type SignalingEvent =
-	| { type: 'handshake'; userId: string }
-	| { type: 'offer'; targetUserId: string; senderId: string; sdp: RTCSessionDescriptionInit }
-	| { type: 'answer'; targetUserId: string; senderId: string; sdp: RTCSessionDescriptionInit }
-	| { type: 'ice-candidate'; targetUserId: string; senderId: string; candidate: RTCIceCandidateInit };
+const MAX_PENDING_ICE_PER_PEER = 32;
+const MAX_PENDING_ICE_PEERS = 64;
 
-export interface PeerConnection {
-	pc: RTCPeerConnection;
-	userId: string;
-	audioElement?: HTMLAudioElement;
-	stream?: MediaStream;
+export type SignalingEvent =
+  | { type: 'handshake'; userId: string }
+  | {
+    type: 'description';
+    targetUserId: string;
+    targetPresenceSessionId: string;
+    targetConnectionId: string;
+    senderId: string;
+    description: RTCSessionDescriptionInit;
+  }
+  | {
+    type: 'ice';
+    targetUserId: string;
+    targetPresenceSessionId: string;
+    targetConnectionId: string;
+    senderId: string;
+    candidate: RTCIceCandidateInit;
+  };
+
+export type WebRTCSignalSender = (event: SignalingEvent) => Promise<void>;
+
+export interface RemoteDisplayEvent {
+  peerId: string;
+  shareId: string | null;
+  stream: MediaStream;
 }
 
+export interface PeerConnection {
+  pc: RTCPeerConnection;
+  userId: string;
+  presenceSessionId: string | null;
+  connectionId: string | null;
+  polite: boolean;
+  makingOffer: boolean;
+  ignoreOffer: boolean;
+  isSettingRemoteAnswerPending: boolean;
+  microphoneSender?: RTCRtpSender;
+  displaySender?: RTCRtpSender;
+  audioElement?: HTMLAudioElement;
+  remoteAudioStream?: MediaStream;
+  remoteDisplayStream?: MediaStream;
+  remoteDisplayTrack?: MediaStreamTrack;
+  remoteDisplayEndedListener?: () => void;
+  emittedRemoteShareId: string | null;
+  remoteShareId: string | null;
+}
+
+interface PendingIceCandidate {
+  candidate: RTCIceCandidateInit;
+  receivedWhileIgnoringOffer: boolean;
+  generation: IceGeneration;
+}
+
+type IceGeneration =
+  | { kind: 'classified'; ufrag: string }
+  | { kind: 'unclassified' }
+  | { kind: 'malformed' };
+
 export interface WebRTCManagerEvents {
-	onPeerConnected: (userId: string) => void;
-	onPeerDisconnected: (userId: string) => void;
-	onPeerSpeaking: (userId: string, isSpeaking: boolean) => void;
-	onError: (error: Error) => void;
-	onRoomLimitWarning: (currentCount: number) => void;
+  onPeerConnected: (userId: string) => void;
+  onPeerDisconnected: (userId: string) => void;
+  onPeerSpeaking: (userId: string, isSpeaking: boolean) => void;
+  onRemoteDisplay: (event: RemoteDisplayEvent) => void;
+  onLocalDisplayStopped: (shareId: string, reason: string) => void;
+  onError: (error: Error) => void;
+  onRoomLimitWarning: (currentCount: number) => void;
 }
 
 export class WebRTCManager {
-	private spaceId: string;
-	private currentUserId: string;
-	private localStream: MediaStream | null = null;
-	private peerConnections: Map<string, PeerConnection> = new Map();
-	private audioElements: Map<string, HTMLAudioElement> = new Map();
-	private vadMap: Map<string, VoiceActivityDetector> = new Map();
-	private signalingChannel: RealtimeChannel | null = null;
-	private events: Partial<WebRTCManagerEvents> = {};
-	private isMuted: boolean = true; // Default: muted on entry
-	private pendingAudioRetryInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly spaceId: string;
+  private readonly currentUserId: string;
+  private microphoneStream: MediaStream | null = null;
+  private microphoneAcquirePromise: Promise<MediaStream> | null = null;
+  private displayStream: MediaStream | null = null;
+  private displayShareId: string | null = null;
+  private displayEndedListener: (() => void) | null = null;
+  private readonly peerConnections = new Map<string, PeerConnection>();
+  private readonly pendingIceCandidates = new Map<string, PendingIceCandidate[]>();
+  private readonly audioElements = new Map<string, HTMLAudioElement>();
+  private readonly vadMap = new Map<string, VoiceActivityDetector>();
+  private signalingChannel: RealtimeChannel | null = null;
+  private signalSender: WebRTCSignalSender | null = null;
+  private presenceSessionId: string | null = null;
+  private connectionId: string | null = null;
+  private readonly events: Partial<WebRTCManagerEvents>;
+  private isMuted = true;
+  private pendingAudioRetryInterval: ReturnType<typeof setInterval> | null = null;
+  private lifecycleGeneration = 0;
+  private cleanedUp = false;
 
-	constructor(spaceId: string, currentUserId: string, events?: Partial<WebRTCManagerEvents>) {
-		this.spaceId = spaceId;
-		this.currentUserId = currentUserId;
-		this.events = events || {};
+  constructor(spaceId: string, currentUserId: string, events?: Partial<WebRTCManagerEvents>) {
+    this.spaceId = spaceId;
+    this.currentUserId = currentUserId;
+    this.events = events ?? {};
+    this.startAudioRetryInterval();
+  }
 
-		// Start retry interval for blocked audio
-		this.startAudioRetryInterval();
-	}
+  setSignalingIdentity(presenceSessionId: string, connectionId: string): void {
+    this.presenceSessionId = presenceSessionId;
+    this.connectionId = connectionId;
+  }
 
-	/**
-	 * Initialize local audio stream (must be called after user gesture for Safari)
-	 */
-	async initializeLocalStream(): Promise<MediaStream> {
-		try {
-			this.localStream = await navigator.mediaDevices.getUserMedia({
-				audio: {
-					echoCancellation: true,
-					noiseSuppression: true,
-					autoGainControl: true,
-				}
-			});
+  /** Request microphone access only after an explicit microphone gesture. */
+  async initializeLocalStream(): Promise<MediaStream> {
+    if (this.cleanedUp) throw new Error('WEBRTC_MANAGER_CLEANED_UP');
+    if (this.microphoneStream && this.isStreamLive(this.microphoneStream)) return this.microphoneStream;
+    if (this.microphoneAcquirePromise) return this.microphoneAcquirePromise;
 
-			// Start muted by default
-			this.setMuted(true);
+    const acquisitionGeneration = this.lifecycleGeneration;
+    const acquisition = navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    }).then(async (stream) => {
+      if (this.cleanedUp || this.lifecycleGeneration !== acquisitionGeneration) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('WEBRTC_MANAGER_CLEANED_UP');
+      }
+      const priorStream = this.microphoneStream;
+      this.microphoneStream = stream;
+      this.setMuted(this.isMuted);
+      await Promise.all([...this.peerConnections.values()].map((peer) => this.attachOrReplaceMicrophone(peer, stream)));
+      if (priorStream && priorStream !== stream) priorStream.getTracks().forEach((track) => track.stop());
+      return stream;
+    }).catch((error: unknown) => {
+      const err = error instanceof Error ? error : new Error('Failed to get user media');
+      this.events.onError?.(err);
+      throw err;
+    }).finally(() => {
+      if (this.microphoneAcquirePromise === acquisition) this.microphoneAcquirePromise = null;
+    });
+    this.microphoneAcquirePromise = acquisition;
+    return acquisition;
+  }
 
-			// If we already have peers, we need to add this stream to them and renegotiate
-			if (this.peerConnections.size > 0) {
-				await this.addLocalStreamToPeers();
-			}
+  /** Attach an already-authorized display stream without touching microphone media. */
+  async startScreenShare(stream: MediaStream, shareId: string): Promise<void> {
+    if (this.displayStream) this.releaseDisplay('replaced');
+    const displayTrack = stream.getVideoTracks()[0];
+    if (!displayTrack) throw new Error('DISPLAY_TRACK_MISSING');
 
-			return this.localStream;
-		} catch (error) {
-			const err = error instanceof Error ? error : new Error('Failed to get user media');
-			this.events.onError?.(err);
-			throw err;
-		}
-	}
+    this.displayStream = stream;
+    this.displayShareId = shareId;
+    this.displayEndedListener = () => this.releaseDisplay('browser-ended');
+    displayTrack.addEventListener?.('ended', this.displayEndedListener, { once: true });
+    await Promise.all([...this.peerConnections.values()].map((peer) => this.attachDisplay(peer)));
+  }
 
-	/**
-	 * Add local stream tracks to existing peer connections and renegotiate
-	 */
-	private async addLocalStreamToPeers(): Promise<void> {
-		if (!this.localStream) return;
+  async stopScreenShare(reason = 'stopped'): Promise<void> {
+    this.releaseDisplay(reason);
+  }
 
-		const promises = Array.from(this.peerConnections.entries()).map(([peerId, { pc }]) => {
-			try {
-				// Add tracks to the connection
-				this.localStream!.getTracks().forEach(track => {
-					pc.addTrack(track, this.localStream!);
-				});
+  setSignalingChannel(channel: RealtimeChannel | null, signalSender?: WebRTCSignalSender): void {
+    this.signalingChannel = channel;
+    this.signalSender = channel ? signalSender ?? null : null;
+  }
 
-				// Create new offer (renegotiation)
-				return pc
-					.createOffer()
-					.then((offer) =>
-						pc.setLocalDescription(offer).then(() =>
-							this.signalingChannel?.send({
-								type: 'broadcast',
-								event: 'offer',
-								payload: {
-									targetUserId: peerId,
-									senderId: this.currentUserId,
-									sdp: offer,
-								},
-							})
-						)
-					)
-					.catch((err) => {
-						console.error(`[WebRTC] Failed to renegotiate with peer ${peerId}:`, err);
-					});
-			} catch (err) {
-				console.error(`[WebRTC] Failed to renegotiate with peer ${peerId}:`, err);
-				return Promise.resolve();
-			}
-		});
+  async broadcastHandshake(): Promise<void> {
+    await this.sendSignal({ type: 'handshake', userId: this.currentUserId });
+  }
 
-		await Promise.all(promises);
-	}
+  async renegotiateExistingPeers(): Promise<void> {
+    await Promise.all([...this.peerConnections.values()].map((peer) => this.negotiate(peer)));
+  }
 
-	/**
-	 * Set the signaling channel for WebRTC negotiations
-	 */
-	setSignalingChannel(channel: RealtimeChannel | null): void {
-		this.signalingChannel = channel;
-	}
+  async handleHandshake(senderId: string, presenceSessionId?: string, connectionId?: string): Promise<void> {
+    if (senderId === this.currentUserId) return;
+    const existing = this.peerConnections.get(senderId);
+    if (existing) {
+      if (this.isSameRemoteInstance(existing, presenceSessionId, connectionId)) {
+        await this.negotiate(existing);
+        return;
+      }
+      this.cleanupPeer(senderId);
+    }
+    if (this.peerConnections.size >= ROOM_LIMITS.SOFT_WARNING) this.events.onRoomLimitWarning?.(this.peerConnections.size + 1);
+    const peer = this.createPeerConnection(senderId, presenceSessionId, connectionId);
+    await this.negotiate(peer);
+  }
 
-	/**
-	 * Broadcast a handshake to announce presence to existing peers
-	 */
-	async broadcastHandshake(): Promise<void> {
-		if (!this.signalingChannel) {
-			throw new Error('Signaling channel not set');
-		}
+  async handleOffer(senderId: string, targetUserId: string, sdp: RTCSessionDescriptionInit): Promise<void> {
+    await this.handleDescription(senderId, targetUserId, sdp);
+  }
 
-		await this.signalingChannel.send({
-			type: 'broadcast',
-			event: 'handshake',
-			payload: { userId: this.currentUserId },
-		});
-	}
+  async handleAnswer(senderId: string, targetUserId: string, sdp: RTCSessionDescriptionInit): Promise<void> {
+    await this.handleDescription(senderId, targetUserId, sdp);
+  }
 
-	/**
-	 * Handle incoming handshake - create offer for new peer
-	 */
-	async handleHandshake(senderId: string): Promise<void> {
-		if (senderId === this.currentUserId) return;
+  /** Complete MDN perfect-negotiation description path for initial and renegotiated media. */
+  async handleDescription(
+    senderId: string,
+    targetUserId: string,
+    description: RTCSessionDescriptionInit,
+    shareId: string | null = null,
+    sourcePresenceSessionId?: string,
+    sourceConnectionId?: string,
+    targetPresenceSessionId?: string,
+    targetConnectionId?: string,
+  ): Promise<void> {
+    if (targetUserId !== this.currentUserId || senderId === this.currentUserId || !this.matchesLocalInstance(targetPresenceSessionId, targetConnectionId)) return;
+    let peer = this.peerConnections.get(senderId);
+    if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
+    if (!peer) {
+      if (this.peerConnections.size >= ROOM_LIMITS.SOFT_WARNING) this.events.onRoomLimitWarning?.(this.peerConnections.size + 1);
+      peer = this.createPeerConnection(senderId, sourcePresenceSessionId, sourceConnectionId);
+    }
+    peer.remoteShareId = shareId;
 
-		// Check room limit
-		if (this.peerConnections.size >= ROOM_LIMITS.SOFT_WARNING) {
-			this.events.onRoomLimitWarning?.(this.peerConnections.size + 1);
-		}
+    const isOffer = description.type === 'offer';
+    const readyForOffer = !peer.makingOffer && (peer.pc.signalingState === 'stable' || peer.isSettingRemoteAnswerPending);
+    const offerCollision = isOffer && !readyForOffer;
+    peer.ignoreOffer = !peer.polite && offerCollision;
+    if (peer.ignoreOffer) {
+      this.clearPendingIceForPeer(senderId);
+      return;
+    }
 
-		// Create new peer connection and send offer
-		const pc = await this.createPeerConnection(senderId);
-		const offer = await pc.createOffer();
-		await pc.setLocalDescription(offer);
+    peer.isSettingRemoteAnswerPending = description.type === 'answer';
+    try {
+      await peer.pc.setRemoteDescription(description);
+    } finally {
+      peer.isSettingRemoteAnswerPending = false;
+    }
+    await this.drainIceCandidates(peer);
 
-		await this.signalingChannel?.send({
-			type: 'broadcast',
-			event: 'offer',
-			payload: {
-				targetUserId: senderId,
-				senderId: this.currentUserId,
-				sdp: offer,
-			},
-		});
-	}
+    if (isOffer) {
+      try {
+        await peer.pc.setLocalDescription();
+        await this.sendCurrentDescription(peer);
+      } catch (error) {
+        await this.recoverAfterSignalFailure(peer);
+        throw error;
+      }
+    }
+  }
 
-	/**
-	 * Handle incoming offer - create and send answer
-	 * Supports both initial connection and renegotiation
-	 */
-	async handleOffer(senderId: string, targetUserId: string, sdp: RTCSessionDescriptionInit): Promise<void> {
-		// Only process offers targeted at us
-		if (targetUserId !== this.currentUserId) return;
-		if (senderId === this.currentUserId) return;
+  async handleIceCandidate(
+    senderId: string,
+    targetUserId: string,
+    candidate: RTCIceCandidateInit,
+    sourcePresenceSessionId?: string,
+    sourceConnectionId?: string,
+    targetPresenceSessionId?: string,
+    targetConnectionId?: string,
+  ): Promise<void> {
+    if (targetUserId !== this.currentUserId || !this.matchesLocalInstance(targetPresenceSessionId, targetConnectionId)) return;
+    const peer = this.peerConnections.get(senderId);
+    if (peer && !this.isSameRemoteInstance(peer, sourcePresenceSessionId, sourceConnectionId)) return;
+    if (peer?.ignoreOffer) {
+      const generation = this.classifyCandidateIceGeneration(candidate);
+      if (generation.kind === 'malformed') return;
+      this.queueIceCandidate(
+        senderId,
+        sourcePresenceSessionId,
+        sourceConnectionId,
+        candidate,
+        true,
+        generation,
+      );
+      return;
+    }
+    if (!peer || peer.isSettingRemoteAnswerPending || !peer.pc.remoteDescription) {
+      this.queueIceCandidate(senderId, sourcePresenceSessionId, sourceConnectionId, candidate);
+      return;
+    }
+    await this.addIceCandidate(peer, candidate);
+  }
 
-		// Check for existing connection (renegotiation case)
-		let pc: RTCPeerConnection;
-		const existing = this.peerConnections.get(senderId);
-		if (existing) {
-			// Reuse existing connection for renegotiation
-			pc = existing.pc;
-		} else {
-			// Create new connection
-			pc = await this.createPeerConnection(senderId);
-		}
+  setMuted(muted: boolean): void {
+    this.isMuted = muted;
+    this.microphoneStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+  }
 
-		await pc
-			.setRemoteDescription(new RTCSessionDescription(sdp))
-			.then(() => pc.createAnswer())
-			.then((answer) =>
-				pc.setLocalDescription(answer).then(() =>
-					this.signalingChannel?.send({
-						type: 'broadcast',
-						event: 'answer',
-						payload: {
-							targetUserId: senderId,
-							senderId: this.currentUserId,
-							sdp: answer,
-						},
-					})
-				)
-			);
-	}
+  getMuted(): boolean { return this.isMuted; }
+  toggleMute(): boolean { this.setMuted(!this.isMuted); return this.isMuted; }
+  getLocalStream(): MediaStream | null { return this.microphoneStream; }
+  getActiveShareId(): string | null { return this.displayShareId; }
+  getConnectedPeers(): string[] { return [...this.peerConnections.keys()]; }
+  getPeerCount(): number { return this.peerConnections.size; }
 
-	/**
-	 * Handle incoming answer
-	 */
-	async handleAnswer(senderId: string, targetUserId: string, sdp: RTCSessionDescriptionInit): Promise<void> {
-		if (targetUserId !== this.currentUserId) return;
+  cleanupPeer(peerId: string): void {
+    this.clearPendingIceForPeer(peerId);
+    const peer = this.peerConnections.get(peerId);
+    if (peer) {
+      if (peer.microphoneSender) peer.pc.removeTrack(peer.microphoneSender);
+      if (peer.displaySender) peer.pc.removeTrack(peer.displaySender);
+      peer.pc.getTransceivers().forEach((transceiver) => transceiver.stop());
+      peer.pc.ontrack = null;
+      peer.pc.onicecandidate = null;
+      peer.pc.onconnectionstatechange = null;
+      peer.pc.onnegotiationneeded = null;
+      peer.pc.close();
+      this.cleanupRemoteDisplay(peer);
+      peer.remoteAudioStream = undefined;
+      this.peerConnections.delete(peerId);
+    }
+    this.cleanupRemoteAudio(peerId);
+  }
 
-		const peerConn = this.peerConnections.get(senderId);
-		if (peerConn?.pc && peerConn.pc.signalingState === 'have-local-offer') {
-			await peerConn.pc.setRemoteDescription(new RTCSessionDescription(sdp));
-		}
-	}
+  resumeRemoteAudio(): void { this.audioElements.forEach((element) => { void element.play().catch(() => undefined); }); }
 
-	/**
-	 * Handle incoming ICE candidate
-	 */
-	async handleIceCandidate(senderId: string, targetUserId: string, candidate: RTCIceCandidateInit): Promise<void> {
-		if (targetUserId !== this.currentUserId) return;
+  cleanup(): void {
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
+    this.lifecycleGeneration += 1;
+    this.releaseDisplay('cleanup');
+    [...this.peerConnections.keys()].forEach((peerId) => this.cleanupPeer(peerId));
+    this.pendingIceCandidates.clear();
+    this.microphoneStream?.getTracks().forEach((track) => track.stop());
+    this.microphoneStream = null;
+    this.audioElements.forEach((element) => { element.srcObject = null; element.remove(); });
+    this.audioElements.clear();
+    this.vadMap.forEach((vad) => vad.stop());
+    this.vadMap.clear();
+    if (this.pendingAudioRetryInterval) { clearInterval(this.pendingAudioRetryInterval); this.pendingAudioRetryInterval = null; }
+    this.signalingChannel = null;
+    this.signalSender = null;
+  }
 
-		const peerConn = this.peerConnections.get(senderId);
-		if (peerConn?.pc) {
-			// Safari compatibility: use RTCIceCandidate constructor
-			await peerConn.pc.addIceCandidate(new RTCIceCandidate(candidate));
-		}
-	}
+  private createPeerConnection(peerId: string, presenceSessionId?: string, connectionId?: string): PeerConnection {
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+    const peer: PeerConnection = {
+      pc, userId: peerId, presenceSessionId: presenceSessionId ?? null, connectionId: connectionId ?? null,
+      polite: this.currentUserId.localeCompare(peerId) > 0, makingOffer: false, ignoreOffer: false,
+      isSettingRemoteAnswerPending: false, remoteShareId: null, emittedRemoteShareId: null,
+    };
+    pc.onnegotiationneeded = () => { void this.negotiate(peer).catch((error: unknown) => this.reportError(error)); };
+    pc.ontrack = (event) => this.handleRemoteTrack(peer, event);
+    pc.onicecandidate = (event) => {
+      if (!event.candidate || peer.ignoreOffer || !peer.presenceSessionId || !peer.connectionId) return;
+      void this.sendSignal({ type: 'ice', targetUserId: peerId, targetPresenceSessionId: peer.presenceSessionId, targetConnectionId: peer.connectionId, senderId: this.currentUserId, candidate: event.candidate.toJSON() }).catch((error: unknown) => this.reportError(error));
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') this.events.onPeerConnected?.(peerId);
+      else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') { this.cleanupPeer(peerId); this.events.onPeerDisconnected?.(peerId); }
+    };
+    this.peerConnections.set(peerId, peer);
+    void this.attachOrReplaceMicrophone(peer, this.microphoneStream).catch((error: unknown) => this.reportError(error));
+    void this.attachDisplay(peer).catch((error: unknown) => this.reportError(error));
+    return peer;
+  }
 
-	/**
-	 * Create a new RTCPeerConnection for a peer
-	 */
-	private async createPeerConnection(peerId: string): Promise<RTCPeerConnection> {
-		// Close existing connection if any
-		const existing = this.peerConnections.get(peerId);
-		if (existing) {
-			existing.pc.close();
-		}
+  private async attachOrReplaceMicrophone(peer: PeerConnection, stream: MediaStream | null): Promise<void> {
+    const track = stream?.getAudioTracks()[0];
+    if (!track || !stream) return;
+    if (peer.microphoneSender) { await peer.microphoneSender.replaceTrack(track); return; }
+    peer.microphoneSender = peer.pc.addTrack(track, stream);
+  }
 
-		const pc = new RTCPeerConnection({
-			iceServers: getIceServers(),
-		});
+  private async attachDisplay(peer: PeerConnection): Promise<void> {
+    const stream = this.displayStream;
+    const track = stream?.getVideoTracks()[0];
+    if (!track || !stream || peer.displaySender) return;
+    peer.displaySender = peer.pc.addTrack(track, stream);
+  }
 
-		// Add local tracks if available
-		if (this.localStream) {
-			this.localStream.getTracks().forEach(track => {
-				pc.addTrack(track, this.localStream!);
-			});
-		}
+  private releaseDisplay(reason: string): void {
+    const stream = this.displayStream;
+    const shareId = this.displayShareId;
+    const listener = this.displayEndedListener;
+    if (!stream || !shareId) return;
+    this.displayStream = null;
+    this.displayShareId = null;
+    this.displayEndedListener = null;
+    const displayTrack = stream.getVideoTracks()[0];
+    if (displayTrack && listener) displayTrack.removeEventListener?.('ended', listener);
+    this.peerConnections.forEach((peer) => {
+      if (!peer.displaySender) return;
+      peer.pc.removeTrack(peer.displaySender);
+      peer.displaySender = undefined;
+    });
+    stream.getTracks().forEach((track) => track.stop());
+    this.events.onLocalDisplayStopped?.(shareId, reason);
+  }
 
-		// Handle incoming tracks
-		pc.ontrack = (event) => {
-			this.handleRemoteTrack(peerId, event);
-		};
+  private async negotiate(peer: PeerConnection): Promise<void> {
+    if (peer.makingOffer || peer.pc.signalingState !== 'stable') return;
+    try {
+      peer.makingOffer = true;
+      await peer.pc.setLocalDescription();
+      await this.sendCurrentDescription(peer);
+    } catch (error) {
+      await this.recoverAfterSignalFailure(peer);
+      throw error;
+    } finally {
+      peer.makingOffer = false;
+    }
+  }
 
-		// Handle ICE candidates
-		pc.onicecandidate = (event) => {
-			if (event.candidate) {
-				this.signalingChannel?.send({
-					type: 'broadcast',
-					event: 'ice-candidate',
-					payload: {
-						targetUserId: peerId,
-						senderId: this.currentUserId,
-						candidate: event.candidate.toJSON(),
-					},
-				});
-			}
-		};
+  private async recoverAfterSignalFailure(peer: PeerConnection): Promise<void> {
+    if (peer.pc.signalingState === 'have-local-offer') {
+      try { await peer.pc.setLocalDescription({ type: 'rollback' }); } catch { /* next valid negotiation can recover */ }
+    }
+  }
 
-		// Handle connection state changes
-		pc.onconnectionstatechange = () => {
-			switch (pc.connectionState) {
-				case 'connected':
-					this.events.onPeerConnected?.(peerId);
-					break;
-				case 'disconnected':
-				case 'failed':
-				case 'closed':
-					this.cleanupPeer(peerId);
-					this.events.onPeerDisconnected?.(peerId);
-					break;
-			}
-		};
+  private async sendCurrentDescription(peer: PeerConnection): Promise<void> {
+    const description = peer.pc.localDescription;
+    if (!description || !peer.presenceSessionId || !peer.connectionId) return;
+    await this.sendSignal({
+      type: 'description', targetUserId: peer.userId, targetPresenceSessionId: peer.presenceSessionId,
+      targetConnectionId: peer.connectionId, senderId: this.currentUserId,
+      description: { type: description.type, sdp: description.sdp ?? undefined },
+    });
+  }
 
-		this.peerConnections.set(peerId, { pc, userId: peerId });
-		return pc;
-	}
+  private async sendSignal(event: SignalingEvent): Promise<void> {
+    if (this.signalSender) { await this.signalSender(event); return; }
+    if (!this.signalingChannel) throw new Error('SIGNALING_UNAVAILABLE');
+    const result = await this.signalingChannel.send({ type: 'broadcast', event: event.type, payload: event });
+    if (result !== 'ok') throw new Error('SIGNALING_SEND_FAILED');
+  }
 
-	/**
-	 * Handle incoming remote track (audio stream)
-	 */
-	private handleRemoteTrack(peerId: string, event: RTCTrackEvent): void {
-		const [stream] = event.streams;
-		if (!stream) return;
+  private queueIceCandidate(
+    peerId: string,
+    presenceSessionId: string | undefined,
+    connectionId: string | undefined,
+    candidate: RTCIceCandidateInit,
+    receivedWhileIgnoringOffer = false,
+    generation = this.classifyCandidateIceGeneration(candidate),
+  ): void {
+    const key = this.pendingIceKey(peerId, presenceSessionId, connectionId);
+    let queue = this.pendingIceCandidates.get(key);
+    if (!queue) {
+      if (this.pendingIceCandidates.size >= MAX_PENDING_ICE_PEERS) return;
+      queue = [];
+      this.pendingIceCandidates.set(key, queue);
+    }
+    if (queue.length >= MAX_PENDING_ICE_PER_PEER) queue.shift();
+    queue.push({ candidate, receivedWhileIgnoringOffer, generation });
+  }
 
-		// Create audio element for this peer
-		let audioEl = this.audioElements.get(peerId);
-		if (!audioEl) {
-			audioEl = document.createElement('audio');
-			audioEl.autoplay = true;
-			audioEl.setAttribute('playsinline', ''); // Safari iOS
-			audioEl.style.display = 'none';
-			document.body.appendChild(audioEl);
-			this.audioElements.set(peerId, audioEl);
-		}
+  private async drainIceCandidates(peer: PeerConnection): Promise<void> {
+    const key = this.pendingIceKey(peer.userId, peer.presenceSessionId ?? undefined, peer.connectionId ?? undefined);
+    const queued = this.pendingIceCandidates.get(key);
+    if (!queued || peer.ignoreOffer || !peer.pc.remoteDescription) return;
+    this.pendingIceCandidates.delete(key);
+    const acceptedIceUfrags = this.getDescriptionIceUfrags(peer.pc.remoteDescription);
+    const errors: unknown[] = [];
+    for (const pending of queued) {
+      if (
+        pending.receivedWhileIgnoringOffer
+        && pending.generation.kind === 'classified'
+        && acceptedIceUfrags.size > 0
+        && !acceptedIceUfrags.has(pending.generation.ufrag)
+      ) {
+        continue;
+      }
+      try {
+        await this.addIceCandidate(peer, pending.candidate);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'QUEUED_ICE_CANDIDATE_ERRORS');
+    }
+  }
 
-		audioEl.srcObject = stream;
+  private clearPendingIceForPeer(peerId: string): void {
+    const prefix = `${encodeURIComponent(peerId)}:`;
+    for (const key of this.pendingIceCandidates.keys()) {
+      if (key.startsWith(prefix)) this.pendingIceCandidates.delete(key);
+    }
+  }
 
-		// Safari autoplay handling - silent retry, don't show error
-		audioEl.play().catch(() => {
-			// Audio blocked, will be retried by interval
-			console.log('[WebRTC] Audio blocked for peer, will retry:', peerId);
-		});
+  private pendingIceKey(peerId: string, presenceSessionId?: string, connectionId?: string): string {
+    return [peerId, presenceSessionId ?? '', connectionId ?? ''].map(encodeURIComponent).join(':');
+  }
 
-		// Store stream reference
-		const peerConn = this.peerConnections.get(peerId);
+  private async addIceCandidate(peer: PeerConnection, candidate: RTCIceCandidateInit): Promise<void> {
+    await peer.pc.addIceCandidate(candidate);
+  }
 
-		// Setup VAD for remote stream
-		const vad = new VoiceActivityDetector(stream, {
-			onSpeakingChange: (isSpeaking) => {
-				this.events.onPeerSpeaking?.(peerId, isSpeaking);
-			}
-		});
-		this.vadMap.set(peerId, vad);
-	}
+  private classifyCandidateIceGeneration(candidate: RTCIceCandidateInit): IceGeneration {
+    if (candidate.usernameFragment !== undefined && candidate.usernameFragment !== null) {
+      const ufrag = this.normalizeIceUfrag(candidate.usernameFragment);
+      return ufrag ? { kind: 'classified', ufrag } : { kind: 'malformed' };
+    }
+    const rawUfrag = /(?:^|\s)ufrag\s+([^\s]+)/i.exec(candidate.candidate ?? '')?.[1];
+    if (rawUfrag === undefined) return { kind: 'unclassified' };
+    const ufrag = this.normalizeIceUfrag(rawUfrag);
+    return ufrag ? { kind: 'classified', ufrag } : { kind: 'malformed' };
+  }
 
-	/**
-	 * Set mute state for local audio
-	 */
-	setMuted(muted: boolean): void {
-		this.isMuted = muted;
-		if (this.localStream) {
-			this.localStream.getAudioTracks().forEach(track => {
-				track.enabled = !muted;
-			});
-		}
-	}
+  private normalizeIceUfrag(value: string): string | null {
+    return /^[A-Za-z0-9+/_-]{1,256}$/.test(value) ? value : null;
+  }
 
-	/**
-	 * Get current mute state
-	 */
-	getMuted(): boolean {
-		return this.isMuted;
-	}
+  private getDescriptionIceUfrags(description: RTCSessionDescriptionInit): Set<string> {
+    const ufrags = new Set<string>();
+    for (const match of description.sdp?.matchAll(/^a=ice-ufrag:([^\r\n]+)$/gm) ?? []) {
+      const ufrag = this.normalizeIceUfrag(match[1].trim());
+      if (ufrag) ufrags.add(ufrag);
+    }
+    return ufrags;
+  }
 
-	/**
-	 * Toggle mute state
-	 */
-	toggleMute(): boolean {
-		this.setMuted(!this.isMuted);
-		return this.isMuted;
-	}
+  private matchesLocalInstance(targetPresenceSessionId?: string, targetConnectionId?: string): boolean {
+    if (!this.presenceSessionId || !this.connectionId) return targetPresenceSessionId === undefined && targetConnectionId === undefined;
+    return targetPresenceSessionId === this.presenceSessionId && targetConnectionId === this.connectionId;
+  }
 
-	/**
-	 * Get local audio stream for VAD
-	 */
-	getLocalStream(): MediaStream | null {
-		return this.localStream;
-	}
+  private isSameRemoteInstance(peer: PeerConnection, presenceSessionId?: string, connectionId?: string): boolean {
+    return peer.presenceSessionId === (presenceSessionId ?? null) && peer.connectionId === (connectionId ?? null);
+  }
 
-	/**
-	 * Get all connected peer IDs
-	 */
-	getConnectedPeers(): string[] {
-		return Array.from(this.peerConnections.keys());
-	}
+  private isStreamLive(stream: MediaStream): boolean {
+    return stream.getTracks().some((track) => track.readyState !== 'ended');
+  }
 
-	/**
-	 * Get peer count
-	 */
-	getPeerCount(): number {
-		return this.peerConnections.size;
-	}
+  private handleRemoteTrack(peer: PeerConnection, event: RTCTrackEvent): void {
+    const [stream] = event.streams;
+    if (!stream) return;
+    if (event.track.kind === 'video') {
+      if (!peer.remoteShareId) return;
+      if (
+        peer.remoteDisplayTrack === event.track
+        && peer.remoteDisplayStream === stream
+        && peer.emittedRemoteShareId === peer.remoteShareId
+      ) {
+        return;
+      }
+      this.cleanupRemoteDisplay(peer);
+      peer.remoteDisplayStream = stream;
+      peer.remoteDisplayTrack = event.track;
+      peer.emittedRemoteShareId = peer.remoteShareId;
+      const endedListener = () => {
+        if (peer.remoteDisplayTrack !== event.track) return;
+        this.cleanupRemoteDisplay(peer);
+      };
+      peer.remoteDisplayEndedListener = endedListener;
+      event.track.addEventListener?.('ended', endedListener, { once: true });
+      this.events.onRemoteDisplay?.({ peerId: peer.userId, shareId: peer.remoteShareId, stream });
+      return;
+    }
+    if (event.track.kind !== 'audio') return;
+    let audioElement = this.audioElements.get(peer.userId);
+    if (!audioElement) {
+      audioElement = document.createElement('audio');
+      audioElement.autoplay = true;
+      audioElement.setAttribute('playsinline', '');
+      audioElement.style.display = 'none';
+      document.body.appendChild(audioElement);
+      this.audioElements.set(peer.userId, audioElement);
+    }
+    audioElement.srcObject = stream;
+    void audioElement.play().catch(() => undefined);
+    peer.remoteAudioStream = stream;
+    this.vadMap.get(peer.userId)?.stop();
+    this.vadMap.set(peer.userId, new VoiceActivityDetector(stream, { onSpeakingChange: (isSpeaking) => this.events.onPeerSpeaking?.(peer.userId, isSpeaking) }));
+  }
 
-	/**
-	 * Cleanup a specific peer connection
-	 */
-	cleanupPeer(peerId: string): void {
-		const peerConn = this.peerConnections.get(peerId);
-		if (peerConn) {
-			peerConn.pc.close();
-			this.peerConnections.delete(peerId);
-		}
+  private cleanupRemoteAudio(peerId: string): void {
+    const audioElement = this.audioElements.get(peerId);
+    if (audioElement) { audioElement.srcObject = null; audioElement.remove(); this.audioElements.delete(peerId); }
+    const vad = this.vadMap.get(peerId);
+    if (vad) { vad.stop(); this.vadMap.delete(peerId); }
+  }
 
-		const audioEl = this.audioElements.get(peerId);
-		if (audioEl) {
-			audioEl.srcObject = null;
-			audioEl.remove();
-			this.audioElements.delete(peerId);
-		}
+  private cleanupRemoteDisplay(peer: PeerConnection): void {
+    if (peer.remoteDisplayTrack && peer.remoteDisplayEndedListener) {
+      peer.remoteDisplayTrack.removeEventListener?.('ended', peer.remoteDisplayEndedListener);
+    }
+    peer.remoteDisplayTrack = undefined;
+    peer.remoteDisplayStream = undefined;
+    peer.remoteDisplayEndedListener = undefined;
+    peer.emittedRemoteShareId = null;
+  }
 
-		const vad = this.vadMap.get(peerId);
-		if (vad) {
-			vad.stop();
-			this.vadMap.delete(peerId);
-		}
-	}
+  private startAudioRetryInterval(): void {
+    this.pendingAudioRetryInterval = setInterval(() => {
+      this.audioElements.forEach((element) => { if (element.paused && element.srcObject) void element.play().catch(() => undefined); });
+    }, 500);
+  }
 
-	/**
-	 * Start interval to retry playing blocked audio
-	 */
-	private startAudioRetryInterval(): void {
-		this.pendingAudioRetryInterval = setInterval(() => {
-			this.audioElements.forEach((el) => {
-				if (el.paused && el.srcObject) {
-					el.play().catch(() => { /* still blocked, will retry */ });
-				}
-			});
-		}, 500);
-	}
-
-	/**
-	 * Retry playing all remote audio elements
-	 * Call this from a user gesture event handler (e.g. onClick)
-	 */
-	resumeRemoteAudio(): void {
-		this.audioElements.forEach((el) => {
-			el.play().catch(err => console.warn('Still failed to play remote audio:', err));
-		});
-	}
-
-	/**
-	 * Full cleanup - close all connections and release resources
-	 * CRITICAL: Must be called on component unmount to prevent ghost audio
-	 */
-	cleanup(): void {
-		// 1. Close all peer connections
-		this.peerConnections.forEach((peerConn, peerId) => {
-			peerConn.pc.close();
-			this.peerConnections.delete(peerId);
-		});
-
-		// 2. Stop local media tracks
-		if (this.localStream) {
-			this.localStream.getTracks().forEach(track => {
-				track.stop();
-			});
-			this.localStream = null;
-		}
-
-		// 3. Remove all audio elements
-		this.audioElements.forEach((el, peerId) => {
-			el.srcObject = null;
-			el.remove();
-			this.audioElements.delete(peerId);
-		});
-
-		// 4. Stop all VADs
-		this.vadMap.forEach((vad) => vad.stop());
-		this.vadMap.clear();
-
-		// 5. Stop retry interval
-		if (this.pendingAudioRetryInterval) {
-			clearInterval(this.pendingAudioRetryInterval);
-			this.pendingAudioRetryInterval = null;
-		}
-
-		// 6. Clear signaling channel reference
-		this.signalingChannel = null;
-	}
+  private reportError(error: unknown): void { this.events.onError?.(error instanceof Error ? error : new Error('WebRTC operation failed')); }
 }

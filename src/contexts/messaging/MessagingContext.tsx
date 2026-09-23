@@ -50,7 +50,7 @@ function useMessagingProviderValue(): MessagingContextType {
     updateConversationWithMessage,
     clearLastActiveConversation,
   } = useConversations();
-  const { currentUserProfile } = useCompany();
+  const { company, currentUserProfile } = useCompany();
 
   // Drawer state with localStorage persistence
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
@@ -274,7 +274,9 @@ function useMessagingProviderValue(): MessagingContextType {
   // server-side, so no conversation id list is needed and this status is the
   // real status of the channel delivering messages, receipts and reactions.
   const { status: realtimeStatus } = useMessageSubscription({
-    isActive: Boolean(currentUserProfile?.id),
+    isActive: Boolean(company?.id && currentUserProfile?.id),
+    companyId: company?.id,
+    currentUserId: currentUserProfile?.id,
     ignoreSenderId: currentUserProfile?.id,
     onInsert: handleConversationInsert,
   });

@@ -2,15 +2,17 @@
 
 ## Movement ownership
 
-All manual, automatic, Knock-approved, teleport, leave, and logout placement
-changes enter the central location-transition coordinator. The coordinator
+Manual, automatic, Knock-approved, teleport, and leave placement changes enter
+the central location-transition coordinator. Logout bypasses that client
+coordinator and calls `/api/presence/logout` directly. The coordinator
 calls the atomic Presence route; the database function performs locked
 authorization, capacity, version checks, session/log updates, and the placement
 write in one transaction.
 
 Selection callbacks update UI and advisory hints only. They do not call another
-movement transport. The legacy users-location endpoint is a non-mutating,
-audited compatibility tombstone and never a feature writer.
+movement transport. The users-location endpoint remains a gated legacy writer:
+atomic runtime rejects it, but legacy code still contains status, placement,
+presence-log, and Knock mutation behavior.
 
 ## Result discipline
 
@@ -25,9 +27,13 @@ identity. These are not success:
 - a same-target placement without renewed authorization;
 - a 426 compatibility response.
 
-After commit, cancel any older scoped query, fetch an authoritative snapshot,
-validate its identity, and replace the scoped cache. Re-check intent after every
-await before selecting UI, opening chat, persisting a hint, or showing success.
+After commit, await any scoped snapshot query that is already fetching, then
+fetch an authoritative snapshot, validate its identity, and replace the scoped
+cache. Re-check intent after each awaited coordinator step before selecting UI,
+opening chat, persisting a hint, or showing success. The `useUserCalling`
+acceptance flow currently lacks an additional intent or identity fence after
+`updateLocation`; it can await conversation creation and message delivery before
+marking the call accepted.
 
 ## Manual versus automatic ordering
 
@@ -60,8 +66,10 @@ retires matching leases, closes qualifying logs, and clears final placement only
 when no valid session remains. Client sign-out then clears cache, storage,
 channel, session state, timers, and in-flight ownership for the old scope.
 
-Account switch, company A-to-B change, remote removal, role change, and snapshot
-identity mismatch advance a generation before reload. Old bootstrap responses
+Auth identity changes and membership-scope invalidation advance
+`authGeneration` before reload. A confirmed role update instead mirrors state
+under its captured mutation scope without advancing `authGeneration` or
+invalidating the Presence lifecycle. Old bootstrap responses
 cannot commit after the fence. Membership entry atomically removes any legacy
 companyless placement, active lease, or open log before assigning a new company.
 
