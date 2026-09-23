@@ -753,6 +753,53 @@ describe('AudioProvider screen-share lifecycle', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(1);
   });
 
+  it('keeps the local display when the initial active read starts after the claim and later returns its pre-claim null', async () => {
+    const preClaimActiveRead = deferred<ScreenSharePublicShare | null>();
+    const track = createTrack();
+    mocks.getDisplayMedia.mockResolvedValue(createStream(track));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/claim')) return claimed();
+      if (url.endsWith('/release')) return released();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderProvider();
+    await waitFor(() => expect(mocks.managers).toHaveLength(1));
+
+    await act(async () => {
+      expect(await currentAudio().startScreenShare()).toBe(true);
+    });
+    const manager = mocks.managers[0];
+    const audioBefore = {
+      muted: currentAudio().isMuted,
+      enabled: currentAudio().isAudioEnabled,
+      speaking: currentAudio().speakingUsers,
+      mutedUsers: currentAudio().mutedUserIds,
+    };
+
+    await act(async () => {
+      preClaimActiveRead.resolve(null);
+      contextState.activeShare = await preClaimActiveRead.promise;
+      contextState.activeShareObservationVersion = 1;
+      view.rerender(<AudioProvider spaceId={SPACE_A} userId={USER_A}><Probe /></AudioProvider>);
+    });
+
+    expect(manager.stopScreenShare).not.toHaveBeenCalled();
+    expect(manager.getActiveShareId()).toBe(SHARE_A);
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(currentAudio().activeScreenShare?.shareId).toBe(SHARE_A);
+    expect(currentAudio().displayStream?.shareId).toBe(SHARE_A);
+    expect(manager.cleanup).not.toHaveBeenCalled();
+    expect(manager.initializeLocalStream).not.toHaveBeenCalled();
+    expect(manager.setMuted).not.toHaveBeenCalled();
+    expect(currentAudio().isMuted).toBe(audioBefore.muted);
+    expect(currentAudio().isAudioEnabled).toBe(audioBefore.enabled);
+    expect(currentAudio().speakingUsers).toBe(audioBefore.speaking);
+    expect(currentAudio().mutedUserIds).toEqual(audioBefore.mutedUsers);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/release'))).toHaveLength(0);
+  });
+
   it.each([
     ['company', { companyId: COMPANY_B }],
     ['space', { spaceId: SPACE_B }],

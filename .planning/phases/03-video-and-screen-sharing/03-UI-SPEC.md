@@ -89,8 +89,8 @@ Accent reservado para: botão **Share screen** quando disponível, foco visível
 ### Stage integrado
 
 1. Quando há apresentação ativa, renderizar `FloorPlanPresentationStage` **dentro do `Card` principal do floor plan, antes de `ModernFloorPlan`**, separado por `16px`. Não navegar, não abrir modal e não substituir a página.
-2. Cabeçalho do stage: selo magenta **LIVE**, heading **Presentation**, avatar existente do apresentador, texto **{Name} is sharing their screen**, e botão local **Collapse presentation**. O apresentador também vê **Stop sharing** com rótulo textual.
-3. Em modo expandido, o vídeo ocupa a região principal em `aspect-ratio: 16 / 9`, com fundo `--vo-bg-2`, borda `--vo-line`, raio `14px`, largura de 100% e altura máxima de `540px`. Não adicionar controles nativos, chat, grade de rostos, gravação, PiP ou fullscreen.
+2. Cabeçalho do stage: selo magenta **LIVE**, heading **Presentation**, avatar existente do apresentador, texto **{Name} is sharing their screen**, botão local **Collapse presentation** e botão **Enter fullscreen**. Enquanto o Fullscreen API estiver ativo, o segundo botão usa **Exit fullscreen**. O apresentador também vê **Stop sharing** com rótulo textual.
+3. Em modo expandido, o vídeo ocupa a região principal em `aspect-ratio: 16 / 9`, com fundo `--vo-bg-2`, borda `--vo-line`, raio `14px`, largura de 100% e altura máxima de `540px`. O botão **Enter fullscreen** aplica o Fullscreen API ao stage completo, mantém cabeçalho e ações acessíveis e dá ao vídeo a área restante da viewport, sem cortar código. Não adicionar controles nativos, chat, grade de rostos, gravação ou PiP.
 4. Ao receber uma apresentação, cada viewer inicia em modo expandido. **Collapse presentation** troca somente a preferência local daquele viewer para um rail de `48px`; não envia Broadcast, não grava no banco e não afeta o apresentador. Enquanto a mesma apresentação estiver ativa, uma escolha manual do viewer é preservada.
 5. O rail colapsado mostra selo LIVE, **{Name} is presenting**, botão **Expand presentation** e, para o apresentador, **Stop sharing**. Ao encerrar, falhar, o apresentador sair ou o viewer mudar de sala, desmontar completamente o stage/rail e devolver o card ao layout pré-apresentação, sem espaço reservado ou frame congelado.
 6. Enquanto a track remota está conectando, manter o mesmo retângulo 16:9 e exibir `Skeleton`/spinner sem deslocamento de layout e a mensagem **Connecting to {Name}'s screen…**. Se não houver track viva do apresentador canônico, não exibir conteúdo de outro peer.
@@ -102,6 +102,7 @@ Accent reservado para: botão **Share screen** quando disponível, foco visível
 | `>= 1280px` | Stage expandido limitado a `960px` de largura e `540px` de altura; fica acima da grade, que conserva largura total abaixo. Cabeçalho em uma linha. |
 | `768–1279px` | Stage usa largura disponível do card, mantém 16:9 e altura máxima de `50vh`; cabeçalho pode quebrar em duas linhas, preservando ações. |
 | `< 768px` | Não criar padrão novo de bottom sheet ou gesto. Stage ocupa 100% da largura disponível, mínimo de `180px`, máximo de `44vh`; padding `16px`; rail de `52px`. Ações têm `44px` de alvo; **Share screen** pode ficar só com ícone, mas exige `aria-label="Share screen"` e tooltip. |
+| Fullscreen local | O stage ocupa a viewport inteira, sem limite de `960px`, `540px` ou `max-height`; o cabeçalho permanece visível e o vídeo usa a área restante com fundo preto e `object-contain`. |
 
 Nunca permitir overflow horizontal da página. Nome/texto longo trunca no cabeçalho; mensagens de erro quebram por palavra dentro do card. A área do vídeo não pode criar scroll horizontal.
 
@@ -119,6 +120,8 @@ Nunca permitir overflow horizontal da página. Nome/texto longo trunca no cabeç
 | Apresentação própria ativa | Substituir por **Stop sharing** com ícone `MonitorOff`. Clique encerra imediatamente a track e libera o lease de forma idempotente; não abrir confirmação. |
 | Outro apresentador ativo | Não iniciar segundo picker por precheck visual. Mostrar estado indisponível com tooltip **{Name} is sharing their screen**; o backend continua sendo a exclusão mútua. |
 | Encerramento bem-sucedido | Restaurar layout; anunciar **Screen sharing ended. Floor plan restored.** sem toast persistente. |
+| Stage expandido | **Enter fullscreen** chama o Fullscreen API no gesto do usuário. O estado visual só muda depois de `fullscreenchange` confirmar que o stage é `document.fullscreenElement`. |
+| Stage em fullscreen | Mostrar **Exit fullscreen**. **Collapse presentation** sai do fullscreen antes de aplicar a preferência local de rail. |
 
 **Ações destrutivas.** Não há exclusão de dados nesta fase. **Stop sharing** encerra transmissão efêmera, é explícita e imediatamente reversível por um novo compartilhamento; portanto não requer diálogo de confirmação nem usa `AlertDialog`.
 
@@ -127,6 +130,7 @@ Nunca permitir overflow horizontal da página. Nome/texto longo trunca no cabeç
 | Evento | Apresentação visual e copy |
 |--------|----------------------------|
 | Browser sem `getDisplayMedia` | Botão desabilitado, ícone `AlertCircle`, tooltip e mensagem inline: **Screen sharing isn’t supported in this browser. Use a current supported browser.** Não oferecer falso fallback. |
+| Fullscreen API ausente ou rejeitado | Manter a apresentação ativa e mostrar alert local: **Fullscreen is not supported in this browser. Use a current supported browser.** ou **Fullscreen could not start. Check your browser settings, then try again.** Não encerrar o compartilhamento. |
 | Permissão negada | Alert inline não modal, `role="alert"`: **We couldn’t start screen sharing. Check your browser permission, then try again.** Restaurar **Share screen**. |
 | Picker cancelado pelo usuário | Status discreto, `aria-live="polite"`: **Screen sharing was cancelled.** Restaurar **Share screen**; não marcar como erro destrutivo. |
 | Nenhuma fonte/display disponível | Alert inline: **No screen is available to share. Connect a display or choose another source, then try again.** |
@@ -144,10 +148,10 @@ Não há retry automático para picker, permissão ou conflito. **Try again** se
 
 ## Acessibilidade, foco e teclado
 
-1. Usar elementos nativos: `button` para iniciar, parar, expandir e colapsar; `section` com heading para o stage; `<video autoPlay playsInline>` para a track remota. O vídeo sem controles não entra na ordem de tabulação; o nome acessível do stage é **Screen shared by {Name}**.
+1. Usar elementos nativos: `button` para iniciar, parar, expandir, colapsar e entrar/sair do fullscreen; `section` com heading para o stage; `<video autoPlay playsInline>` para a track remota. O vídeo sem controles não entra na ordem de tabulação; o nome acessível do stage é **Screen shared by {Name}**.
 2. Todos os controles somente por ícone têm `aria-label` e `Tooltip`. Foco visível é contorno de `2px` em `--ring`, com offset de `2px`, preservando o padrão existente; não remover outline sem substituto.
-3. **Tab/Shift+Tab** percorrem os controles em ordem visual: áudio, compartilhar, expandir/colapsar e parar. `Enter` e `Space` acionam cada botão. Não criar atalho global `S`; ele poderia disparar capture acidentalmente ou conflitar com campos. Manter o atalho existente `M` exclusivamente para microfone e ignorá-lo ao digitar.
-4. O botão expandir/colapsar expõe `aria-expanded` e `aria-controls` apontando para a região do vídeo. `Escape` apenas colapsa stage expandido; nunca encerra a apresentação. Após `Escape`, foco retorna a **Expand presentation**. Ao parar por botão, o foco retorna a **Share screen**; finais remotos não roubam foco do viewer.
+3. **Tab/Shift+Tab** percorrem os controles em ordem visual: áudio, compartilhar, expandir/colapsar, fullscreen e parar. `Enter` e `Space` acionam cada botão. Não criar atalho global `S`; ele poderia disparar capture acidentalmente ou conflitar com campos. Manter o atalho existente `M` exclusivamente para microfone e ignorá-lo ao digitar.
+4. O botão expandir/colapsar expõe `aria-expanded` e `aria-controls` apontando para a região do vídeo. O botão de fullscreen reflete `document.fullscreenElement` por meio de `fullscreenchange`. Enquanto o stage está em fullscreen, `Escape` sai do fullscreen e não colapsa; fora dele, `Escape` colapsa o stage e retorna foco a **Expand presentation**. Ao parar por botão, o foco retorna a **Share screen**; finais remotos não roubam foco do viewer.
 5. Mensagens de progresso, cancelamento e término usam uma única região `aria-live="polite"` próxima ao controle; falhas que exigem ação usam `role="alert"`. Não depender apenas de cor ou animação para LIVE, speaking, erro ou apresentação.
 6. Aplicar `prefers-reduced-motion`: expansão/colapso e entrada/saída usam no máximo opacidade/transform em 150–200ms; com redução de movimento, trocar imediatamente. Não piscar o vídeo, não animar continuamente o status LIVE e não mover o foco automaticamente em mobile.
 7. Se uma ação ficar dentro de card clicável, marcar com `data-space-action` ou `data-avatar-interactive`, parar propagação de pointer/click/keyboard e garantir que o handler do card ignore descendentes interativos. Conteúdo de tooltip/popover em portal também interrompe propagação.
@@ -163,6 +167,7 @@ A interface do produto permanece em inglês, conforme escopo atual; esta especif
 | CTA primário | **Share screen** |
 | CTA durante início | **Opening screen picker…**; depois **Starting screen share…** |
 | CTA de encerramento | **Stop sharing** |
+| CTA de fullscreen | **Enter fullscreen**; enquanto ativo, **Exit fullscreen** |
 | Estado vazio acessível | **No one is sharing a screen** |
 | Estado de carregamento | **Connecting to {Name}'s screen…** |
 | Cabeçalho populated | **Presentation**; **{Name} is sharing their screen** |
@@ -212,6 +217,7 @@ Estados aplicáveis resolvidos: 13 cobertos, 0 backstop, 0 não resolvidos.
 - O presenter é único por sala, mas não é host de reunião: a UI não oferece encerrar áudio ou apresentação de outra pessoa.
 - Troca de sala, perda de identidade/empresa ou teardown remove controles e callbacks da sala anterior antes de refletir a nova sala.
 - O browser é dono do picker e das permissões. Não criar modal que simule escolha de janela/aba/tela, não persistir autorização e não prometer suporte onde o feature detection falhar.
+- O browser é dono do Fullscreen API. Fullscreen é uma preferência local e efêmera do viewer ou presenter; não enviar estado por Broadcast/Presence nem gravar no banco. Se a API faltar ou rejeitar a solicitação, preservar a apresentação e mostrar recuperação local.
 - Preferência expandido/colapsado é local por viewer e efêmera; presenter, share, ocupação e acesso não são estados que a UI possa autorizar por Broadcast/Presence.
 
 ---

@@ -85,6 +85,40 @@ function display(presenterUserId = REMOTE_USER_ID, shareId = 'share-a') {
   };
 }
 
+function installFullscreenApi() {
+  let fullscreenElement: Element | null = null;
+  const requestFullscreen = vi.fn(function (this: HTMLElement): Promise<void> {
+    fullscreenElement = this;
+    return Promise.resolve();
+  });
+  const exitFullscreen = vi.fn(async (): Promise<void> => {
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
+
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => fullscreenElement,
+  });
+  Object.defineProperty(document, 'exitFullscreen', {
+    configurable: true,
+    value: exitFullscreen,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+    configurable: true,
+    value: requestFullscreen,
+  });
+
+  return {
+    requestFullscreen,
+    exitFullscreen,
+    setFullscreenElement(element: Element | null) {
+      fullscreenElement = element;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    },
+  };
+}
+
 const SPACE = {
   id: 'space-a',
   companyId: 'company-a',
@@ -185,12 +219,15 @@ describe('ScreenShareControls', () => {
 });
 
 describe('FloorPlanPresentationStage', () => {
+  let fullscreenApi: ReturnType<typeof installFullscreenApi>;
+
   beforeEach(() => {
     audio.activeScreenShare = share();
     audio.displayStream = null;
     audio.screenShareStatus = 'sharing';
     audio.screenShareError = null;
     audio.stopScreenShare.mockClear();
+    fullscreenApi = installFullscreenApi();
   });
 
   it('renders the complete loading and responsive stage contract without native video controls', () => {
@@ -210,7 +247,31 @@ describe('FloorPlanPresentationStage', () => {
       'xl:max-w-[960px]',
       'break-words',
     );
-    expect(screen.queryByRole('button', { name: /fullscreen|picture|record|camera/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /picture|record|camera/i })).not.toBeInTheDocument();
+  });
+
+  it('derives the fullscreen label and layout from fullscreenchange', async () => {
+    render(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+    const stage = screen.getByTestId('floor-plan-presentation-stage');
+    const videoRegion = screen.getByTestId('presentation-video-region');
+    const enter = screen.getByRole('button', { name: 'Enter fullscreen' });
+
+    fireEvent.click(enter);
+    expect(fullscreenApi.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument();
+
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument();
+    expect(stage).toHaveAttribute('data-fullscreen', 'true');
+    expect(stage).toHaveClass('h-screen', 'max-h-none', 'w-screen', 'max-w-none');
+    expect(videoRegion).toHaveClass('flex-1', 'max-w-none');
+    expect(videoRegion).not.toHaveClass('aspect-video', 'xl:max-h-[540px]', 'xl:max-w-[960px]');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exit fullscreen' }));
+    await waitFor(() => expect(fullscreenApi.exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toHaveFocus();
+    expect(stage).not.toHaveAttribute('data-fullscreen');
   });
 
   it('binds only the exact canonical live stream and clears it on retirement', async () => {
@@ -220,6 +281,9 @@ describe('FloorPlanPresentationStage', () => {
     const video = screen.getByTestId('floor-plan-presentation-video');
     expect(video).toHaveProperty('srcObject', canonical.value.stream);
     expect(video).not.toHaveAttribute('controls');
+
+    act(() => fullscreenApi.setFullscreenElement(screen.getByTestId('floor-plan-presentation-stage')));
+    expect(video).toHaveProperty('srcObject', canonical.value.stream);
 
     act(() => canonical.retire());
     await waitFor(() => expect(video).toHaveProperty('srcObject', null));
@@ -246,6 +310,100 @@ describe('FloorPlanPresentationStage', () => {
     audio.activeScreenShare = share(REMOTE_USER_ID, 'share-b');
     view.rerender(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
     expect(screen.getByRole('button', { name: 'Collapse presentation' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('exits fullscreen on Escape without collapsing, then exits before a collapse click', async () => {
+    render(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+    const stage = screen.getByTestId('floor-plan-presentation-stage');
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument();
+
+    fireEvent.keyDown(stage, { key: 'Escape' });
+    await waitFor(() => expect(fullscreenApi.exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Collapse presentation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toHaveFocus();
+
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    fullscreenApi.exitFullscreen.mockRejectedValueOnce(new Error('fullscreen exit denied'));
+    fireEvent.keyDown(stage, { key: 'Escape' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Fullscreen could not exit. Press Escape or try again.',
+    );
+    expect(screen.getByRole('button', { name: 'Collapse presentation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument();
+
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse presentation' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand presentation' })).toBeInTheDocument());
+    expect(fullscreenApi.exitFullscreen).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole('button', { name: /fullscreen/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the share active and reports unsupported or rejected fullscreen APIs', async () => {
+    const view = render(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: undefined,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Fullscreen is not supported in this browser. Use a current supported browser.',
+    );
+    expect(screen.getByTestId('floor-plan-presentation-stage')).toBeInTheDocument();
+
+    view.unmount();
+    fullscreenApi = installFullscreenApi();
+    fullscreenApi.requestFullscreen.mockRejectedValueOnce(new Error('fullscreen denied'));
+    render(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Fullscreen could not start. Check your browser settings, then try again.',
+    );
+    expect(screen.getByTestId('floor-plan-presentation-stage')).toBeInTheDocument();
+  });
+
+  it('exits fullscreen on a share replacement without moving unrelated focus', async () => {
+    const view = render(
+      <>
+        <button type="button">Viewer action</button>
+        <FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />
+      </>,
+    );
+    const stage = screen.getByTestId('floor-plan-presentation-stage');
+    const viewerAction = screen.getByRole('button', { name: 'Viewer action' });
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    viewerAction.focus();
+
+    audio.activeScreenShare = share(REMOTE_USER_ID, 'share-b', 'Ada Lovelace');
+    view.rerender(
+      <>
+        <button type="button">Viewer action</button>
+        <FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />
+      </>,
+    );
+
+    await waitFor(() => expect(fullscreenApi.exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(viewerAction).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument();
+  });
+
+  it('retires a pending fullscreen request when the active share changes', async () => {
+    let resolveRequest!: () => void;
+    fullscreenApi.requestFullscreen.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      resolveRequest = resolve;
+    }));
+    const view = render(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+    const stage = screen.getByTestId('floor-plan-presentation-stage');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }));
+    audio.activeScreenShare = share(REMOTE_USER_ID, 'share-b', 'Ada Lovelace');
+    view.rerender(<FloorPlanPresentationStage currentUserId={LOCAL_USER_ID} />);
+
+    act(() => fullscreenApi.setFullscreenElement(stage));
+    await act(async () => resolveRequest());
+
+    await waitFor(() => expect(fullscreenApi.exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument();
   });
 
   it('renders owner Stop sharing in expanded and rail states and returns focus to Share screen', async () => {
