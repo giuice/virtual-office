@@ -19,6 +19,7 @@ tracker, not in this skill.
   with a capped delay. Until contract errors are classified as terminal and
   actionable, an application/database mismatch can produce repeated 500s.
 
-When one of these blocks completion, explain the user-visible consequence and
-the exact human action needed. Do not expose internal evaluation machinery as
-the headline of the final report.
+When one of these blocks a dependent operation or verification, explain the
+user-visible consequence and the next action needed. Continue independent
+local work and report its evidence separately from the blocked runtime claim.
+Keep internal evaluation details out of the headline of the final report.

@@ -19,7 +19,7 @@ This resulted in:
 
 ## Decision
 
-We've implemented a comprehensive solution to address both existing duplicate companies and prevent future duplication:
+The current implementation prevents the known duplicate-company creation paths. Cleanup of companies that were already duplicated remains planned and is not operational:
 
 1. **Prevention Mechanisms:**
    - Update route protection logic to check `currentUserProfile?.companyId` instead of just `company`
@@ -28,12 +28,12 @@ We've implemented a comprehensive solution to address both existing duplicate co
    - Fix user profile updates to correctly associate with a single companyId
 
 2. **Cleanup Solution:**
-   - Create a server-side API endpoint for removing duplicate companies
-   - Implement cleanup functionality to identify and retain only the most recent company
-   - Build an admin tool with web interface for manual database cleanup
+   - Planned: create a server-side API endpoint for removing duplicate companies; the current code does not define `/api/companies/cleanup`
+   - Planned: implement cleanup functionality to identify and retain only the most recent company; the current code contains client-side descriptions but no server-side cleanup implementation
+   - A cleanup page was built at `src/app/tools/cleanup-companies/page.tsx`, but it is not admin-restricted and calls the unimplemented `/api/companies/cleanup` endpoint
 
 3. **Database Integrity:**
-   - Add cleanup call during user login to automatically fix existing issues
+   - Planned: add a cleanup call during user login to automatically fix existing issues; the current authentication and company bootstrap flows do not invoke duplicate-company cleanup
    - Implement more robust error handling in company-related operations
 
 ## Consequences
@@ -41,7 +41,7 @@ We've implemented a comprehensive solution to address both existing duplicate co
 ### Positive
 
 - Prevents creation of duplicate companies
-- Provides tools to fix existing database inconsistencies
+- Would provide tools to fix existing database inconsistencies once the planned server cleanup endpoint is implemented; the current cleanup page has no working backend
 - Improves user experience by eliminating redirect loops
 - Enhances database integrity for company-user relationships
 - Reduces potential for data corruption and inconsistencies
@@ -55,19 +55,19 @@ We've implemented a comprehensive solution to address both existing duplicate co
 ### Mitigations
 
 - Added detailed logging for company operations to track any remaining issues
-- Created admin cleanup tool with clear interface for manual database management
-- Implemented both automatic and manual cleanup mechanisms 
+- Added a cleanup UI prototype; it is not admin-restricted and has no working backend endpoint
+- Automatic and manual cleanup mechanisms were planned, but neither is complete in the current implementation
 
 ## Compliance
 
 This ADR complies with database integrity best practices by:
 - Enforcing one-to-many relationship between companies and users
 - Validating data before creation operations
-- Providing cleanup mechanisms for data inconsistencies
-- Implementing detailed logging for auditing purposes
+- Planning cleanup mechanisms for data inconsistencies; no server-side duplicate-company cleanup is currently implemented
+- Using console logging for company diagnostics; durable audit logging for company operations and cleanup is not implemented
 
 ## References
 
-- Changelog entry: 2025-03-08 Fixed Duplicate Company Creation Issue
+- Historical decision date: 2025-03-08 (recorded by this ADR; no matching changelog entry exists in the repository)
 - PR #XX: Fix company duplication issues
 - Issue #XX: Users creating multiple companies

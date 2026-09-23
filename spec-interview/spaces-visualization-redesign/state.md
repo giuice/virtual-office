@@ -1,3 +1,5 @@
+Status: frozen
+
 # Spec Interview State — spaces-visualization-redesign
 
 **Idea:** Redesign the virtual office floor-plan / spaces visualization. The current design (2025 BMad UX spec + ux-space-grid-v3.html prototype, implemented as `src/components/floor-plan/modern/*`) has accumulated problems; the goal is a modern, genuinely useful design for every worker regardless of role.

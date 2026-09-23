@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/giuice/.agents/skills/caveman-compress/**)",
+      "Bash(python3 -m scripts /home/giuice/desenv/virtual-office/CLAUDE.md)",
+      "Skill(presence-safety)",
+      "Bash(rtk gsd-sdk *)",
+      "Bash(rtk proxy *)",
+      "Bash(rtk ls *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk find *)",
+      "Skill(supabase)",
+      "mcp__supabase__search_docs",
+      "WebFetch(domain:supabase.com)",
+      "Bash(rtk git *)",
+      "mcp__supabase__execute_sql",
+      "Bash(supabase migration *)",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "Bash(rtk npx *)",
+      "Bash(rtk vitest *)",
+      "Bash(rtk npm *)",
+      "Bash(node *)",
+      "Bash(supabase --version)",
+      "Bash(npx --no-install supabase --version)",
+      "Bash(supabase init *)",
+      "Bash(npm install *)",
+      "Bash(psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -tAc ' *)",
+      "Bash(docker exec supabase_db_virtual-office psql -U postgres -tAc ' *)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "supabase",
+    "context7",
+    "playwright"
+  ]
+}

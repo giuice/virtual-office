@@ -1,8 +1,8 @@
 # Roles### 1.4 Orthogonal Roles (Capabilities)
-*   **Publisher:**
-    *   **Scope:** Can be assigned at Global, Neighborhood, or Space level.
-    *   **Capabilities:** Post to the "Company Board" / "Mural".
-    *   **Assignment:** Can be given to any role (Member, Admin, Owner).
+*   **Publisher (proposal only):**
+    *   **Current implementation:** No Publisher role or scoped Publisher assignment exists.
+    *   **Proposed capability:** A future Publisher capability could gate posting to a Company Board / Mural; neither feature is currently implemented.
+    *   **Proposed assignment:** If introduced, Publisher could be orthogonal to company roles; the current company-role model contains only `admin` and `member`.
 
 ## 2. Permission Matrixodel - Discussion Document
 
@@ -18,17 +18,17 @@
 ### 1.0 Platform Level (Supra-Tenant)
 *   **Platform Admin:** The "God" role.
     *   **Scope:** Cross-tenant.
-    *   **Capabilities:** Create Tenants (Companies), Create initial Owner, Manage Billing Plans.
+    *   **Current capabilities:** Create Tenants (Companies) with an initial `admin` invitation. Initial Owner creation and billing-plan management are not implemented.
     *   **Access:** Cannot access tenant data (messages, rooms) unless explicitly invited.
 
 ### 1.1 Organization Level (Tenant)
-*   **Owner:** The highest level of permission within a single Organization.
-    *   **Scope:** Entire Organization.
-    *   **Capabilities:** Manage Billing, Manage Organization Settings, Assign Admins.
-    *   **Constraint:** Must belong to exactly one Organization.
+*   **Owner (proposed, not implemented):** A candidate highest permission level within a single Organization.
+    *   **Proposed scope:** Entire Organization.
+    *   **Proposed capabilities:** Manage Billing, Manage Organization Settings, Assign Admins.
+    *   **Current implementation:** There is no `owner` role or exactly-one-Organization constraint; `users.company_id` is nullable and company removal sets it to `null`.
 *   **Admin (Office Manager):** Operational management.
     *   **Scope:** Entire Organization.
-    *   **Capabilities:** Manage Spaces, Rooms, User Invites, Integrations.
+    *   **Current capabilities:** Admin-gated user invites; space/room management exists, although some endpoints authorize same-company membership rather than the `admin` role. Integration management is not implemented.
     *   **Constraint:** Cannot remove Owner or change Billing.
 
 ### Current State
@@ -64,7 +64,7 @@ user_role ENUM: 'admin' | 'member'
 | Remove members | admin | ✅ | Keep |
 | Remove admins | admin | ⚠️ | Only owner? |
 | Promote member → admin | admin | ⚠️ | Only owner? |
-| Demote admin → member | ??? | ❌ | Only owner? |
+| Demote admin → member | admin | ✅ (another admin; self-demotion is blocked) | Owner-only if an `owner` role is introduced? |
 | Transfer ownership | ??? | ❌ | Only current owner |
 
 ### 2.3 Billing & Subscription
@@ -91,7 +91,7 @@ user_role ENUM: 'admin' | 'member'
 | Action | Who can do it? | Current | Needs Decision |
 |--------|----------------|---------|----------------|
 | Create spaces | admin | ✅ | Keep |
-| Delete spaces | admin | ✅ | Keep |
+| Delete spaces | any authenticated same-company member | ✅ (route has no role check) | Should deletion be admin-only? |
 | Edit space settings | admin | ✅ | Keep |
 | Create agenda for space | admin | ✅ (RLS) | admin? space creator? any participant? |
 | Update agenda phase | admin | ✅ (RLS) | Same as create? Or any participant? |
@@ -165,9 +165,9 @@ Space-level roles (`space_members.role`) should complement, not override, compan
 
 | Feature | Blocking Issue |
 |---------|----------------|
-| Agenda CRUD | Who can create/edit? |
-| Admin invitation | Can admin invite other admins? |
-| Company settings | Who can edit/delete? |
+| Agenda CRUD | Implemented: company admins have `FOR ALL` RLS access; broader space-role access remains a product decision. |
+| Admin invitation | Implemented: an admin can invite both `admin` and `member` roles. |
+| Company settings | Partially implemented: admins can PATCH name/settings; company deletion is not available to authenticated users. |
 | Future: Billing | Role for billing access |
 | Future: Audit log | What actions to log per role? |
 

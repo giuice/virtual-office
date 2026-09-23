@@ -11,6 +11,7 @@ import { SpaceActionButtons } from './SpaceActionButtons';
 import { CapacityIndicator } from './StatusIndicators';
 import type { KnockStatus } from '@/hooks/useKnock';
 import { SpaceAudioControls } from '../SpaceAudioControls';
+import { ScreenShareControls } from '../ScreenShareControls';
 import { SpaceTypeIndicator } from './SpaceTypeIndicator';
 import { isSpaceStatusEnterable } from './NowBoard';
 
@@ -137,13 +138,16 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
         {userInSpace ? (
-          <div aria-labelledby={`space-audio-${space.id}`}>
+          <div aria-labelledby={`space-audio-${space.id}`} data-space-action>
             <h4 id={`space-audio-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Audio
+              Audio &amp; presentation
             </h4>
-            <div className="flex items-center justify-between rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] p-2.5" data-testid="space-detail-audio">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] p-2.5" data-testid="space-detail-audio">
               <p className="text-xs text-muted-foreground">Space audio controls</p>
-              <SpaceAudioControls />
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                <SpaceAudioControls />
+                <ScreenShareControls isCurrentOccupant />
+              </div>
             </div>
           </div>
         ) : null}

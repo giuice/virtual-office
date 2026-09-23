@@ -1,6 +1,8 @@
 # Phase 10 rollout runbook (draft)
 
-Status: prepared locally; no staging or production mutation has been authorized or performed.
+Status: broader rollout remains draft. Production corrective follow-up `20260727123730` was explicitly authorized, applied, recorded, and read back on project `vhabpcoyypobgasacsko` on 2026-07-27; no application deployment was performed by that follow-up.
+
+Production audit baseline: `2026-07-27T17:06:23.560672Z`. Evidence before this timestamp is ineligible for cutover or adapter-removal gates. The legacy adapter remains enabled. Future targets must apply `20260727123730_fix_presence_cutover_coverage_first_observation.sql` after its predecessors and before accepting any 168-hour audit artifact.
 
 This runbook turns the recovered Phase 10 handoff into an operator sequence. Every SQL result, application deployment, maintenance window, target project reference, and UTC timestamp must be retained unedited in the rollout artifact. A timed wait is never evidence that a writer drained.
 

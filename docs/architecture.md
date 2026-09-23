@@ -1,863 +1,133 @@
-# Virtual Office - Architecture Review & Integration Plan
+<!-- generated-by: gsd-doc-writer -->
+# Arquitetura do Virtual Office
 
-**Project:** virtual-office  
-**Type:** Level 3 Brownfield (Complex Integration)  
-**Date:** 2025-10-22  
-**Author:** Winston (Architect Agent)  
-**Status:** Phase 3 - Solutioning
+## Visão geral do sistema
 
----
+O Virtual Office é uma aplicação web full-stack para equipes remotas que reúne planta virtual, salas, presença em tempo real, mensagens, chamadas de áudio e administração de empresas. A aplicação recebe interações do navegador, cookies de autenticação, requisições HTTP, eventos Realtime e mídia local; como saída, apresenta o estado do escritório e sincroniza alterações persistidas. A arquitetura é um monólito em camadas construído com Next.js 16 App Router, React 19 e TypeScript estrito: componentes e contextos formam a interface, hooks coordenam cache e efeitos, Route Handlers expõem a API, serviços e repositórios isolam regras e acesso a dados, e Supabase fornece Auth, Postgres, Realtime e Storage.
 
-## Executive Summary
+## Diagrama de componentes
 
-Virtual Office has strong tech base from Epics 1-4: Next.js 15, React 19, Supabase, Repository Pattern. Auth, hooks, repos, data access patterns solid. Review confirms current choices, marks integration points for Epics 5-9, and guides scale from MVP (4 epics done) to full set (9 epics).
+As setas indicam chamadas, envio de eventos ou fluxo de mídia.
 
-**Current State:** ✅ Prod-ready base: messaging, floor plans, auth, company management  
-**Next Phase:** Add AI, video/audio, admin analytics  
-**Key Strength:** Clean separation via Repository Pattern  
-**Key Risk:** AI costs + WebRTC complexity need tight plan
+```mermaid
+graph TD
+    Browser[Navegador]
+    App[Next.js App Router]
+    State[Providers e Contextos React]
+    Hooks[Hooks e TanStack Query]
+    API[Route Handlers em app/api]
+    Domain[Serviços e Repositórios]
+    Supabase[Supabase Auth, Postgres e Storage]
+    Realtime[Supabase Realtime]
+    WebRTC[WebRTC P2P de áudio]
 
----
-
-## Table of Contents
-
-1. [Current Architecture Assessment](#current-architecture-assessment)
-2. [Technology Stack Validation](#technology-stack-validation)
-3. [Architectural Patterns Review](#architectural-patterns-review)
-4. [Integration Points for New Features](#integration-points-for-new-features)
-5. [Scale Considerations](#scale-considerations)
-6. [Security & Compliance](#security--compliance)
-7. [Recommendations & Next Steps](#recommendations--next-steps)
-
----
-
-## Current Architecture Assessment
-
-### Foundation (Epics 1-2): ✅ EXCELLENT
-
-**Completed Components:**
-- Next.js 15.3.0 with App Router + React 19.1.0
-- TypeScript 5 strict mode everywhere
-- Supabase PostgreSQL with Row-Level Security (RLS)
-- Supabase Auth with SSR (@supabase/ssr ^0.8.0)
-- Repository Pattern with interfaces + implementations
-- Multi-tenancy through company data isolation
-
-**Strengths:**
-1. **Repository Pattern**: Clean split between data access + business logic
-   - Interfaces in `src/repositories/interfaces/`
-   - Supabase implementations in `src/repositories/implementations/supabase/`
-   - Easy tests, easy data-source swap
-2. **RLS Enforcement**: All DB access uses server-side Supabase client
-   - `src/lib/supabase/server-client.ts` in API routes
-   - `src/lib/supabase/browser-client.ts` in Client Components
-   - `auth.uid()` context preserved for RLS policies
-3. **Type Safety**: Full TypeScript types in `src/types/`
-   - `auth.ts`, `database.ts`, `messaging.ts`, `common.ts`, `ui.ts`
-   - Prevents mismatches across 85-120 stories
-4. **Authentication Architecture**: ✅ Exemplary; zero duplicates per audit
-   - `src/lib/auth/` utilities
-   - `src/contexts/AuthContext.tsx`
-   - SSR-compatible flows with middleware
-
-**Assessment:** Foundation prod-ready, scalable to 10,000+ DAU target.
-
----
-
-### Messaging & Floor Plan (Epics 3-4): �� FUNCTIONAL, NEEDS POLISH
-
-**Epic 3 Status:** Basic floor plan done; 12 UX stories pending: visual design, occupancy viz, templates.
-
-**Epic 4A Status:** In progress (Timeline & Composer)
-- ✅ Foundation (Tasks 1.0 + 2.0): data contracts, repos, APIs, drawer shell, conversation grouping
-- 🚧 Tasks 2.5 + 3.0: timeline UI (replies, reactions, pins), attachments, voice notes, search
-
-**Epic 4B Status:** Planned (Resilience & Scale)
-- ⏳ Tasks 4.0 + 5.0: offline queue, reconnect, polling fallback, analytics, notifications
-
-**Strengths:**
-1. **Hooks Organization**: ✅ Excellent per audit
-   - `src/hooks/queries/` for TanStack Query fetches
-   - `src/hooks/mutations/` for data changes
-   - `src/hooks/realtime/` for Supabase Realtime subscriptions
-2. **Component Structure**: Feature-based
-   - `src/components/messaging/` chat UI
-   - `src/components/floor-plan/` Konva.js canvas
-   - `src/components/ui/` shadcn/Radix primitives
-3. **Real-Time**: Supabase Realtime for presence + messaging
-   - `space_presence_log` tracks activity
-   - Message delivery via Realtime channels
-
-**Gaps:**
-- Message threading UI incomplete (Story 4.12-4.13)
-- File attachments missing (Story 4.18-4.20)
-- Offline resilience missing (Story 4.23-4.25)
-- Floor plan needs polish (Epic 3 Stories 3.1-3.12)
-
-**Assessment:** MVP works; 18 messaging + 12 floor plan stories remain for Slack/Teams parity.
-
----
-
-### Audit & Code Quality: ✅ STRONG WITH MINOR CLEANUP NEEDED
-
-**System Audit Findings (December 2024):**
-
-**Exemplary Systems (reference models):**
-1. ✅ **Authentication**: Zero duplicates, industry best practices
-2. ✅ **Hooks**: Clear organization + responsibilities
-3. ✅ **Repositories**: Clean interface design
-4. ✅ **Library Directory**: No duplicates, strong separation
-
-**Areas Requiring Consolidation:**
-- **Avatar Components**: 11 components → 7 (36% reduction)
-  - Canonical display: `EnhancedAvatarV2`
-  - Canonical upload: `UploadableAvatar`
-  - Other avatar components deprecated
-- **Messaging Components**: 4 duplicates from naming inconsistency
-
-**Performance Metrics:**
-- Avatar system: 100 resolutions <100ms ✅
-- Invitation system: 1000 validations <50ms ✅
-- Authentication: 1000 session validations <100ms ✅
-- Test coverage: 71 comprehensive tests ✅
-
-**Assessment:** High-quality codebase; avatar consolidation top cleanup.
-
----
-
-## Technology Stack Validation
-
-### Core Stack: ✅ OPTIMAL FOR REQUIREMENTS
-
-| Technology | Version | Purpose | Assessment |
-|------------|---------|---------|------------|
-| **Next.js** | 15.3.0 | App Router, Server Components, API routes | ✅ Latest stable; strong SSR + client-side |
-| **React** | 19.1.0 | UI framework | ✅ Latest stable; Server Components ready |
-| **TypeScript** | 5 (strict) | Type safety | ✅ Prevents errors across 85-120 stories |
-| **Supabase** | v2.49.4 | Database, Auth, Realtime, Storage | ✅ All-in-one lowers vendor complexity |
-| **TailwindCSS** | 4.1.3 | Styling | ✅ Latest; CSS variables for theming |
-| **TanStack Query** | ^5.90.6 | State management | ✅ Smart caching, background updates |
-| **Vitest** | ^4.0.7 | Unit testing | ✅ Fast modern runner |
-| **Playwright** | ^1.56.1 | E2E testing | ✅ Cross-browser automation |
-
-**Rationale for Supabase:**
-- **Integrated ecosystem**: Auth + DB + Realtime + Storage = fewer vendors
-- **PostgreSQL RLS**: DB-level multi-tenancy
-- **Open-source**: Self-host path for enterprise customers (Epic 9)
-- **Cost-effective**: Reaches 10,000 DAU target within budget limits
-
-**Alternative Considered & Rejected:**
-- Firebase: migrated away (changelog 2025-04-03)
-  - Reason: needed PostgreSQL relational model, RLS, open-source option
-
-**Assessment:** Stack fits requirements. No change.
-
----
-
-### Dependencies: ✅ CURRENT, NO BREAKING CHANGES NEEDED
-
-**UI & Interaction:**
-- `@radix-ui/*` v1.x-2.x: accessible primitives (Dialog, Dropdown, etc.)
-- `lucide-react` v0.546.0: icons
-- `react-zoom-pan-pinch` v3.7.0: floor plan navigation
-- `sonner` v2.0.3: toasts
-
-**Data & State:**
-- `@tanstack/react-query` ^5.90.6: cache + background updates
-- `date-fns` v4.1.0: dates
-- `uuid` v13.0.0: IDs
-- `lodash` v4.17.21: utilities
-
-**Backend & Storage:**
-- `@supabase/supabase-js` v2.49.4: DB client
-- `@supabase/ssr` ^0.8.0: server auth
-- `aws-sdk` v2.1692.0: avatar upload to S3
-
-**Testing:**
-- `vitest` ^4.0.7, `@playwright/test` ^1.56.1
-- `@testing-library/react` v16.3.0
-- `happy-dom` v20.0.0 (fast DOM tests)
-
-**Assessment:** Current deps. No urgent upgrades.
-
----
-
-## Architectural Patterns Review
-
-### Repository Pattern: ✅ EXEMPLARY IMPLEMENTATION
-
-**Pattern Structure:**
-```
-src/repositories/
-├── interfaces/             # Contracts
-│   ├── IUserRepository.ts
-│   ├── ICompanyRepository.ts
-│   ├── ISpaceRepository.ts
-│   ├── IConversationRepository.ts
-│   └── IMessageRepository.ts
-├── implementations/
-│   └── supabase/          # Supabase-specific
-│       ├── SupabaseUserRepository.ts
-│       ├── SupabaseCompanyRepository.ts
-│       └── ... (all interfaces implemented)
-└── factory.ts             # Repository creation
+    Browser --> App
+    App --> State
+    State --> Hooks
+    Hooks --> API
+    Hooks --> Supabase
+    API --> Domain
+    Domain --> Supabase
+    Supabase --> Realtime
+    Realtime --> Hooks
+    State --> WebRTC
+    WebRTC <--> Browser
+    Realtime --> WebRTC
 ```
 
-**Benefits:**
-1. **Testability**: Mock repos in unit tests; no DB touch
-2. **Flexibility**: Swap Supabase without business-logic rewrite
-3. **Type Safety**: Interfaces enforce consistent implementation API
+Há dois caminhos de dados no cliente. Operações sensíveis ou com autorização de aplicação passam pelos Route Handlers. Algumas consultas e assinaturas usam o cliente Supabase do navegador e dependem das políticas de Row Level Security. No servidor, os handlers criam um cliente por requisição para preservar os cookies e o contexto autenticado; o uso de `service_role` fica restrito a caminhos de servidor que também executam autorização de aplicação.
 
-**Usage Pattern in API Routes:**
-```typescript
-// src/app/api/users/by-company/route.ts
-export async function GET(request: Request) {
-  const supabase = createSupabaseServerClient(); // Server context!
-  const repository = new SupabaseUserRepository(supabase);
-  const users = await repository.getUsersByCompanyId(companyId);
-  return NextResponse.json(users);
-}
+## Fluxo de dados
+
+Um fluxo comum, como carregar e editar os espaços de uma empresa, percorre estas etapas:
+
+1. O navegador entra por uma rota do App Router. [`src/proxy.ts`](../src/proxy.ts) valida páginas protegidas com `supabase.auth.getUser()` e atualiza cookies quando necessário; rotas `/api` fazem a própria validação no handler.
+2. O layout raiz monta os providers de tema, TanStack Query, autenticação, empresa, mensagens, presença e chamadas. O layout do dashboard acrescenta proteção de rota, busca e a assinatura Realtime de espaços.
+3. [`CompanyProvider`](../src/contexts/CompanyContext.tsx) carrega o perfil, a empresa, os membros e os espaços por meio do cliente HTTP em [`src/lib/api.ts`](../src/lib/api.ts). Componentes consomem esse estado sem conhecer detalhes do banco.
+4. Uma mutação de espaço chama `/api/spaces`. O handler usa [`requireAuthUser`](../src/lib/auth/session.ts) para validar o JWT no servidor, resolve o usuário interno a partir de `users.supabase_uid`, confirma o escopo da empresa e delega a persistência ao `SupabaseSpaceRepository`.
+5. O repositório converte entre os nomes `camelCase` da aplicação e `snake_case` do Postgres, executa a operação com o cliente Supabase recebido e devolve o modelo tipado ao handler.
+6. Após o resultado HTTP, os hooks de mutação invalidam as chaves correspondentes do TanStack Query. Eventos de alteração da tabela `spaces` também invalidam o cache para que a interface refaça a leitura.
+7. A nova resposta chega aos contextos e componentes; a planta virtual deriva filtros, ocupantes, permissões visuais e ações a partir desse estado.
+
+### Presença e movimento
+
+Presença usa um fluxo mais rigoroso porque envolve concorrência e múltiplas abas:
+
+1. [`PresenceProvider`](../src/contexts/PresenceContext.tsx) combina registro de sessão, snapshot, Realtime, recuperação do último espaço e transições de localização.
+2. [`LocationTransitionCoordinator`](../src/lib/presence/location-transition-coordinator.ts) serializa intenções de entrada, saída, reposicionamento automático e entrada aprovada por Knock. Ele envia o comando tipado a `/api/presence/location`.
+3. O handler valida a sessão e chama a RPC `transition_user_location_observed`, que decide autorização, capacidade e gravação de forma atômica no banco.
+4. Depois do commit, o cliente lê `/api/presence/snapshot` e substitui o cache da combinação empresa + usuário. Esse snapshot validado é a fonte de verdade para conexão e ocupação.
+5. O canal Realtime privado apenas sinaliza que o snapshot deve ser relido. Reconexão, foco da janela e uma consulta periódica de 30 segundos mantêm a convergência quando um evento não chega.
+
+### Mensagens e áudio
+
+O [`MessagingProvider`](../src/contexts/messaging/MessagingContext.tsx) coordena a gaveta de mensagens, conversas e ações do usuário. O cliente em [`src/lib/messaging-api.ts`](../src/lib/messaging-api.ts) chama os handlers de conversas, mensagens, reações e anexos; esses handlers aplicam autenticação e autorização antes de usar os repositórios Supabase. Para áudio, [`AudioProvider`](../src/contexts/AudioContext.tsx) e [`WebRTCManager`](../src/lib/webrtc/WebRTCManager.ts) mantêm uma malha P2P entre participantes da mesma sala, enquanto Supabase Realtime transporta a sinalização de handshake, oferta, resposta e candidatos ICE.
+
+## Abstrações principais
+
+| Abstração | Localização | Responsabilidade |
+| --- | --- | --- |
+| `AuthProvider` / `useAuth` | [`src/contexts/AuthContext.tsx`](../src/contexts/AuthContext.tsx) | Expõe sessão e ações de autenticação no cliente e coordena a limpeza de presença no logout ou revogação. |
+| `CompanyProvider` / `useCompany` | [`src/contexts/CompanyContext.tsx`](../src/contexts/CompanyContext.tsx) | Mantém o bootstrap e as mutações de empresa, perfil, membros e espaços, com cercas contra troca de identidade durante operações assíncronas. |
+| `PresenceProvider` / `usePresence` | [`src/contexts/PresenceContext.tsx`](../src/contexts/PresenceContext.tsx) | Compõe sessão, snapshot, ocupação, movimento, recuperação e estado de conexão Realtime. |
+| `MessagingProvider` / `useMessaging` | [`src/contexts/messaging/MessagingContext.tsx`](../src/contexts/messaging/MessagingContext.tsx) | Centraliza conversas, mensagens, visual ativa e comportamento da gaveta global. |
+| `QueryProvider` | [`src/providers/query-provider.tsx`](../src/providers/query-provider.tsx) | Configura o `QueryClient`, políticas de cache, retry e ferramentas de desenvolvimento. |
+| `LocationTransitionCoordinator` | [`src/lib/presence/location-transition-coordinator.ts`](../src/lib/presence/location-transition-coordinator.ts) | Ordena comandos de movimento, cancela intenções obsoletas, recupera sessões e reconcilia o resultado confirmado. |
+| `requireAuthUser` | [`src/lib/auth/session.ts`](../src/lib/auth/session.ts) | Valida o usuário Supabase com `getUser()`, resolve o registro da aplicação e fornece o cliente autenticado aos handlers. |
+| Interfaces de repositório | [`src/repositories/interfaces/`](../src/repositories/interfaces/) | Definem os contratos de acesso a usuários, empresas, espaços, mensagens, conversas, convites e bairros. |
+| Repositórios Supabase | [`src/repositories/implementations/supabase/`](../src/repositories/implementations/supabase/) | Implementam os contratos, mapeiam modelos da aplicação para linhas do banco e executam consultas com o cliente injetado. |
+| `WebRTCManager` | [`src/lib/webrtc/WebRTCManager.ts`](../src/lib/webrtc/WebRTCManager.ts) | Gerencia mídia local, conexões peer-to-peer, sinalização, atividade de voz e limpeza de recursos de áudio. |
+
+## Limites arquiteturais
+
+### Identidade e autorização
+
+O sistema distingue dois identificadores de usuário. `auth.users.id` é o UID do Supabase Auth; `public.users.id` é o UUID da aplicação usado por chaves estrangeiras. A relação é feita por `users.supabase_uid`. Handlers devem validar o JWT com `getUser()`, resolver o usuário da aplicação e então verificar empresa, papel ou participação conforme a operação. O proxy protege navegação de páginas, mas não substitui a autorização dos Route Handlers.
+
+### Clientes Supabase
+
+- [`createSupabaseBrowserClient`](../src/lib/supabase/browser-client.ts) cria o cliente usado em Client Components, consultas sujeitas a RLS e assinaturas Realtime.
+- [`createSupabaseServerClient`](../src/lib/supabase/server-client.ts) cria clientes por requisição e integra a renovação de cookies do App Router.
+- O modo `service_role` existe apenas no servidor. Ele ignora RLS, portanto o handler ainda precisa aplicar as regras de autorização da aplicação antes de qualquer mutação.
+
+### Cache e eventos
+
+TanStack Query é a camada de cache de dados remotos. Hooks em `queries/` leem dados, hooks em `mutations/` executam alterações e invalidam chaves, e hooks em `realtime/` transformam eventos em invalidações. Para presença, payloads Realtime não atualizam diretamente usuários, ocupação ou permissões: somente o snapshot retornado pelo servidor pode substituir o estado autoritativo.
+
+## Estrutura de diretórios
+
+```text
+src/
+├── app/                    # Rotas, layouts, páginas e Route Handlers do App Router
+├── components/             # Interface por domínio e componentes reutilizáveis
+├── contexts/               # Estado React de autenticação, empresa, presença, mensagens e áudio
+├── hooks/
+│   ├── queries/            # Leituras e chaves do TanStack Query
+│   ├── mutations/          # Escritas e invalidação de cache
+│   ├── realtime/           # Assinaturas e sinalização Supabase Realtime
+│   └── ui/                 # Comportamentos exclusivamente visuais
+├── lib/
+│   ├── api/                # Contratos e respostas HTTP compartilhados
+│   ├── auth/               # Validação de sessão, autorização e métricas
+│   ├── presence/           # Contratos e coordenação do subsistema de presença
+│   ├── messaging/          # Transformações de cache de mensagens e reações
+│   ├── services/           # Regras de aplicação que coordenam repositórios
+│   ├── supabase/           # Fábricas dos clientes de navegador e servidor
+│   ├── audio/              # Detecção de atividade de voz
+│   └── webrtc/             # Conexões e sinalização de áudio P2P
+├── providers/              # Providers de infraestrutura, como Query e tema
+├── repositories/
+│   ├── interfaces/         # Portas de acesso a dados
+│   └── implementations/    # Adaptadores concretos, atualmente Supabase
+├── types/                  # Modelos e tipos compartilhados entre camadas
+└── utils/                  # Utilitários transversais pequenos
+
+supabase/migrations/        # Histórico ordenado de migrações aplicado pelo Supabase CLI
+migrations/                 # Inventário de estrutura e scripts SQL históricos do projeto
+__tests__/                  # Testes unitários, de integração e contratos de presença/banco
+scripts/                    # Gates, verificações e automações operacionais
+public/                     # Arquivos estáticos servidos pelo Next.js
+docs/                       # Documentação técnica e de produto
 ```
 
-**Critical Rule:** Always use `createSupabaseServerClient()` in API routes, never `createSupabaseBrowserClient()`.  
-**Reason:** `auth.uid()` needs server context for RLS policies.
-
-**Assessment:** Data-access foundation. Keep for Epics 5-9.
-
----
-
-### State Management: ✅ WELL-ARCHITECTED
-
-**Three-Layer Approach:**
-1. **Server State**: TanStack Query v5
-   - `src/hooks/queries/` for GET
-   - `src/hooks/mutations/` for POST/PUT/DELETE
-   - Auto cache, background refetch, optimistic updates
-2. **Global Client State**: React Context
-   - `src/contexts/AuthContext.tsx` for auth
-   - `src/contexts/CompanyContext.tsx` for company data
-   - `src/contexts/PresenceContext.tsx` for presence
-3. **Local Component State**: React `useState` / `useReducer`
-
-**Real-Time Integration:**
-- `src/hooks/realtime/` manages Supabase Realtime subscriptions
-- Realtime hooks invalidate TanStack Query cache on updates
-- UI stays synced with DB changes
-
-**Assessment:** Clean, scalable. No change.
-
----
-
-### Naming Conventions: ✅ CONSISTENT
-
-**File Naming:**
-- **Components**: PascalCase (`UserProfile.tsx`, `MessageItem.tsx`)
-- **Hooks**: camelCase with `use` prefix (`useUserPresence.ts`, `useConversations.ts`)
-- **Utilities**: kebab-case (`avatar-utils.ts`, `messaging-api.ts`)
-- **Types**: kebab-case (`database.ts`, `messaging.ts`)
-
-**Code Naming:**
-- **Components**: PascalCase (`UserProfile`, `FloorPlanCanvas`)
-- **Functions**: camelCase (`getUserProfile`, `sendMessage`)
-- **Variables**: camelCase (`currentUser`, `messageList`)
-- **Constants**: UPPER_SNAKE_CASE (`MAX_FILE_SIZE`, `API_BASE_URL`)
-- **Handlers**: `handle*` prefix (`handleSubmit`, `handleDelete`)
-- **Booleans**: `is/has/can` prefix (`isLoading`, `hasPermission`, `canEdit`)
-
-**Assessment:** Clear conventions. No change.
-
----
-
-## Integration Points for New Features
-
-### Epic 5: Meeting Notes System (6-10 stories)
-
-**Design Note:** Epic 5 starts with **external meeting transcripts** (Zoom, Google Meet, Microsoft Teams). Gives value before Epic 8 native video. Later, native meetings auto-feed transcripts.
-
-**Architecture Needs:**
-1. **New Tables:**
-   - `meeting_notes` (id, title, date, participants, content, summary, transcript, space_id, created_by)
-   - `meeting_note_action_items` (id, note_id, description, assignee_id, due_date, status)
-2. **New Repositories:**
-   - `IMeetingNoteRepository` interface
-   - `SupabaseMeetingNoteRepository` implementation
-   - Methods: `createNote()`, `updateNote()`, `getNotesForSpace()`, `deleteNote()`
-3. **AI Service Abstraction:**
-   - `src/lib/services/ai-service.ts` (interface)
-   - Implementations: `OpenAIService`, `AnthropicService`
-   - Methods: `transcribe()`, `summarize()`, `extractActionItems()`
-4. **UI Components:**
-   - `src/components/meeting-notes/NoteEditor.tsx`
-   - `src/components/meeting-notes/ActionItemList.tsx`
-   - `src/components/meeting-notes/NoteHistory.tsx`
-
-**Integration Pattern:**
-```typescript
-// API Route: POST /api/meeting-notes/generate-summary
-export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
-  const noteRepo = new SupabaseMeetingNoteRepository(supabase);
-  const aiService = AIServiceFactory.create(); // OpenAI or Anthropic
-  
-  const note = await noteRepo.getNoteById(noteId);
-  const summary = await aiService.summarize(note.transcript);
-  await noteRepo.updateNote(noteId, { summary });
-  
-  return NextResponse.json({ summary });
-}
-```
-
-**Dependencies:**
-- Add `openai` or `@anthropic-ai/sdk` to `package.json`
-- Env vars: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
-- Cost monitoring: track API usage per Story 7.11
-
-**Assessment:** Straightforward Repository Pattern integration. AI abstraction keeps provider swap easy.
-
----
-
-### Epic 6: Announcement System (4-6 stories)
-
-**Architecture Needs:**
-1. **New Tables:**
-   - `announcements` (id, title, content, priority, expiration_date, company_id, created_by)
-   - `announcement_views` (user_id, announcement_id, viewed_at) for read tracking
-2. **New Repositories:**
-   - `IAnnouncementRepository`
-   - `SupabaseAnnouncementRepository`
-3. **Realtime Subscription:**
-   - Subscribe to `announcements` inserts for live updates
-   - Use existing `src/hooks/realtime/` patterns
-4. **Email Service:**
-   - `src/lib/services/email-service.ts` for urgent announcement notifications
-   - SMTP provider: Resend, SendGrid, or AWS SES
-
-**Integration Pattern:**
-```typescript
-// Realtime hook: src/hooks/realtime/useAnnouncementSubscription.ts
-export function useAnnouncementSubscription(companyId: string) {
-  const queryClient = useQueryClient();
-  
-  useEffect(() => {
-    const channel = supabase
-      .channel(`announcements:${companyId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'announcements',
-        filter: `company_id=eq.${companyId}`
-      }, (payload) => {
-        queryClient.invalidateQueries(['announcements', companyId]);
-        if (payload.new.priority === 'urgent') {
-          showDesktopNotification(payload.new.title);
-        }
-      })
-      .subscribe();
-      
-    return () => { channel.unsubscribe(); };
-  }, [companyId]);
-}
-```
-
-**Assessment:** Low complexity; follows Realtime patterns. Email service is new external dependency.
-
----
-
-### Epic 7: AI-Powered Features (12-18 stories)
-
-**Architecture Needs:**
-1. **AI Service Layer** (Story 7.1):
-   ```typescript
-   // src/lib/services/ai/ai-service-interface.ts
-   export interface IAIService {
-     transcribe(audio: Buffer): Promise<string>;
-     summarize(text: string, options?: SummaryOptions): Promise<string>;
-     search(query: string, embeddings: Embedding[]): Promise<SearchResult[]>;
-     chat(messages: ChatMessage[]): Promise<ChatResponse>;
-     translate(text: string, targetLang: string): Promise<string>;
-   }
-   
-   // src/lib/services/ai/openai-service.ts
-   export class OpenAIService implements IAIService { ... }
-   
-   // src/lib/services/ai/anthropic-service.ts
-   export class AnthropicService implements IAIService { ... }
-   ```
-
-2. **Embeddings for Semantic Search** (Story 7.3):
-   - New table: `message_embeddings` (message_id, embedding_vector)
-   - PostgreSQL extension: `pgvector` for vector similarity search
-   - Background job: Generate embeddings for all new messages
-   - Query pattern: `SELECT * FROM messages WHERE embedding <-> query_embedding < threshold`
-
-3. **AI Cost Tracking** (Story 7.11):
-   - New table: `ai_usage_log` (user_id, service, operation, tokens, cost, timestamp)
-   - Middleware: Log all AI API calls
-   - Dashboard: `src/app/admin/ai-usage/page.tsx`
-
-4. **Task/Reminder Extraction** (Story 7.6):
-   - New table: `tasks` (id, user_id, description, due_date, source_message_id, status)
-   - Background job: Scan messages daily for task patterns
-   - Repository: `ITaskRepository`
-
-5. **Context-Aware Assistant** (Story 7.8):
-   - Chat interface: `src/components/ai-assistant/AssistantChat.tsx`
-   - RAG pattern: Retrieve relevant messages/notes → Send to AI with context
-   - Streaming responses: Use `ReadableStream` for real-time AI output
-
-**Key Architectural Decisions:**
-
-**1. AI Provider Selection:**
-- **Recommendation**: Start with OpenAI GPT-4 for MVP (best transcription via Whisper)
-- **Future**: Add Anthropic Claude as alternative (better long-context handling)
-- **Rationale**: OpenAI has proven Whisper API for transcription (Epic 7.2); Anthropic Claude excels at summarization
-
-**2. Embedding Strategy:**
-- **Recommendation**: Use OpenAI `text-embedding-ada-002` ($0.0001/1K tokens)
-- **Storage**: PostgreSQL `pgvector` extension for similarity search
-- **Indexing**: Background job processes new messages in batches (every 5 minutes)
-- **Rationale**: Cost-effective; PostgreSQL native reduces vendor count
-
-**3. Cost Controls:**
-- **Hard limits**: $500/month cap, alerts at $400
-- **Per-user limits**: 100 AI requests/day for free tier, unlimited for paid tier
-- **Graceful degradation**: Disable AI features when limit reached, show user message
-- **Monitoring**: Real-time dashboard in Epic 9
-
-**Dependencies:**
-- `openai` package (npm)
-- `@anthropic-ai/sdk` (optional, for Claude)
-- `pgvector` PostgreSQL extension
-- Background job infrastructure (node-cron or Supabase Edge Functions)
-
-**Risks:**
-- **Cost escalation**: AI APIs can be expensive at scale
-  - Mitigation: Hard limits, usage monitoring (Story 7.11)
-- **Latency**: AI calls add 1-5s latency
-  - Mitigation: Async processing, show loading indicators
-- **Accuracy**: AI-generated summaries may miss nuance
-  - Mitigation: User can edit AI output before saving (Epic 5 Story 5.5)
-
-**Assessment:** Most complex epic; requires careful API cost management and accuracy validation.
-
----
-
-### Epic 8: Video/Audio Calls (10-15 stories)
-
-**Architecture Needs:**
-1. **WebRTC Signaling** (Story 8.1):
-   - **Option A**: Supabase Realtime for signaling (reuse existing infrastructure)
-   - **Option B**: Dedicated Socket.IO server
-   - **Recommendation**: Option A (Supabase Realtime) for simplicity
-   - Signaling flow: Offer/Answer/ICE candidates via Realtime channels
-
-2. **TURN Server** (for NAT traversal):
-   - **Option A**: Twilio TURN service ($0.40/GB)
-   - **Option B**: Self-hosted coturn server (open-source)
-   - **Recommendation**: Twilio for MVP (easier setup); migrate to self-hosted if costs high
-
-3. **WebRTC Client Library:**
-   - **Recommendation**: Native WebRTC APIs (built into browsers)
-   - **Alternative**: Simple-peer (wrapper library) for easier API
-   - Rationale: Native APIs give more control; Simple-peer abstracts complexity
-
-4. **Call Recording** (Story 8.6):
-   - **Option A**: MediaRecorder API (client-side recording)
-   - **Option B**: Server-side recording via SFU (Selective Forwarding Unit)
-   - **Recommendation**: MediaRecorder for MVP (simpler); SFU for >10 participants
-   - Storage: Supabase Storage for recordings
-
-5. **Background Blur** (Story 8.7):
-   - **Option A**: TensorFlow.js (ML-based segmentation)
-   - **Option B**: Browser native Background Blur API (if available)
-   - **Recommendation**: Browser native first, TensorFlow.js fallback
-   - Rationale: Native API is faster; TensorFlow.js for unsupported browsers
-
-**Architectural Pattern:**
-```typescript
-// src/lib/webrtc/webrtc-manager.ts
-export class WebRTCManager {
-  private peerConnection: RTCPeerConnection;
-  private localStream: MediaStream;
-  private remoteStreams: Map<string, MediaStream>;
-  
-  async initializeConnection(spaceId: string) {
-    // Setup peer connection with ICE servers (STUN/TURN)
-    this.peerConnection = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'turn:turnserver.com', username: '...', credential: '...' }
-      ]
-    });
-    
-    // Subscribe to Supabase Realtime for signaling
-    const channel = supabase.channel(`webrtc:${spaceId}`);
-    channel.on('offer', handleOffer);
-    channel.on('answer', handleAnswer);
-    channel.on('ice-candidate', handleIceCandidate);
-  }
-  
-  async startCall(withVideo: boolean) {
-    this.localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: withVideo
-    });
-    this.peerConnection.addStream(this.localStream);
-    // Create offer and send via Realtime
-  }
-}
-```
-
-**Dependencies:**
-- No new npm packages for basic WebRTC (browser native)
-- `@tensorflow/tfjs` for background blur (optional)
-- Twilio account for TURN server
-
-**Risks:**
-- **WebRTC complexity**: Peer connection management, NAT traversal, codec negotiation
-  - Mitigation: Start with audio-only (Story 8.2); add video incrementally
-- **Cross-browser compatibility**: Safari WebRTC quirks
-  - Mitigation: Extensive testing on Safari, Firefox, Chrome
-- **Scalability**: >10 participants requires SFU architecture
-  - Mitigation: Start with 10-participant limit; plan SFU upgrade (e.g., mediasoup)
-
-**Assessment:** High complexity; recommend starting with audio-only MVP (Story 8.2) before video (8.3).
-
----
-
-### Epic 8A: Audio MVP Architecture (P2P Mesh)
-
-To meet the urgent requirement for "Sococo-style" audio without infrastructure costs, we implement a **P2P Mesh** topology.
-
-**1. Topology Strategy:**
-- **Mesh:** Every client connects directly to every other client.
-- **Constraints:** Bandwidth usage scales quadratically ($N*(N-1)$). Steps to mitigate:
-  - **Soft Limit:** UI warning at >8 users.
-  - **Hard Limit:** Disable audio or switch to listener-only at >12 users (future).
-
-**2. Signaling Protocol (Supabase Realtime):**
-We reuse the existing `rooms` channel for WebRTC signaling messages.
-- **Topic:** `room:audio:${spaceId}`
-- **Events:**
-  - `handshake`: Joined user announces "I am here" -> triggers Offers.
-  - `signal`: Payload `{ type: 'offer' | 'answer' | 'ice-candidate', target: userId, data: ... }`
-
-**3. Voice Activity Detection (VAD):**
-Instead of sending "is_speaking" events over the network (latency), we use **Client-Side Detection**.
-- **Mechanism:** `AudioContext` with `AnalyserNode` attached to incoming `MediaStream`.
-- **Logic:** Calculate RMS volume every 100ms. If > Threshold, set `isSpeaking` state locally.
-- **Result:** Visualizer drives the Avatar pulse animation (Story 3.3) with zero latency.
-
-**4. State Synchronization:**
-- **Mute Status:** Synced via Supabase Presence `metadata: { is_muted: boolean }`.
-
----
-
-### Epic 9: Admin Dashboard & Analytics (8-12 stories)
-
-**Architecture Needs:**
-1. **Analytics Queries:**
-   - Optimize `space_presence_log` queries (add indexes on user_id, timestamp, status)
-   - Aggregate queries: Daily active users, message volume, space utilization
-   - Use PostgreSQL `DATE_TRUNC` for time-based grouping
-
-2. **Charting Library:**
-   - **Recommendation**: Recharts (React-native charting)
-   - **Alternative**: Chart.js (more features, steeper learning curve)
-   - Rationale: Recharts is simpler and React-friendly
-
-3. **Data Export:**
-   - CSV export: Use `json2csv` library
-   - PDF export: Use `jsPDF` or server-side `puppeteer`
-   - **Recommendation**: CSV for MVP; PDF for compliance reports (Epic 9 Story 9.7)
-
-4. **Real-Time Monitoring** (Story 9.9):
-   - Reuse existing Realtime patterns
-   - Subscribe to `space_presence_log` inserts/updates
-   - Live dashboard updates without polling
-
-5. **Performance Optimization:**
-   - **Materialized Views**: Pre-compute daily/weekly aggregates
-   - **Caching**: TanStack Query caches analytics data (stale-time: 5 minutes)
-   - **Pagination**: Load reports in chunks (1000 rows per page)
-
-**Architectural Pattern:**
-```typescript
-// API Route: GET /api/admin/analytics/presence
-export async function GET(request: Request) {
-  const supabase = createSupabaseServerClient();
-  const { data } = await supabase.rpc('get_user_presence_summary', {
-    start_date: '2025-01-01',
-    end_date: '2025-01-31'
-  });
-  return NextResponse.json(data);
-}
-
-// PostgreSQL function (RPC):
-CREATE OR REPLACE FUNCTION get_user_presence_summary(
-  start_date DATE,
-  end_date DATE
-) RETURNS TABLE (
-  user_id UUID,
-  total_hours NUMERIC,
-  online_hours NUMERIC,
-  meeting_hours NUMERIC
-) AS $$
-  SELECT
-    user_id,
-    SUM(EXTRACT(EPOCH FROM (exited_at - entered_at)) / 3600) AS total_hours,
-    SUM(CASE WHEN status = 'online' THEN EXTRACT(EPOCH FROM (exited_at - entered_at)) / 3600 ELSE 0 END) AS online_hours,
-    SUM(CASE WHEN status = 'in_meeting' THEN EXTRACT(EPOCH FROM (exited_at - entered_at)) / 3600 ELSE 0 END) AS meeting_hours
-  FROM space_presence_log
-  WHERE entered_at >= start_date AND exited_at <= end_date
-  GROUP BY user_id;
-$$ LANGUAGE sql;
-```
-
-**Dependencies:**
-- `recharts` for charting
-- `json2csv` for CSV exports
-- PostgreSQL RPC functions for complex analytics
-
-**Assessment:** Moderate complexity; performance optimization critical for large datasets.
-
----
-
-## Scale Considerations
-
-### Current Scale Target: 10,000 DAU within 18 months
-
-**Database Scaling:**
-- **Supabase Free Tier**: 500 MB DB, 1 GB bandwidth/month
-- **Supabase Pro**: $25/month, 8 GB DB, 250 GB bandwidth
-- **Expected Need**: Pro tier at 1,000 users; Team tier ($599/month) at 5,000 users
-
-**Scaling Strategies:**
-1. **Database Indexes**: Add indexes on frequently queried fields
-   - `messages (conversation_id, created_at)`
-   - `space_presence_log (user_id, entered_at)`
-   - `announcements (company_id, expiration_date)`
-2. **Connection Pooling**: Supabase Pooler for API route connections
-3. **Caching**: TanStack Query + CDN (Vercel Edge) for static assets
-4. **Realtime Limits**: Supabase Pro supports 200 concurrent connections; Team supports 500
-
-**Cost Projections:**
-| Users | Supabase Plan | Cost/Month | Notes |
-|-------|---------------|------------|-------|
-| 100 | Free | $0 | MVP testing |
-| 1,000 | Pro | $25 | Early adopters |
-| 5,000 | Team | $599 | Growth phase |
-| 10,000 | Team + Add-ons | $1,200 | Target scale |
-
-**AI Costs (Epic 7):**
-- OpenAI GPT-4: $0.03/1K input tokens, $0.06/1K output tokens
-- Estimated usage: 10 AI requests/user/month = 100K requests at 10K users
-- Cost estimate: $500-1,000/month at 10K users (with limits)
-
-**Video Costs (Epic 8):**
-- Twilio TURN: $0.40/GB (estimated 100 MB per call)
-- 10K users × 5 calls/month × 100 MB = 5 TB/month = $2,000/month
-- **Mitigation**: Migrate to self-hosted coturn at scale
-
-**Assessment:** Costs are manageable up to 1,000 users (~$500/month total). Need revenue growth to support 10K user scale ($3,500-4,000/month infrastructure).
-
----
-
-## Security & Compliance
-
-### Row-Level Security (RLS): ✅ ENFORCED
-
-**RLS Policies Implemented:**
-- `users`: User can read own profile, admins can read all
-- `companies`: Members can read their company, admins can update
-- `messages`: Users can read messages in conversations they're part of
-- `spaces`: Users can see spaces in their company
-- `invitations`: Target user can read their invitations, admins can manage
-
-**Critical Rules:**
-1. **Always use server-side Supabase client in API routes**: `createSupabaseServerClient()`
-2. **Never use browser client in API routes**: Breaks RLS context
-3. **Test RLS policies**: Verify users can't access other companies' data
-
-**Assessment:** RLS is properly implemented and enforced.
-
----
-
-### Authentication Security: ✅ STRONG
-
-**Features:**
-- Supabase Auth with email/password + OAuth (Google)
-- JWT tokens with refresh token rotation
-- Session management via `@supabase/ssr` (SSR-compatible)
-- API route protection via middleware (`src/middleware.ts`)
-
-**Recommendations:**
-- Add rate limiting to login endpoint (prevent brute force)
-  - Library: `express-rate-limit` or Vercel rate limiting
-- Implement 2FA for admin accounts (Epic 9)
-- Add security headers via Next.js middleware (CSP, HSTS)
-
-**Assessment:** Authentication is strong; minor hardening recommended for production.
-
----
-
-### Data Privacy & GDPR (Epic 9 Story 9.12)
-
-**Required Features:**
-1. **Data Export**: User can export all their data (messages, presence, profile)
-2. **Data Deletion**: User can request account deletion (GDPR "right to erasure")
-3. **Retention Policies**: Configurable message retention (30 days, 90 days, 1 year)
-4. **Audit Logs**: Track all data access for compliance
-
-**Implementation:**
-- `GET /api/users/export-data` → Returns JSON with all user data
-- `DELETE /api/users/delete-account` → Soft delete (flags account as deleted, retains for 30 days)
-- Background job: Purge messages older than retention policy
-
-**Assessment:** GDPR features are not yet implemented; required for EU customers (Epic 9 Story 9.12).
-
----
-
-## Recommendations & Next Steps
-
-### Immediate Priorities (Phase 3 Completion)
-
-1. **Complete Epic 4A (Messaging Timeline & Composer)**: 12 stories (Tasks 2.5 + 3.0)
-   - **Priority**: Stories 4A.1-4A.12 (E2E tests, threads, reactions, attachments, voice notes, search)
-   - **Timeline**: 3-4 weeks
-   - **Why**: User-facing messaging features for Slack/Teams parity
-
-2. **Complete Epic 4B (Messaging Resilience & Scale)**: 8 stories (Tasks 4.0 + 5.0)
-   - **Priority**: Stories 4B.1-4B.8 (offline queue, reconnection, analytics, notifications)
-   - **Timeline**: 2-3 weeks
-   - **Dependencies**: Epic 4A complete
-   - **Why**: Enterprise reliability and observability
-
-3. **Epic 3 Polish (Floor Plan)**: 12 UX stories
-   - **Priority**: Stories 3.1-3.4 (visual design, occupancy, selection UX)
-   - **Timeline**: 1-2 weeks
-   - **Why**: Floor plan is unique differentiator; needs professional polish
-
-4. **Avatar Consolidation Cleanup**:
-   - **Priority**: High (reduces technical debt)
-   - **Timeline**: 1 week
-   - **Why**: Removes confusion, improves maintainability
-
-### Phase 4 Implementation Sequence
-
-**Recommended Epic Order:**
-1. **Epic 6 (Announcements)**: Low complexity, high value
-   - 6 stories, 12-18 hours
-   - Enables company-wide communication
-2. **Epic 5 (Meeting Notes)**: Moderate complexity, AI integration
-   - 8 stories, 16-24 hours
-   - Placeholder AI calls (can defer full AI to Epic 7)
-3. **Epic 9 (Admin Dashboard)**: Moderate complexity, data-heavy
-   - 12 stories, 36-48 hours
-   - Unlocks compliance and analytics features
-4. **Epic 7 (AI Features)**: High complexity, cost-sensitive
-   - 12 stories, 36-48 hours
-   - Most complex; requires cost monitoring
-5. **Epic 8 (Video/Audio)**: Highest complexity
-   - 10 stories, 30-45 hours
-   - Start with audio-only MVP, add video incrementally
-
-**Rationale:**
-- Start with low-complexity, high-value features (Epic 6)
-- Build analytics foundation (Epic 9) before AI (Epic 7) to monitor costs
-- Defer WebRTC (Epic 8) until messaging and AI are solid
-
----
-
-### Architectural Improvements
-
-**1. Add Background Job Infrastructure**
-- **Need**: Epic 7 requires background jobs for embedding generation, task extraction
-- **Options**:
-  - **Supabase Edge Functions** (serverless, triggered by DB events)
-  - **node-cron** (self-hosted cron jobs)
-  - **AWS Lambda** (serverless, more control)
-- **Recommendation**: Supabase Edge Functions for MVP (simplicity)
-
-**2. API Rate Limiting**
-- **Need**: Prevent abuse of AI endpoints, protect against DDoS
-- **Library**: Vercel built-in rate limiting or `express-rate-limit`
-- **Example**: 100 requests/hour per user for AI endpoints
-
-**3. Performance Monitoring**
-- **Need**: Track API latency, DB query performance (Epic 9 Story 9.10)
-- **Options**:
-  - **Vercel Analytics** (built-in, easy)
-  - **Datadog / New Relic** (enterprise-grade)
-- **Recommendation**: Vercel Analytics for MVP; upgrade to Datadog at scale
-
-**4. Error Tracking**
-- **Need**: Centralized error logging for production issues
-- **Library**: Sentry (industry standard)
-- **Integration**: Add Sentry SDK to catch frontend and backend errors
-
----
-
-### Testing Strategy
-
-**Current Coverage:**
-- ✅ 71 comprehensive tests (authentication, invitations, avatars)
-- ✅ Playwright E2E tests for API routes
-
-**Gaps:**
-- Messaging E2E tests (Story 4.11, 4.30)
-- Floor plan interaction tests
-- AI feature tests (mocking AI API responses)
-
-**Recommendations:**
-1. **Add E2E tests for messaging drawer** (Story 4.11)
-2. **Add offline/reconnection tests** (Story 4.30)
-3. **Mock AI API calls in tests** (avoid real API costs)
-4. **Visual regression tests for floor plan** (Playwright screenshots)
-
----
-
-### Risk Mitigation
-
-**Top 5 Risks:**
-
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| **AI cost overruns** | High | Medium | Hard limits ($500/month), usage monitoring, per-user caps |
-| **WebRTC complexity** | High | High | Start audio-only, incremental video, extensive browser testing |
-| **Scale performance** | Medium | Medium | Database indexes, connection pooling, CDN, monitoring |
-| **Avatar component chaos** | Medium | Low | Consolidate to 2 canonical components (high priority cleanup) |
-| **Security breach** | Critical | Low | Penetration testing, bug bounty, regular security audits |
-
----
-
-## Conclusion
-
-Virtual Office has a **strong architectural foundation** ready for scale. The Repository Pattern, RLS enforcement, and clean separation of concerns provide a solid base for implementing the remaining 5 epics (60-80 stories).
-
-**Key Strengths:**
-- Production-ready infrastructure (Supabase, Next.js 15, TypeScript)
-- Exemplary authentication and data access patterns
-- Comprehensive testing coverage (71 tests)
-- Clear roadmap with vertically-sliced stories
-
-**Key Challenges:**
-- AI cost management (Epic 7) requires strict monitoring
-- WebRTC complexity (Epic 8) demands incremental approach
-- Avatar consolidation cleanup needed before major feature expansion
-
-**Next Steps:**
-1. ✅ Complete Phase 3 Solutioning (this document)
-2. Proceed to Phase 4 Implementation:
-   - Start with Epic 6 (Announcements) for quick win
-   - Build Epic 9 (Admin Dashboard) for analytics foundation
-   - Tackle Epic 7 (AI) with strict cost controls
-   - Defer Epic 8 (Video/Audio) until AI proven
-
-**Status:** **Architecture Review Complete. Ready for Implementation Phase.**
-
----
-
-**Document Version:** 1.0  
-**Last Updated:** 2025-10-22  
-**Next Review:** After Epic 6 completion (expected 2 weeks)
+Essa organização separa composição visual, estado do cliente, orquestração de dados e persistência. Domínios com regras próprias, especialmente presença, mensagens e áudio, ficam em módulos dedicados dentro de `lib/` e são expostos à interface por contextos e hooks. As interfaces de repositório mantêm os Route Handlers e serviços desacoplados do formato físico das tabelas, enquanto os tipos compartilhados preservam os contratos entre as camadas.

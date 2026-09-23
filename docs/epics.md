@@ -31,13 +31,13 @@ Each epic has:
 ## Epic 1: Core Infrastructure & Supabase Migration ✅ COMPLETE
 
 **Goal:**
-Establish modern, scalable base for Virtual Office using Next.js 15, React 19, + Supabase, replacing legacy Firebase build. Build Repository Pattern for clean data access abstraction + set up CI/CD pipeline for reliable deployments.
+Establish a modern, scalable base for Virtual Office using Next.js 16, React 19, and Supabase, replacing the legacy Firebase build. Build the Repository Pattern for clean data-access abstraction and set up CI/CD for reliable deployments.
 
 **Value:**
 This epic delivered technical base enabling all subsequent features: type-safe dev w/ TypeScript, real-time capabilities via Supabase, + maintainable arch via Repository Pattern.
 
 **Done:**
-- Next.js 15.3.0 + React 19.1.0 + TypeScript 5 stack
+- Next.js 16.1.6 + React 19.2.4 + TypeScript 6 stack
 - Supabase PostgreSQL DB w/ RLS policies
 - Repository Pattern build (interfaces + Supabase builds)
 - Initial DB schema (companies, users, spaces, chats, msgs)
@@ -102,7 +102,7 @@ As new user registering on platform: want clear feedback after signup about next
 As user who received invite link: want to click link + get guided via signup/login; so can join company invited me.
 
 **Acceptance Criteria:**
-1. Remove `generateTestUuid()` function + all fake UUID logic from `/join` page
+1. Remove all fake UUID logic from `/join` page
 2. `/join?token=xxx` validates token before auth UI
 3. Show Supabase Auth UI (Google + Email/Password) if not logged in
 4. After auth success, auto-call `/api/invitations/accept` w/ token
@@ -114,7 +114,7 @@ As user who received invite link: want to click link + get guided via signup/log
 **Tech Ref:**
 - `src/app/join/page.tsx` - Complete rewrite required
 - `src/app/api/invitations/accept/route.ts` - Ensure uses server client
-- DB trigger `handle_new_user()` creates user w/ `company_id = NULL`
+- DB function `public.handle_new_user()` inserts user w/o setting `company_id`
 
 **Prereq:** Story 2.1 (signup UX)
 **Estimate:** 4-6 hours
@@ -193,7 +193,7 @@ As user: want to switch between many visual themes (Neon, Zen, Obsidian, Paper);
 As user: want rich, interactive space cards reveal details on hover; so can see what's happening inside room w/o entering it.
 
 **Acceptance Criteria:**
-1. New `SpaceCard` component implementing Orbit Gallery design (refactor from `SpaceElement.tsx`)
+1. New `SpaceCard` component implementing Orbit Gallery design (refactor from `src/components/floor-plan/modern/ModernSpaceCard.tsx`)
 2. Gradient backgrounds based on space type/neighborhood
 3. Status ribbons (Agenda Phase, Mtg Type) shown on card face
 4. Card displays: space name, occupancy count, phase pill
@@ -632,7 +632,7 @@ As user: want to pin key msgs + star msgs for later reference; so can fast find 
 2. Pinned msgs show pin icon + appear in "Pinned Msgs" section at top of feed
 3. Starred msgs show star icon + are accessible via "Starred" filter
 4. Unpin/unstar options available in context menu
-5. Pin/star actions persist via API (`POST /api/messages/pin`, `/api/messages/star`)
+5. Pin/star actions persist via API (`POST /api/messages/[messageId]/pin`, `/api/messages/star`)
 
 **Manual Testing Checklist:**
 - [ ] Test pin/star via context menu
@@ -1861,7 +1861,7 @@ For each story:
 5. Mark story complete w/ `story-approved` workflow
 
 **Progress Tracking:**
-- All stories tracked in `docs/bmm-workflow-status.md`
+- All stories tracked in `docs/bmm-workflow-status.yaml`
 - Update status file after each story completion
 - Run `workflow-status` anytime to see current progress
 

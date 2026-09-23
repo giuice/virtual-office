@@ -29,6 +29,13 @@ type SpaceRow = {
 
 type SessionRow = { readonly id: string };
 
+type CoverageRow = {
+  readonly coverage_hour: Date;
+  readonly checked_at: Date;
+  readonly schema_fingerprint: string;
+  readonly healthy: boolean;
+};
+
 type RpcResult = {
   readonly ok: boolean;
   readonly code: string;
@@ -38,16 +45,28 @@ type RpcResult = {
 
 describe("presence-db corrective concurrency contract", () => {
   let fixtures: PresenceFixtures;
+  let coverageSnapshot: readonly CoverageRow[] | undefined;
+  let coverageFixtureTakenOver = false;
 
   beforeAll(async () => {
     fixtures = await PresenceFixtures.connect(NS);
+    await prepareHealthyCoverageFixture();
   });
 
   afterAll(async () => {
     if (!fixtures) return;
-    await setRuntimeMode("legacy", null);
-    await fixtures.cleanup();
-    await fixtures.end();
+    try {
+      await setRuntimeMode("legacy", null);
+      await fixtures.cleanup();
+    } finally {
+      try {
+        if (coverageFixtureTakenOver && coverageSnapshot) {
+          await restoreCoverageFixture(coverageSnapshot);
+        }
+      } finally {
+        await fixtures.end();
+      }
+    }
   });
 
   async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
@@ -69,13 +88,85 @@ describe("presence-db corrective concurrency contract", () => {
 
   async function asPmo<T>(client: Client, fn: () => Promise<T>): Promise<T> {
     await client.query("grant presence_maintenance_owner to postgres");
-    await client.query("set role presence_maintenance_owner");
     try {
-      return await fn();
+      await client.query("set role presence_maintenance_owner");
+      try {
+        return await fn();
+      } finally {
+        await client.query("reset role").catch(() => undefined);
+      }
     } finally {
-      await client.query("reset role");
-      await client.query("revoke presence_maintenance_owner from postgres");
+      await client
+        .query("revoke presence_maintenance_owner from postgres")
+        .catch(() => undefined);
     }
+  }
+
+  async function prepareHealthyCoverageFixture(): Promise<void> {
+    await asPmo(fixtures.client, async () => {
+      await fixtures.client.query("begin");
+      try {
+        const result = await fixtures.client.query<CoverageRow>(
+          `select coverage_hour, checked_at, schema_fingerprint, healthy
+             from private.presence_legacy_cutover_audit_coverage
+            order by coverage_hour`,
+        );
+        coverageSnapshot = result.rows;
+        coverageFixtureTakenOver = true;
+        await fixtures.client.query(
+          `delete from private.presence_legacy_cutover_audit_coverage
+            where coverage_hour = pg_catalog.date_trunc(
+              'hour', pg_catalog.clock_timestamp()
+            )`,
+        );
+        await fixtures.client.query("commit");
+      } catch (error) {
+        await fixtures.client.query("rollback").catch(() => undefined);
+        throw error;
+      }
+    });
+
+    const [coverage] = await fixtures.sql<{ readonly healthy: boolean }>(
+      `select (private.record_presence_legacy_cutover_audit_coverage()).healthy
+         as healthy`,
+    );
+    if (!coverage?.healthy) {
+      throw new Error("Expected a healthy coverage fixture");
+    }
+  }
+
+  async function restoreCoverageFixture(
+    snapshot: readonly CoverageRow[],
+  ): Promise<void> {
+    await asPmo(fixtures.client, async () => {
+      await fixtures.client.query("begin");
+      try {
+        await fixtures.client.query(
+          "delete from private.presence_legacy_cutover_audit_coverage",
+        );
+        for (const row of snapshot) {
+          await fixtures.client.query(
+            `insert into private.presence_legacy_cutover_audit_coverage (
+               coverage_hour,
+               checked_at,
+               schema_fingerprint,
+               healthy
+             )
+             values ($1, $2, $3, $4)`,
+            [
+              row.coverage_hour,
+              row.checked_at,
+              row.schema_fingerprint,
+              row.healthy,
+            ],
+          );
+        }
+        await fixtures.client.query("commit");
+      } catch (error) {
+        await fixtures.client.query("rollback").catch(() => undefined);
+        throw error;
+      }
+    });
   }
 
   async function setRuntimeMode(

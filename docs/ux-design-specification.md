@@ -296,8 +296,8 @@ Interaction & accessibility:
 ### Related Documents
 
 - Product Requirements: `docs/prd.md`
-- Product Brief: `docs/product-brief-virtual-office-2025-10-21.md`
-- Brainstorming: `docs/archive/brainstorming.md`
+- No separate product-brief or brainstorming source document is present in the
+  current repository.
 
 ### Core Interactive Deliverables
 
@@ -312,13 +312,12 @@ This UX Design Specification was created through visual collaboration:
   - Interactive HTML with 6-8 complete design approaches
   - Full-screen mockups of key screens
   - Design philosophy and rationale for each direction
-- **Space Grid Overview**: [ux-space-grid.html](./ux-space-grid.html)
+- **Space Grid Overview**: [ux-space-grid-v3.html](./ux-space-grid-v3.html)
   - Toggle between Warm Control (light default) and Cosmic Efficiency (dark default) while viewing 16 concurrent spaces
   - Orbit Gallery layout showcased as the primary condensed view; Command Atrium and Analyst Matrix remain as comparison toggles
   - Highlights avatars, agenda phases, beacons, and log snippets in condensed view
-- **Orbit Gallery Showcase**: [ux-final-app-showcase.html](./ux-final-app-showcase.html)
-  - Six Warm Control vs Cosmic Efficiency screens covering NowBoard, grid, delegation, sprint cadence, admin settings, and empty states
-  - Theme toggle baked in for stakeholders to preview both palettes alongside the Orbit layout decisions
+- No separate Orbit Gallery showcase file is present in the current repository;
+  the v3 space-grid prototype is the current visual reference.
 
 ### Optional Enhancement Deliverables
 

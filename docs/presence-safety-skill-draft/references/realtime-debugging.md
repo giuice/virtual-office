@@ -23,10 +23,10 @@ Snapshot query keys contain company ID and app-user ID. Never reuse a global
 Presence query across logout/account switch. A membership or auth invalidation
 cancels and removes old-scope queries before loading the new scope.
 
-Local-storage keys are equally scoped and advisory. A stored last-space hint can
-propose a recovery target only after the authoritative snapshot says placement
-is null. It cannot authorize, prove recency, or override a committed server
-version.
+Local-storage keys are equally scoped and advisory. A stored last-space hint is
+read from its scoped key and exposed to callers, but automatic placement does
+not currently use it to choose a recovery target. It cannot authorize, prove
+recency, or override a committed server version.
 
 ## Debugging protocol
 
@@ -37,7 +37,7 @@ Collect evidence in this order:
    revisions, active/retired leases, exact-session revocation fence, and open
    logs. Redact tokens and credentials.
 3. Inspect transition results and structured server logs for command ID,
-   observed version, lock-time decision, affected-row count, and error code.
+   observed version, lock-time decision, idempotent-replay status, and error code.
 4. Inspect the scoped query key and confirm old-scope cache/storage removal.
 5. Inspect channel lifecycle, invalidation count, immediate/delayed reconciliation,
    and 30-second fallback polling. Do not infer delivery from `SUBSCRIBED`.

@@ -15,10 +15,27 @@ import { useReducerState } from '@/hooks/useReducerState';
 import { WebRTCManager, ROOM_LIMITS } from '@/lib/webrtc';
 import { useAudioSignaling } from '@/hooks/realtime/useAudioSignaling';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { toast } from 'sonner';
+import {
+	screenShareClaimResponseSchema,
+	screenSharePublicErrorSchema,
+	screenShareReleaseResponseSchema,
+	screenShareRenewResponseSchema,
+	type ScreenSharePublicShare,
+} from '@/lib/webrtc/screen-share-contract';
 
 // Permission states
 export type MicPermissionState = 'prompt' | 'granted' | 'denied' | 'unavailable';
+export type ScreenShareStartStatus = 'idle' | 'opening-picker' | 'claiming' | 'sharing' | 'stopping';
+export type ScreenShareStopReason = 'user-stop' | 'track-ended' | 'scope-changed' | 'error-cleanup';
+
+export interface ScreenShareDisplayStream {
+	presenterUserId: string;
+	shareId: string;
+	stream: MediaStream;
+}
 
 interface AudioContextValue { // Manager access
 	webrtcManager: WebRTCManager | null;
@@ -31,6 +48,11 @@ interface AudioContextValue { // Manager access
 	speakingUsers: Map<string, boolean>;
 	mutedUserIds: Set<string>;
 	error: string | null;
+	activeScreenShare: ScreenSharePublicShare | null;
+	displayStream: ScreenShareDisplayStream | null;
+	screenShareStatus: ScreenShareStartStatus;
+	screenShareError: string | null;
+	currentUserId: string | undefined;
 
 	// Helpers
 	isUserMuted: (userId: string) => boolean;
@@ -41,9 +63,15 @@ interface AudioContextValue { // Manager access
 	toggleMute: () => void;
 	setSpeaking: (userId: string, isSpeaking: boolean) => void;
 	cleanup: () => void;
+	startScreenShare: () => Promise<boolean>;
+	stopScreenShare: (reason?: ScreenShareStopReason) => Promise<void>;
 
 	// Info
 	peerCount: number; }
+
+function stopMediaStream(stream: MediaStream): void {
+	stream.getTracks().forEach((track) => track.stop());
+}
 
 const AudioContext = createContext<AudioContextValue | null>(null);
 
@@ -54,24 +82,81 @@ export function useAudio(): AudioContextValue { const context = use(AudioContext
 }
 
 interface AudioProviderProps { spaceId: string | undefined;
-	userId?: string; // Internal user.id (from profile), not supabase_uid
+	userId?: string; // Internal application user.id, never the Supabase Auth UUID
 	children: ReactNode; }
 
 interface OwnedWebRTCManager {
 	manager: WebRTCManager;
+	companyId: string;
 	spaceId: string;
 	userId: string;
+	presenceSessionId: string;
+	identity: string;
 }
 
-export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { user } = useAuth();
-	// Use internal userId if provided, otherwise fall back to supabase uid
-	const currentUserId = userId || user?.id;
+interface OwnedAudioInitialization {
+	manager: WebRTCManager;
+	identity: string;
+	promise: Promise<boolean>;
+}
+
+interface OwnedScreenShareLifecycle {
+	generation: number;
+	identity: string;
+	companyId: string;
+	spaceId: string;
+	userId: string;
+	presenceSessionId: string;
+	manager: WebRTCManager;
+	controller: AbortController | null;
+	stream: MediaStream | null;
+	track: MediaStreamTrack | null;
+	endedListener: (() => void) | null;
+	requestedShareId: string | null;
+	share: ScreenSharePublicShare | null;
+	activeShareReadVersionAtClaim: number;
+	attached: boolean;
+	heartbeatTimer: ReturnType<typeof setTimeout> | null;
+	releaseStarted: boolean;
+}
+
+const SCREEN_SHARE_RENEW_INTERVAL_MS = 10_000;
+
+const SCREEN_SHARE_COPY = {
+	permission: 'We couldn’t start screen sharing. Check your browser permission, then try again.',
+	cancelled: 'Screen sharing was cancelled.',
+	noDisplay: 'No screen is available to share. Connect a display or choose another source, then try again.',
+	failed: 'We couldn’t start screen sharing. Try again. If the problem continues, rejoin the space.',
+	busy: 'Another participant is already sharing their screen. Wait for them to stop, then try again.',
+	ended: 'Screen sharing ended in your browser. Floor plan restored.',
+	signaling: 'Screen sharing could not connect to other participants. Stop sharing, then try again.',
+} as const;
+
+export function AudioProvider({ spaceId, userId, children }: AudioProviderProps) { const { session } = useAuth();
+	const { company } = useCompany();
+	const { presenceSessionId } = usePresence();
+	const currentUserId = userId;
+	const accessToken = session?.access_token ?? null;
+	const tokenIdentityRef = useRef<string | null>(null);
+	const tokenEpochRef = useRef(0);
+	if (tokenIdentityRef.current !== accessToken) {
+		tokenIdentityRef.current = accessToken;
+		tokenEpochRef.current += 1;
+	}
+	const managerIdentity = company?.id && currentUserId && presenceSessionId && spaceId && accessToken
+		? `${company.id}:${currentUserId}:${presenceSessionId}:${spaceId}:token-${tokenEpochRef.current}`
+		: null;
 
 	// State
 	const [ownedWebrtcManager, updateOwnedWebrtcManager] = useReducerState<OwnedWebRTCManager | null>(null);
-	const webrtcManager = ownedWebrtcManager &&
-		ownedWebrtcManager.spaceId === spaceId &&
-		ownedWebrtcManager.userId === currentUserId
+	const retiredIdentityRef = useRef<string | null>(null);
+	const cleanedManagersRef = useRef(new WeakSet<WebRTCManager>());
+	const cleanupOwnedManager = useCallback((manager: WebRTCManager): void => {
+		if (cleanedManagersRef.current.has(manager)) return;
+		cleanedManagersRef.current.add(manager);
+		manager.cleanup();
+	}, []);
+	const webrtcManager = ownedWebrtcManager && ownedWebrtcManager.identity === managerIdentity
 		? ownedWebrtcManager.manager
 		: null;
 	const [isMuted, updateIsMutedState] = useReducerState(true); // Default: muted on entry
@@ -80,23 +165,81 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 	const [micPermission, updateMicPermission] = useReducerState<MicPermissionState>('prompt');
 	const [speakingUsers, updateSpeakingUsers] = useReducerState<Map<string, boolean>>(new Map());
 	const [error, updateError] = useReducerState<string | null>(null);
+	const [ownedScreenShare, updateOwnedScreenShare] = useReducerState<{
+		identity: string;
+		share: ScreenSharePublicShare;
+	} | null>(null);
+	const [displayStream, updateDisplayStream] = useReducerState<ScreenShareDisplayStream | null>(null);
+	const [screenShareStatus, updateScreenShareStatus] = useReducerState<ScreenShareStartStatus>('idle');
+	const [screenShareError, updateScreenShareError] = useReducerState<string | null>(null);
 	const [peerCount, updatePeerCount] = useReducerState(0);
-
-	// Refs for cleanup
 	const managerRef = useRef<WebRTCManager | null>(null);
+	const managerIdentityRef = useRef<string | null>(managerIdentity);
+	managerIdentityRef.current = managerIdentity;
+	const initializationPromiseRef = useRef<OwnedAudioInitialization | null>(null);
+	const screenShareGenerationRef = useRef(0);
+	const screenShareLifecycleRef = useRef<OwnedScreenShareLifecycle | null>(null);
+	const stopScreenSharePromiseRef = useRef<Promise<void> | null>(null);
+	const stopScreenShareRef = useRef<(reason?: ScreenShareStopReason) => Promise<void>>(
+		async () => undefined,
+	);
 
-	// Setup signaling when manager is ready
-	const { mutedUserIds } = useAudioSignaling({
+	const onTerminalAuthorizationDenied = useCallback(() => {
+		const current = managerRef.current;
+		if (!current || current !== webrtcManager || !managerIdentity) return;
+		void stopScreenShareRef.current('scope-changed');
+		retiredIdentityRef.current = managerIdentity;
+		cleanupOwnedManager(current);
+		managerRef.current = null;
+		updateOwnedWebrtcManager(null);
+		updateIsMutedState(true);
+		updateIsAudioEnabled(false);
+		updateSpeakingUsers(new Map());
+		updatePeerCount(0);
+		updateOwnedScreenShare(null);
+		updateDisplayStream(null);
+		updateScreenShareStatus('idle');
+	}, [cleanupOwnedManager, managerIdentity, updateDisplayStream, updateIsAudioEnabled, updateIsMutedState, updateOwnedScreenShare, updateOwnedWebrtcManager, updatePeerCount, updateScreenShareStatus, updateSpeakingUsers, webrtcManager]);
+
+	const onSignalDelivered = useCallback(() => {
+		updateScreenShareError((current) => (
+			current === SCREEN_SHARE_COPY.signaling ? null : current
+		));
+	}, [updateScreenShareError]);
+
+	// Setup signaling only for the currently authoritative company/session/space scope.
+	const signalingGeneration = managerIdentity ?? 'incomplete-media-identity';
+	const {
+		mutedUserIds,
+		error: signalingError,
+		activeShare: signalingActiveShare,
+		activeShareObservationVersion,
+		getActiveShareReadVersion,
+	} = useAudioSignaling({
+		companyId: company?.id,
 		spaceId,
 		currentUserId,
+		presenceSessionId,
+		accessToken,
+		generation: signalingGeneration,
 		webrtcManager,
-		enabled: !!webrtcManager, // Enable signaling immediately for listen-only mode
+		enabled: !!webrtcManager,
 		isMuted,
+		onTerminalAuthorizationDenied,
+		onSignalDelivered,
 	});
 
-	// Create manager when entering space
 	useEffect(() => {
-		if (!spaceId || !currentUserId) {
+		if (
+			!signalingError
+			|| (!screenShareLifecycleRef.current && !signalingActiveShare)
+		) return;
+		updateScreenShareError(SCREEN_SHARE_COPY.signaling);
+	}, [signalingActiveShare, signalingError, updateScreenShareError]);
+
+	// A manager is valid only for the complete company/user/session/space/token identity.
+	useEffect(() => {
+		if (!managerIdentity || !company?.id || !spaceId || !currentUserId || !presenceSessionId || !accessToken || retiredIdentityRef.current === managerIdentity) {
 			return;
 		}
 
@@ -116,6 +259,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 					next.delete(peerId);
 					return next;
 				});
+				updateDisplayStream((current) => current?.presenterUserId === peerId ? null : current);
 			},
 			onPeerSpeaking: (peerId, isSpeaking) => {
 				if (managerRef.current !== manager) return;
@@ -129,6 +273,20 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 					return next;
 				});
 			},
+			onRemoteDisplay: ({ peerId, shareId, stream }) => {
+				if (managerRef.current !== manager || !shareId) return;
+				const track = stream.getVideoTracks()[0];
+				if (!track || track.readyState !== 'live') return;
+				updateScreenShareError(null);
+				updateDisplayStream({ presenterUserId: peerId, shareId, stream });
+			},
+			onLocalDisplayStopped: (shareId) => {
+				if (managerRef.current !== manager) return;
+				const lifecycle = screenShareLifecycleRef.current;
+				if (lifecycle?.manager === manager && lifecycle.share?.shareId === shareId) {
+					void stopScreenShareRef.current('track-ended');
+				}
+			},
 			onRoomLimitWarning: (count) => {
 				if (managerRef.current !== manager) return;
 				toast.warning(`Sala com ${count} usuários. Performance pode ser afetada acima de ${ROOM_LIMITS.SOFT_WARNING} pessoas.`);
@@ -136,6 +294,9 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			onError: (err) => {
 				if (managerRef.current !== manager) return;
 				console.error('[AudioProvider] Error:', err);
+				if (err.message === 'SIGNALING_SEND_FAILED' || err.message === 'SIGNALING_UNAVAILABLE') {
+					updateScreenShareError(SCREEN_SHARE_COPY.signaling);
+				}
 				if (err.message === 'AUTOPLAY_BLOCKED') {
 					updateError('Clique para habilitar o áudio');
 				} else {
@@ -144,7 +305,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			},
 		});
 
-		updateOwnedWebrtcManager({ manager, spaceId, userId: currentUserId });
+		updateOwnedWebrtcManager({ manager, companyId: company.id, spaceId, userId: currentUserId, presenceSessionId, identity: managerIdentity });
 		managerRef.current = manager;
 
 		// Browser audio policy: resume any blocked audio on ANY user interaction
@@ -156,73 +317,90 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		return () => {
 			console.log('[AudioProvider] Cleaning up manager');
 			window.removeEventListener('click', handleGlobalClick);
-			manager.cleanup();
-			updateOwnedWebrtcManager(null);
-			managerRef.current = null;
+			if (screenShareLifecycleRef.current?.manager === manager) {
+				void stopScreenShareRef.current('scope-changed');
+			}
+			cleanupOwnedManager(manager);
+			if (managerRef.current === manager) managerRef.current = null;
+			if (initializationPromiseRef.current?.manager === manager) initializationPromiseRef.current = null;
+			updateOwnedWebrtcManager((current) => current?.manager === manager ? null : current);
 			updateIsMutedState(true);
 			updateIsAudioEnabled(false);
+			updateIsInitializing(false);
+			updateMicPermission('prompt');
+			updateError(null);
 			updateSpeakingUsers(new Map());
 			updatePeerCount(0);
+			updateOwnedScreenShare(null);
+			updateDisplayStream(null);
+			updateScreenShareStatus('idle');
 		};
-		}, [spaceId, currentUserId, updatePeerCount, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsMutedState]);
+		}, [accessToken, cleanupOwnedManager, company?.id, currentUserId, managerIdentity, presenceSessionId, spaceId, updateDisplayStream, updateOwnedScreenShare, updatePeerCount, updateScreenShareError, updateScreenShareStatus, updateSpeakingUsers, updateError, updateOwnedWebrtcManager, updateIsAudioEnabled, updateIsInitializing, updateIsMutedState, updateMicPermission]);
 
 	/**
 	 * Initialize audio (must be called from user gesture for Safari)
 	 */
-	const initializeAudio = useCallback(async (): Promise<boolean> => {
-		if (!webrtcManager) {
+	const initializeAudio = useCallback((): Promise<boolean> => {
+		if (!webrtcManager || !managerIdentity) {
 			updateError('Manager não inicializado');
-			return false;
+			return Promise.resolve(false);
 		}
 
-		if (isInitializing) {
-			return false;
+		const manager = webrtcManager;
+		const identity = managerIdentity;
+		const existingInitialization = initializationPromiseRef.current;
+		if (existingInitialization?.manager === manager && existingInitialization.identity === identity) {
+			return existingInitialization.promise;
 		}
+		const isCurrent = (): boolean => (
+			managerRef.current === manager
+			&& managerIdentityRef.current === identity
+		);
+		if (!isCurrent()) return Promise.resolve(false);
 
-		updateIsInitializing(true);
-		updateError(null);
-
-		try {
-			// Check permission state
-			const permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
-			if (permissionStatus) {
-				updateMicPermission(permissionStatus.state as MicPermissionState);
-			}
-
-			// Request microphone access
-			await webrtcManager.initializeLocalStream();
-
-			// Also resume any blocked remote audio (since we now have a user gesture)
-			webrtcManager.resumeRemoteAudio();
-
-			updateMicPermission('granted');
-			updateIsAudioEnabled(true);
-			updateIsMutedState(false); // Start unmuted (One-click enable)
-			webrtcManager.setMuted(false); // CRITICAL: Actually unmute the tracks!
-
-			return true;
-		} catch (err) {
-			console.error('[AudioProvider] Failed to initialize audio:', err);
-
-			if (err instanceof DOMException) {
-				if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-					updateMicPermission('denied');
-					updateError('Permissão de microfone negada');
-				} else if (err.name === 'NotFoundError') {
-					updateMicPermission('unavailable');
-					updateError('Microfone não encontrado');
-				} else {
-					updateError(err.message);
+		let initialization!: Promise<boolean>;
+		initialization = (async (): Promise<boolean> => {
+			updateIsInitializing(true);
+			updateError(null);
+			try {
+				let permissionStatus: PermissionStatus | undefined;
+				try {
+					permissionStatus = await navigator.permissions?.query?.({ name: 'microphone' as PermissionName });
+				} catch {
+					// The Permissions API is informational; media initialization remains authoritative.
 				}
-			} else {
-				updateError('Erro ao acessar microfone');
+				if (!isCurrent()) return false;
+				if (permissionStatus) updateMicPermission(permissionStatus.state as MicPermissionState);
+				await manager.initializeLocalStream();
+				if (!isCurrent()) return false;
+				manager.resumeRemoteAudio();
+				updateMicPermission('granted');
+				updateIsAudioEnabled(true);
+				updateIsMutedState(false);
+				manager.setMuted(false);
+				return true;
+			} catch (err) {
+				if (!isCurrent()) return false;
+				console.error('[AudioProvider] Failed to initialize audio:', err);
+				if (err instanceof DOMException) {
+					if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') { updateMicPermission('denied'); updateError('Permissão de microfone negada'); }
+					else if (err.name === 'NotFoundError') { updateMicPermission('unavailable'); updateError('Microfone não encontrado'); }
+					else updateError(err.message);
+				} else updateError('Erro ao acessar microfone');
+				return false;
+			} finally {
+				if (
+					isCurrent()
+					&& initializationPromiseRef.current?.promise === initialization
+				) updateIsInitializing(false);
 			}
-
-			return false;
-		} finally {
-			updateIsInitializing(false);
-		}
-		}, [webrtcManager, isInitializing, updateError, updateIsInitializing, updateMicPermission, updateIsAudioEnabled, updateIsMutedState]);
+		})();
+		initializationPromiseRef.current = { manager, identity, promise: initialization };
+		void initialization.finally(() => {
+			if (initializationPromiseRef.current?.promise === initialization) initializationPromiseRef.current = null;
+		});
+		return initialization;
+	}, [managerIdentity, updateError, updateIsInitializing, updateMicPermission, updateIsAudioEnabled, updateIsMutedState, webrtcManager]);
 
 	/**
 	 * Set mute state
@@ -259,14 +437,346 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 	 * Manual cleanup
 	 */
 	const cleanup = useCallback(() => {
-		if (managerRef.current) {
-			managerRef.current.cleanup();
+		void stopScreenShareRef.current('scope-changed');
+		if (managerRef.current) cleanupOwnedManager(managerRef.current);
+	}, [cleanupOwnedManager]);
+
+	const releaseScreenShareLease = useCallback(async (
+		lifecycle: OwnedScreenShareLifecycle,
+		shareId: string,
+		reason: ScreenShareStopReason,
+	): Promise<void> => {
+		if (lifecycle.releaseStarted) return;
+		lifecycle.releaseStarted = true;
+		try {
+			const response = await fetch(`/api/spaces/${encodeURIComponent(lifecycle.spaceId)}/screen-share/release`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					presenceSessionId: lifecycle.presenceSessionId,
+					shareId,
+					stopReason: reason,
+				}),
+			});
+			const body: unknown = await response.json().catch(() => null);
+			const released = screenShareReleaseResponseSchema.safeParse(body);
+			if (!response.ok || !released.success) return;
+		} catch {
+			// Release is best effort; server expiry remains the final cleanup fence.
 		}
 	}, []);
+
+	const stopScreenShare = useCallback((reason: ScreenShareStopReason = 'user-stop'): Promise<void> => {
+		const existingStop = stopScreenSharePromiseRef.current;
+		if (existingStop) return existingStop;
+
+		const lifecycle = screenShareLifecycleRef.current;
+		if (!lifecycle) {
+			updateOwnedScreenShare(null);
+			updateDisplayStream(null);
+			updateScreenShareStatus('idle');
+			return Promise.resolve();
+		}
+
+		// Retire the generation synchronously before any teardown await can settle.
+		const retiredGeneration = ++screenShareGenerationRef.current;
+		screenShareLifecycleRef.current = null;
+		updateScreenShareStatus('stopping');
+		lifecycle.controller?.abort();
+		lifecycle.controller = null;
+		if (lifecycle.heartbeatTimer) {
+			clearTimeout(lifecycle.heartbeatTimer);
+			lifecycle.heartbeatTimer = null;
+		}
+		if (lifecycle.track && lifecycle.endedListener) {
+			lifecycle.track.removeEventListener?.('ended', lifecycle.endedListener);
+		}
+		lifecycle.endedListener = null;
+		updateOwnedScreenShare(null);
+		updateDisplayStream(null);
+
+		const stopping = (async (): Promise<void> => {
+			try {
+				if (lifecycle.attached) {
+					await lifecycle.manager.stopScreenShare(reason);
+				} else if (lifecycle.stream) {
+					stopMediaStream(lifecycle.stream);
+				}
+			} catch {
+				if (lifecycle.stream) stopMediaStream(lifecycle.stream);
+			}
+
+			const shareId = lifecycle.share?.shareId;
+			if (shareId) {
+				await releaseScreenShareLease(lifecycle, shareId, reason);
+			}
+		})().finally(() => {
+			if (stopScreenSharePromiseRef.current === stopping) {
+				stopScreenSharePromiseRef.current = null;
+			}
+			if (
+				screenShareGenerationRef.current === retiredGeneration
+				&& screenShareLifecycleRef.current === null
+			) {
+				updateScreenShareStatus('idle');
+			}
+		});
+		stopScreenSharePromiseRef.current = stopping;
+		return stopping;
+	}, [releaseScreenShareLease, updateDisplayStream, updateOwnedScreenShare, updateScreenShareStatus]);
+	stopScreenShareRef.current = stopScreenShare;
+
+	const startScreenShare = useCallback(async (): Promise<boolean> => {
+		const manager = webrtcManager;
+		const identity = managerIdentity;
+		if (!manager || !identity || !spaceId || !currentUserId || !presenceSessionId || !company?.id) {
+			updateScreenShareError('Screen sharing is unavailable outside your current space.');
+			return false;
+		}
+		const getDisplayMedia = navigator.mediaDevices?.getDisplayMedia;
+		if (typeof getDisplayMedia !== 'function') {
+			updateScreenShareError("Screen sharing isn't supported in this browser. Use a current supported browser.");
+			return false;
+		}
+		if (screenShareLifecycleRef.current || stopScreenSharePromiseRef.current) return false;
+
+		const generation = ++screenShareGenerationRef.current;
+		const controller = new AbortController();
+		const lifecycle: OwnedScreenShareLifecycle = {
+			generation,
+			identity,
+			companyId: company.id,
+			spaceId,
+			userId: currentUserId,
+			presenceSessionId,
+			manager,
+			controller,
+			stream: null,
+			track: null,
+			endedListener: null,
+			requestedShareId: null,
+			share: null,
+			activeShareReadVersionAtClaim: 0,
+			attached: false,
+			heartbeatTimer: null,
+			releaseStarted: false,
+		};
+		screenShareLifecycleRef.current = lifecycle;
+		const isCurrent = (): boolean => (
+			screenShareLifecycleRef.current === lifecycle
+			&& screenShareGenerationRef.current === generation
+			&& managerRef.current === manager
+			&& managerIdentityRef.current === identity
+		);
+		const retireUnclaimed = (): void => {
+			if (screenShareLifecycleRef.current === lifecycle) {
+				screenShareLifecycleRef.current = null;
+				screenShareGenerationRef.current += 1;
+			}
+			controller.abort();
+			if (lifecycle.track && lifecycle.endedListener) {
+				lifecycle.track.removeEventListener?.('ended', lifecycle.endedListener);
+			}
+			if (lifecycle.stream) stopMediaStream(lifecycle.stream);
+		};
+		const scheduleRenewal = (): void => {
+			if (!isCurrent() || !lifecycle.share) return;
+			lifecycle.heartbeatTimer = setTimeout(() => {
+				lifecycle.heartbeatTimer = null;
+				if (!isCurrent() || !lifecycle.share) return;
+				const renewController = new AbortController();
+				lifecycle.controller = renewController;
+				void (async () => {
+					try {
+						const response = await fetch(`/api/spaces/${encodeURIComponent(lifecycle.spaceId)}/screen-share/renew`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								presenceSessionId: lifecycle.presenceSessionId,
+								shareId: lifecycle.share?.shareId,
+							}),
+							signal: renewController.signal,
+						});
+						const body: unknown = await response.json().catch(() => null);
+						if (!isCurrent() || renewController.signal.aborted) return;
+						const renewed = screenShareRenewResponseSchema.safeParse(body);
+						if (
+							!response.ok
+							|| !renewed.success
+							|| renewed.data.shareId !== lifecycle.share?.shareId
+						) {
+							await stopScreenShareRef.current('error-cleanup');
+							return;
+						}
+						lifecycle.share = { ...lifecycle.share, expiresAt: renewed.data.expiresAt };
+						updateOwnedScreenShare({ identity, share: lifecycle.share });
+						scheduleRenewal();
+					} catch {
+						if (isCurrent() && !renewController.signal.aborted) {
+							await stopScreenShareRef.current('error-cleanup');
+						}
+					} finally {
+						if (lifecycle.controller === renewController) lifecycle.controller = null;
+					}
+				})();
+			}, SCREEN_SHARE_RENEW_INTERVAL_MS);
+		};
+		updateScreenShareStatus('opening-picker');
+		updateScreenShareError(null);
+		try {
+			const stream = await getDisplayMedia.call(navigator.mediaDevices, { video: true, audio: false });
+			const displayTrack = stream.getVideoTracks()[0];
+			if (!displayTrack || displayTrack.readyState !== 'live') {
+				stopMediaStream(stream);
+				if (screenShareLifecycleRef.current === lifecycle) screenShareLifecycleRef.current = null;
+				updateScreenShareError('No screen is available to share. Connect a display or choose another source, then try again.');
+				return false;
+			}
+			lifecycle.stream = stream;
+			lifecycle.track = displayTrack;
+			if (!isCurrent()) {
+				stopMediaStream(stream);
+				return false;
+			}
+			const endedListener = () => {
+				if (!isCurrent()) return;
+				updateScreenShareError(SCREEN_SHARE_COPY.ended);
+				void stopScreenShareRef.current('track-ended');
+			};
+			lifecycle.endedListener = endedListener;
+			displayTrack.addEventListener?.('ended', endedListener, { once: true });
+
+			updateScreenShareStatus('claiming');
+			const shareId = crypto.randomUUID();
+			lifecycle.requestedShareId = shareId;
+			const response = await fetch(`/api/spaces/${encodeURIComponent(spaceId)}/screen-share/claim`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ presenceSessionId, shareId }),
+				signal: controller.signal,
+			});
+			const body: unknown = await response.json().catch(() => null);
+			const claimed = screenShareClaimResponseSchema.safeParse(body);
+			if (!isCurrent()) {
+				if (
+					response.ok
+					&& claimed.success
+					&& claimed.data.share.companyId === lifecycle.companyId
+					&& claimed.data.share.spaceId === lifecycle.spaceId
+					&& claimed.data.share.presenterUserId === lifecycle.userId
+					&& claimed.data.share.shareId === shareId
+				) {
+					void releaseScreenShareLease(lifecycle, shareId, 'scope-changed');
+				}
+				return false;
+			}
+			if (
+				!response.ok ||
+				!claimed.success ||
+				claimed.data.share.companyId !== company.id ||
+				claimed.data.share.spaceId !== spaceId ||
+				claimed.data.share.presenterUserId !== currentUserId ||
+				claimed.data.share.shareId !== shareId
+			) {
+				const publicError = screenSharePublicErrorSchema.safeParse(body);
+				updateScreenShareError(publicError.success && publicError.data.code === 'PRESENTER_BUSY'
+					? SCREEN_SHARE_COPY.busy
+					: SCREEN_SHARE_COPY.failed);
+				retireUnclaimed();
+				return false;
+			}
+
+			lifecycle.share = claimed.data.share;
+			lifecycle.activeShareReadVersionAtClaim = getActiveShareReadVersion();
+			lifecycle.controller = null;
+			await manager.startScreenShare(stream, shareId);
+			if (!isCurrent()) {
+				await manager.stopScreenShare('stale-scope');
+				return false;
+			}
+			lifecycle.attached = true;
+			updateOwnedScreenShare({ identity, share: claimed.data.share });
+			updateDisplayStream({ presenterUserId: currentUserId, shareId, stream });
+			updateScreenShareStatus('sharing');
+			scheduleRenewal();
+			return true;
+		} catch (shareError) {
+			if (isCurrent()) {
+				if (lifecycle.share) {
+					await stopScreenShareRef.current('error-cleanup');
+				} else {
+					retireUnclaimed();
+				}
+				if (shareError instanceof DOMException) {
+					if (shareError.name === 'AbortError') updateScreenShareError(SCREEN_SHARE_COPY.cancelled);
+					else if (shareError.name === 'NotAllowedError' || shareError.name === 'InvalidStateError') updateScreenShareError(SCREEN_SHARE_COPY.permission);
+					else if (shareError.name === 'NotFoundError') updateScreenShareError(SCREEN_SHARE_COPY.noDisplay);
+					else updateScreenShareError(SCREEN_SHARE_COPY.failed);
+				} else {
+					updateScreenShareError(SCREEN_SHARE_COPY.failed);
+				}
+			} else if (lifecycle.requestedShareId) {
+				// The server may have committed the exact claim even when the
+				// retired browser request ends without an observable Response.
+				// Compensation uses only the original route/session/share fence
+				// and never commits UI or media state into the replacement scope.
+				await releaseScreenShareLease(
+					lifecycle,
+					lifecycle.requestedShareId,
+					'scope-changed',
+				);
+			}
+			return false;
+		} finally {
+			if (
+				screenShareLifecycleRef.current === null
+				&& screenShareGenerationRef.current >= generation
+			) {
+				updateScreenShareStatus('idle');
+			}
+		}
+	}, [company?.id, currentUserId, getActiveShareReadVersion, managerIdentity, presenceSessionId, releaseScreenShareLease, spaceId, updateDisplayStream, updateOwnedScreenShare, updateScreenShareError, updateScreenShareStatus, webrtcManager]);
+
+	useEffect(() => {
+		const lifecycle = screenShareLifecycleRef.current;
+		if (
+			lifecycle
+			&& lifecycle.share
+			&& lifecycle.manager === webrtcManager
+			&& lifecycle.identity === managerIdentity
+			&& activeShareObservationVersion > lifecycle.activeShareReadVersionAtClaim
+		) {
+			const isExactOwnedShare = Boolean(
+				signalingActiveShare
+				&& signalingActiveShare.companyId === lifecycle.companyId
+				&& signalingActiveShare.spaceId === lifecycle.spaceId
+				&& signalingActiveShare.presenterUserId === lifecycle.userId
+				&& signalingActiveShare.shareId === lifecycle.share?.shareId
+			);
+			if (!isExactOwnedShare) {
+				void stopScreenShareRef.current('error-cleanup');
+				return;
+			}
+			lifecycle.activeShareReadVersionAtClaim = activeShareObservationVersion;
+		}
+		updateDisplayStream((current) => {
+			if (!current) return current;
+			if (lifecycle?.attached && current.shareId === lifecycle.share?.shareId) return current;
+			if (
+				signalingActiveShare
+				&& current.presenterUserId === signalingActiveShare.presenterUserId
+				&& current.shareId === signalingActiveShare.shareId
+			) return current;
+			return null;
+		});
+	}, [activeShareObservationVersion, managerIdentity, signalingActiveShare, updateDisplayStream, webrtcManager]);
 
 	// Helper to check if a user is muted
 	const isUserMuted = useCallback((userId: string) => { if (userId === currentUserId) return isMuted;
 		return mutedUserIds.has(userId); }, [currentUserId, isMuted, mutedUserIds]);
+	const activeScreenShare = ownedScreenShare?.identity === managerIdentity
+		? ownedScreenShare.share
+		: signalingActiveShare;
 
 	const value: AudioContextValue = {
 		webrtcManager,
@@ -276,11 +786,18 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 		micPermission,
 		speakingUsers,
 		error,
+		activeScreenShare,
+		displayStream,
+		screenShareStatus,
+		screenShareError,
+		currentUserId,
 		initializeAudio,
 		setMuted,
 		toggleMute,
 		setSpeaking,
 		cleanup,
+		startScreenShare,
+		stopScreenShare,
 		peerCount,
 		mutedUserIds,
 		isUserMuted,

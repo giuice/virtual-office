@@ -29,8 +29,15 @@ import { YouAreHereChip } from './modern/YouAreHereChip';
 import { NeighborhoodManager } from './neighborhoods/NeighborhoodManager';
 import { useNeighborhoods } from '@/hooks/queries/useNeighborhoods';
 import { useNeighborhoodFilters } from '@/hooks/useNeighborhoodFilters';
-import { AudioProvider } from '@/contexts/AudioContext';
+import { AudioProvider, useAudio } from '@/contexts/AudioContext';
 import { FloorPlanToolbar } from './FloorPlanToolbar';
+import { FloorPlanPresentationStage } from './FloorPlanPresentationStage';
+
+function FloorPlanPresentationSlot({ currentUserId }: { currentUserId?: string }) {
+  const { activeScreenShare } = useAudio();
+  if (!activeScreenShare) return null;
+  return <FloorPlanPresentationStage currentUserId={currentUserId} />;
+}
 const handleDuplicateRoom = (_room: Space) => {
   console.warn("handleDuplicateRoom needs API integration");
 };
@@ -459,6 +466,8 @@ export function FloorPlan() {
           onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
           onCreateRoom={() => setIsRoomDialogOpen(true)}
           onOpenNeighborhoodManager={() => setIsNeighborhoodManagerOpen(true)}
+          isCurrentOccupant={currentSpaceId !== undefined}
+          currentUserId={currentUserProfile?.id}
           onOpenSelectedChat={() => {
             if (selectedSpace) void handleOpenChat(selectedSpace);
           }}
@@ -468,6 +477,7 @@ export function FloorPlan() {
         {/* Main Floor Plan Card */}
         <Card className="w-full">
           <div className="p-4 min-h-[600px]"> {/* Added min-height */}
+            <FloorPlanPresentationSlot currentUserId={currentUserProfile?.id} />
             <ModernFloorPlan
               spaces={neighborhoodFilteredSpaces || []}
               neighborhoods={neighborhoods}
