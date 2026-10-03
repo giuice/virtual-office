@@ -51,9 +51,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Presence unit, API, hook, and boundary suites
-        run: npm run test:presence
-      - name: Full isolated unit suite
+      # The full suite includes the Presence unit, API, hook, and boundary tests.
+      - name: Full isolated suite including Presence
         run: npm test
       - name: Type check
         run: npm run type-check

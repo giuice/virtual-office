@@ -188,7 +188,7 @@ Dois workflows de GitHub Actions executam testes. Ambos aceitam execução manua
 |---|---|---|
 | `.github/workflows/e2e-playwright.yml` (`Playwright E2E`) | `e2e` | Usa Node.js 20, executa `npm ci`, instala os navegadores Playwright, materializa `.env.local` a partir de secrets e roda `npm run test:api:ci`. O relatório HTML é publicado como artefato. |
 | `.github/workflows/presence-remediation.yml` (`presence-remediation`) | `movement-gate` | Executa `node scripts/presence-movement-gate.mjs`. |
-| `.github/workflows/presence-remediation.yml` | `presence-unit-and-quality` | Executa `npm run test:presence` e `npm test`, seguidos de type-check, lint e build. |
+| `.github/workflows/presence-remediation.yml` | `presence-unit-and-quality` | Executa `npm test`, que inclui os testes isolados de Presence, seguido de type-check, lint e build. A seleção `npm run test:presence` continua disponível localmente, mas não é executada separadamente no CI. |
 | `.github/workflows/presence-remediation.yml` | `presence-db` | Inicia e reseta Supabase local, roda `npm run test:presence:db` e `npm run test:presence:concurrency` e publica a evidência de concorrência. |
 | `.github/workflows/presence-remediation.yml` | `presence-e2e` | Provisiona um Supabase local descartável, instala Chromium e executa `npm run test:presence:e2e`; o stack é encerrado mesmo após falhas. |
 

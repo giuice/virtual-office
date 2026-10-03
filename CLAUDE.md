@@ -202,6 +202,23 @@ Common commands:
 
 ## Cross-model delegation
 
+Use the following policy for cross-provider delegation (OpenAI to Anthropic or
+Anthropic to OpenAI). Same-provider specialist agents retain their own contracts.
+Pass the full model ID and an explicit effort level; do not rely on runtime defaults or
+moving aliases.
+
+| Provider | Model ID | Standard work | Important work |
+| --- | --- | --- | --- |
+| OpenAI | `gpt-6-sol` (GPT-6 Sol) | `high` | `max` |
+| Anthropic | `claude-opus-5-5` (Claude Opus 5.5) | `high` | `xhigh` |
+
+Important work includes adversarial reviews, review gates, acceptance checks,
+security-critical changes, and difficult investigations where the first fix
+failed or the root cause remains uncertain. Use the important-work effort from
+the start for these tasks. This policy selects model and effort; it does not
+expand which tasks may be delegated. This policy supersedes older model and
+effort recommendations in saved memories or historical task notes.
+
 Delegation mechanics depend on which model family is orchestrating, because each
 family drives the other one through a different runtime. Read the file that
 matches the model you are running as, and follow it completely:

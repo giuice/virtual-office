@@ -9,15 +9,27 @@ equivalent Claude plugin. So this side drives Claude through the `claude` CLI
 inside a WezTerm pane. WezTerm's mux behaves like tmux and keeps the pane alive
 after the calling turn ends, which is what makes a long review survivable.
 
+## Model and effort policy
+
+| Work delegated to Anthropic | Model ID | Effort |
+| --- | --- | --- |
+| Standard work, when delegation is explicitly requested | `claude-opus-5-5` | `high` |
+| Important work: adversarial review, review gates, acceptance checks | `claude-opus-5-5` | `xhigh` |
+
+Use Claude Opus 5.5 explicitly. The moving `opus` alias is not a version pin.
+Pass `--model claude-opus-5-5 --effort high` for standard work and
+`--model claude-opus-5-5 --effort xhigh` for important work.
+
 ## What gets delegated
 
-- **Adversarial review: delegate to Claude Opus 5.** Every diff that is about to
-  be handed to the user gets reviewed by Opus 5 as a second, hostile pair of
-  eyes. Model id: `claude-opus-5`, or `--model opus`.
-- **Implementation, debugging, and research stay local.** Do not round-trip
-  ordinary coding work to Claude; only the adversarial pass crosses the boundary.
-- Never downgrade the review model to a cheaper Claude tier to save tokens.
-  Correctness and regression prevention take priority over cost.
+- **Adversarial review: delegate to Claude Opus 5.5 at `xhigh`.** Every diff
+  that is about to be handed to the user gets this independent adversarial review.
+- **Implementation, debugging, and research stay local** unless the user
+  explicitly requests delegation. Important delegated work follows the criteria
+  in CLAUDE.md and uses `xhigh`.
+- Never silently substitute another model or lower the required effort. If the
+  runtime rejects the model or effort, report that limitation and keep the
+  dependent review pending; do not call it accepted.
 
 ## The review prompt
 
@@ -72,7 +84,7 @@ OUT="$REPO/docs/<topic-folder>/opus-review.md"
 # 2. Spawn the review in its own pane; capture the printed pane id.
 PANE=$("$WT" cli --no-auto-start spawn --pane-id 0 --cwd "$REPO" -- \
   bash -lc "claude -p \"\$(cat $REPO/review-prompt.txt)\" \
-    --model opus --permission-mode plan > \"$OUT\" 2>&1")
+    --model claude-opus-5-5 --effort xhigh --permission-mode plan > \"$OUT\" 2>&1")
 
 # 3. Poll for completion by watching the output file, not the pane text.
 # 4. Read $OUT, then clean up:
@@ -82,7 +94,7 @@ PANE=$("$WT" cli --no-auto-start spawn --pane-id 0 --cwd "$REPO" -- \
 Notes on the `claude` invocation:
 
 - `-p` / `--print` runs one shot and exits — the right mode for a review.
-- `--model opus` selects Opus 5.
+- `--model claude-opus-5-5 --effort xhigh` pins the required review model and effort.
 - Keep the reviewer read-only. `--permission-mode plan` or an `--allowedTools`
   list restricted to read and search tools prevents it from editing the diff it
   is supposed to be judging.

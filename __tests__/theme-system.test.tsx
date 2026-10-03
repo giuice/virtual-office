@@ -1,11 +1,7 @@
 // __tests__/theme-system.test.tsx
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { VOThemeProvider, useVOThemeContext, VO_THEMES, VO_THEME_METADATA, VOTheme } from '@/contexts/ThemeContext';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { ThemeProvider } from 'next-themes';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
+import { VO_THEMES, VO_THEME_METADATA, VOTheme } from '@/contexts/ThemeContext';
 
 // Mock next-themes
 vi.mock('next-themes', async () => {
@@ -24,7 +20,7 @@ vi.mock('next-themes', async () => {
 
 // Mock auth context
 vi.mock('@/contexts/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useAuth: () => ({
     user: null,
     isAuthReady: true,
@@ -36,26 +32,6 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/lib/api', () => ({
   getUserById: vi.fn(() => Promise.resolve(null)),
 }));
-
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="data-theme" defaultTheme="paper" themes={['neon', 'zen', 'obsidian', 'paper']}>
-          <AuthProvider>
-            <VOThemeProvider>
-              {children}
-            </VOThemeProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    );
-  };
-};
 
 describe('Theme System', () => {
   beforeEach(() => {
@@ -128,14 +104,5 @@ describe('Theme System', () => {
         expect(VO_THEMES.includes(theme)).toBe(true);
       });
     });
-  });
-});
-
-describe('Theme CSS Token Verification', () => {
-  it('tokens.css file should exist and be importable', async () => {
-    // This validates the CSS file structure exists
-    const tokensPath = 'src/styles/themes/tokens.css';
-    // File existence is validated by the build process
-    expect(tokensPath).toBeTruthy();
   });
 });
