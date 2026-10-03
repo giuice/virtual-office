@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt (completed 2026-05-17)
 - [x] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection (completed 2026-05-13)
 - [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
-- [ ] **Phase 3: Spatial Audio and Screen Sharing** - Demonstrate reliable existing spatial audio plus single-presenter screen sharing on an integrated floor-plan stage
+- [x] **Phase 3: Spatial Audio and Screen Sharing** - Demonstrate reliable existing spatial audio plus single-presenter screen sharing on an integrated floor-plan stage
 - [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
 - [ ] **Phase 5: Messaging Resilience** - Offline queue, reconnection, polling fallback, typing indicators, multi-device sync, analytics, notifications
 - [ ] **Phase 6: Meeting Notes** - Meeting note creation, action items, transcript upload, AI summaries, search, and notifications
