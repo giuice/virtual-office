@@ -1,5 +1,7 @@
 # Requirements: Virtual Office
 
+> Historical reference. GSD is retired; do not execute its skills or workflows. New delivery uses `spec-to-done` and an approved Ready SPEC under `spec-interview/<slug>/`. This file provides context, not an execution contract.
+
 **Defined:** 2026-02-23
 **Core Value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
 
@@ -10,8 +12,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Stabilization
 
 - [x] **STAB-01**: Floor plan space cards render at correct size matching v3 design spec (`docs/ux-space-grid-v3.html`)
-- [ ] **STAB-02**: Auth login and signup flows work without errors on current branch
-- [ ] **STAB-03**: Knock to Enter (Story 3-16) channel timeout issue is verified fixed or resolved
+- [x] **STAB-02**: Auth login and signup flows work without errors on current branch
+- [x] **STAB-03**: Knock to Enter (Story 3-16) channel timeout issue is verified fixed or resolved
 - [x] **STAB-04**: Avatar components consolidated from 11 to 2 canonical (EnhancedAvatarV2, UploadableAvatar)
 
 ### Floor Plan Completion
@@ -23,12 +25,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Messaging Timeline
 
+Source baseline reconciled 2026-10-03 in [phase-4-source-baseline.md](../docs/messaging/phase-4-source-baseline.md). The unchecked requirements below are full user workflows; existing types, APIs, status icons, and debug-only components do not satisfy them.
+
 - [ ] **MSG-01**: User can see read receipts on sent messages showing who read and when (Story 4A.4)
 - [ ] **MSG-02**: User can drag files into composer to attach them with upload progress and inline preview (Stories 4A.7-8)
 - [ ] **MSG-03**: User can record and send voice notes with waveform visualization and playback (Story 4A.9)
 - [ ] **MSG-04**: User can filter message feed to show only starred messages (Story 4A.11)
 
 ### Messaging Resilience
+
+Typing indicators and bounded message-subscription reconnect code already exist in the production source. Phase 5 must reuse and verify them; its requirements stay unchecked until their complete runtime acceptance criteria are demonstrated.
 
 - [ ] **RESIL-01**: User's messages queue locally when offline and send automatically on reconnect (Story 4B.1)
 - [ ] **RESIL-02**: Supabase Realtime reconnects with exponential backoff and resumes subscriptions (Story 4B.2)
@@ -141,31 +147,31 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | STAB-01 | Phase 1 | Complete |
-| STAB-02 | Phase 1 | Pending |
-| STAB-03 | Phase 1 | Pending |
+| STAB-02 | Phase 1 | Complete — 01-02 human verification |
+| STAB-03 | Phase 1 | Complete — 01-02 verification + owner-confirmed Knock |
 | STAB-04 | Phase 1 | Complete |
 | FLOR-01 | Phase 2 | Complete |
 | FLOR-02 | Phase 2 | Complete |
 | FLOR-03 | Phase 2 | Complete |
 | FLOR-04 | Phase 2 + 2.1 | Complete |
-| VID-01 | Phase 3 | Gaps Found |
-| VID-02 | Phase 3 | Gaps Found |
+| VID-01 | Phase 3 | Complete — owner accepted 2026-10-03 |
+| VID-02 | Phase 3 | Complete — owner accepted 2026-10-03 |
 | VID-03 | Future — Advanced Collaboration | Deferred |
-| VID-04 | Phase 3 | Gaps Found |
+| VID-04 | Phase 3 | Complete — owner accepted 2026-10-03 |
 | VID-05 | Future — Advanced Collaboration | Deferred |
 | VID-06 | Future — Advanced Collaboration | Deferred |
 | VID-07 | Future — Advanced Collaboration | Deferred |
 | VID-08 | Future — Advanced Collaboration | Deferred |
 | VID-09 | Future — Advanced Collaboration | Deferred |
 | VID-10 | Future — Advanced Collaboration | Deferred |
-| MSG-01 | Phase 4 | Pending |
-| MSG-02 | Phase 4 | Pending |
-| MSG-03 | Phase 4 | Pending |
-| MSG-04 | Phase 4 | Pending |
+| MSG-01 | Phase 4 | Partial — read tracking/status exists; reader/time details missing |
+| MSG-02 | Phase 4 | Partial — upload APIs exist; production composer integration missing |
+| MSG-03 | Phase 4 | Pending — type only; recording/send/playback missing |
+| MSG-04 | Phase 4 | Partial — star infrastructure exists; production filter/actions missing |
 | RESIL-01 | Phase 5 | Pending |
-| RESIL-02 | Phase 5 | Pending |
+| RESIL-02 | Phase 5 | Partial — bounded subscription backoff exists; full reconnect acceptance pending |
 | RESIL-03 | Phase 5 | Pending |
-| RESIL-04 | Phase 5 | Pending |
+| RESIL-04 | Phase 5 | Implemented in production source — two-user acceptance not rechecked |
 | RESIL-05 | Phase 5 | Pending |
 | RESIL-06 | Phase 5 | Pending |
 | RESIL-07 | Phase 5 | Pending |
@@ -193,4 +199,4 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-07-22 after Phase 3 scope reduction and Advanced Collaboration deferral*
+*Last updated: 2026-10-03 after owner acceptance and source-based messaging reconciliation; no new runtime/deployment evidence claimed*

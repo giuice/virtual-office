@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 03
-current_phase_name: video-and-screen-sharing
-status: In Progress
-stopped_at: Completed 03-15-PLAN.md
-last_updated: "2026-08-01T13:28:51.200Z"
-last_activity: 2026-08-01
+current_phase: 04
+current_phase_name: messaging-timeline
+status: reference_only
+stopped_at: Phase 3 owner accepted; Phase 4 baseline reconciled
+last_updated: "2026-10-03T11:46:42Z"
+last_activity: 2026-10-03
 progress:
-  total_phases: 4
+  total_phases: 8
   completed_phases: 4
   total_plans: 26
   completed_plans: 26
@@ -17,63 +17,38 @@ progress:
 
 # Project State
 
+> Historical reference. GSD is retired; do not execute its skills or workflows. New delivery uses `spec-to-done` and an approved Ready SPEC under `spec-interview/<slug>/`. This file provides context, not an execution contract.
+
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-23)
+See: .planning/PROJECT.md (updated 2026-10-03)
 
 **Core value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
-**Current focus:** Phase 03 — video-and-screen-sharing
+**Next product area:** Phase 04 — Messaging Timeline, as input for a new spec-to-done SPEC; no new development contract is approved yet.
 
 ## Current Position
 
-Phase: 03 (video-and-screen-sharing) — EXECUTING
-Plan: 15 of 15
+Next reference phase: 04 (messaging-timeline) — READY FOR SPEC DISCUSSION
+Plan: none written; scope and context must be agreed before execution plans.
+Baseline: [docs/messaging/phase-4-source-baseline.md](../docs/messaging/phase-4-source-baseline.md)
 
-## Performance Metrics
+Phase 03 is closed for routing by the owner's 2026-10-03 completion confirmation, 15/15 execution summaries, and subsequent recorded corrections. Old UAT failures and manual handoff instructions describe earlier snapshots; they do not instruct a new session to rerun completed waves.
 
-**Velocity:**
+### Next action
 
-- Total plans completed: 14
-- Average duration: 3m 34s
-- Total execution time: 0.06 hours
+Use the messaging baseline as input to spec-to-done Specify: choose the first slice, define reader/time semantics and starred-filter scope, then settle upload limits/previews and voice-note behavior. New SPEC, state, PLAN, TRACK, and REPORT belong under spec-interview/<slug>/. Require user-confirmed Ready SPEC before planning or implementation. Suggested first slice: read receipts + starred filtering, reusing the existing backend; this is a recommendation, not an approved scope.
 
-**By Phase:**
+### Current planning inventory
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-stabilization | 1 | 3m 34s | 3m 34s |
+| Phase | Execution plans | Summaries | Routing status |
+| --- | --- | --- | --- |
+| 01 — Stabilization | 2 | 2 | Complete |
+| 02 — Floor Plan Completion | 8 | 8 | Complete |
+| 02.1 — Presence Reload Fixes | 1 | 1 | Complete |
+| 03 — Spatial Audio and Screen Sharing | 15 | 15 | Complete — owner accepted |
+| 04 — Messaging Timeline | 0 | 0 | Ready for discussion |
 
-**Recent Trend:**
-
-- Last 5 plans: 01-01 (3m 34s)
-- Trend: n/a (insufficient data)
-
-*Updated after each plan completion*
-| Phase 02 P00 | 2m | 2 tasks | 5 files |
-| Phase 02-floor-plan-completion P02 | 9m 5s | 2 tasks | 4 files |
-| Phase 02-floor-plan-completion P01 | 11m | 2 tasks | 4 files |
-| Phase 02-floor-plan-completion P03 | 12m | 2 tasks | 5 files |
-| Phase 02 P04 | 12 min | 2 tasks | 5 files |
-| Phase 02-floor-plan-completion P04 | 10m | 2 tasks | 3 files |
-| Phase 02-floor-plan-completion P05 | 4m | 2 tasks | 2 files |
-| Phase 02-floor-plan-completion P06 | 4m | 1 tasks | 4 files |
-| Phase 02-floor-plan-completion P07 | 3m | 1 tasks | 3 files |
-| Phase 02.1-presence-reload-fixes P01 | 2m | 2 tasks | 2 files |
-**Per-Plan Metrics:**
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 03 P01 | 7min | 2 tasks | 6 files |
-| Phase 03 P02 | 19min | 2 tasks | 2 files |
-| Phase 03 P03 | 18min | 2 tasks | 4 files |
-| Phase 03 P04 | 10min | 2 tasks | 6 files |
-| Phase 03-video-and-screen-sharing P11 | 29min | 1 tasks | 5 files |
-| Phase 03-video-and-screen-sharing P05 | 12min | 2 tasks | 10 files |
-| Phase 03-video-and-screen-sharing P06 | 50min | 1 tasks | 7 files |
-| Phase 03-video-and-screen-sharing P14 | 18min | 2 tasks | 3 files |
-| Phase 03-video-and-screen-sharing P12 | ~3h | 1 task | 5 files plus planning metadata |
-| Phase 03-video-and-screen-sharing P13 | 5m | 2 tasks | 1 files |
-| Phase 03-video-and-screen-sharing P15 | 14min | 3 tasks | 5 files |
+There are 8 roadmap phases, including 02.1; 4 are complete. All 26 existing execution plans have summaries. Future plan counts and durations are not estimated from old placeholders. Historical per-plan timing remains in the phase summaries.
 
 ## Accumulated Context
 
@@ -131,7 +106,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 03-06: Screen-sharing browser evidence is loopback-only and requires the disposable local fixture.
 - [Phase ?]: 03-06: Deterministic canvas streams and host-only peers prove UI/lifecycle behavior, not permissions, P2P/TURN, RLS, or concurrency.
 - [Phase ?]: 03-06: Presenter teardown sends targeted invalidation only; viewers re-read the authorized active route.
-- [Phase 03]: 03-07 permanece revision-required; o bloqueio Presence Safety não pode ser dispensado. — Reconciliação autoritativa periódica ausente pode manter activeShare, stage e video.srcObject obsoletos quando invalidações Realtime são perdidas.
+- [Phase 03]: Historical 03-07 revision-required gate was closed in 03-14 and subsequent corrective work; it is not an active Phase 4 blocker.
 - [Phase ?]: [03-14] A rota autenticada active permanece a única autoridade; Realtime e o timer apenas disparam reconciliação.
 - [Phase ?]: [03-14] Timer e leitura pertencem à assinatura exata e são cercados por identidade, sessão, token, manager, conexão e gerações.
 
@@ -139,7 +114,7 @@ Recent decisions affecting current work:
 - [Phase 03]: [03-12] The correction is a forward-only migration; Wave 12 changed no online database and performed no deployment.
 - [Phase 03]: [post-03-12] With explicit user authorization, migration `20260727123730` was applied and recorded on production project `vhabpcoyypobgasacsko`; same-target catalog readback passed.
 - [Phase 03]: [post-03-12] Production cutover observation restarted at `2026-07-27T17:06:23.560672Z`; the legacy adapter remains enabled and no cutover/adapter removal may consume evidence from before that timestamp.
-- [Phase ?]: Keep completed Phase 3 work local-only with no paid services, extra equipment, browser matrix, credentials, or online rollout.
+- [Phase 03]: Historical no-spend decision excluded paid TURN, extra equipment, and a browser matrix; later explicitly authorized online screen-share database changes are recorded in 03-TRACKER.md.
 - [Phase ?]: The free public STUN fallback remains the default; TURN is optional and not a Phase 3 completion gate.
 - [Phase ?]: Restrictive-network traversal and Chrome/Firefox/Safari parity remain explicitly unverified.
 - [Phase ?]: Any future production rollout requires a new request, exact-target authorization, provenance reconciliation, and a separate database-first plan.
@@ -148,7 +123,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+Prepare the new spec-to-done SPEC from the production-source baseline; MSG-01 through MSG-04 remain incomplete end-to-end. Do not start a GSD workflow.
+
+### Phase 4 evidence and workflow limits
+
+- Source inspection is the messaging baseline; no new browser, application, or database tests were run during this planning reconciliation. Partial implementations are not marked as satisfied requirements.
+- GSD is retired by the owner instruction on 2026-10-03. Never invoke its skills, scripts, workflows, automation, update, or reinstallation. Its absent runtime and stale skill references are historical facts, not prerequisites or repair tasks. New delivery uses spec-to-done.
+- `.planning/config.json` and old GSD agent profiles are reference-only and are not active workflow configuration. Current development/delegation policy is in CLAUDE.md and the matching delegation file.
 
 ### Blockers/Concerns
 
@@ -161,7 +142,7 @@ None yet.
 - Screen-share signaling migration `20260801155137` was applied and recorded on production project `vhabpcoyypobgasacsko` on 2026-08-01. Browser Broadcast INSERT is removed, corrected clients use `media:v2`, and the production Realtime HTTP smoke returned 202.
 - Screen-share signaling sender authority now belongs to the authenticated server route; clients submit strict intent and cannot choose source user, company, or space fields.
 - Multi-user screen delivery was corrected on 2026-08-04 by matching the server Realtime send timeout to the ten-second client default. A real two-user test reached connected peers and delivered a live remote video track. Release invalidation now runs after the response, and a later acknowledged signal clears stale transport feedback. No database change was required.
-- Production migration history remains divergent: four remote-only historical versions and nine June local-only versions make ordinary `db push` fail closed. Reconcile exact provenance before any broad production migration; never use `--include-all` or broad history repair.
+- Last recorded production migration-history concern: four remote-only historical versions and nine June local-only versions (03-TRACKER.md, August). This was not rechecked on 2026-10-03. Run target preflight and reconcile exact provenance before any future online migration; never use `--include-all` or broad history repair.
 
 ### Quick Tasks Completed
 
@@ -172,13 +153,13 @@ None yet.
 
 ### Roadmap Evolution
 
-- Phase 3 edited: edited fields: title, goal, requirements, optional/deferred scope, success_criteria, plan placeholders, requirements traceability
+- Phase 3 edited: title, goal, requirements, optional/deferred scope, success criteria, and traceability. On 2026-10-03 owner acceptance closed phase routing; Phase 4 now starts from a source inventory instead of unimplemented-feature assumptions.
 
 ## Session Continuity
 
-**Last session:** 2026-08-01T13:28:51.178Z
+**Last session:** 2026-10-03T11:46:42Z
 
-Last activity: 2026-08-01
-Stopped at: Completed 03-15-PLAN.md
-Resume file: None
-Human handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md
+Last activity: 2026-10-03 — owner confirmed Knock/screen-sharing completion; reconciled Phase 4 baseline and routing.
+Stopped at: source reconciliation complete; Phase 4 is input for a new spec-to-done SPEC. No implementation or new execution plan started.
+Resume file: docs/messaging/phase-4-source-baseline.md
+Historical Phase 3 handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md (superseded for routing by owner acceptance)

@@ -1,5 +1,7 @@
 # Virtual Office
 
+> Historical reference. GSD is retired; do not execute its skills or workflows. New delivery uses `spec-to-done` and an approved Ready SPEC under `spec-interview/<slug>/`. This file provides context, not an execution contract.
+
 ## What This Is
 
 Virtual Office is an AI-powered digital workspace that recreates the ambient awareness and spontaneous collaboration of physical offices. Teams see a spatial floor plan with rooms, hear colleagues via P2P audio, chat in real-time, and get AI-powered meeting intelligence. Built for remote/hybrid teams (5-500 users) who are tired of fragmented tools (Slack + Zoom + email) and want a single spatial platform. The vision is a full Slack replacement with spatial context as the differentiator.
@@ -15,7 +17,7 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 - Auth: Email/password authentication with Supabase Auth, SSR session management, company-based multi-tenancy with RLS isolation
 - Auth: User invitation workflow with token validation, auto-accept, role assignment (Admin/Member), 10-user freemium limit
 - Auth: Registration UX with email confirmation, resend inline, error mapping
-- Infrastructure: Next.js 15 + React 19 + TypeScript strict + Supabase PostgreSQL + Repository Pattern
+- Infrastructure: Next.js App Router + React + TypeScript strict + Supabase PostgreSQL + Repository Pattern; use package.json and the lockfile for current versions.
 - Infrastructure: TanStack Query v5 state management, Realtime subscriptions
 - Floor Plan: Interactive space cards with Orbit/Analyst/Cinema perspectives, theme system (Neon/Zen/Obsidian/Paper)
 - Floor Plan: Avatar constellation with status rings, speaking animation, hover effects, overflow badges
@@ -32,30 +34,21 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 - Messaging: Reaction chips and emoji picker
 - Messaging: Pinned and starred message indicators
 - Messaging: Foundation — data contracts, repositories, APIs, drawer shell, conversation grouping
+- Stabilization: Auth/login fixes and avatar consolidation completed in Phase 1.
+- Floor Plan: Knock request/approval/entry, defaults, reconnection, and Presence reload corrections completed; owner confirmed Knock on 2026-10-03.
+- Collaboration: Spatial audio and single-presenter screen sharing completed; owner accepted Phase 3 on 2026-10-03. See 03-TRACKER.md for historical runtime/database evidence and its deployment limits.
 
 ### Active
 
-- [ ] Fix: Floor plan space cards broken by design branch (spaces too small vs v3 spec)
-- [ ] Fix: Auth login/signup issues (undiagnosed)
-- [ ] Fix: Verify 3-16 Knock to Enter timeout resolution
-- [ ] Epic 3 remaining: Mobile responsive floor plan (3-14)
-- [ ] Epic 3 remaining: Knock to Enter workflow (3-16)
-- [ ] Epic 3 remaining: Auto-remove offline users from space display (3-17)
-- [ ] Epic 3 remaining: Default space assignment & reconnection grace period (3-18)
-- [ ] Epic 4A: Read receipts display (4A.4)
-- [ ] Epic 4A: Infinite scroll with pagination (4A.5)
-- [ ] Epic 4A: Auto-scroll to new messages (4A.6)
-- [ ] Epic 4A: File attachment drag-and-drop (4A.7)
-- [ ] Epic 4A: File attachment preview (4A.8)
-- [ ] Epic 4A: Voice note recording (4A.9)
-- [ ] Epic 4A: Conversation search (4A.10)
-- [ ] Epic 4A: Starred messages filter (4A.11)
-- [ ] Epic 4B: Offline message queue, reconnection, polling fallback, typing indicators, multi-client sync, analytics, notifications
-- [ ] Epic 5: Meeting notes with AI summaries and action item tracking (external transcript upload)
-- [ ] Epic 6: Company-wide announcements with priority, expiration, filtering
-- [ ] Epic 7: AI-powered features — transcription, semantic search, summarization, assistant, translation, cost monitoring
-- [ ] Epic 8B: Video conferencing, screen sharing, virtual whiteboard, call recording, background blur
-- [ ] Epic 9: Admin dashboard — presence reports, space utilization, compliance export, user management, privacy controls
+- [ ] Phase 4 / MSG-01: complete read receipt details (reader identity and time).
+- [ ] Phase 4 / MSG-02: complete production file sending, drag/drop, progress, and inline previews.
+- [ ] Phase 4 / MSG-03: implement voice-note recording, sending, waveform, and playback.
+- [ ] Phase 4 / MSG-04: complete production star/unstar actions and the personal starred-message filter.
+- [ ] Phase 5: verify and finish messaging resilience from existing typing/backoff/read-sync foundations.
+- [ ] Phase 6: meeting notes with AI summaries and action item tracking.
+- [ ] Phase 7: company-wide announcements with priority, expiration, filtering, and read tracking.
+
+REQUIREMENTS.md preserves historical IDs and the release split as reference; the new approved SPEC will define its own contract. Mobile floor-plan work, automatic infinite scrolling/new-message navigation, conversation content search, and advanced video collaboration were assigned to v2. Basic history loading and auto-scroll already exist and should not be rebuilt as new Phase 4 features.
 
 ### Out of Scope
 
@@ -75,13 +68,13 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 ## Context
 
 **Brownfield project** with significant existing code:
-- **Tech stack:** Next.js 15.3.0, React 19.1.0, TypeScript 5 strict, Supabase (Postgres + Realtime + Auth + Storage), TailwindCSS 4.1.3, shadcn/ui, TanStack Query v5
+- **Tech stack:** Next.js App Router, React, TypeScript strict, Supabase (Postgres + Realtime + Auth + Storage), TailwindCSS, shadcn/ui, and TanStack Query. Current versions come from package.json and the lockfile; the old Next.js 15/React 19.1 snapshot is not current.
 - **Architecture:** Repository Pattern (interfaces + Supabase implementations), RLS enforcement, three-layer state (TanStack Query + React Context + local state)
-- **Completion:** ~35% of total scope (Epics 1, 2, 8A done; Epic 3 ~80% done; Epic 4A ~27% done)
-- **Tests:** 400+ tests across Vitest + Playwright
-- **Known tech debt:** Avatar component consolidation (11 -> 2 canonical), messaging component naming inconsistency
-- **Current blocker:** Design branch broke floor plan space card sizing (need to align with v3 spec from `docs/ux-space-grid-v3.html`)
-- **Auth issues:** Login/signup flow has undiagnosed problems on current branch
+- **Delivery state (2026-10-03):** Phases 1, 2, 2.1, and 3 complete for routing; Phase 4 ready for discussion. Broad product completion percentages are not recalculated from old epic estimates.
+- **Tests:** Existing Vitest and Playwright coverage; inspect package scripts/manifests for the current inventory. No suite was rerun for this planning-only reconciliation.
+- **Current messaging debt:** Parallel legacy/enhanced components; enhanced upload and star-action variants are used by debug pages while the production drawer uses MessageFeed + MessageComposer.
+- **Current next step:** Use docs/messaging/phase-4-source-baseline.md as input for a new spec-to-done SPEC before planning development.
+- **Historical auth issues:** Closed by 01-02 human verification; not an active messaging blocker.
 - **Design specs:** `docs/ux-space-grid-v3.html` (visual target), `docs/ux-space-grid-v3-implementation-plan.md` (implementation guide)
 
 **Market positioning:** Fills gap between generic chat (Slack/Teams) and gaming-focused spatial (Gather.town). Key differentiators: professional spatial UI, enterprise messaging, AI meeting intelligence, compliance-ready presence audit.
@@ -90,7 +83,7 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 
 ## Constraints
 
-- **Tech stack**: Must use existing Next.js 15 + Supabase stack — no framework migrations
+- **Tech stack**: Preserve the existing Next.js + Supabase stack; confirm any new migration requirement in the new SPEC.
 - **Brownfield**: All new work must integrate with existing Repository Pattern, RLS policies, and click-stop protocol
 - **AI costs**: Hard limit $500/month for AI API calls; per-user caps required
 - **WebRTC scale**: P2P mesh limited to ~8 users/room; SFU upgrade needed for larger meetings (future)
@@ -108,7 +101,7 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 | Client-side VAD for speaking detection | Zero network traffic, zero latency | Good |
 | External transcript upload before native video | Provides AI meeting value without waiting for Epic 8B | Good |
 | OpenAI GPT-4 for initial AI provider | Best transcription via Whisper, proven API | Pending |
-| Bugs-first stabilization phase | Fix broken floor plan + auth before new features | Pending |
+| Bugs-first stabilization phase | Fix broken floor plan + auth before new features | Completed in Phase 1 |
 
 ---
-*Last updated: 2026-05-13 after Phase 02.1 presence reload fixes*
+*Last updated: 2026-10-03 after owner-confirmed Knock/screen-sharing completion and messaging baseline reconciliation*

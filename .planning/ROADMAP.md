@@ -1,8 +1,10 @@
 # Roadmap: Virtual Office
 
+> Historical reference. GSD is retired; do not execute its skills or workflows. New delivery uses `spec-to-done` and an approved Ready SPEC under `spec-interview/<slug>/`. This file provides context, not an execution contract.
+
 ## Overview
 
-This roadmap takes a brownfield Virtual Office application from its current ~35% completion state through full v1 delivery. The journey starts with stabilizing broken functionality (auth, floor plan sizing, avatar debt), then completes remaining floor plan features, immediately follows with a reliable spatial-audio and screen-sharing demonstration that leverages the existing WebRTC foundation, then rounds out messaging features and resilience, and finishes with meeting intelligence and company announcements. Each phase delivers a coherent, verifiable capability that builds on the previous.
+This roadmap tracks the remaining v1 delivery of a brownfield Virtual Office application. Stabilization, floor-plan completion, Presence reload fixes, Knock, and spatial audio/screen sharing are complete for phase routing; the current phase is Messaging Timeline. The journey starts with stabilizing broken functionality (auth, floor plan sizing, avatar debt), then completes remaining floor plan features, immediately follows with a reliable spatial-audio and screen-sharing demonstration that leverages the existing WebRTC foundation, then rounds out messaging features and resilience, and finishes with meeting intelligence and company announcements. Each phase delivers a coherent, verifiable capability that builds on the previous.
 
 ## Phases
 
@@ -16,8 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Stabilization** - Fix broken auth, floor plan sizing, knock-to-enter timeout, and consolidate avatar tech debt (completed 2026-05-17)
 - [x] **Phase 2: Floor Plan Completion** - Deliver remaining spatial features: knock-to-enter, offline removal, default spaces, reconnection (completed 2026-05-13)
 - [x] **Phase 2.1: Presence Reload Fixes (INSERTED)** - Fix remaining presence reload bugs: lastSpaceId persistence and UI/DB divergence
-- [x] **Phase 3: Spatial Audio and Screen Sharing** - Demonstrate reliable existing spatial audio plus single-presenter screen sharing on an integrated floor-plan stage
-- [ ] **Phase 4: Messaging Timeline** - Add read receipts, file attachments, voice notes, and starred message filtering
+- [x] **Phase 3: Spatial Audio and Screen Sharing** - Reliable spatial audio and single-presenter screen sharing on the integrated floor-plan stage (owner confirmed completion 2026-10-03)
+- [ ] **Phase 4: Messaging Timeline** - Complete the existing messaging foundation with reader/time details, usable attachments, voice notes, and a starred-message filter (ready for discussion)
 - [ ] **Phase 5: Messaging Resilience** - Offline queue, reconnection, polling fallback, typing indicators, multi-device sync, analytics, notifications
 - [ ] **Phase 6: Meeting Notes** - Meeting note creation, action items, transcript upload, AI summaries, search, and notifications
 - [ ] **Phase 7: Announcements** - Company-wide announcements with priority, filtering, admin controls, and read tracking
@@ -143,7 +145,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [x] 03-07-PLAN.md — BLOCKED (`revision-required`): add periodic authoritative reconciliation in `useAudioSignaling` and prove cleanup after missed invalidations before Wave 11
+- [x] 03-07-PLAN.md — Initial review required periodic authoritative reconciliation; closed by 03-14 and subsequent corrective work
 
 **Wave 11** *(targeted correction required by the Wave 10 review gate)*
 
@@ -159,24 +161,29 @@ Plans:
 
 ### Phase 4: Messaging Timeline
 
-**Goal**: Users have a rich messaging experience with read awareness, file sharing, voice notes, and message organization
-**Depends on**: Phase 1
+**Goal**: Finish the messaging features in the production drawer, reusing the existing APIs, repositories, hooks, and cache.
+**Depends on**: Phase 1; next in execution order after the completed Phase 3
 **Requirements**: MSG-01, MSG-02, MSG-03, MSG-04
+**Status**: Ready for discussion; no execution plans written yet
+**Baseline**: [Source inventory and remaining work](../docs/messaging/phase-4-source-baseline.md), reconciled 2026-10-03
+
+**Already present**: text messages, room/DM conversations, replies/threads, reactions, cursor-based history loading, basic read indicators, attachment APIs, and star/pin infrastructure. Existing typing and subscription-backoff code also informs Phase 5; it is not evidence that either phase is complete.
+
+**Remaining work**:
+
+- MSG-01: show the reader identities and read times; the current feed only derives a basic read status.
+- MSG-02: wire file sending into the production composer, including drag/drop, progress, and usable previews. The enhanced upload composer is currently used by the debug comparison page.
+- MSG-03: implement the voice-note recording, send, waveform, and playback workflow; only a voice attachment type currently exists.
+- MSG-04: wire star/unstar in the production feed and add the current user's starred-message filter; repository/actions alone do not deliver the filter.
+
 **Success Criteria** (what must be TRUE):
 
-  1. User can see who read their sent messages and when, displayed as read receipt indicators
-  2. User can drag files into the composer, see upload progress, and view inline previews of attached files
-  3. User can record a voice note, see waveform visualization during recording, and play it back in the message feed
-  4. User can receive voice note, see waveform visualization during recording, and play it back in the message feed
-  5. User can toggle a starred messages filter to see only their starred messages in the feed
+  1. The sender can see who read a sent message and when, with correct conversation authorization.
+  2. A user can drag files into the production composer, see upload progress, send them, and view inline previews in the conversation.
+  3. A user can record and send a voice note with recording waveform feedback; sender and recipient can play the delivered note in the feed.
+  4. A user can star/unstar a message and switch the feed to their starred messages, including messages outside the initially loaded page.
 
-**Plans**: TBD
-
-Plans:
-
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+**Next contract**: a new spec-to-done SPEC after scope discussion. Suggested slices: read receipts + starred filter, attachments, voice notes. These are not approved execution plans; new workflow artifacts belong under spec-interview/<slug>/, not in the old GSD tree.
 
 ### Phase 5: Messaging Resilience
 
@@ -243,6 +250,12 @@ Plans:
 - [ ] 07-02: TBD
 - [ ] 07-03: TBD
 
+## Completion evidence and routing
+
+On 2026-10-03 the owner confirmed Knock and screen sharing were finished. Phase 3 has 15 plans and 15 summaries; its tracker records later production database readback, real two-user screen delivery, and the September startup-race correction. The old August UAT/verification snapshots remain historical evidence and are superseded for phase routing by this owner acceptance. They do not become new test results.
+
+Hosted application deployment, current online database state, restrictive-network traversal, cross-browser parity, and legacy Presence cutover are not reverified by this planning update. Historical migration-provenance concerns remain in STATE.md and require target preflight before any future online database work.
+
 ## Progress
 
 **Execution Order:**
@@ -254,12 +267,12 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 1. Stabilization | 2/2 | Complete | 2026-05-17 |
 | 2. Floor Plan Completion | 8/8 | Complete    | 2026-05-13 |
 | 2.1 Presence Reload Fixes | 1/1 | Complete    | 2026-05-13 |
-| 3. Spatial Audio and Screen Sharing | 15/15 | In Progress|  |
-| 4. Messaging Timeline | 0/3 | Not started | - |
+| 3. Spatial Audio and Screen Sharing | 15/15 | Complete — owner accepted | 2026-10-03 |
+| 4. Messaging Timeline | 0/TBD | Ready for discussion | - |
 | 5. Messaging Resilience | 0/4 | Not started | - |
 | 6. Meeting Notes | 0/4 | Not started | - |
 | 7. Announcements | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-07-24*
+*Last updated: 2026-10-03 after owner-confirmed Knock/screen-sharing completion and messaging source reconciliation*

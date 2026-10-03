@@ -15,6 +15,12 @@ messaging, and company management.
 
 Use package.json and the lockfile for declared and resolved dependency versions.
 
+## Delivery workflow
+
+Use `spec-to-done` for new substantial development and its Specify → Plan → Execute/Replan → Report lifecycle. Its approved Ready SPEC is the contract for execution.
+
+GSD is retired in this repository. Never invoke or execute GSD skills, workflows, scripts, or automation, including progress, planning, verification, updates, or reinstallation. GSD skills, `.planning/`, and their old plans/state are historical reference only; consult them for context or clarification. Their phase status, gates, config, and model profiles do not control new work or establish SPEC readiness. Start new work under `spec-interview/<slug>/` according to `spec-to-done`; preserve the historical material. This user instruction supersedes older GSD guidance and saved memories.
+
 ## Working principles
 
 - Inspect the implementation relevant to the task. Establish behavior from
