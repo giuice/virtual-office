@@ -12,18 +12,18 @@ express the required effort.
 
 | Work delegated to OpenAI | Model ID | Effort |
 | --- | --- | --- |
-| Standard implementation, planning, debugging, research | `gpt-6-sol` | `high` |
-| Important work: adversarial review, review gates, acceptance checks | `gpt-6-sol` | `max` |
+| Standard implementation, planning, debugging, research | `gpt-6.1-sol` | `high` |
+| Important work: adversarial review, review gates, acceptance checks | `gpt-6.1-sol` | `max` |
 
-Pass GPT-6 Sol by its full ID, `gpt-6-sol`. Do not substitute GPT-6.1 Sol or
-another version merely because it is newer.
+Pass GPT-6.1 Sol by its full ID, `gpt-6.1-sol`. Do not substitute another
+version merely because it is newer.
 
 Rules:
 
 - `high` is the minimum and default for standard delegated work. Important
   work, as defined in CLAUDE.md, requires `max` from the start.
 - Escalate to `max` when work meets the important-work criteria in CLAUDE.md.
-- Model capability and launcher capability are separate. GPT-6 Sol supports
+- Model capability and launcher capability are separate. GPT-6.1 Sol supports
   `max`; the installed companion 1.0.6 currently accepts only `none`,
   `minimal`, `low`, `medium`, `high`, and `xhigh`. This is a companion
   limitation, not permission to lower the required effort.
@@ -61,7 +61,7 @@ $reviewOutput = Join-Path $reviewFolder ('sol-review-' + [guid]::NewGuid().ToStr
 Write-Output $reviewOutput
 Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $reviewFolder 'review-prompt.txt') |
   codex exec -C 'E:/projects/virtual-office' `
-    --model gpt-6-sol -c 'model_reasoning_effort="max"' `
+    --model gpt-6.1-sol -c 'model_reasoning_effort="max"' `
     --sandbox read-only --output-last-message $reviewOutput - 2> (Join-Path $env:TEMP ([IO.Path]::GetFileName($reviewOutput) + '.stderr.log'))
 if ($LASTEXITCODE -ne 0) { throw 'Codex review failed; do not accept its output.' }
 ```
@@ -77,7 +77,7 @@ Codex process has exited using its recorded process/session identity. If it is
 still alive, stop only that identified process from PowerShell and confirm its
 exit. Then inspect `git status` and partial writes before retrying a write job.
 Retain the startup summary from stderr and verify that it reports model
-`gpt-6-sol` and reasoning effort `max`; a successful exit alone is insufficient.
+`gpt-6.1-sol` and reasoning effort `max`; a successful exit alone is insufficient.
 Accept a review only with that evidence, a successful exit, and a fresh report.
 
 A direct CLI job has no companion job ID: do not use companion `status` commands

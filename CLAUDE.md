@@ -209,7 +209,7 @@ moving aliases.
 
 | Provider | Model ID | Standard work | Important work |
 | --- | --- | --- | --- |
-| OpenAI | `gpt-6-sol` (GPT-6 Sol) | `high` | `max` |
+| OpenAI | `gpt-6.1-sol` (GPT-6.1 Sol) | `high` | `max` |
 | Anthropic | `claude-opus-5-5` (Claude Opus 5.5) | `high` | `xhigh` |
 
 Important work includes adversarial reviews, review gates, acceptance checks,
