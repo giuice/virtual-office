@@ -1,10 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/giuice/.agents/skills/caveman-compress/**)",
-      "Bash(python3 -m scripts /home/giuice/desenv/virtual-office/CLAUDE.md)",
       "Skill(presence-safety)",
-      "Bash(rtk gsd-sdk *)",
       "Bash(rtk proxy *)",
       "Bash(rtk ls *)",
       "Bash(rtk grep *)",
