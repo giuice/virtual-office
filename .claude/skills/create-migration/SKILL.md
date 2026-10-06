@@ -69,7 +69,7 @@ Generate a new migration file for this repo. Migrations live in
    Notes baked in on purpose:
    - Wrap `auth.uid()` in a subquery — `(select auth.uid())` — so Postgres caches
      it per-statement instead of per-row (Supabase RLS performance best practice).
-   - Use the enum values from CLAUDE.md (`user_status`, `space_status`, etc.).
+   - Use the existing enum values (`user_status`, `space_status`, etc.) from `migrations/database-structure.md` and the migrations; roles are only admin or member (AGENTS.md).
 
 5. **Remind the user** to:
    - Update `migrations/database-structure.md` to reflect the change.

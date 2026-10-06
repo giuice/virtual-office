@@ -21,8 +21,8 @@ version merely because it is newer.
 Rules:
 
 - `high` is the minimum and default for standard delegated work. Important
-  work, as defined in CLAUDE.md, requires `max` from the start.
-- Escalate to `max` when work meets the important-work criteria in CLAUDE.md.
+  work, as defined in AGENTS.md, requires `max` from the start.
+- Escalate to `max` when work meets the important-work criteria in AGENTS.md.
 - Model capability and launcher capability are separate. GPT-6.1 Sol supports
   `max`; the installed companion 1.0.6 currently accepts only `none`,
   `minimal`, `low`, `medium`, `high`, and `xhigh`. This is a companion
@@ -55,7 +55,7 @@ For a read-only adversarial review, save the prompt first, then use PowerShell:
 
 ```powershell
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$reviewFolder = 'E:/projects/virtual-office/docs/<topic-folder>'
+$reviewFolder = 'E:/projects/virtual-office/spec-interview/<slug>/reviews'
 New-Item -ItemType Directory -Force -Path $reviewFolder | Out-Null
 $reviewOutput = Join-Path $reviewFolder ('sol-review-' + [guid]::NewGuid().ToString('N') + '.md')
 Write-Output $reviewOutput
@@ -123,7 +123,7 @@ the current invocation contract, and treat the following as fixed:
 
 ## Reporting back
 
-Delegated work does not change the reporting contract in `CLAUDE.md`. Job ids,
+Delegated work does not change the reporting contract in `AGENTS.md`. Job ids,
 model names, and effort levels are internal machinery: keep them out of the
 user's report unless one is genuinely needed, and then confine it to the single
 `Technical note:` line.

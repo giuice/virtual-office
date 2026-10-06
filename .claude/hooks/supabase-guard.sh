@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # supabase-guard — PreToolUse (Edit|Write|MultiEdit)
 #
-# Blocks the documented Supabase/DB footguns from CLAUDE.md *before* they reach
+# Blocks the documented Supabase/DB footguns from AGENTS.md *before* they reach
 # disk. These are the project's #1 source of bugs (users.id vs supabase_uid),
 # plus leaked service credentials. Exit 2 blocks the edit and shows the reason
 # to Claude; warnings are advisory (exit 0). Self-contained; requires jq.
@@ -69,7 +69,7 @@ if [ "${#blocks[@]}" -gt 0 ]; then
     echo "⛔ supabase-guard blocked this change → $file"
     for b in "${blocks[@]}"; do echo "  • $b"; done
     for w in "${warns[@]}"; do echo "  ⚠ $w"; done
-    echo "Ref: CLAUDE.md › Database (User ID vs Supabase UID) + Supabase & RLS."
+    echo "Ref: AGENTS.md › Database (User ID vs Supabase UID) + Supabase & RLS."
   } >&2
   exit 2
 fi

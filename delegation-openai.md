@@ -26,7 +26,7 @@ Pass `--model claude-opus-5-5 --effort high` for standard work and
   that is about to be handed to the user gets this independent adversarial review.
 - **Implementation, debugging, and research stay local** unless the user
   explicitly requests delegation. Important delegated work follows the criteria
-  in CLAUDE.md and uses `xhigh`.
+  in AGENTS.md and uses `xhigh`.
 - Never silently substitute another model or lower the required effort. If the
   runtime rejects the model or effort, report that limitation and keep the
   dependent review pending; do not call it accepted.
@@ -105,7 +105,7 @@ Notes on the `claude` invocation:
 
 ## Reporting back
 
-Delegation does not change the reporting contract in `CLAUDE.md`. Pane ids,
+Delegation does not change the reporting contract in `AGENTS.md`. Pane ids,
 model names, and prompt files are internal machinery: keep them out of the
 user's report unless one is genuinely needed, and then confine it to the single
 `Technical note:` line. Report an unresolved review finding as a remaining risk;

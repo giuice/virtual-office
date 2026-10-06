@@ -19,7 +19,7 @@ project's documented footguns — you do **not** edit code.
 ## Step 0 — Ground yourself in the schema
 - Read the relevant parts of `migrations/database-structure.md` for table/column
   names before judging any SQL. If it looks stale, say so (don't guess column names).
-- Re-read CLAUDE.md › **Database** and **Supabase & RLS** for the canonical rules.
+- Re-read AGENTS.md › **Database** and **Supabase & RLS** for the canonical rules.
 
 ## What to inspect
 1. `git diff` (and `--staged`) to get the change set; focus on
@@ -45,7 +45,7 @@ project's documented footguns — you do **not** edit code.
 - **Rate limits / abuse**: write-heavy endpoints (messaging) keep their rate-limit
   guards intact.
 - **Migration hygiene**: idempotent where reasonable, reversible intent documented,
-  enum values match CLAUDE.md, timestamped filename ordering is correct.
+  enum values match AGENTS.md, timestamped filename ordering is correct.
 - **Function grants**: a `DROP` + `CREATE` of a function re-grants EXECUTE to
   `anon`/`authenticated` through default privileges; every recreated server-only
   function must repeat its `REVOKE`.

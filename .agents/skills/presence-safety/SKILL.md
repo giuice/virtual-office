@@ -67,7 +67,7 @@ stop the affected workflow, and report the application as not ready until the
 named database and deployment are compatible.
 
 Online changes, authorization, readback, rollback, rollout states, and reporting
-are governed by [CLAUDE.md](../../../CLAUDE.md).
+are governed by [AGENTS.md](../../../AGENTS.md).
 
 ## Implementation and verification
 

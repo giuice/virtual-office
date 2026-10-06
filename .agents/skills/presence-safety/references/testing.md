@@ -36,7 +36,7 @@ not prove that its target is disposable or that it has no production access.
 | API, RPC, schema, authorization, leases, or database locks | Run affected Presence/API tests, `npm run test:presence:db` against a disposable Postgres target, and `npm run presence:gate`. Add typecheck/lint for touched TypeScript and real concurrency cases for affected ordering, locking, capacity, or lifecycle behavior. |
 | User-visible presence, movement, Realtime, or Knock workflow | Run the affected `npm run test:presence:e2e` scenarios with the distinct authenticated users/tabs needed to prove the workflow, plus the relevant client/API/database checks above. |
 | Framework boundaries or production output | Run `npm run build` in addition to the affected-layer checks. |
-| Deployment, live contract compatibility, or legacy cutover | Verify the named target's migrations/catalog and runtime behavior, following CLAUDE.md and the active-limitations reference. Local tests do not establish deployed readiness. |
+| Deployment, live contract compatibility, or legacy cutover | Verify the named target's migrations/catalog and runtime behavior, following AGENTS.md and the active-limitations reference. Local tests do not establish deployed readiness. |
 
 Inspect the final diff and run `git diff --check` for every change. Select checks
 before claiming completion, retain exact results, and rerun affected checks
