@@ -40,11 +40,11 @@ When a user logs in, they instantly see where their colleagues are, what's happe
 
 ### Active
 
-- [ ] Phase 4 / MSG-01: complete read receipt details (reader identity and time).
-- [ ] Phase 4 / MSG-02: complete production file sending, drag/drop, progress, and inline previews.
-- [ ] Phase 4 / MSG-03: implement voice-note recording, sending, waveform, and playback.
-- [ ] Phase 4 / MSG-04: complete production star/unstar actions and the personal starred-message filter.
-- [ ] Phase 5: verify and finish messaging resilience from existing typing/backoff/read-sync foundations.
+- [x] Phase 4 / MSG-01: complete read receipt details (reader identity and time).
+- [x] Phase 4 / MSG-02: complete production file sending, drag/drop, progress, and inline previews.
+- [x] Phase 4 / MSG-03: implement voice-note recording, sending, waveform, and playback.
+- [x] Phase 4 / MSG-04: complete production star/unstar actions and the personal starred-message filter.
+- [ ] Phase 5: verify and finish messaging resilience from existing typing/backoff/read-sync foundations and the Phase 4 notifications, failed-send retry, and reconnect catch-up.
 - [ ] Phase 6: meeting notes with AI summaries and action item tracking.
 - [ ] Phase 7: company-wide announcements with priority, expiration, filtering, and read tracking.
 
@@ -70,10 +70,10 @@ REQUIREMENTS.md preserves historical IDs and the release split as reference; the
 **Brownfield project** with significant existing code:
 - **Tech stack:** Next.js App Router, React, TypeScript strict, Supabase (Postgres + Realtime + Auth + Storage), TailwindCSS, shadcn/ui, and TanStack Query. Current versions come from package.json and the lockfile; the old Next.js 15/React 19.1 snapshot is not current.
 - **Architecture:** Repository Pattern (interfaces + Supabase implementations), RLS enforcement, three-layer state (TanStack Query + React Context + local state)
-- **Delivery state (2026-10-03):** Phases 1, 2, 2.1, and 3 complete for routing; Phase 4 ready for discussion. Broad product completion percentages are not recalculated from old epic estimates.
+- **Delivery state (2026-10-06):** Phases 1, 2, 2.1, 3, and 4 complete for routing (Phase 4 owner-accepted 2026-10-06; its 6 migrations are online, new app not yet deployed); Phase 5 next. Broad product completion percentages are not recalculated from old epic estimates.
 - **Tests:** Existing Vitest and Playwright coverage; inspect package scripts/manifests for the current inventory. No suite was rerun for this planning-only reconciliation.
 - **Current messaging debt:** Parallel legacy/enhanced components; enhanced upload and star-action variants are used by debug pages while the production drawer uses MessageFeed + MessageComposer.
-- **Current next step:** Use docs/messaging/phase-4-source-baseline.md as input for a new spec-to-done SPEC before planning development.
+- **Current next step:** Write a spec-to-done SPEC for Phase 5 (Messaging Resilience) before planning development; Phase 4 record: spec-interview/phase-4-messaging-timeline/REPORT.md.
 - **Historical auth issues:** Closed by 01-02 human verification; not an active messaging blocker.
 - **Design specs:** `docs/ux-space-grid-v3.html` (visual target), `docs/ux-space-grid-v3-implementation-plan.md` (implementation guide)
 
@@ -104,4 +104,4 @@ REQUIREMENTS.md preserves historical IDs and the release split as reference; the
 | Bugs-first stabilization phase | Fix broken floor plan + auth before new features | Completed in Phase 1 |
 
 ---
-*Last updated: 2026-10-03 after owner-confirmed Knock/screen-sharing completion and messaging baseline reconciliation*
+*Last updated: 2026-10-06 after owner acceptance of Phase 4 (Messaging Timeline)*

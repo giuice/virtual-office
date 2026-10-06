@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<!--
+  TEMPLATE - Spec interview round (HTML fallback path).
+
+  Runtime use:
+  1. Copy this file to spec-interview/<slug>/round-N.html.
+  2. Set round and topic in collect().
+  3. Replace QUESTIONS with the round's real questions.
+     - multi: false renders radio buttons; multi: true renders checkboxes.
+     - Options are [key, label, recommended(bool), short-reason].
+     - Mark exactly one recommended option unless none is sensible.
+     - Every question automatically gets an Other / note textarea.
+  4. Keep copy/download logic intact. It emits
+     { "round": N, "topic": "...", "answers": [{"id":"...","selected":[],"note":""}] }.
+
+  The examples demonstrate both radio and checkbox questions. Replace them.
+  This file is self-contained and works without a network connection.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec Interview - Round 2 / phase-4-messaging-timeline</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --card-2:#1f232c; --border:#2b303b;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#6ea8fe; --accent-soft:#2a3b57; --ok:#3ddc97; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; }
+  .wrap { max-width:820px; margin:0 auto; padding:32px 20px 120px; }
+  header h1 { font-size:1.5rem; margin:0 0 6px; }
+  header p { color:var(--muted); margin:0 0 8px; }
+  .hint { background:var(--accent-soft); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; font-size:.92rem; margin:18px 0 28px; }
+  fieldset { border:1px solid var(--border); border-radius:12px; background:var(--card);
+    margin:0 0 20px; padding:18px 20px; }
+  legend { font-weight:600; padding:0 8px; font-size:1.02rem; }
+  .domain { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); margin:-4px 0 12px; }
+  .opt { display:flex; gap:10px; align-items:flex-start; padding:9px 11px;
+    border:1px solid transparent; border-radius:8px; cursor:pointer; transition:background .12s,border-color .12s; }
+  .opt:hover { background:var(--card-2); }
+  .opt:focus-within { border-color:var(--accent); outline:2px solid var(--accent); outline-offset:1px; }
+  .opt input { margin-top:4px; accent-color:var(--accent); width:16px; height:16px; flex:none; }
+  .rec { color:var(--ok); font-size:.78rem; font-weight:600; margin-left:6px; }
+  .reason { color:var(--muted); }
+  textarea { width:100%; margin-top:12px; background:var(--card-2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font:inherit; resize:vertical; min-height:44px; }
+  textarea:focus, button:focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .note-label { font-size:.8rem; color:var(--muted); display:block; margin-top:12px; }
+  .bar { position:fixed; bottom:0; left:0; right:0; background:rgba(15,17,21,.92);
+    backdrop-filter:blur(6px); border-top:1px solid var(--border); padding:14px 20px;
+    display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; cursor:pointer; border-radius:9px; padding:11px 20px; border:1px solid var(--border); }
+  .primary { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  .primary:hover { filter:brightness(1.08); }
+  .ghost { background:transparent; color:var(--text); }
+  .ghost:hover { background:var(--card-2); }
+  #status { color:var(--ok); font-size:.9rem; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Spec Interview - Rodada 2</h1>
+    <p>Fase 4 — Messaging Timeline: limites com a Fase 5, regra de migração, testes e casos de borda</p>
+  </header>
+  <div class="hint">
+    Pick the option that fits best. <strong>Every question has a free-text field</strong>: use it to write your own answer, adjust the selected option, or explain. When done, click <strong>Copy answers</strong> and paste the block back into the chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copy answers</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Download answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+// Replace this array with the real questions for this round.
+const QUESTIONS = [
+  { id: "q1", domain: "Escopo — limite com a Fase 5", multi: false,
+    title: "Fila offline: hoje não existe nada (sem rede, o envio simplesmente falha). Onde ela entra?",
+    options: [
+      ["A", "Fase 5 (é o primeiro item dela). Na Fase 4, só garantir que envio/upload que falhar não some: o texto e os arquivos ficam no composer com erro e botão 'tentar de novo'", true, "evita perder conteúdo já agora sem trazer a fila inteira (persistência local, reenvio em ordem, deduplicação) para esta fase"],
+      ["B", "Fila offline completa na Fase 4 (compor sem rede, enviar sozinho quando a rede voltar, inclusive anexos e voz)", false, "a Fase 4 cresce bastante; anexos e voz offline são a parte mais difícil"],
+      ["C", "Fase 5, sem nada extra na Fase 4", false, "menor escopo; enquanto isso, um envio que falhar pode perder o texto"]
+    ] },
+  { id: "q2", domain: "Escopo — limite com a Fase 5", multi: false,
+    title: "Reconexão: useMessageSubscription já reconecta sozinho, com backoff. O que falta é recuperar mensagens perdidas enquanto estava desconectado e cair para polling se o Realtime ficar fora por mais de 30 s. Onde isso entra?",
+    options: [
+      ["A", "Fase 5. A Fase 4 não pode piorar a reconexão atual, e os recursos novos (recibos, favoritas, anexos) precisam se atualizar quando a reconexão já existente acontecer", true, "mantém a Fase 4 focada; a Fase 5 trata recuperação e polling de verdade"],
+      ["B", "Trazer só 'ao reconectar, buscar as mensagens perdidas' para a Fase 4; o polling fica na Fase 5", false, "fecha o buraco mais visível agora; precisa de E2E com rede caindo"],
+      ["C", "Reconexão completa (recuperação + polling) na Fase 4", false, "a Fase 4 vira meia Fase 5"]
+    ] },
+  { id: "q3", domain: "Escopo — notificações desktop", multi: false,
+    title: "Você disse que as notificações desktop são essenciais. Hoje não existe @menção no código, então 'DM e @menção' exigiria criar menções primeiro. O que entra e onde?",
+    options: [
+      ["A", "Item Must da Fase 4: notificação desktop para nova mensagem em DM e em grupo quando a aba está em segundo plano (ou o drawer não está aberto naquela conversa), com pedido de permissão explícito. @menções e regras finas (silenciar, salas) ficam na Fase 5", true, "entrega o essencial já, sem inventar o recurso de menção junto"],
+      ["B", "Primeiro item Must da Fase 5 (a próxima SPEC), com DM + @menções completos", false, "Fase 4 menor; a notificação chega uma SPEC depois"],
+      ["C", "Fase 4 completa: notificações + criar @menções + notificar menções em sala", false, "escopo grande: menção tem autocomplete, armazenamento e regras próprias"]
+    ] },
+  { id: "q4", domain: "Escopo — o que ficou desmarcado na rodada 1", multi: true,
+    title: "Busca no texto das mensagens, scroll infinito automático e aviso 'Novas mensagens' ficaram desmarcados. Quais ENTRAM na Fase 4?",
+    options: [
+      ["A", "Scroll infinito automático (carregar histórico ao chegar no topo, mantendo a posição de leitura)", false, "combina com 'pular até a favorita antiga', que já carrega histórico; risco médio de bug de rolagem"],
+      ["B", "Aviso 'Novas mensagens' / botão 'ir para o fim' quando chega mensagem e você está lendo mais acima", false, "pequeno e útil com a nova regra de leitura (só conta o que aparece na tela)"],
+      ["C", "Busca no texto das mensagens da conversa", false, "superfície nova (rota, índice, UI); recomendo SPEC própria"],
+      ["D", "Nenhum: os três ficam fora da Fase 4 e vão para o backlog", true, "mantém o contrato em MSG-01..04 + o que você decidir aqui"]
+    ] },
+  { id: "q5", domain: "Escopo — apagar anexos", multi: false,
+    title: "Editar/apagar anexo depois de enviado ficou desmarcado. Hoje não existe exclusão de mensagem em lugar nenhum. O que vale?",
+    options: [
+      ["A", "Fora da Fase 4: mensagem enviada não é apagada nem tem anexo editado; arquivos de upload cancelado/falho são limpos", true, "exclusão é um recurso inteiro (regras, recibos, favoritas, threads, Storage)"],
+      ["B", "O remetente pode apagar a própria mensagem (com os anexos); para os outros aparece 'mensagem apagada'", false, "útil para arquivo enviado por engano, mas mexe em favoritas/recibos/threads"],
+      ["C", "Só remover um anexo específico de uma mensagem já enviada", false, "meio-termo pouco usado"]
+    ] },
+  { id: "q6", domain: "Restrições — regra das migrações online", multi: false,
+    title: "Sua regra: nenhuma tarefa avança sem a migração aplicada online depois de testada. Como fica a autorização para mexer no Supabase online (vhabpcoyypobgasacsko)?",
+    options: [
+      ["A", "Autorização prévia para esta fase: passou nos testes locais, eu aplico online na hora (preflight do histórico de migrações, aplicação, leitura de volta do catálogo, smoke check) e registro no TRACK. Mudança destrutiva ou irreversível (DROP, apagar dados, restringir algo que o app publicado usa) continua exigindo sua autorização caso a caso", true, "cumpre a regra sem travar o fluxo; você mantém o veto sobre o que é perigoso"],
+      ["B", "Paro e peço autorização a cada migração; a próxima tarefa fica bloqueada até você aprovar e a migração estar aplicada", false, "controle total; o trabalho espera sua resposta a cada vez"],
+      ["C", "Outro (descreva na nota)", false, ""]
+    ] },
+  { id: "q7", domain: "Restrições — deploy do app", multi: false,
+    title: "Com a migração indo para o online antes do app novo ser publicado, o app atual roda contra o banco novo. O que se exige?",
+    options: [
+      ["A", "Toda migração precisa ser compatível com o app já publicado (aditiva: colunas/rotas/políticas novas sem quebrar as antigas). O deploy do app continua com você; a fase termina com o app pronto e verificado localmente contra o banco online", true, "aplicar online cedo fica seguro; ninguém fica com app quebrado no meio"],
+      ["B", "Eu também faço o deploy do app a cada fatia (diga onde na nota: Vercel? outro?)", false, "precisa de acesso e de autorização para o deploy"],
+      ["C", "Outro (descreva na nota)", false, ""]
+    ] },
+  { id: "q8", domain: "Estratégia de teste — testes existentes", multi: false,
+    title: "E os testes unitários que já existem e só 'acomodam' o código?",
+    options: [
+      ["A", "Nesta fase, só os testes de mensagens que a mudança tocar: se um teste só espelha a implementação, eu substituo por cobertura de integração/E2E do mesmo comportamento e removo, listando cada remoção com motivo no TRACK. Nunca removo teste sem cobertura equivalente", true, "melhora onde estamos mexendo, sem virar refatoração da suíte inteira"],
+      ["B", "Não mexer nos testes existentes; uma limpeza da suíte vira trabalho separado (SPEC própria depois)", false, "zero risco de escopo; o monstro continua"],
+      ["C", "Limpeza ampla da suíte faz parte da Fase 4", false, "escopo grande e desconectado das funcionalidades"]
+    ] },
+  { id: "q9", domain: "Casos de borda — voz x áudio espacial", multi: false,
+    title: "Você está numa sala com o microfone do áudio espacial (Fase 3) aberto e começa a gravar uma nota de voz. O que acontece?",
+    options: [
+      ["A", "Durante a gravação, o microfone da sala é silenciado sozinho (com aviso visível) e volta ao estado anterior quando a gravação termina ou é descartada", true, "a sala não ouve o que você dita; sem passo manual"],
+      ["B", "Bloquear a gravação enquanto o microfone da sala estiver aberto, com mensagem 'silencie o microfone da sala para gravar'", false, "mais simples, mas o usuário tem um passo extra"],
+      ["C", "Sem interação: os dois usam o microfone ao mesmo tempo", false, "a sala ouve a nota sendo gravada"]
+    ] },
+  { id: "q10", domain: "Casos de borda — microfone", multi: false,
+    title: "Permissão do microfone negada, sem microfone, ou navegador sem suporte a gravação:",
+    options: [
+      ["A", "Mensagem clara no composer com o motivo e como liberar; texto e anexos continuam funcionando; sem suporte, o botão de gravar fica desabilitado com explicação", true, "falha previsível, sem travar o resto"],
+      ["B", "Esconder o botão de voz quando não houver permissão ou suporte", false, "o usuário não entende por que sumiu"]
+    ] },
+  { id: "q11", domain: "Regras de negócio — recibos em grupo/sala", multi: false,
+    title: "Mensagem numa sala com 8 membros, lida por 3. O que o remetente vê?",
+    options: [
+      ["A", "'Lida por 3' e, ao abrir, a lista dos 3 leitores com horário (mais recente primeiro). Sem denominador e sem lista de quem não leu", true, "membros entram e saem; 'de 8' muda com o tempo e confunde"],
+      ["B", "'Lida por 3 de 8' e, ao abrir, quem leu (com horário) e quem ainda não leu", false, "mais informativo; exige definir quem conta como membro no momento do envio"],
+      ["C", "Outro (descreva na nota)", false, ""]
+    ] },
+  { id: "q12", domain: "Regras de negócio — recibos ao vivo e não lidas", multi: true,
+    title: "Atualização de recibos e do contador de não lidas (marque todos que valem):",
+    options: [
+      ["A", "Se o remetente estiver com a conversa aberta, o indicador e a lista de leitores se atualizam em tempo real quando alguém lê", true, "os recibos já estão na publicação do Realtime"],
+      ["B", "O contador de não lidas na lista de conversas só diminui conforme as mensagens realmente aparecem na tela (mesma regra de 'lida' da rodada 1), não ao abrir a conversa", true, "coerente com sua regra de leitura"],
+      ["C", "Ao abrir uma conversa com muitas não lidas, ela abre na primeira não lida (não no fim)", false, "comum em chats, mas muda o comportamento atual de rolagem"]
+    ] },
+  { id: "q13", domain: "Requisitos — anexos (extra)", multi: false,
+    title: "Colar imagem da área de transferência (Ctrl+V) no composer:",
+    options: [
+      ["A", "Should: entra se couber, mas não bloqueia a conclusão da fase", true, "baixo custo depois que o upload estiver no composer"],
+      ["B", "Must", false, ""],
+      ["C", "Fora desta fase", false, ""]
+    ] },
+  { id: "q14", domain: "Regras de negócio — favoritas", multi: false,
+    title: "Ordem da lista de favoritas e escopo da estrela:",
+    options: [
+      ["A", "Ordenada pela data da mensagem, mais recente primeiro; a estrela é pessoal (ninguém mais vê o que eu favoritei) e vale em todos os meus dispositivos", true, "é como o repositório já guarda (por usuário)"],
+      ["B", "Ordenada por quando eu favoritei, mais recente primeiro; estrela pessoal", false, "bom para 'o que marquei agora há pouco'"]
+    ] }
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " / multiple choice" : ""}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recommended)</span>' : ""}
+      ${reason ? ` - <span class="reason">${reason}</span>` : ""}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Other / note (write your own answer):</label>
+    <textarea id="${q.id}-note" placeholder="Write here if no option fits, or to add detail..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 2,
+    topic: "phase-4-messaging-timeline",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(data).then(
+      () => setStatus("Copied! Paste the block into the chat."),
+      () => fallbackCopy(data)
+    );
+  } else {
+    fallbackCopy(data);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("Copied! Paste the block into the chat."); }
+  catch (e) { setStatus("Couldn't copy - use Download answers.json."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Downloaded answers file.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>

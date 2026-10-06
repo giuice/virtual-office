@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<!--
+  TEMPLATE - Spec interview round (HTML fallback path).
+
+  Runtime use:
+  1. Copy this file to spec-interview/<slug>/round-N.html.
+  2. Set round and topic in collect().
+  3. Replace QUESTIONS with the round's real questions.
+     - multi: false renders radio buttons; multi: true renders checkboxes.
+     - Options are [key, label, recommended(bool), short-reason].
+     - Mark exactly one recommended option unless none is sensible.
+     - Every question automatically gets an Other / note textarea.
+  4. Keep copy/download logic intact. It emits
+     { "round": N, "topic": "...", "answers": [{"id":"...","selected":[],"note":""}] }.
+
+  The examples demonstrate both radio and checkbox questions. Replace them.
+  This file is self-contained and works without a network connection.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec Interview - Round 1 / phase-4-messaging-timeline</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --card-2:#1f232c; --border:#2b303b;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#6ea8fe; --accent-soft:#2a3b57; --ok:#3ddc97; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; }
+  .wrap { max-width:820px; margin:0 auto; padding:32px 20px 120px; }
+  header h1 { font-size:1.5rem; margin:0 0 6px; }
+  header p { color:var(--muted); margin:0 0 8px; }
+  .hint { background:var(--accent-soft); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; font-size:.92rem; margin:18px 0 28px; }
+  fieldset { border:1px solid var(--border); border-radius:12px; background:var(--card);
+    margin:0 0 20px; padding:18px 20px; }
+  legend { font-weight:600; padding:0 8px; font-size:1.02rem; }
+  .domain { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); margin:-4px 0 12px; }
+  .opt { display:flex; gap:10px; align-items:flex-start; padding:9px 11px;
+    border:1px solid transparent; border-radius:8px; cursor:pointer; transition:background .12s,border-color .12s; }
+  .opt:hover { background:var(--card-2); }
+  .opt:focus-within { border-color:var(--accent); outline:2px solid var(--accent); outline-offset:1px; }
+  .opt input { margin-top:4px; accent-color:var(--accent); width:16px; height:16px; flex:none; }
+  .rec { color:var(--ok); font-size:.78rem; font-weight:600; margin-left:6px; }
+  .reason { color:var(--muted); }
+  textarea { width:100%; margin-top:12px; background:var(--card-2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font:inherit; resize:vertical; min-height:44px; }
+  textarea:focus, button:focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .note-label { font-size:.8rem; color:var(--muted); display:block; margin-top:12px; }
+  .bar { position:fixed; bottom:0; left:0; right:0; background:rgba(15,17,21,.92);
+    backdrop-filter:blur(6px); border-top:1px solid var(--border); padding:14px 20px;
+    display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; cursor:pointer; border-radius:9px; padding:11px 20px; border:1px solid var(--border); }
+  .primary { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  .primary:hover { filter:brightness(1.08); }
+  .ghost { background:transparent; color:var(--text); }
+  .ghost:hover { background:var(--card-2); }
+  #status { color:var(--ok); font-size:.9rem; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Spec Interview - Rodada 1</h1>
+    <p>Fase 4 — Messaging Timeline (recibos de leitura, anexos, notas de voz, favoritas)</p>
+  </header>
+  <div class="hint">
+    Pick the option that fits best. <strong>Every question has a free-text field</strong>: use it to write your own answer, adjust the selected option, or explain. When done, click <strong>Copy answers</strong> and paste the block back into the chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copy answers</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Download answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+// Replace this array with the real questions for this round.
+const QUESTIONS = [
+  { id: "q1", domain: "Problema e objetivos / Escopo", multi: false,
+    title: "Qual o escopo desta SPEC da Fase 4?",
+    options: [
+      ["A", "Os 4 itens numa SPEC só (recibos de leitura, anexos, notas de voz, favoritos), entregues em fatias ordenadas", true, "segue o seu pedido de uma SPEC por fase; o plano fatia a entrega (ex.: recibos+favoritos, depois anexos, depois voz)"],
+      ["B", "Só a primeira fatia (recibos de leitura + favoritos); anexos e voz viram outra SPEC", false, "contrato menor e mais rápido, mas quebra 'uma SPEC por fase'"],
+      ["C", "Os 4 itens, mas notas de voz como Should (podem ficar de fora sem bloquear a conclusão)", false, "reduz risco: voz é a parte mais nova (gravação, formato de áudio, navegador)"]
+    ] },
+  { id: "q2", domain: "Usuários / Escopo", multi: true,
+    title: "Quais tipos de conversa precisam ter TODAS as funcionalidades desta fase? (marque todos)",
+    options: [
+      ["A", "DM 1:1 (direct)", true, "caso principal"],
+      ["B", "Conversas de grupo (group)", true, "o tipo existe no código; recibos com vários leitores importam aqui"],
+      ["C", "Chat da sala/espaço (room)", true, "conversa ligada ao espaço do floor plan; pode ter muitos membros"],
+      ["D", "Só o drawer de produção (MessagingDrawer); a página debug/messaging-comparison fica fora", true, "evita manter duas implementações"]
+    ] },
+  { id: "q3", domain: "Regras de negócio — recibos de leitura", multi: false,
+    title: "Em grupo/sala, o que o remetente vê sobre quem leu a mensagem?",
+    options: [
+      ["A", "Indicador resumido na mensagem (ex.: 'Lida por 3') e, ao abrir/passar o mouse, a lista de leitores com nome, avatar e horário", true, "atende 'quem leu e quando' sem poluir o feed"],
+      ["B", "Só um contador de leitores, sem identidades", false, "mais simples e mais privado, mas não cumpre MSG-01 como está escrito"],
+      ["C", "Detalhes (quem/quando) só em DM 1:1; em grupo/sala apenas 'lida'", false, "evita listas grandes em salas, mas é parcial"]
+    ] },
+  { id: "q4", domain: "Regras de negócio — recibos de leitura", multi: false,
+    title: "O que conta como 'lida'?",
+    options: [
+      ["A", "A mensagem apareceu na tela do destinatário com o drawer aberto naquela conversa e a aba do navegador em foco", true, "mais fiel à leitura real; impede 'lida' em aba de fundo"],
+      ["B", "O destinatário abriu a conversa (todas as mensagens até ali viram lidas), como o comportamento atual parece fazer", false, "reaproveita a rota/RPC atual sem mudanças, mas marca como lidas mensagens que ninguém rolou para ver"],
+      ["C", "A mensagem foi entregue ao dispositivo do destinatário", false, "isso é 'entregue', não 'lida'"]
+    ] },
+  { id: "q5", domain: "Requisitos / Privacidade", multi: false,
+    title: "Privacidade dos recibos de leitura:",
+    options: [
+      ["A", "Sempre ligados; quem pode ver os detalhes é só o remetente da mensagem", true, "menor exposição; hoje o RLS deixa qualquer membro ler todos os recibos, então o recorte seria na UI e/ou na API"],
+      ["B", "Sempre ligados; qualquer membro da conversa vê quem leu cada mensagem", false, "bate com o RLS atual, mas expõe mais"],
+      ["C", "Cada usuário pode desligar o envio dos próprios recibos (preferência)", false, "mais controle, mas acrescenta configuração, armazenamento e casos de borda"]
+    ] },
+  { id: "q6", domain: "Requisitos — anexos", multi: false,
+    title: "Tipos e limites de arquivo para anexos:",
+    options: [
+      ["A", "Manter o limite atual do servidor: 10 MB; imagens (jpeg/png/gif/webp), PDF, txt, Word e Excel (+ formatos de áudio só para notas de voz)", true, "já está validado na rota e no bucket; nada de mudança de política além do áudio"],
+      ["B", "Ampliar a lista (ex.: zip, csv, pptx, vídeo curto) e/ou o limite de tamanho", false, "mais útil, mas exige mudança no bucket/schema e cuidados com vídeo"],
+      ["C", "Só imagens nesta fase", false, "menor esforço, mas fica aquém do MSG-02"]
+    ] },
+  { id: "q7", domain: "Requisitos — anexos", multi: false,
+    title: "Quantos arquivos por mensagem, e com texto?",
+    options: [
+      ["A", "Até 5 arquivos por mensagem, com texto opcional; mensagem só com anexo também vale", true, "cobre arrastar várias imagens de uma vez; o limite segura abuso"],
+      ["B", "1 arquivo por mensagem, com texto opcional", false, "mais simples para progresso/erros; várias imagens viram várias mensagens"],
+      ["C", "Sem limite por mensagem", false, "risco de abuso e uploads muito longos"]
+    ] },
+  { id: "q8", domain: "Requisitos — anexos", multi: true,
+    title: "Quais previews precisam aparecer no feed? (marque todos)",
+    options: [
+      ["A", "Imagens: miniatura inline; clique abre em tamanho grande (lightbox)", true, "o essencial do MSG-02"],
+      ["B", "PDF/Office/txt: cartão com ícone, nome, tamanho e botão de download", true, "baixo custo e funciona para tudo"],
+      ["C", "PDF: visualização inline da primeira página", false, "bonito, mas pesado (renderização de PDF)"],
+      ["D", "GIF animado tocando inline", false, "decida se GIF anima sozinho ou só ao clicar"]
+    ] },
+  { id: "q9", domain: "Casos de borda — anexos", multi: false,
+    title: "Upload falhou, foi cancelado ou travou no meio. O que acontece?",
+    options: [
+      ["A", "Progresso por arquivo no composer; dá para remover/cancelar cada arquivo; a mensagem só é enviada depois que TODOS os uploads terminarem; falha mostra erro e botão 'tentar de novo'; arquivos órfãos não aparecem para ninguém", true, "nunca aparece mensagem quebrada no feed"],
+      ["B", "A mensagem é enviada na hora (otimista) e os anexos vão aparecendo conforme o upload termina", false, "parece mais rápido, mas outros usuários podem ver mensagens com anexo faltando"],
+      ["C", "Sem cancelar/tentar de novo; falhou, o usuário escolhe o arquivo de novo", false, "mais simples, UX pior"]
+    ] },
+  { id: "q10", domain: "Requisitos — notas de voz (se ficarem no escopo)", multi: false,
+    title: "Como funciona a gravação da nota de voz?",
+    options: [
+      ["A", "Clicar no microfone para gravar, ver forma de onda ao vivo e cronômetro, parar, ouvir antes de enviar, enviar ou descartar", true, "evita enviar gravação errada; funciona com mouse e teclado"],
+      ["B", "Segurar para gravar e soltar para enviar (estilo WhatsApp), arrastar para cancelar", false, "rápido, mas pior para acessibilidade/teclado e no desktop"],
+      ["C", "Os dois modos", false, "mais código e mais testes"]
+    ] },
+  { id: "q11", domain: "Regras de negócio — notas de voz (se ficarem no escopo)", multi: false,
+    title: "Duração máxima de uma nota de voz:",
+    options: [
+      ["A", "2 minutos (para sozinha no limite, com aviso nos últimos 10 s)", true, "cabe com folga em 10 MB em Opus/WebM e mantém mensagens curtas"],
+      ["B", "5 minutos", false, "mais flexível; arquivo maior"],
+      ["C", "Sem limite além dos 10 MB", false, "o corte acontece de forma imprevisível para o usuário"]
+    ] },
+  { id: "q12", domain: "Restrições — navegadores e dispositivos", multi: false,
+    title: "Quais navegadores/dispositivos são obrigatórios nesta fase?",
+    options: [
+      ["A", "Chrome e Edge desktop obrigatórios; Firefox e Safari no melhor esforço (a nota gravada no Chrome precisa tocar no Safari, ou mostrar erro claro)", true, "segue a base da Fase 3; gravação no Safari usa outro formato de áudio"],
+      ["B", "Chrome, Edge, Firefox e Safari desktop, todos obrigatórios", false, "mais cobertura, mais trabalho de formato de áudio e de testes"],
+      ["C", "Desktop + mobile (iOS/Android) obrigatórios", false, "o drawer precisaria de UX mobile e de testes em aparelho real"]
+    ] },
+  { id: "q13", domain: "Requisitos — favoritos", multi: false,
+    title: "Onde fica o filtro de mensagens favoritadas?",
+    options: [
+      ["A", "Botão no cabeçalho da conversa que troca o feed para 'só minhas favoritas desta conversa'; clicar num resultado volta ao feed normal com rolagem até a mensagem e destaque", true, "cabe no drawer atual; usa o filtro por conversa que o repositório já tem"],
+      ["B", "Uma visão global 'Favoritas' com mensagens de todas as minhas conversas, agrupadas por conversa", false, "mais útil para achar coisas, mas é uma nova superfície de navegação"],
+      ["C", "As duas (A e B)", false, "mais completo, mais escopo"]
+    ] },
+  { id: "q14", domain: "Casos de borda — favoritos", multi: false,
+    title: "A mensagem favoritada é antiga e não está na página carregada. Ao clicar nela:",
+    options: [
+      ["A", "Carregar o histórico até chegar nela (com indicador de carregamento), rolar e destacar; se ela foi apagada ou eu perdi acesso, mostrar aviso e manter o feed estável", true, "cumpre 'mensagens fora da página carregada' sem nova superfície"],
+      ["B", "Abrir a mensagem isolada com algumas mensagens de contexto ao redor, sem pular no feed principal", false, "evita carregar muito histórico, mas cria uma visão nova"],
+      ["C", "Só listar as favoritas, sem pular até elas", false, "não cumpre o critério de sucesso do roadmap"]
+    ] },
+  { id: "q15", domain: "Escopo — o que NÃO entra", multi: true,
+    title: "O que fica explicitamente FORA da Fase 4? (marque todos que concorda)",
+    options: [
+      ["A", "Fila offline / reenvio automático de mensagens e uploads sem rede (Fase 5)", true, "RESIL-01"],
+      ["B", "Reconexão/polling do Realtime, indicador de digitando e sincronização entre dispositivos (Fase 5)", true, "RESIL-02..05; o que já existe precisa continuar funcionando"],
+      ["C", "Notificações desktop e métricas de mensagens (Fase 5)", true, "RESIL-06/07"],
+      ["D", "Busca no texto das mensagens, scroll infinito automático e affordance 'Novas mensagens'", true, "MSG-05..07: históricos, não fazem parte deste contrato"],
+      ["E", "Editar ou apagar anexos depois de enviados", false, "decida: apagar a mensagem apaga o anexo? Isso entra?"],
+      ["F", "Transcrição de nota de voz", true, "IA, outro escopo"]
+    ] },
+  { id: "q16", domain: "Restrições — o que NÃO pode acontecer", multi: true,
+    title: "Quais destas são regras invioláveis? (marque todas)",
+    options: [
+      ["A", "Nenhum anexo/nota de voz acessível por URL pública ou por quem não é membro da conversa", true, "bucket privado + URL assinada, como hoje"],
+      ["B", "O remetente nunca gera recibo de leitura da própria mensagem", true, ""],
+      ["C", "Nada que já funciona no drawer quebra: texto, respostas/threads, reações, digitando, histórico, envio em tempo real", true, "regressão vira bloqueio"],
+      ["D", "Nenhum serviço pago novo (armazenamento extra, transcodificação, SaaS de mídia)", true, "segue a linha zero-custo da Fase 3"],
+      ["E", "Nada de usar users.id comparado direto com auth.uid(); identidade sempre via supabase_uid", true, "regra do projeto"]
+    ] },
+  { id: "q17", domain: "Restrições — banco e rollout", multi: false,
+    title: "Mudanças de banco (ex.: liberar áudio no bucket, nova rota/RPC de favoritas, recorte do RLS de recibos):",
+    options: [
+      ["A", "Tudo primeiro no banco local; aplicar no Supabase online (vhabpcoyypobgasacsko) só no fim, com sua autorização explícita, preflight e leitura de volta", true, "padrão do CLAUDE.md"],
+      ["B", "Pode aplicar no online durante o desenvolvimento, fatia por fatia, sempre com sua autorização", false, "feedback real antes, mas mais operações online"],
+      ["C", "Esta fase não pode exigir nenhuma mudança de banco online", false, "provavelmente inviável para notas de voz (MIME de áudio no bucket)"]
+    ] },
+  { id: "q18", domain: "Critérios de aceite / Estratégia de teste", multi: false,
+    title: "Como a fase é dada como pronta?",
+    options: [
+      ["A", "Testes escritos a partir dos critérios de aceite (TDD onde couber): unit + integração para repositório/rotas/RLS no Postgres local, e Playwright com DUAS contas reais para cada fluxo (recibo, anexo, voz, favoritas); depois o seu UAT manual no navegador", true, "mocks não provam RLS nem entrega em tempo real"],
+      ["B", "Unit/integração + seu UAT manual; sem E2E com duas contas", false, "mais rápido, prova menos"],
+      ["C", "Só o seu UAT manual", false, "fraco contra regressão"]
+    ] },
+  { id: "q19", domain: "Usabilidade / Acessibilidade", multi: false,
+    title: "Acessibilidade e layout:",
+    options: [
+      ["A", "Tudo funciona por teclado, com rótulos para leitor de tela (gravar, tocar, favoritar, lista de leitores), e funciona na largura atual do drawer, incluindo telas estreitas", true, "padrão do projeto (shadcn/Radix)"],
+      ["B", "Só mouse/desktop nesta fase", false, "mais rápido, mas a dívida vem depois"]
+    ] },
+  { id: "q20", domain: "Objetivos — sinal de sucesso", multi: false,
+    title: "Qual é o principal sinal de que a fase deu certo para você?",
+    options: [
+      ["A", "Duas pessoas conseguem, no drawer de produção, sem bug: ver quem leu e quando, mandar e ver arquivos, mandar e ouvir voz, e achar uma favorita antiga, cada fluxo coberto por E2E", true, "objetivo e verificável"],
+      ["B", "Um uso real no escritório (ex.: o time usa por uma semana sem reclamação)", false, "valioso, mas difícil de virar critério de aceite"],
+      ["C", "Outro (descreva na nota)", false, ""]
+    ] }
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " / multiple choice" : ""}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recommended)</span>' : ""}
+      ${reason ? ` - <span class="reason">${reason}</span>` : ""}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Other / note (write your own answer):</label>
+    <textarea id="${q.id}-note" placeholder="Write here if no option fits, or to add detail..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 1,
+    topic: "phase-4-messaging-timeline",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(data).then(
+      () => setStatus("Copied! Paste the block into the chat."),
+      () => fallbackCopy(data)
+    );
+  } else {
+    fallbackCopy(data);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("Copied! Paste the block into the chat."); }
+  catch (e) { setStatus("Couldn't copy - use Download answers.json."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Downloaded answers file.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>

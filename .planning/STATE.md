@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: messaging-timeline
+current_phase: 05
+current_phase_name: messaging-resilience
 status: reference_only
-stopped_at: Phase 3 owner accepted; Phase 4 baseline reconciled
-last_updated: "2026-10-03T11:46:42Z"
-last_activity: 2026-10-03
+stopped_at: Phase 4 owner accepted (spec-to-done REPORT COMPLETED); Phase 5 needs a SPEC
+last_updated: "2026-10-06T00:00:00Z"
+last_activity: 2026-10-06
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 26
   completed_plans: 26
 ---
@@ -24,19 +24,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-03)
 
 **Core value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
-**Next product area:** Phase 04 — Messaging Timeline, as input for a new spec-to-done SPEC; no new development contract is approved yet.
+**Next product area:** Phase 05 — Messaging Resilience, as input for a new spec-to-done SPEC; no contract is approved yet. Phase 04 is complete (owner accepted 2026-10-06; record in `spec-interview/phase-4-messaging-timeline/`).
 
 ## Current Position
 
-Next reference phase: 04 (messaging-timeline) — READY FOR SPEC DISCUSSION
-Plan: none written; scope and context must be agreed before execution plans.
-Baseline: [docs/messaging/phase-4-source-baseline.md](../docs/messaging/phase-4-source-baseline.md)
+Next reference phase: 05 (messaging-resilience) — NEEDS SPEC
+Phase 04 (messaging-timeline): COMPLETE — owner UAT accepted 2026-10-06; SPEC/PLAN/TRACK/REPORT in `spec-interview/phase-4-messaging-timeline/`. 6 migrations applied online to `vhabpcoyypobgasacsko` (2026-10-05); new app NOT yet deployed (order: migrations → app; rollback app first).
 
 Phase 03 is closed for routing by the owner's 2026-10-03 completion confirmation, 15/15 execution summaries, and subsequent recorded corrections. Old UAT failures and manual handoff instructions describe earlier snapshots; they do not instruct a new session to rerun completed waves.
 
 ### Next action
 
-Use the messaging baseline as input to spec-to-done Specify: choose the first slice, define reader/time semantics and starred-filter scope, then settle upload limits/previews and voice-note behavior. New SPEC, state, PLAN, TRACK, and REPORT belong under spec-interview/<slug>/. Require user-confirmed Ready SPEC before planning or implementation. Suggested first slice: read receipts + starred filtering, reusing the existing backend; this is a recommendation, not an approved scope.
+Start spec-to-done Specify for Phase 05 (Messaging Resilience) under a new spec-interview/<slug>/. Start from Phase 04's delivered state: DM/group desktop notifications, failed-send preservation with single-message retry, and Realtime reconnect catch-up already exist; the Phase 04 REPORT lists follow-ups (two need migrations). Owner deploy of the Phase 04 app is still pending. Require a user-confirmed Ready SPEC before planning or implementation.
 
 ### Current planning inventory
 
@@ -46,9 +45,10 @@ Use the messaging baseline as input to spec-to-done Specify: choose the first sl
 | 02 — Floor Plan Completion | 8 | 8 | Complete |
 | 02.1 — Presence Reload Fixes | 1 | 1 | Complete |
 | 03 — Spatial Audio and Screen Sharing | 15 | 15 | Complete — owner accepted |
-| 04 — Messaging Timeline | 0 | 0 | Ready for discussion |
+| 04 — Messaging Timeline | spec-to-done (T1–T32) | REPORT | Complete — owner accepted 2026-10-06 |
+| 05 — Messaging Resilience | 0 | 0 | Next — needs SPEC |
 
-There are 8 roadmap phases, including 02.1; 4 are complete. All 26 existing execution plans have summaries. Future plan counts and durations are not estimated from old placeholders. Historical per-plan timing remains in the phase summaries.
+There are 8 roadmap phases, including 02.1; 5 are complete. All 26 existing execution plans have summaries. Future plan counts and durations are not estimated from old placeholders. Historical per-plan timing remains in the phase summaries.
 
 ## Accumulated Context
 
@@ -157,9 +157,9 @@ Prepare the new spec-to-done SPEC from the production-source baseline; MSG-01 th
 
 ## Session Continuity
 
-**Last session:** 2026-10-03T11:46:42Z
+**Last session:** 2026-10-06
 
-Last activity: 2026-10-03 — owner confirmed Knock/screen-sharing completion; reconciled Phase 4 baseline and routing.
-Stopped at: source reconciliation complete; Phase 4 is input for a new spec-to-done SPEC. No implementation or new execution plan started.
-Resume file: docs/messaging/phase-4-source-baseline.md
+Last activity: 2026-10-06 — owner accepted Phase 4 (Messaging Timeline); spec-to-done REPORT COMPLETED.
+Stopped at: Phase 4 closed; Phase 5 (Messaging Resilience) is input for a new spec-to-done SPEC.
+Resume file: spec-interview/phase-4-messaging-timeline/REPORT.md
 Historical Phase 3 handoff: .planning/phases/03-video-and-screen-sharing/03-HUMAN-HANDOFF.md (superseded for routing by owner acceptance)

@@ -2,14 +2,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { Message, MessageStatus, MessageType } from '@/types/messaging';
 import { usePresence } from '@/contexts/PresenceContext';
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CheckCheck, AlertCircle, File, Reply, MoreHorizontal, ChevronDown, Pin, Star } from 'lucide-react';
+import { CheckCheck, AlertCircle, Reply, MoreHorizontal, ChevronDown, Pin, Star } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/contexts/CompanyContext';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
@@ -17,6 +16,8 @@ import { AvatarUser } from '@/lib/avatar-utils';
 import type { User } from '@/types/database';
 import { EmojiPicker } from '@/components/messaging/EmojiPicker';
 import { ReactionChips } from '@/components/messaging/ReactionChips';
+import { MessageReadReceipts } from '@/components/messaging/MessageReadReceipts';
+import { MessageAttachments } from '@/components/messaging/MessageAttachments';
 // Format message timestamp
 const formatMessageTime = (timestamp: Date) => {
   if (!timestamp) return '';
@@ -66,21 +67,12 @@ function MessageContent({
     case MessageType.TEXT:
       return <p className="whitespace-pre-wrap break-words">{message.content}</p>;
     case MessageType.IMAGE:
-      return <div>
-          <p className="mb-2">{message.content}</p>
-          {message.attachments && message.attachments.length > 0 && <div className="rounded-md overflow-hidden">
-              <Image src={message.attachments[0].url} alt={message.attachments[0].name} width={640} height={480} className="max-w-full h-auto" />
-            </div>}
-        </div>;
     case MessageType.FILE:
-      return <div>
-          <p className="mb-2">{message.content}</p>
-          {message.attachments && message.attachments.length > 0 && <div className="flex items-center p-2 rounded-md bg-secondary">
-              <File className="size-5 mr-2" />
-              <a href={message.attachments[0].url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                {message.attachments[0].name}
-              </a>
-            </div>}
+      // Phase 4 FR-011: every attachment renders (images as thumbnails with a
+      // lightbox, other files as download cards); the text is optional.
+      return <div className="flex min-w-0 flex-col gap-2">
+          {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+          {message.attachments && message.attachments.length > 0 && <MessageAttachments attachments={message.attachments} pending={message.status === MessageStatus.SENDING} />}
         </div>;
     case MessageType.SYSTEM:
       return <div className="text-center text-muted-foreground text-sm italic">
@@ -131,7 +123,8 @@ function MessageActions({
   onPin,
   onUnpin,
   onStar,
-  onUnstar
+  onUnstar,
+  onMenuOpenChange
 }: {
   showActions: boolean;
   message: Message;
@@ -143,6 +136,7 @@ function MessageActions({
   onUnpin?: (messageId: string) => void;
   onStar?: (messageId: string) => void;
   onUnstar?: (messageId: string) => void;
+  onMenuOpenChange: (open: boolean) => void;
 }) {
   if (!showActions) return null;
   return <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1" data-avatar-interactive>
@@ -153,13 +147,13 @@ function MessageActions({
         <Reply className="size-4" />
       </Button>
       <EmojiPicker onEmojiSelect={emoji => onReaction?.(message.id, emoji)} />
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={onMenuOpenChange}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-7" data-avatar-interactive onClick={e => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="size-7" data-avatar-interactive onClick={e => e.stopPropagation()} aria-label="Mais ações" data-testid={`message-more-actions-${message.id}`}>
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onPointerDownOutside={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+        <DropdownMenuContent align="end" onPointerDownOutside={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
           <DropdownMenuItem onSelect={e => {
           e.preventDefault();
           isPinned ? onUnpin?.(message.id) : onPin?.(message.id);
@@ -167,12 +161,13 @@ function MessageActions({
             <Pin className={cn("mr-2 size-4", isPinned && "fill-current")} />
             {isPinned ? 'Unpin Message' : 'Pin Message'}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={e => {
-          e.preventDefault();
+          {/* Stars are personal (Phase 4 FR-020). The menu closes after the
+              action so focus returns to the trigger. */}
+          <DropdownMenuItem onSelect={() => {
           isStarred ? onUnstar?.(message.id) : onStar?.(message.id);
-        }}>
-            <Star className={cn("mr-2 size-4", isStarred && "fill-yellow-400 text-yellow-400")} />
-            {isStarred ? 'Unstar Message' : 'Star Message'}
+        }} data-testid={`message-star-toggle-${message.id}`}>
+            <Star className={cn("mr-2 size-4", isStarred && "fill-yellow-400 text-yellow-400")} aria-hidden="true" />
+            {isStarred ? 'Remover dos favoritos' : 'Favoritar'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -217,6 +212,9 @@ export function MessageItem({
     currentUserProfile
   } = useCompany();
   const [showActions, setShowActions] = useState(false);
+  // The menu content is portaled, so moving focus into it blurs the message;
+  // the action bar (which owns the menu) must stay mounted while it is open.
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const showReplyIndicator = replyCount > 0;
 
   // Get sender presence information
@@ -307,7 +305,7 @@ export function MessageItem({
         </div>
       </div>;
   }
-  return <div data-testid={`message-${message.id}`} className={cn('relative flex items-start mb-4 px-4 group', isCurrentUser ? 'justify-end' : 'justify-start')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onFocus={handleFocusWithin} onBlur={hideActionsOnBlur} data-thread-depth={depth}>
+  return <div data-testid={`message-${message.id}`} className={cn('relative flex items-start mb-4 px-4 group', isCurrentUser ? 'justify-end' : 'justify-start')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onFocus={handleFocusWithin} onBlur={hideActionsOnBlur} data-thread-depth={depth} data-attachment-count={message.attachments?.length ?? 0}>
       {showAvatar && (interactiveUser ? <InteractiveUserAvatar user={interactiveUser} size="sm" className="mr-2" display={{ status: true }} /> : fallbackAvatarUser ? <EnhancedAvatarV2 user={fallbackAvatarUser} size="sm" className="mr-2" display={{ status: !!senderPresence?.status }} status={senderPresence?.status} /> : null)}
 
       <div className={cn("max-w-[80%]", isCurrentUser ? "order-1" : "order-2")}>
@@ -330,8 +328,15 @@ export function MessageItem({
               {getMessageStatusIcon(message.status)}
             </span>
           )}
+          {isCurrentUser && (message.readCount ?? 0) > 0 && (
+            <MessageReadReceipts messageId={message.id} readCount={message.readCount ?? 0} />
+          )}
           {isPinned && <Pin className="size-3 text-muted-foreground rotate-45" />}
-          {isStarred && <Star className="size-3 text-yellow-400 fill-yellow-400" />}
+          {isStarred && (
+            <span role="img" aria-label="Favoritada" title="Favoritada" data-testid={`message-starred-${message.id}`}>
+              <Star className="size-3 text-yellow-400 fill-yellow-400" aria-hidden="true" />
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 mt-2">
@@ -347,6 +352,6 @@ export function MessageItem({
         </div>
       </div>
 
-      <MessageActions showActions={showActions} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={onReply} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
+      <MessageActions showActions={showActions || isActionsMenuOpen} onMenuOpenChange={setIsActionsMenuOpen} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={onReply} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
     </div>;
 }

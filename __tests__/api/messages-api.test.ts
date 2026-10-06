@@ -1,10 +1,8 @@
 import { NextRequest } from 'next/server';
-import { POST as uploadHandler } from '@/app/api/messages/upload/route';
 import { GET as getAttachmentsHandler } from '@/app/api/messages/attachments/route';
 import { getSupabaseRepositories } from '@/repositories/getSupabaseRepositories';
 import type { IMessageRepository } from '@/repositories/interfaces';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { jsonError } from '@/lib/auth/authorize';
 
 const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
 const CONVERSATION_ID = 'conversation-123';
@@ -148,42 +146,6 @@ describe('Messages API Routes', () => {
         }),
       } as unknown as IMessageRepository,
     } as unknown as Awaited<ReturnType<typeof getSupabaseRepositories>>);
-  });
-
-  describe('File Upload Route', () => {
-    test('should upload file and return attachment data', async () => {
-      const mockFile = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
-      mockFile.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(10));
-      const mockRequest = createMockRequest('POST', {
-        file: mockFile,
-        conversationId: CONVERSATION_ID,
-        messageId: MESSAGE_ID,
-      });
-
-      const response = await uploadHandler(mockRequest as NextRequest);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('success', true);
-      expect(data).toHaveProperty('attachment');
-    });
-
-    test('should return 401 when user is not authenticated', async () => {
-      mockRequireConversationParticipant.mockResolvedValueOnce(
-        { errorResponse: jsonError(401, 'UNAUTHORIZED', 'Authentication required') }
-      );
-
-      const mockRequest = createMockRequest('POST', {
-        file: new File(['test'], 'test.jpg', { type: 'image/jpeg' }),
-        conversationId: CONVERSATION_ID,
-      });
-
-      const response = await uploadHandler(mockRequest as NextRequest);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data).toHaveProperty('code', 'UNAUTHORIZED');
-    });
   });
 
   describe('Message Attachments Route', () => {

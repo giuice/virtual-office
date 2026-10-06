@@ -2,15 +2,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { hashKey, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
-import { appendMessageToPages, type MessagesInfiniteData } from '@/lib/messaging/message-cache';
+import {
+  appendMessageToPages,
+  keepMessageThroughInflightFetch,
+  type MessagesInfiniteData,
+} from '@/lib/messaging/message-cache';
+import { MESSAGE_READERS_QUERY_KEY, messageReadersQueryKey } from '@/hooks/queries/useMessageReaders';
+import { STARRED_MESSAGES_QUERY_KEY } from '@/hooks/queries/useStarredMessages';
 import {
   type RealtimeChannel,
   type RealtimePostgresChangesPayload,
+  type RealtimeSystemPayload,
 } from '@supabase/supabase-js';
 
 interface UseMessageSubscriptionOptions {
@@ -26,6 +33,8 @@ const FAILURE_STATUSES = new Set(['TIMED_OUT', 'CHANNEL_ERROR', 'CLOSED']);
 const RETRY_BASE_DELAY_MS = 250;
 const RETRY_MAX_DELAY_MS = 5000;
 const RETRY_STABLE_AFTER_MS = 30_000;
+// A mark-read writes one receipt row per message; each row is its own event.
+const RECEIPT_REFETCH_DELAY_MS = 100;
 let channelTopicSequence = 0;
 
 function createChannelTopic(companyId: string, currentUserId: string): string {
@@ -59,10 +68,18 @@ const ATTACHMENT_MESSAGE_TYPES = new Set(['image', 'file']);
 // Audit B-04: shared cache-merge with the optimistic send path — page 0 is
 // the newest window and dedupe runs across all pages.
 const appendMessageToCache = (queryClient: QueryClient, message: Message) => {
+  // A conversation whose history was never loaded has no cache entry. Creating
+  // one from this single row would make the feed treat it as the whole history
+  // (no older-page cursor, 5 min staleTime) and hide every earlier message, so
+  // they could never be seen or read. Its first open fetches the history.
+  if (!queryClient.getQueryData(['messages', message.conversationId])) {
+    return;
+  }
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', message.conversationId],
     (oldData) => appendMessageToPages(oldData, message)
   );
+  keepMessageThroughInflightFetch(queryClient, message.conversationId, message);
 };
 
 const updateMessageInCache = (queryClient: QueryClient, conversationId: string, row: any) => {
@@ -232,12 +249,16 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
 
       if (eventType === 'INSERT' && payload.new) {
         const message = mapRowToMessage(payload.new);
-        appendMessageToCache(queryClient, message);
 
-        // M-08: image/file messages arrive without their attachments —
-        // refetch the conversation so receivers see them without a reload.
+        // M-08: image/file messages arrive without their attachments. The
+        // bare row is not shown (BR-007: a message is never visible without
+        // its files); the feed refetches it with them. The refetch is the
+        // deferred, non-cancelling one, so it never aborts an older page the
+        // reader is loading.
         if (ATTACHMENT_MESSAGE_TYPES.has(message.type as string)) {
-          queryClient.invalidateQueries({ queryKey: ['messages', message.conversationId] });
+          scheduleFeedRefetch(message.conversationId);
+        } else {
+          appendMessageToCache(queryClient, message);
         }
 
         const ignoreSenderId = ignoreSenderIdRef.current;
@@ -264,15 +285,81 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
 
     // Phase 2.2: read-receipt INSERTs (written in bulk by the
     // mark_conversation_read RPC) flip the sender's read indicator.
-    // Refetch derives status from message_read_receipts server-side;
-    // TanStack coalesces the burst of invalidations into one refetch.
+    // Refetch derives status from message_read_receipts server-side.
+    // A burst of receipt events becomes one refetch per conversation, and it
+    // never cancels an in-flight fetch: an invalidation with the default
+    // cancelRefetch aborts an older page the reader is loading, after which
+    // the infinite query refetches only the pages it already had. While a
+    // fetch is running the refetch waits for it, so no receipt is lost.
+    // The same deferred refetch catches a feed (and an open starred list,
+    // which also pages) up after the channel (re)joins.
+    const deferredRefetchTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const scheduleDeferredRefetch = (queryKey: QueryKey) => {
+      const timerKey = hashKey(queryKey);
+      if (deferredRefetchTimers.has(timerKey)) return;
+      deferredRefetchTimers.set(
+        timerKey,
+        setTimeout(() => {
+          deferredRefetchTimers.delete(timerKey);
+          if (!isMounted) return;
+          const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+          if (query?.state.fetchStatus === 'fetching') {
+            scheduleDeferredRefetch(queryKey);
+            return;
+          }
+          void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
+        }, RECEIPT_REFETCH_DELAY_MS)
+      );
+    };
+    const scheduleFeedRefetch = (conversationId: string) => {
+      scheduleDeferredRefetch(['messages', conversationId]);
+    };
+
     const handleReceiptInsert = (
       payload: RealtimePostgresChangesPayload<Record<string, unknown>>
     ) => {
-      const conversationId = (payload.new as Record<string, unknown> | null)?.conversation_id;
+      const row = payload.new as Record<string, unknown> | null;
+      const conversationId = row?.conversation_id;
       if (typeof conversationId === 'string') {
-        queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+        scheduleFeedRefetch(conversationId);
       }
+      // Phase 4 FR-005: an open reader list refetches right away (only active
+      // queries refetch; a closed one is refetched on its next open). Its
+      // request is small and per message, so superseding one in flight —
+      // which may predate this receipt — is the safe default.
+      const messageId = row?.message_id;
+      if (typeof messageId === 'string') {
+        void queryClient.invalidateQueries({ queryKey: messageReadersQueryKey(messageId) });
+      }
+    };
+
+    // Changes committed while the channel was not yet (or no longer) streaming
+    // never arrive as events: on first load, a message sent between the
+    // initial fetches and the join would leave the unread count and the feed
+    // stale until some later event. Once the server confirms the
+    // postgres_changes stream for this (re)join, every cached feed refetches
+    // (receipt counts, stars, attachment messages), and so do the caches kept
+    // outside the feed: an open reader list (receipts) and an open starred
+    // list (stars have no Realtime event at all; another session's change
+    // shows on the next refetch). Closed ones are only marked stale; they
+    // refetch whenever they open. The conversation list catches up in
+    // useConversationRealtime.
+    const catchUpTimelineCaches = () => {
+      const queryCache = queryClient.getQueryCache();
+      queryCache
+        .findAll({ queryKey: ['messages'] })
+        .forEach((query) => {
+          const [, conversationId] = query.queryKey;
+          if (query.queryKey.length === 2 && typeof conversationId === 'string') {
+            scheduleFeedRefetch(conversationId);
+          }
+        });
+      queryCache
+        .findAll({ queryKey: STARRED_MESSAGES_QUERY_KEY })
+        .forEach((query) => scheduleDeferredRefetch(query.queryKey));
+      // Same policy as the receipt handler: a small per-message request, so
+      // superseding one in flight (which may predate the reconnect) is safe.
+      void queryClient.invalidateQueries({ queryKey: MESSAGE_READERS_QUERY_KEY });
     };
 
     const handleReactionChange = (
@@ -373,7 +460,16 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
           (payload) => {
             if (isOwnedChannel()) handleReactionChange(payload);
           }
-        );
+        )
+        .on('system', {}, (payload: RealtimeSystemPayload) => {
+          if (
+            isOwnedChannel()
+            && payload.extension === 'postgres_changes'
+            && payload.status === 'ok'
+          ) {
+            catchUpTimelineCaches();
+          }
+        });
       channel = nextChannel;
 
       nextChannel.subscribe((channelStatus) => {
@@ -443,6 +539,8 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       isMounted = false;
       clearRetryTimer();
       clearStableSubscriptionTimer();
+      deferredRefetchTimers.forEach((timer) => clearTimeout(timer));
+      deferredRefetchTimers.clear();
       if (channel) retireChannel(channel);
       publishStatus(null);
     };

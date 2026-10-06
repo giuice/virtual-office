@@ -9,8 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, MessageSquare, Minimize2, ArrowLeft, Plus, List } from 'lucide-react';
 import { MessageFeed } from './message-feed';
-import { ConversationList } from './ConversationList';
+import {
+  ConversationList,
+  DEFAULT_CONVERSATION_LIST_FILTERS,
+  type ConversationListFilters,
+} from './ConversationList';
 import { ConversationSearch } from './ConversationSearch';
+import { DesktopNotificationsToggle } from './DesktopNotificationsToggle';
 import { cn } from '@/lib/utils';
 
 interface MessagingDrawerProps {
@@ -44,6 +49,12 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
 
   // Local state for tracking conversation creation
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  // List filters live here, not in ConversationList, so opening a
+  // conversation and coming back keeps the tab/pinned/archived choice for the
+  // rest of the drawer session (reset when the drawer is closed).
+  const [listFilters, setListFilters] = useState<ConversationListFilters>(
+    DEFAULT_CONVERSATION_LIST_FILTERS
+  );
 
   const conversationToDisplay = activeConversation ?? lastActiveConversation;
 
@@ -71,6 +82,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
   }
 
   const handleClose = () => {
+    setListFilters(DEFAULT_CONVERSATION_LIST_FILTERS);
     closeDrawer();
   };
 
@@ -138,6 +150,11 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
     if (conversationToDisplay.type === ConversationType.ROOM) {
       return conversationToDisplay.name || 'Room';
     }
+    // Groups are named like in the conversation list and the feed header; a
+    // group is not titled after one of its members.
+    if (conversationToDisplay.type === ConversationType.GROUP) {
+      return conversationToDisplay.name || 'Group';
+    }
     // For direct messages, find the other participant's name
     const otherParticipantId = conversationToDisplay.participants?.find(
       (participantId: string) => participantId !== currentUserProfile?.id
@@ -158,6 +175,7 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
         <Button
           variant="default"
           className="flex items-center gap-2 shadow-lg"
+          data-testid="messaging-drawer-minimized"
           onClick={toggleMinimize}
         >
           <MessageSquare className="size-4" />
@@ -186,14 +204,16 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
                 size="icon"
                 className="size-6"
                 onClick={handleBackToList}
+                aria-label="Back to conversations"
               >
                 <ArrowLeft className="size-3" />
               </Button>
             )}
             <MessageSquare className="size-4" />
-            <CardTitle className="text-sm font-medium">{drawerTitle}</CardTitle>
+            <CardTitle className="text-sm font-medium" data-testid="messaging-drawer-title">{drawerTitle}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
+            <DesktopNotificationsToggle currentUserId={currentUserProfile?.id} />
             {/* New message button for list view */}
             {activeView === 'list' && (
               <Button
@@ -245,6 +265,8 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
           {activeView === 'list' && (
             <ConversationList
               conversations={conversations}
+              filters={listFilters}
+              onFiltersChange={setListFilters}
               selectedConversationId={activeConversation?.id || null}
               onSelectConversation={handleSelectConversation}
               isLoading={loadingConversations}

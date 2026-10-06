@@ -1,7 +1,13 @@
 // src/app/api/messages/attachment/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
-import { isAuthzFailure, requireMessageParticipant } from '@/lib/auth/authorize';
+import { isAuthzFailure, jsonError, requireMessageParticipant } from '@/lib/auth/authorize';
+import {
+  ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+  isConversationAttachmentPath,
+  normalizeAttachmentName,
+} from '@/lib/messaging/attachment-policy';
+import { signAttachmentUrl } from '@/lib/messaging/attachment-storage';
 
 // Audit S-03: message_attachments.url stores the storage path; legacy rows
 // may still hold a full public URL — extract the path in that case.
@@ -16,9 +22,13 @@ function resolveStoragePath(url: string): string | null {
 /**
  * GET handler — authz'd read of a private attachment (audit S-03).
  * Checks conversation membership, then redirects to a short-lived signed URL.
+ * Only linked attachments resolve here: pending uploads (not yet sent) are
+ * not in message_attachments and answer 404 (Phase 4 FR-010).
+ * `?download=1` signs the URL as a download saved under the attachment's
+ * name (feed file cards, Phase 4 FR-011); otherwise it is served inline.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -30,7 +40,7 @@ export async function GET(
     const serviceClient = await createSupabaseServerClient('service_role');
     const { data: attachment, error: fetchError } = await serviceClient
       .from('message_attachments')
-      .select('id, message_id, url')
+      .select('id, message_id, url, name')
       .eq('id', id)
       .single();
 
@@ -47,18 +57,30 @@ export async function GET(
     if (!storagePath) {
       return NextResponse.json({ error: 'Invalid attachment URL format' }, { status: 400 });
     }
+    // Phase 4 T12: sign only objects stored under the message's own
+    // conversation folder, so a row can never expose another conversation's
+    // object (or a pending upload of another conversation).
+    if (!isConversationAttachmentPath(storagePath, ctx.message.conversationId)) {
+      return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+    }
 
-    const { data: signed, error: signError } = await serviceClient
-      .storage
-      .from('attachments')
-      .createSignedUrl(storagePath, 3600);
-
-    if (signError || !signed) {
-      console.error('Error signing attachment URL:', signError);
+    // Phase 4 BR-011: short-lived signed URL (ATTACHMENT_SIGNED_URL_TTL_SECONDS),
+    // issued only after the membership check; the redirect itself is not
+    // cacheable so every read re-checks membership.
+    const download = request.nextUrl.searchParams.get('download') === '1';
+    const signedUrl = await signAttachmentUrl(
+      serviceClient,
+      storagePath,
+      ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+      download ? { downloadName: normalizeAttachmentName(String(attachment.name ?? '')) } : {}
+    );
+    if (!signedUrl) {
       return NextResponse.json({ error: 'Failed to get file URL' }, { status: 500 });
     }
 
-    return NextResponse.redirect(signed.signedUrl);
+    const response = NextResponse.redirect(signedUrl);
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
   } catch (error) {
     console.error('Error fetching attachment:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -104,6 +126,27 @@ export async function DELETE(
 
     if (ctx.message.senderId !== ctx.dbUser.id) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+
+    // Phase 4 T12: an attachment-only message keeps at least one attachment
+    // (it would otherwise be an empty message).
+    const [{ data: owner, error: ownerError }, { count: attachmentCount, error: countError }] = await Promise.all([
+      supabase.from('messages').select('content').eq('id', attachment.message_id).single(),
+      supabase
+        .from('message_attachments')
+        .select('id', { count: 'exact', head: true })
+        .eq('message_id', attachment.message_id),
+    ]);
+    if (ownerError || countError || !owner || attachmentCount === null) {
+      console.error('Error checking attachment removal:', ownerError ?? countError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+    if (owner.content === '' && attachmentCount <= 1) {
+      return jsonError(
+        409,
+        'LAST_ATTACHMENT_OF_EMPTY_MESSAGE',
+        'The only attachment of a message without text cannot be removed; delete the message instead'
+      );
     }
     
     const storagePath = resolveStoragePath(attachment.url);

@@ -9,7 +9,15 @@ import { jsonError } from '@/lib/auth/authorize';
 const RATE_LIMITS = {
   'message:create': { limit: 30, windowSeconds: 60 },
   'message:react': { limit: 60, windowSeconds: 60 },
-  'message:upload': { limit: 10, windowSeconds: 60 },
+  // Phase 4 T13: one upload per file, up to 5 files per message, plus retries
+  // of failed uploads; 10/min refused the second full message in a minute.
+  // 30/min = six 5-file messages, in line with message:create (each file is
+  // still capped at 10 MB and only links to the uploader's own message).
+  'message:upload': { limit: 30, windowSeconds: 60 },
+  // Phase 4 T12: cancelling pending uploads (composer remove/cancel).
+  'message:upload-cancel': { limit: 60, windowSeconds: 60 },
+  // Visible-message receipts are batched by the drawer while it scrolls.
+  'conversation:read-receipts': { limit: 120, windowSeconds: 60 },
 } as const;
 
 export type RateLimitedAction = keyof typeof RATE_LIMITS;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { RealtimeSystemPayload } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
 /**
@@ -49,7 +50,16 @@ export function useConversationRealtime(userId?: string) {
             queryClient.removeQueries({ queryKey: ['conversation', row.id] });
           }
         }
-      );
+      )
+      // Changes committed before this channel was streaming (between the
+      // list's first fetch and the join, or while reconnecting) never arrive
+      // as events, so unread counts and order would stay stale. Refetch once
+      // the server confirms the postgres_changes stream for each (re)join.
+      .on('system', {}, (payload: RealtimeSystemPayload) => {
+        if (payload.extension === 'postgres_changes' && payload.status === 'ok') {
+          void queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
+        }
+      });
 
     const subscription = channel.subscribe((status) => {
       setConnectionStatus(status);

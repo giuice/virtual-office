@@ -4,7 +4,6 @@
 import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
-  Conversation,
   Message,
   MessageType,
   FileAttachment,
@@ -13,6 +12,7 @@ import { MessagingContextType, DrawerView } from './types';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
+import { useIncomingMessageNotifications } from '@/hooks/ui/use-message-notifications';
 import { debugLogger } from '@/utils/debug-logger';
 
 // LocalStorage keys for drawer state persistence
@@ -45,7 +45,7 @@ function useMessagingProviderValue(): MessagingContextType {
     unarchiveConversation,
     pinConversation,
     unpinConversation,
-    markConversationAsRead,
+    markMessagesAsRead,
     totalUnreadCount,
     updateConversationWithMessage,
     clearLastActiveConversation,
@@ -145,119 +145,94 @@ function useMessagingProviderValue(): MessagingContextType {
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
 
-  // Audit B-01: mark the active conversation read while it is actually visible.
-  // Unread is derived from the query cache (the activeConversation object is a
-  // stale snapshot), and gated on drawer visibility because the localStorage
-  // restore sets an active conversation without opening the drawer.
-  const activeConversationId = activeConversation?.id ?? null;
-  const currentUserId = currentUserProfile?.id ?? null;
-  const activeUnreadCount = useMemo(() => {
-    if (!activeConversationId || !currentUserId) return 0;
-    const listed = conversations.find((c) => c.id === activeConversationId);
-    return listed?.unreadCount ?? 0;
-  }, [activeConversationId, currentUserId, conversations]);
+  // The conversation whose feed the drawer shows (same choice as
+  // MessagingDrawer), or null when the drawer is closed, minimized, or on the
+  // list/search view.
+  const displayedConversationId = (activeConversation ?? lastActiveConversation)?.id ?? null;
+  const viewedConversationId = isDrawerOpen && !isMinimized && activeView === 'conversation'
+    ? displayedConversationId
+    : null;
 
-  useEffect(() => {
-    if (!isDrawerOpen || isMinimized) return;
-    if (!activeConversationId || activeUnreadCount <= 0) return;
-    void markConversationAsRead(activeConversationId);
-  }, [isDrawerOpen, isMinimized, activeConversationId, activeUnreadCount, markConversationAsRead]);
+  const openConversationFromNotification = useCallback((conversationId: string) => {
+    const conversation = getCachedConversations().find((c) => c.id === conversationId);
+    if (!conversation) return;
+    setIsDrawerOpen(true);
+    setIsMinimized(false);
+    setActiveConversation(conversation);
+    setActiveView('conversation');
+  }, [getCachedConversations, setActiveConversation]);
 
-  // Ensure an incoming message opens its conversation. Auto-opening the drawer
-  // for received DMs is an explicit product requirement.
-  const ensureOpenForMessage = useCallback(async (message: { conversationId: string; senderId: string }) => {
-    if (debugLogger.messaging.enabled()) {
-      debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'start', {
+  // Phase 4 FR-023: desktop notifications for live messages from others.
+  const notifyIncomingMessage = useIncomingMessageNotifications({
+    currentUserId: currentUserProfile?.id,
+    conversationsLoaded: hasLoadedConversations,
+    getCachedConversations,
+    viewedConversationId,
+    onOpenConversation: openConversationFromNotification,
+  });
+
+  // Read receipts come from the message feed, for the messages actually
+  // visible on screen (useVisibleMessageReceipts). Opening a conversation does
+  // not mark anything read by itself.
+
+  // An incoming message from someone else updates its conversation in the
+  // list (activity time, unread count, order). It never switches the active
+  // conversation or opens the drawer: the recipient's unread state must stay
+  // intact until they actually see the message.
+  const trackIncomingMessage = useCallback(async (message: Message) => {
+    const instrumentationEnabled = debugLogger.messaging.enabled();
+    if (instrumentationEnabled) {
+      debugLogger.messaging.event('MessagingContext.trackIncomingMessage', 'start', {
         activeId: activeConversation?.id,
-        ...message,
+        conversationId: message.conversationId,
+        senderId: message.senderId,
       });
     }
 
-    const openConversation = (conversation: Conversation) => {
-      updateConversationWithMessage(conversation.id, message, message.senderId);
-      setActiveConversation(conversation);
-      setIsDrawerOpen(true);
-    };
+    const findListed = () =>
+      getCachedConversations().find((c) => c.id === message.conversationId);
 
-    // 1) Skip if already viewing
-    if (activeConversation?.id === message.conversationId) return;
-
-    // 2) Try the query cache
-    let existing = getCachedConversations().find((c) => c.id === message.conversationId);
-    if (existing) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:local', {
-          conversationId: message.conversationId,
-        });
-      }
-      openConversation(existing);
+    const listed = findListed();
+    if (listed) {
+      updateConversationWithMessage(message.conversationId, message, message.senderId);
+      void notifyIncomingMessage(message, listed);
       return;
     }
 
-    // 3) Hard refresh, then re-read the cache imperatively (audit B-07: the
-    // render-closure list never reflected the refresh)
-    await refreshConversations();
-    existing = getCachedConversations().find((c) => c.id === message.conversationId);
-    if (existing) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:after-refresh', {
-          conversationId: message.conversationId,
-        });
+    // Unknown conversation (e.g. a DM someone just started): refetch the list,
+    // which carries the server's activity time and unread count. Retry with
+    // backoff in case replication delay hides it from the first refetch
+    // (audit B-07: re-read the cache imperatively, not the render closure).
+    const delays = [0, 200, 500, 1000];
+    for (const delay of delays) {
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      openConversation(existing);
-      return;
-    }
-
-    // 4) As a last resort, try resolving a DM with the sender (covers direct DMs)
-    try {
-      const dm = await getOrCreateUserConversation(message.senderId);
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'created:dm', {
-          conversationId: dm.id,
-        });
-      }
-      openConversation(dm);
-      return;
-    } catch { }
-
-    // 5) Retry loop with backoff in case replication delay prevents immediate discovery
-    const delays = [200, 500, 1000];
-    const retryFindConversation = async (attempt: number): Promise<boolean> => {
-      const delay = delays[attempt];
-      if (delay === undefined) {
-        return false;
-      }
-
-      await new Promise((r) => setTimeout(r, delay));
       await refreshConversations();
-      const found = getCachedConversations().find((c) => c.id === message.conversationId);
-      if (found) {
-        if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.event('MessagingContext.ensureOpenForMessage', 'hit:retry', {
-            conversationId: found.id,
+      const refreshed = findListed();
+      if (refreshed) {
+        void notifyIncomingMessage(message, refreshed);
+        if (instrumentationEnabled) {
+          debugLogger.messaging.event('MessagingContext.trackIncomingMessage', 'hit:after-refresh', {
+            conversationId: message.conversationId,
             delay,
           });
         }
-        openConversation(found);
-        return true;
+        return;
       }
-      return retryFindConversation(attempt + 1);
-    };
+    }
 
-    if (await retryFindConversation(0)) return;
-
-    if (debugLogger.messaging.enabled()) {
-      debugLogger.messaging.warn('MessagingContext.ensureOpenForMessage', 'miss:unresolved', {
+    if (instrumentationEnabled) {
+      debugLogger.messaging.warn('MessagingContext.trackIncomingMessage', 'miss:unresolved', {
         conversationId: message.conversationId,
       });
     }
   }, [
     activeConversation?.id,
     getCachedConversations,
+    notifyIncomingMessage,
     refreshConversations,
-    getOrCreateUserConversation,
     updateConversationWithMessage,
-    setActiveConversation,
   ]);
 
   const handleConversationInsert = useCallback((message: Message) => {
@@ -267,8 +242,8 @@ function useMessagingProviderValue(): MessagingContextType {
         senderId: message.senderId,
       });
     }
-    void ensureOpenForMessage({ conversationId: message.conversationId, senderId: message.senderId });
-  }, [ensureOpenForMessage]);
+    void trackIncomingMessage(message);
+  }, [trackIncomingMessage]);
 
   // One channel for every messaging event (audit M-06): RLS scopes rows
   // server-side, so no conversation id list is needed and this status is the
@@ -309,9 +284,12 @@ function useMessagingProviderValue(): MessagingContextType {
   const {
     messages,
     loadingMessages,
+    loadingMoreMessages,
+    loadMoreMessagesFailed,
     errorMessages,
     hasMoreMessages,
     loadMoreMessages,
+    loadHistoryUntilMessage,
     refreshMessages,
     sendMessage: sendMessageToActiveConversation,
     addReaction,
@@ -324,6 +302,7 @@ function useMessagingProviderValue(): MessagingContextType {
     replyToId?: string;
     attachments?: FileAttachment[];
     type?: MessageType;
+    clientMessageId?: string;
   }) => {
     if (!activeConversation) return;
 
@@ -365,16 +344,19 @@ function useMessagingProviderValue(): MessagingContextType {
     unarchiveConversation,
     pinConversation,
     unpinConversation,
-    markConversationAsRead,
+    markMessagesAsRead,
     totalUnreadCount,
     refreshConversations,
     closeDrawer,
     // Messages
     messages,
     loadingMessages,
+    loadingMoreMessages,
+    loadMoreMessagesFailed,
     errorMessages,
     hasMoreMessages,
     loadMoreMessages,
+    loadHistoryUntilMessage,
     refreshMessages,
     sendMessage,
     addReaction,
@@ -402,15 +384,18 @@ function useMessagingProviderValue(): MessagingContextType {
     unarchiveConversation,
     pinConversation,
     unpinConversation,
-    markConversationAsRead,
+    markMessagesAsRead,
     totalUnreadCount,
     refreshConversations,
     closeDrawer,
     messages,
     loadingMessages,
+    loadingMoreMessages,
+    loadMoreMessagesFailed,
     errorMessages,
     hasMoreMessages,
     loadMoreMessages,
+    loadHistoryUntilMessage,
     refreshMessages,
     sendMessage,
     addReaction,

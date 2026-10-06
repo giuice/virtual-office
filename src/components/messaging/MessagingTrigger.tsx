@@ -18,11 +18,8 @@ interface MessagingTriggerProps {
 }
 
 export function MessagingTrigger({ className }: MessagingTriggerProps) {
-  const { isDrawerOpen, openDrawer, conversations } = useMessaging();
-
-  // Calculate total unread messages (unreadCount is the viewer's own
-  // server-computed count — Phase 2.2)
-  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+  // Viewer's own server-computed unread total (Phase 2.2), archived excluded.
+  const { isDrawerOpen, openDrawer, totalUnreadCount: totalUnread } = useMessaging();
 
   // Don't show trigger if drawer is already open
   if (isDrawerOpen) {

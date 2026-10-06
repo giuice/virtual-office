@@ -1,5 +1,5 @@
 // src/hooks/useMessages.ts
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
@@ -7,11 +7,14 @@ import {
   MessageStatus,
   MessageType,
   FileAttachment,
+  type MessageHistorySearchResult,
 } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+import { attachmentMessageType } from '@/lib/messaging/attachment-policy';
 import {
   appendMessageToPages,
+  keepMessageThroughInflightFetch,
   replaceMessageInPages,
   type MessagesInfiniteData,
 } from '@/lib/messaging/message-cache';
@@ -36,6 +39,18 @@ const createTraceId = (prefix: string): string => {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 
+const MESSAGES_PAGE_SIZE = 20;
+
+/**
+ * Upper bound on fetch rounds while searching history for one message (each
+ * round loads an older page or waits for a fetch already running): about
+ * MAX_HISTORY_SEARCH_ROUNDS * MESSAGES_PAGE_SIZE messages.
+ */
+const MAX_HISTORY_SEARCH_ROUNDS = 100;
+
+const pagesContainMessage = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
+  data?.pages.some((page) => page.messages.some((message) => message.id === messageId)) ?? false;
+
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
   const { currentUserProfile } = useCompany();
@@ -47,7 +62,7 @@ export function useMessages(activeConversationId: string | null) {
   const {
     data,
     isLoading,
-    isFetching,
+    isFetchingNextPage,
     error,
     hasNextPage,
     fetchNextPage,
@@ -63,7 +78,7 @@ export function useMessages(activeConversationId: string | null) {
       // When pageParam is provided, it is an opaque keyset cursor produced by
       // the server (composite "timestamp|id")
       const res = await messagingApi.getMessages(activeConversationId, {
-        limit: 20,
+        limit: MESSAGES_PAGE_SIZE,
         cursorBefore: pageParam,
       });
       return res; // { messages, hasMoreOlder, nextCursorBefore }
@@ -80,8 +95,22 @@ export function useMessages(activeConversationId: string | null) {
     return flattened;
   }, [data]);
 
-  const loadingMessages = isLoading || isFetching;
-  const errorMessages = error ? (error as Error).message : null;
+  // Initial load only. Background refetches (realtime/receipt invalidations,
+  // focus) and older-page fetches must not swap the feed for a skeleton: that
+  // unmounts the composer and discards whatever the user is typing.
+  const loadingMessages = isLoading;
+  const loadingMoreMessages = isFetchingNextPage;
+  // A failed "Load more" keeps the loaded feed (below); the feed says so next
+  // to the button until the user retries or opens another conversation. Kept
+  // here rather than read from the query: a background refetch of the loaded
+  // pages (e.g. a receipt invalidation) would clear the query error first.
+  const [loadMoreFailedConversationId, setLoadMoreFailedConversationId] = useState<string | null>(null);
+  const loadMoreMessagesFailed =
+    activeConversationId !== null && loadMoreFailedConversationId === activeConversationId;
+  // Only a conversation that never loaded shows the error state. Once the
+  // feed has messages, a failed older page or background refetch keeps them
+  // on screen (a member who lost access keeps a stable feed, FR-022).
+  const errorMessages = error && !data ? (error as Error).message : null;
   const hasMoreMessages = !!hasNextPage;
 
   const refreshMessages = useCallback(async () => {
@@ -116,14 +145,67 @@ export function useMessages(activeConversationId: string | null) {
       });
     }
 
-    await fetchNextPage();
+    setLoadMoreFailedConversationId(null);
+    const result = await fetchNextPage();
+    if (result.isError) setLoadMoreFailedConversationId(activeConversationId);
 
     if (debugLogger.messaging.enabled()) {
       debugLogger.messaging.event('useMessages.loadMoreMessages', 'finish', {
         conversationId: activeConversationId,
+        failed: result.isError,
       });
     }
   }, [activeConversationId, fetchNextPage, hasNextPage]);
+
+  /**
+   * Loads older pages of the active conversation until `messageId` is in the
+   * feed (Phase 4 FR-022). Every round re-reads the cache, so it survives
+   * fetches it does not own: a refetch that cancels its older-page request
+   * (or one already running) is awaited and the search continues from the
+   * pages the cache then holds. It stops when the message is loaded, the
+   * history ends without it, a page fails (e.g. 403 after losing access),
+   * `signal` aborts, or after MAX_HISTORY_SEARCH_ROUNDS rounds.
+   */
+  const loadHistoryUntilMessage = useCallback(
+    async (messageId: string, signal: AbortSignal): Promise<MessageHistorySearchResult> => {
+      if (!activeConversationId) return 'unavailable';
+      const queryKey = ['messages', activeConversationId];
+
+      for (let round = 0; round < MAX_HISTORY_SEARCH_ROUNDS; round += 1) {
+        if (signal.aborted) return 'cancelled';
+        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+        if (!query) return 'unavailable';
+        const data = query.state.data as MessagesInfiniteData | undefined;
+        if (pagesContainMessage(data, messageId)) return 'found';
+
+        const isFetching = query.state.fetchStatus === 'fetching';
+        if (!isFetching && !data?.pages.at(-1)?.nextCursorBefore) {
+          // History exhausted (or never loaded) without the message.
+          return 'unavailable';
+        }
+
+        const failuresBefore = query.state.errorUpdateCount;
+        // Without cancelRefetch a fetch already in flight is awaited instead
+        // of being cancelled; the next round then loads the next older page.
+        await fetchNextPage({ cancelRefetch: false });
+        if (query.state.errorUpdateCount > failuresBefore) {
+          if (signal.aborted) return 'cancelled';
+          return pagesContainMessage(
+            queryClient.getQueryData<MessagesInfiniteData>(queryKey),
+            messageId
+          )
+            ? 'found'
+            : 'unavailable';
+        }
+      }
+
+      if (signal.aborted) return 'cancelled';
+      return pagesContainMessage(queryClient.getQueryData<MessagesInfiniteData>(queryKey), messageId)
+        ? 'found'
+        : 'unavailable';
+    },
+    [activeConversationId, fetchNextPage, queryClient]
+  );
 
   const sendMessage = useCallback(
     async (
@@ -132,13 +214,22 @@ export function useMessages(activeConversationId: string | null) {
         replyToId?: string;
         attachments?: FileAttachment[];
         type?: MessageType;
+        // Composition key (FR-024): a retry with the same key gets back the
+        // message already stored, which then replaces this optimistic copy.
+        clientMessageId?: string;
       }
     ) => {
       const trimmedContent = content.trim();
+      const attachments = options?.attachments?.length ? options.attachments : undefined;
+      // Attachment messages take their type from their files, as the server
+      // derives it (all images → image, otherwise file).
+      const messageType = attachments
+        ? attachmentMessageType(attachments.map((attachment) => attachment.type))
+        : options?.type || MessageType.TEXT;
       const instrumentationEnabled = debugLogger.messaging.enabled();
       const traceId = instrumentationEnabled ? createTraceId('hook-send') : '';
 
-      if (!currentUserProfile?.id || !activeConversationId || !trimmedContent) {
+      if (!currentUserProfile?.id || !activeConversationId || (!trimmedContent && !attachments)) {
         if (instrumentationEnabled) {
           debugLogger.messaging.trace('useMessages.sendMessage', 'skip:missing-context', {
             traceId,
@@ -156,8 +247,8 @@ export function useMessages(activeConversationId: string | null) {
           traceId,
           conversationId: activeConversationId,
           contentLength: trimmedContent.length,
-          type: options?.type || MessageType.TEXT,
-          attachments: options?.attachments?.length || 0,
+          type: messageType,
+          attachments: attachments?.length || 0,
         });
       }
 
@@ -169,9 +260,9 @@ export function useMessages(activeConversationId: string | null) {
         content: trimmedContent,
         timestamp: now,
         status: MessageStatus.SENDING,
-        type: options?.type || MessageType.TEXT,
+        type: messageType,
         replyToId: options?.replyToId,
-        attachments: options?.attachments,
+        attachments,
         reactions: [],
         isEdited: false,
       };
@@ -192,13 +283,18 @@ export function useMessages(activeConversationId: string | null) {
 
       try {
         // Server derives sender from session; do not send senderId
-        const savedMessage = await messagingApi.sendMessage({
-          conversationId: activeConversationId,
-          content: trimmedContent,
-          replyToId: options?.replyToId,
-          attachments: options?.attachments,
-          type: options?.type || MessageType.TEXT,
-        });
+        const savedMessage = await messagingApi.sendMessage(
+          {
+            conversationId: activeConversationId,
+            content: trimmedContent,
+            replyToId: options?.replyToId,
+            type: messageType,
+          },
+          {
+            clientMessageId: options?.clientMessageId,
+            attachmentIds: attachments?.map((attachment) => attachment.id),
+          }
+        );
 
         if (instrumentationEnabled) {
           const duration = start ? getTimestamp() - start : 0;
@@ -222,6 +318,7 @@ export function useMessages(activeConversationId: string | null) {
           ['messages', activeConversationId],
           (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
         );
+        keepMessageThroughInflightFetch(queryClient, activeConversationId, savedMessage);
         return savedMessage;
       } catch (err) {
         if (instrumentationEnabled) {
@@ -416,10 +513,13 @@ export function useMessages(activeConversationId: string | null) {
   return {
     messages,
     loadingMessages,
+    loadingMoreMessages,
+    loadMoreMessagesFailed,
     errorMessages,
     hasMoreMessages,
     refreshMessages,
     loadMoreMessages,
+    loadHistoryUntilMessage,
     sendMessage,
     updateMessageStatusLocal,
     addMessage,

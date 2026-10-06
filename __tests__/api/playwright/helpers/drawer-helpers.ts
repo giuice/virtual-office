@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test';
+import { type Page, type Locator, type WebSocketRoute, expect } from '@playwright/test';
 
 /**
  * Helper functions for interacting with the messaging drawer in E2E tests.
@@ -99,8 +99,12 @@ export async function sendMessage(page: Page, messageText: string): Promise<stri
 
   await sendButton.click();
 
-  // Wait for message to appear in feed
-  const messageInFeed = page.locator('[data-testid^="message-"]', { hasText: messageText });
+  // Wait for the server-confirmed message: the optimistic copy carries a
+  // temporary id (message-temp-*) that is replaced once the send resolves.
+  const messageInFeed = page.locator(
+    '[data-testid^="message-"]:not([data-testid^="message-temp-"])',
+    { hasText: messageText }
+  );
   await expect(messageInFeed).toBeVisible({ timeout: 10_000 });
 
   // Extract message ID from data-testid if available
@@ -302,25 +306,42 @@ export async function unpinConversation(page: Page, conversationId: string): Pro
 }
 
 /**
- * Navigates to a space on the floor plan.
- * Useful for testing drawer stability during navigation.
+ * Moves the current user into a space from the floor plan.
+ *
+ * Since the floor-plan redesign a card click only opens the space detail
+ * panel; moving goes through the card's "Enter" action, and the card's
+ * `data-selected` follows the user's actual current space. The floor-plan
+ * search narrows the grid to the target card first because the fixed drawer
+ * can cover cards on the right of the grid. Resolves once the server accepted
+ * the move and the card shows the user inside it, selected.
  */
 export async function navigateToSpace(page: Page, spaceId: string): Promise<void> {
-  const spaceElement = page.locator(`[data-testid="space-${spaceId}"]`).or(
-    page.locator(`[data-space-id="${spaceId}"]`)
-  );
+  const card = page.locator(`[data-testid="space-${spaceId}"]`);
+  await expect(card).toBeVisible({ timeout: 10_000 });
 
-  await Promise.all([
-    page.waitForFunction(
-      (id) => {
-        const target = document.querySelector<HTMLElement>(`[data-testid="space-${id}"]`);
-        return target?.getAttribute('data-selected') === 'true';
-      },
-      spaceId,
-      { timeout: 5_000 }
-    ),
-    spaceElement.click(),
-  ]);
+  if ((await card.getAttribute('data-user-in-space')) !== 'true') {
+    const spaceName = (await card.locator('h3').textContent())?.trim();
+    expect(spaceName, `space ${spaceId} has no visible name`).toBeTruthy();
+
+    const search = page.getByRole('textbox', { name: 'Search spaces or people' });
+    await search.fill(spaceName ?? '');
+    await expect(page.locator('[data-testid^="space-"][data-space-id]')).toHaveCount(1);
+
+    const locationResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/presence/location',
+      { timeout: 15_000 }
+    );
+    await card.getByRole('button', { name: 'Enter', exact: true }).click();
+    const response = await locationResponse;
+    expect(response.ok(), `move to space ${spaceId} failed (${response.status()})`).toBe(true);
+
+    await search.fill('');
+  }
+
+  await expect(card).toHaveAttribute('data-user-in-space', 'true', { timeout: 15_000 });
+  await expect(card).toHaveAttribute('data-selected', 'true');
 }
 
 /**
@@ -350,4 +371,234 @@ export async function waitForRealtimeReady(page: Page): Promise<void> {
     const root = document.documentElement;
     return root?.getAttribute('data-messaging-realtime-ready') === 'true';
   }, undefined, { timeout: 15_000 });
+}
+
+/** Topic prefix of the drawer's message channel (useMessageSubscription). */
+const MESSAGING_CHANNEL_TOPIC_PREFIX = 'realtime:messaging-db-changes:';
+
+/** Reads a Realtime text frame (protocol 2.0.0 array or 1.0.0 object). */
+function readRealtimeFrame(raw: string): { topic: unknown; event: unknown; payload: unknown } | null {
+  try {
+    const frame: unknown = JSON.parse(raw);
+    if (Array.isArray(frame)) {
+      return { topic: frame[2], event: frame[3], payload: frame[4] };
+    }
+    if (frame && typeof frame === 'object') {
+      const { topic, event, payload } = frame as Record<string, unknown>;
+      return { topic, event, payload };
+    }
+  } catch {
+    // Not JSON: not a frame this watcher reads.
+  }
+  return null;
+}
+
+/**
+ * Watches the page's messaging channel for the server's confirmation that its
+ * postgres_changes stream is live. `data-messaging-realtime-ready` is set at
+ * SUBSCRIBED, which comes before that confirmation (TRACK T26); a change
+ * committed in between reaches the page only through the catch-up refetch,
+ * not as a Realtime event. Start watching before the page navigates; each new
+ * Realtime connection (e.g. after a reload) starts unconfirmed again.
+ * Returns a function that waits for the confirmation.
+ */
+export function watchMessagingChangesStream(page: Page): (options?: { timeout?: number }) => Promise<void> {
+  let streaming = false;
+  page.on('websocket', (socket) => {
+    if (!socket.url().includes('/realtime/v1/websocket')) return;
+    streaming = false;
+    socket.on('framereceived', ({ payload }) => {
+      if (isMessagingStreamReadyFrame(payload)) {
+        streaming = true;
+      }
+    });
+  });
+  return async ({ timeout = 15_000 } = {}) => {
+    await expect
+      .poll(() => streaming, { timeout, message: 'messaging postgres_changes stream confirmed by the server' })
+      .toBe(true);
+  };
+}
+
+/** The server's `system` frame confirming the messaging channel's postgres_changes stream. */
+function isMessagingStreamReadyFrame(payload: string | Buffer): boolean {
+  if (typeof payload !== 'string' || !payload.includes('postgres_changes')) return false;
+  const frame = readRealtimeFrame(payload);
+  const body = frame?.payload as { extension?: unknown; status?: unknown } | undefined;
+  return (
+    frame?.event === 'system'
+    && typeof frame.topic === 'string'
+    && frame.topic.startsWith(MESSAGING_CHANNEL_TOPIC_PREFIX)
+    && body?.extension === 'postgres_changes'
+    && body.status === 'ok'
+  );
+}
+
+export interface RealtimeConnectionControl {
+  /**
+   * Drops the page's Realtime connection: closes every open socket (the
+   * server side too) and closes each reconnect attempt as soon as it is made,
+   * until `restore()`. Resolves once the page has noticed (messaging channel
+   * no longer SUBSCRIBED).
+   */
+  drop(): Promise<void>;
+  /** Lets the next reconnect attempt through to the server. */
+  restore(): void;
+  /** Server confirmations of the messaging postgres_changes stream received so far. */
+  streamConfirmations(): number;
+  /** Waits for a confirmation after the first `after` ones (i.e. the next (re)join). */
+  waitForStreamConfirmation(after: number, options?: { timeout?: number }): Promise<void>;
+  /** Reconnect attempts closed while dropped. */
+  refusedAttempts(): number;
+}
+
+/**
+ * Puts the page's Realtime WebSocket under the test's control (install before
+ * the page navigates). Chromium offline emulation (`context.setOffline`) does
+ * not close an open WebSocket — the connection keeps streaming — so a real
+ * Realtime drop is produced here instead. The app's own reconnect (supabase
+ * socket backoff and the messaging channel retry) is untouched: it only sees
+ * its socket close and its reconnect attempts fail until `restore()`.
+ * Routed sockets do not emit page `websocket` events, so stream
+ * confirmations are counted here rather than by watchMessagingChangesStream.
+ */
+export async function controlRealtimeConnection(page: Page): Promise<RealtimeConnectionControl> {
+  let connected = true;
+  let confirmations = 0;
+  let refused = 0;
+  const openRoutes = new Set<WebSocketRoute>();
+
+  await page.routeWebSocket(/\/realtime\/v1\/websocket/, (route) => {
+    if (!connected) {
+      refused += 1;
+      void route.close({ code: 4000, reason: 'test: Realtime connection dropped' });
+      return;
+    }
+    const server = route.connectToServer();
+    openRoutes.add(route);
+    server.onMessage((message) => {
+      if (isMessagingStreamReadyFrame(message)) confirmations += 1;
+      route.send(message);
+    });
+  });
+
+  return {
+    async drop() {
+      connected = false;
+      const routes = [...openRoutes];
+      openRoutes.clear();
+      await Promise.all(
+        routes.map((route) => route.close({ code: 4000, reason: 'test: Realtime connection dropped' })),
+      );
+      await page.waitForFunction(
+        () => document.documentElement.getAttribute('data-messaging-realtime-ready') !== 'true',
+        undefined,
+        { timeout: 15_000 },
+      );
+    },
+    restore() {
+      connected = true;
+    },
+    streamConfirmations: () => confirmations,
+    async waitForStreamConfirmation(after, { timeout = 30_000 } = {}) {
+      await expect
+        .poll(() => confirmations, {
+          timeout,
+          message: 'messaging postgres_changes stream confirmed again by the server',
+        })
+        .toBeGreaterThan(after);
+    },
+    refusedAttempts: () => refused,
+  };
+}
+
+/** The drawer feed's scrolling element (Radix ScrollArea viewport). */
+export function feedViewport(page: Page): Locator {
+  return page.locator('[data-testid="messages-feed"] [data-radix-scroll-area-viewport]');
+}
+
+/**
+ * Leaves the conversation view for the conversation list (drawer stays open)
+ * and waits until the given conversation's row is rendered, so a missing
+ * unread badge really means zero.
+ */
+export async function backToConversationList(page: Page, conversationId: string): Promise<void> {
+  await page.getByRole('button', { name: 'Back to conversations' }).click();
+  await expect(page.locator(`[data-testid="conversation-item-${conversationId}"]`)).toBeVisible({
+    timeout: 10_000,
+  });
+}
+
+/**
+ * Unread count shown on a conversation's row in the drawer list. The row must
+ * be visible; no badge on a visible row means zero unread.
+ *
+ * The badge is read in a single call that never waits: the list can re-render
+ * between two separate reads (a refetch clearing the count unmounts the
+ * badge), and a waiting read such as `textContent()` after `count()` would
+ * then wait for an element that never comes back (TRACK T31).
+ */
+export async function readListUnreadCount(page: Page, conversationId: string): Promise<number> {
+  const row = page.locator(`[data-testid="conversation-item-${conversationId}"]`);
+  if (!(await row.isVisible())) {
+    throw new Error(`conversation row ${conversationId} is not visible`);
+  }
+  const [value] = await row
+    .locator(`[data-testid="conversation-unread-badge-${conversationId}"]`)
+    .allTextContents();
+  return parseBadgeCount(value);
+}
+
+/**
+ * Reads the first visible element of `badge` in a single non-waiting call
+ * (see readListUnreadCount); undefined when none is visible.
+ */
+export async function readVisibleBadgeText(badge: Locator): Promise<string | undefined> {
+  const [value] = await badge.filter({ visible: true }).allTextContents();
+  return value;
+}
+
+/** Unread badge text ("3", "99+") as a number; a missing badge is zero. */
+export function parseBadgeCount(value: string | undefined): number {
+  if (value === undefined) return 0;
+  return Number.parseInt(value.trim().replace('+', ''), 10) || 0;
+}
+
+/**
+ * Scrolls the drawer feed from its current position to the very top in steps
+ * of a quarter viewport, letting each step render, so every message passes
+ * fully through the viewport like it does when a reader scrolls up.
+ */
+export async function scrollFeedToTopStepwise(page: Page): Promise<void> {
+  await feedViewport(page).evaluate(async (viewport) => {
+    const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const step = Math.max(1, Math.floor(viewport.clientHeight / 4));
+    while (viewport.scrollTop > 0) {
+      viewport.scrollTop = Math.max(0, viewport.scrollTop - step);
+      await nextFrame();
+      await nextFrame();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+  });
+}
+
+/**
+ * Emulates the tab becoming hidden or visible again. The app decides "the tab
+ * is visible" from document.visibilityState and reacts to visibilitychange,
+ * exactly the signals a browser gives when the tab is backgrounded or the
+ * window minimized; headless Chromium never hides a page on its own.
+ */
+export async function setTabHidden(page: Page, hidden: boolean): Promise<void> {
+  await page.evaluate((isHidden) => {
+    if (isHidden) {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    } else {
+      // Drop the overrides; the prototype getters report the real state.
+      delete (document as { visibilityState?: unknown }).visibilityState;
+      delete (document as { hidden?: unknown }).hidden;
+    }
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+  expect(await page.evaluate(() => document.visibilityState)).toBe(hidden ? 'hidden' : 'visible');
 }

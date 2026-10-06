@@ -1,6 +1,7 @@
 // src/repositories/implementations/supabase/SupabaseMessageRepository.ts
 import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
-import { Message, FileAttachment, MessageReaction, MessageType, MessageStatus, ReadReceipt, MessagePin, MessageStar } from '@/types/messaging';
+import { Message, FileAttachment, VoiceNoteAttachment, MessageReaction, MessageType, MessageStatus, MessageReader, MessagePin, MessageStar, MessageCreateResult } from '@/types/messaging';
+import { toVoiceNoteWaveform } from '@/lib/messaging/attachment-policy';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -51,15 +52,28 @@ function mapMessageToCamelCase(data: MessageRow): Message {
   };
 }
 
-// Map DB snake_case to FileAttachment type (camelCase)
-function mapAttachmentToCamelCase(data: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }): FileAttachment {
+interface AttachmentFields {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  thumbnail_url?: string | null;
+  // Voice notes (Phase 4 T15).
+  duration?: number | null;
+  waveform_data?: unknown;
+}
+
+// Map DB snake_case to FileAttachment type (camelCase); voice notes also
+// carry duration and waveformData (VoiceNoteAttachment).
+function mapAttachmentToCamelCase(data: AttachmentFields): FileAttachment | VoiceNoteAttachment {
   if (!data) return data;
   // Audit S-03: the bucket is private and `url` stores the storage path —
   // expose the authz'd API route, which redirects to a signed URL. Legacy
   // rows holding a full URL pass through (migration rewrites them to paths).
   const isStoragePath = (value: string): boolean => !value.startsWith('http') && !value.startsWith('/');
   const thumbnail = data.thumbnail_url || undefined;
-  return {
+  const attachment: FileAttachment = {
     id: data.id,
     name: data.name,
     type: data.type,
@@ -67,6 +81,10 @@ function mapAttachmentToCamelCase(data: { id: string; name: string; type: string
     url: isStoragePath(data.url) ? `/api/messages/attachment/${data.id}` : data.url,
     thumbnailUrl: thumbnail && isStoragePath(thumbnail) ? `/api/messages/attachment/${data.id}` : thumbnail
   };
+  if (typeof data.duration === 'number') {
+    return { ...attachment, duration: data.duration, waveformData: toVoiceNoteWaveform(data.waveform_data) ?? undefined };
+  }
+  return attachment;
 }
 
 // Map DB snake_case to MessageReaction type (camelCase)
@@ -77,17 +95,6 @@ function mapReactionToCamelCase(data: { emoji: string; user_id: string; timestam
     emoji: data.emoji,
     userId: data.user_id,
     timestamp: new Date(data.timestamp) // Convert DB timestamp string/obj to Date
-  };
-}
-
-// Map DB snake_case to ReadReceipt type (camelCase)
-function mapReadReceiptToCamelCase(data: { id: string; message_id: string; user_id: string; read_at: string }): ReadReceipt {
-  if (!data) return data;
-  return {
-    id: data.id,
-    messageId: data.message_id,
-    userId: data.user_id,
-    readAt: new Date(data.read_at)
   };
 }
 
@@ -116,11 +123,41 @@ function mapMessageStarToCamelCase(data: { id: string; message_id: string; conve
 }
 
 // Map array helpers
+type MessageCreateData = Omit<Message, 'id' | 'timestamp' | 'reactions' | 'attachments' | 'isEdited'>;
+
+// Map Message type (camelCase) to DB schema (snake_case) for INSERT.
+// timestamp, id and is_edited use their column defaults; reactions and
+// attachments live in their own tables.
+function toMessageInsertRow(messageData: MessageCreateData) {
+  return {
+    conversation_id: messageData.conversationId,
+    sender_id: messageData.senderId,
+    content: messageData.content,
+    type: messageData.type,
+    status: messageData.status,
+    reply_to_id: messageData.replyToId,
+  };
+}
+
+function mapCreatedMessage(row: MessageRow): Message {
+  const message = mapMessageToCamelCase(row);
+  message.reactions = message.reactions || [];
+  message.attachments = message.attachments || [];
+  return message;
+}
+
+// unique_violation. On a keyed insert the only reachable unique index is
+// messages_sender_conversation_client_message_id_key (id is defaulted); the
+// caller confirms by reading the winning row and rethrows if there is none.
+function isUniqueViolation(error: { code?: string }): boolean {
+  return error.code === '23505';
+}
+
 function mapMessageArrayToCamelCase(dataArray: MessageRow[]): Message[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapMessageToCamelCase(item));
 }
-function mapAttachmentArrayToCamelCase(dataArray: { id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null }[]): FileAttachment[] {
+function mapAttachmentArrayToCamelCase(dataArray: AttachmentFields[]): FileAttachment[] {
   if (!dataArray) return [];
   return dataArray.map(item => mapAttachmentToCamelCase(item));
 }
@@ -128,15 +165,16 @@ function mapReactionArrayToCamelCase(dataArray: { emoji: string; user_id: string
   if (!dataArray) return [];
   return dataArray.map(item => mapReactionToCamelCase(item));
 }
-function mapReadReceiptArrayToCamelCase(dataArray: { id: string; message_id: string; user_id: string; read_at: string }[]): ReadReceipt[] {
-  if (!dataArray) return [];
-  return dataArray.map(item => mapReadReceiptToCamelCase(item));
-}
 
-type AttachmentRow = { id: string; message_id: string; name: string; type: string; size: number; url: string; thumbnail_url?: string | null };
+type AttachmentRow = AttachmentFields & { message_id: string };
 type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
 type MessagePinRow = { id: string; message_id: string; conversation_id: string; pinned_by: string; pinned_at: string };
 type MessageStarRow = { id: string; message_id: string; conversation_id: string; user_id: string; starred_at: string };
+type MessageReaderRow = {
+  user_id: string;
+  read_at: string;
+  reader: { display_name: string | null; avatar_url: string | null } | null;
+};
 
 
 export class SupabaseMessageRepository implements IMessageRepository {
@@ -189,6 +227,87 @@ export class SupabaseMessageRepository implements IMessageRepository {
     });
 
     return messages;
+  }
+
+  // Full feed enrichment shared by the paginated feed and the starred list
+  // (Phase 4 FR-021): attachments, reactions, pins, the viewer's stars
+  // (star RLS returns only the caller's own rows), readCount and the derived
+  // READ status. Routes still strip readCount from messages the viewer did
+  // not send (FR-003).
+  private async enrichFeedMessages(messages: Message[], conversationId: string): Promise<Message[]> {
+    if (messages.length === 0) {
+      return messages;
+    }
+
+    const messageIds = messages.map(m => m.id);
+    const enrichedMessages = await this.enrichMessages(messages);
+
+    // Fetch all pins for these messages in bulk
+    const { data: pinsData, error: pinsError } = await this.supabaseClient
+      .from(this.MESSAGE_PIN_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (pinsError) {
+      console.error(`Error fetching pins for conversation ${conversationId}:`, pinsError);
+    }
+    const pinsByMessageId = (pinsData as MessagePinRow[] | null || []).reduce((acc: Record<string, MessagePin[]>, row: MessagePinRow) => {
+      const msgId = row.message_id;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapMessagePinToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessagePin[]>);
+
+    // Fetch all stars for these messages in bulk
+    const { data: starsData, error: starsError } = await this.supabaseClient
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (starsError) {
+      console.error(`Error fetching stars for conversation ${conversationId}:`, starsError);
+    }
+    const starsByMessageId = (starsData as MessageStarRow[] | null || []).reduce((acc: Record<string, MessageStar[]>, row: MessageStarRow) => {
+      const msgId = row.message_id;
+      if (!acc[msgId]) acc[msgId] = [];
+      acc[msgId].push(mapMessageStarToCamelCase(row));
+      return acc;
+    }, {} as Record<string, MessageStar[]>);
+
+    // Audit B-05/Phase 2.2: messages.status is frozen at 'sent' in the DB;
+    // the read indicator derives from message_read_receipts. Rule: read if
+    // ANY non-sender receipt exists (receipts are only ever written for
+    // non-senders). Phase 4 FR-001: readCount is the number of distinct
+    // non-sender readers ("Lida por N"); (message_id, user_id) is unique, so
+    // counting rows counts readers. Receipt RLS returns every reader's row
+    // only to the message's sender (anyone else sees just their own), so the
+    // count is exact for the viewer's own messages — the only ones it is
+    // shown on.
+    const { data: receiptsData, error: receiptsError } = await this.supabaseClient
+      .from(this.READ_RECEIPT_TABLE_NAME)
+      .select('message_id, user_id')
+      .in('message_id', messageIds);
+
+    if (receiptsError) {
+      console.error(`Error fetching read receipts for conversation ${conversationId}:`, receiptsError);
+    }
+    const senderByMessageId = new Map(enrichedMessages.map(message => [message.id, message.senderId]));
+    const readCountByMessageId = new Map<string, number>();
+    for (const row of (receiptsData || []) as Array<{ message_id: string; user_id: string }>) {
+      if (row.user_id === senderByMessageId.get(row.message_id)) continue;
+      readCountByMessageId.set(row.message_id, (readCountByMessageId.get(row.message_id) ?? 0) + 1);
+    }
+
+    enrichedMessages.forEach(message => {
+      message.pins = pinsByMessageId[message.id] || [];
+      message.stars = starsByMessageId[message.id] || [];
+      message.readCount = readCountByMessageId.get(message.id) ?? 0;
+      if (message.readCount > 0 && message.status !== MessageStatus.FAILED) {
+        message.status = MessageStatus.READ;
+      }
+    });
+
+    return enrichedMessages;
   }
 
   async findById(id: string): Promise<Message | null> {
@@ -359,65 +478,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
       ? (hasCursorAfter ? data.slice(0, limit) : data.slice(data.length - limit))
       : data;
 
-    // Map core message data
-    const messages = mapMessageArrayToCamelCase(trimmedData);
-    const messageIds = messages.map(m => m.id);
-    const enrichedMessages = await this.enrichMessages(messages);
-
-    // Fetch all pins for these messages in bulk
-    const { data: pinsData, error: pinsError } = await this.supabaseClient
-      .from(this.MESSAGE_PIN_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    if (pinsError) {
-      console.error(`Error fetching pins for conversation ${conversationId}:`, pinsError);
-    }
-    const pinsByMessageId = (pinsData as MessagePinRow[] | null || []).reduce((acc: Record<string, MessagePin[]>, row: MessagePinRow) => {
-      const msgId = row.message_id;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapMessagePinToCamelCase(row));
-      return acc;
-    }, {} as Record<string, MessagePin[]>);
-
-    // Fetch all stars for these messages in bulk
-    const { data: starsData, error: starsError } = await this.supabaseClient
-      .from(this.MESSAGE_STAR_TABLE_NAME)
-      .select('*')
-      .in('message_id', messageIds);
-
-    if (starsError) {
-      console.error(`Error fetching stars for conversation ${conversationId}:`, starsError);
-    }
-    const starsByMessageId = (starsData as MessageStarRow[] | null || []).reduce((acc: Record<string, MessageStar[]>, row: MessageStarRow) => {
-      const msgId = row.message_id;
-      if (!acc[msgId]) acc[msgId] = [];
-      acc[msgId].push(mapMessageStarToCamelCase(row));
-      return acc;
-    }, {} as Record<string, MessageStar[]>);
-
-    // Audit B-05/Phase 2.2: messages.status is frozen at 'sent' in the DB;
-    // the read indicator derives from message_read_receipts. Rule: read if
-    // ANY non-sender receipt exists (receipts are only ever written for
-    // non-senders by mark_conversation_read). Group all-participants-read
-    // semantics deferred.
-    const { data: receiptsData, error: receiptsError } = await this.supabaseClient
-      .from(this.READ_RECEIPT_TABLE_NAME)
-      .select('message_id')
-      .in('message_id', messageIds);
-
-    if (receiptsError) {
-      console.error(`Error fetching read receipts for conversation ${conversationId}:`, receiptsError);
-    }
-    const readMessageIds = new Set((receiptsData || []).map((row: { message_id: string }) => row.message_id));
-
-    enrichedMessages.forEach(message => {
-      message.pins = pinsByMessageId[message.id] || [];
-      message.stars = starsByMessageId[message.id] || [];
-      if (readMessageIds.has(message.id) && message.status !== MessageStatus.FAILED) {
-        message.status = MessageStatus.READ;
-      }
-    });
+    const enrichedMessages = await this.enrichFeedMessages(
+      mapMessageArrayToCamelCase(trimmedData),
+      conversationId
+    );
 
     // Determine nextCursor based on pagination direction. Built from the RAW
     // row (full Postgres timestamp precision) — Date#toISOString truncates to
@@ -444,23 +508,10 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   // Note: Input timestamp is Date object, Supabase handles conversion to TIMESTAMPTZ
-  async create(messageData: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'attachments' | 'isEdited'>): Promise<Message> {
-    // Map Message type (camelCase) to DB schema (snake_case)
-    const dbData = {
-      conversation_id: messageData.conversationId,
-      sender_id: messageData.senderId,
-      content: messageData.content,
-      type: messageData.type,
-      status: messageData.status,
-      reply_to_id: messageData.replyToId,
-      // timestamp handled by Supabase default value
-      // reactions/attachments handled separately
-      // is_edited defaults to false
-    };
-
+  async create(messageData: MessageCreateData): Promise<Message> {
     const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
-      .insert(dbData)
+      .insert(toMessageInsertRow(messageData))
       .select()
       .single();
 
@@ -468,13 +519,58 @@ export class SupabaseMessageRepository implements IMessageRepository {
       console.error('Error creating message:', error);
       throw error || new Error('Failed to create message or retrieve created data.');
     }
-    // Map DB response back to Message type
-    // Initialize reactions/attachments as empty arrays (will be populated later if needed)
-    const createdMessage = mapMessageToCamelCase(data);
-    // Ensure these arrays exist even if mapping doesn't add them
-    createdMessage.reactions = createdMessage.reactions || [];
-    createdMessage.attachments = createdMessage.attachments || [];
-    return createdMessage;
+    return mapCreatedMessage(data as MessageRow);
+  }
+
+  // Idempotent create (Phase 4 FR-024): the composition key is unique per
+  // (sender_id, conversation_id) through the partial unique index
+  // messages_sender_conversation_client_message_id_key. A retry finds the
+  // stored row; a concurrent create with the same key loses the INSERT race
+  // with a unique violation and reads the winner instead.
+  async createWithClientKey(messageData: MessageCreateData, clientMessageId: string): Promise<MessageCreateResult> {
+    const stored = await this.findByClientMessageId(messageData, clientMessageId);
+    if (stored) {
+      return { message: stored, created: false };
+    }
+
+    const { data, error } = await this.supabaseClient
+      .from(this.MSG_TABLE_NAME)
+      .insert({ ...toMessageInsertRow(messageData), client_message_id: clientMessageId })
+      .select()
+      .single();
+
+    if (!error && data) {
+      return { message: mapCreatedMessage(data as MessageRow), created: true };
+    }
+
+    if (error && isUniqueViolation(error)) {
+      const winner = await this.findByClientMessageId(messageData, clientMessageId);
+      if (winner) {
+        return { message: winner, created: false };
+      }
+    }
+
+    console.error('Error creating message:', error);
+    throw error || new Error('Failed to create message or retrieve created data.');
+  }
+
+  private async findByClientMessageId(
+    messageData: Pick<MessageCreateData, 'senderId' | 'conversationId'>,
+    clientMessageId: string
+  ): Promise<Message | null> {
+    const { data, error } = await this.supabaseClient
+      .from(this.MSG_TABLE_NAME)
+      .select('*')
+      .eq('sender_id', messageData.senderId)
+      .eq('conversation_id', messageData.conversationId)
+      .eq('client_message_id', clientMessageId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error looking up message by client key:', error);
+      throw error;
+    }
+    return data ? mapCreatedMessage(data as MessageRow) : null;
   }
 
   async update(id: string, updates: Partial<Pick<Message, 'content' | 'status' | 'isEdited'>>): Promise<Message | null> {
@@ -612,22 +708,34 @@ export class SupabaseMessageRepository implements IMessageRepository {
   }
 
   // --- Read Receipt Methods ---
-  // Receipts are written exclusively by the mark_conversation_read RPC
-  // (atomic with the conversation_members.last_read_at update).
+  // Receipts are written exclusively by the service_role-only RPCs
+  // mark_conversation_read / mark_messages_read (PATCH /api/conversations/read).
 
-  async getReadReceipts(messageId: string): Promise<ReadReceipt[]> {
+  async getMessageReaders(messageId: string, senderId: string): Promise<MessageReader[]> {
+    // One query: receipts joined with the reader's users row, most recent
+    // first. The sender's own receipt is excluded defensively (BR-002: the
+    // RPCs never write one). Callers must have verified the requester IS the
+    // sender (BR-003); on a user-scoped client RLS enforces it again.
     const { data, error } = await this.supabaseClient
       .from(this.READ_RECEIPT_TABLE_NAME)
-      .select('*')
+      .select('user_id, read_at, reader:users!message_read_receipts_user_id_fkey(display_name, avatar_url)')
       .eq('message_id', messageId)
-      .order('read_at', { ascending: false });
+      .neq('user_id', senderId)
+      .order('read_at', { ascending: false })
+      .order('user_id', { ascending: true })
+      .overrideTypes<MessageReaderRow[], { merge: false }>();
 
     if (error) {
-      console.error('Error fetching read receipts:', error);
+      console.error('Error fetching message readers:', error);
       throw error;
     }
 
-    return mapReadReceiptArrayToCamelCase(data || []);
+    return (data ?? []).map((row) => ({
+      userId: row.user_id,
+      displayName: row.reader?.display_name ?? null,
+      avatarUrl: row.reader?.avatar_url ?? null,
+      readAt: new Date(row.read_at),
+    }));
   }
 
   // --- Message Pin Methods ---
@@ -749,51 +857,67 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return (count ?? 0) > 0;
   }
 
-  async getStarredMessages(userId: string, conversationId?: string): Promise<Message[]> {
-    // First, get the starred message IDs for this user
-    const { data: starsData, error: starsError } = await this.supabaseClient
-      .from(this.MESSAGE_STAR_TABLE_NAME)
-      .select('message_id')
-      .eq('user_id', userId)
-      .order('starred_at', { ascending: false });
+  /**
+   * Phase 4 FR-021 / BR-009: the caller's starred messages in one
+   * conversation, newest MESSAGE first (not star time), keyset-paginated by
+   * the feed's composite "{raw_pg_timestamp}|{id}" cursor (`cursorBefore`
+   * continues with older messages). Items come back newest-first with full
+   * feed enrichment. The caller must authorize conversation membership
+   * first; with the user-scoped client, message RLS (member-only) and star
+   * RLS (own stars only) also apply.
+   */
+  async getStarredMessages(
+    userId: string,
+    conversationId: string,
+    options?: Pick<PaginationOptions, 'limit' | 'cursorBefore'>
+  ): Promise<PaginatedResult<Message>> {
+    const limit = options?.limit ?? 20;
 
-    if (starsError) {
-      console.error('Error fetching starred message IDs:', starsError);
-      throw starsError;
-    }
-
-    if (!starsData || starsData.length === 0) {
-      return [];
-    }
-
-    const starredMessageIds = starsData.map((s: any) => s.message_id);
-
-    // Fetch the actual messages
+    // Driven from the caller's star rows (bounded by how many they starred),
+    // with the starred message as an inner to-one embed: filters, ordering
+    // and the keyset cursor apply to the MESSAGE columns, so the cursor is
+    // the feed's. Driving from messages instead would scan (and evaluate
+    // message RLS on) the whole conversation when stars are sparse.
+    // messages.conversation_id is authoritative; the denormalized
+    // starred_messages.conversation_id only narrows the star scan.
     let query = this.supabaseClient
-      .from(this.MSG_TABLE_NAME)
-      .select('*')
-      .in('id', starredMessageIds);
+      .from(this.MESSAGE_STAR_TABLE_NAME)
+      .select('message:messages!message_stars_message_id_fkey!inner(*)')
+      .eq('user_id', userId)
+      .eq('conversation_id', conversationId)
+      .eq('message.conversation_id', conversationId);
 
-    // Filter by conversation if specified
-    if (conversationId) {
-      query = query.eq('conversation_id', conversationId);
+    if (options?.cursorBefore) {
+      const { ts, id } = parseCompositeCursor(options.cursorBefore);
+      query = id
+        ? query.or(`timestamp.lt."${ts}",and(timestamp.eq."${ts}",id.lt."${id}")`, { referencedTable: 'message' })
+        : query.lt('message.timestamp', ts);
     }
 
-    query = query.order('timestamp', { ascending: false });
+    const { data, error } = await query
+      .order('message(timestamp)', { ascending: false })
+      .order('message(id)', { ascending: false })
+      .limit(limit + 1);
 
-    const { data: messagesData, error: messagesError } = await query;
-
-    if (messagesError) {
-      console.error('Error fetching starred messages:', messagesError);
-      throw messagesError;
+    if (error) {
+      console.error('Error fetching starred messages:', error);
+      throw error;
     }
 
-    if (!messagesData || messagesData.length === 0) {
-      return [];
-    }
+    const rows = ((data ?? []) as unknown as Array<{ message: MessageRow }>).map((row) => row.message);
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const items = await this.enrichFeedMessages(mapMessageArrayToCamelCase(pageRows), conversationId);
+    // Personal stars only, even if a privileged client is ever passed in.
+    items.forEach(message => {
+      message.stars = (message.stars ?? []).filter(star => star.userId === userId);
+    });
 
-    // Map to Message objects
-    const messages = mapMessageArrayToCamelCase(messagesData);
-    return this.enrichMessages(messages);
+    return {
+      items,
+      hasMore,
+      // RAW row timestamp keeps microsecond precision (see findByConversation).
+      nextCursor: hasMore ? buildCompositeCursor(pageRows[pageRows.length - 1]) : null,
+    };
   }
 }

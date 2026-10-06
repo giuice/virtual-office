@@ -10,8 +10,25 @@ import { Button } from '@/components/ui/button';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { ConversationListItem } from './ConversationListItem';
 
+export type ConversationListTab = 'dms' | 'rooms' | 'all';
+
+/** List view filters, owned by the drawer so they survive list ↔ conversation switches. */
+export interface ConversationListFilters {
+  tab: ConversationListTab;
+  pinnedOnly: boolean;
+  showArchived: boolean;
+}
+
+export const DEFAULT_CONVERSATION_LIST_FILTERS: ConversationListFilters = {
+  tab: 'all',
+  pinnedOnly: false,
+  showArchived: false,
+};
+
 interface ConversationListProps {
   conversations: Conversation[];
+  filters: ConversationListFilters;
+  onFiltersChange: React.Dispatch<React.SetStateAction<ConversationListFilters>>;
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   isLoading?: boolean;
@@ -21,6 +38,8 @@ interface ConversationListProps {
 
 export const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
+  filters,
+  onFiltersChange,
   selectedConversationId,
   onSelectConversation,
   isLoading = false,
@@ -32,9 +51,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const viewerId = currentUserProfile?.id ?? null;
 
   // UI state
-  const [activeTab, setActiveTab] = useState<'dms' | 'rooms' | 'all'>('all');
-  const [pinnedOnly, setPinnedOnly] = useState<boolean>(false);
-  const [showArchived, setShowArchived] = useState<boolean>(false);
+  const { tab: activeTab, pinnedOnly, showArchived } = filters;
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Group conversations by pinned, DMs, and rooms
@@ -166,7 +183,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     <div className="h-full flex flex-col">
       {/* Controls */}
       <div className="px-2 py-1 flex items-center justify-between gap-2">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <Tabs value={activeTab} onValueChange={(v) => onFiltersChange((f) => ({ ...f, tab: v as ConversationListTab }))}>
           <TabsList>
             <TabsTrigger value="dms" data-testid="conversation-tab-dms">DMs</TabsTrigger>
             <TabsTrigger value="rooms" data-testid="conversation-tab-rooms">Rooms</TabsTrigger>
@@ -178,7 +195,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             type="button"
             size="sm"
             variant={pinnedOnly ? 'default' : 'outline'}
-            onClick={() => setPinnedOnly((p) => !p)}
+            onClick={() => onFiltersChange((f) => ({ ...f, pinnedOnly: !f.pinnedOnly }))}
             data-testid="filter-pinned-toggle"
             aria-pressed={pinnedOnly}
             data-pinned-only={pinnedOnly ? 'true' : 'false'}
@@ -189,7 +206,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             type="button"
             size="sm"
             variant={showArchived ? 'default' : 'outline'}
-            onClick={() => setShowArchived((s) => !s)}
+            onClick={() => onFiltersChange((f) => ({ ...f, showArchived: !f.showArchived }))}
             data-testid="show-archived-button"
             aria-pressed={showArchived}
             data-archived-visible={showArchived ? 'true' : 'false'}
@@ -199,78 +216,87 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         </div>
       </div>
 
-      {isRefreshing && hasLoadedConversations && (
-        <div
-          className="px-3 py-1 text-xs text-muted-foreground flex items-center gap-1"
-          data-testid="conversation-refresh-indicator"
-        >
-          <Loader2 className="size-3 animate-spin" />
-          <span>Refreshing conversations…</span>
-        </div>
-      )}
+      <div className="relative flex-1 min-h-0">
+        {/* Background refetches (realtime catch-up, pin/archive) overlay the
+            list instead of pushing it down: a row must never move under the
+            pointer between aiming and clicking (TRACK T30). */}
+        {isRefreshing && hasLoadedConversations ? (
+          <div
+            role="status"
+            className="pointer-events-none absolute right-3 top-2 z-10 flex items-center gap-1 rounded-full bg-card/90 px-2 py-0.5 text-xs text-muted-foreground shadow-sm"
+            data-testid="conversation-refresh-indicator"
+          >
+            <Loader2 className="size-3 animate-spin" />
+            <span>Refreshing conversations…</span>
+          </div>
+        ) : null}
 
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-1 p-2">
-          {/* Archived view */}
-          {showArchived && (
-            <div data-testid="archived-section">
-              <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                Archived
+        {/* Radix wraps the viewport content in display:table, which grows to the
+            longest unbroken name; force block layout so names truncate and each
+            row keeps its actions button inside the drawer. */}
+        <ScrollArea className="h-full [&_[data-radix-scroll-area-viewport]>div]:block!">
+          <div className="flex flex-col gap-1 p-2">
+            {/* Archived view */}
+            {showArchived && (
+              <div data-testid="archived-section">
+                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  Archived
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {filteredSections.archived && filteredSections.archived.length > 0 ? (
+                    filteredSections.archived.map(renderConversation)
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">No archived conversations</div>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col gap-0.5">
-                {filteredSections.archived && filteredSections.archived.length > 0 ? (
-                  filteredSections.archived.map(renderConversation)
-                ) : (
-                  <div className="px-3 py-2 text-xs text-muted-foreground">No archived conversations</div>
+            )}
+
+            {!showArchived && (
+              <>
+                {/* Pinned conversations section */}
+                {filteredSections.pinned && filteredSections.pinned.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Pin className="size-3" />
+                      Pinned
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {filteredSections.pinned.map(renderConversation)}
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
-          )}
 
-          {!showArchived && (
-            <>
-              {/* Pinned conversations section */}
-              {filteredSections.pinned && filteredSections.pinned.length > 0 && (
-                <div className="mb-2">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Pin className="size-3" />
-                    Pinned
+                {/* Direct messages section */}
+                {filteredSections.direct && filteredSections.direct.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <MessageSquare className="size-3" />
+                      Direct Messages
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {filteredSections.direct.map(renderConversation)}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    {filteredSections.pinned.map(renderConversation)}
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* Direct messages section */}
-              {filteredSections.direct && filteredSections.direct.length > 0 && (
-                <div className="mb-2">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="size-3" />
-                    Direct Messages
+                {/* Rooms section */}
+                {filteredSections.rooms && filteredSections.rooms.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Hash className="size-3" />
+                      Rooms
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {filteredSections.rooms.map(renderConversation)}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    {filteredSections.direct.map(renderConversation)}
-                  </div>
-                </div>
-              )}
-
-              {/* Rooms section */}
-              {filteredSections.rooms && filteredSections.rooms.length > 0 && (
-                <div className="mb-2">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Hash className="size-3" />
-                    Rooms
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {filteredSections.rooms.map(renderConversation)}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </ScrollArea>
+                )}
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 };

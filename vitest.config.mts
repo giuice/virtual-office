@@ -21,6 +21,8 @@ export default defineConfig({
       // Real-database suites need the local Supabase stack and run under
       // vitest.presence-db.config.mts (npm run test:presence-db) only.
       '**/__tests__/presence-db/**',
+      // Local-Supabase messaging integration: vitest.messaging-db.config.mts only.
+      '**/__tests__/messaging-db/**',
       // This service-role integration mutates an explicitly configured remote
       // project and runs only via `npm run test:messaging-remote`.
       '**/__tests__/messaging/pin_star_integration.test.ts',

@@ -5,6 +5,7 @@ export * from './ICompanyRepository';
 export * from './ISpaceRepository';
 export * from './ISpaceReservationRepository';
 export * from './IMessageRepository';
+export * from './IMessageAttachmentUploadRepository';
 export * from './IConversationRepository';
 export * from './IInvitationRepository';
 export * from './IAnnouncementRepository';

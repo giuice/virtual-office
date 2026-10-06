@@ -57,8 +57,16 @@ export async function GET(request: NextRequest) {
     const nextCursorBefore =
       hasMoreOlder && typeof result.nextCursor === 'string' ? result.nextCursor : undefined;
 
+    // Phase 4 FR-003: reader counts are sender-only. Another member's
+    // message never carries one (RLS would only have let the viewer count
+    // their own receipt anyway).
+    const viewerId = ctx.dbUser.id;
+    const messages = result.items.map((message) =>
+      message.senderId === viewerId ? message : { ...message, readCount: undefined }
+    );
+
     return NextResponse.json({
-      messages: result.items,
+      messages,
       nextCursorBefore,
       hasMoreOlder,
     });

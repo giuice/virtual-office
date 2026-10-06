@@ -14,6 +14,7 @@
 /coverage
 /test-results
 /playwright-report
+/playwright-report-messaging-local
 
 # Raw Presence rollout evidence contains stable UUIDs; keep it in the approved
 # access-controlled evidence repository, never in the application worktree.
@@ -23,6 +24,7 @@
 /.next/
 /.next-screen-sharing/
 /.next-auth-metrics*/
+/.next-messaging-local/
 /out/
 
 # production

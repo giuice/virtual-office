@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/contexts/CompanyContext';
-import { Conversation, ConversationType } from '@/types/messaging';
+import { Conversation, ConversationType, Message } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
 import { debugLogger } from '@/utils/debug-logger';
@@ -72,8 +72,10 @@ export function useConversations() {
   const conversationsQuery = useQuery<Conversation[], Error>({
     queryKey: conversationsQueryKey(userId),
     queryFn: async () => {
-      // Query conversations by Database User ID
-      const result = await messagingApi.getConversations(userId!);
+      // Query conversations by Database User ID. Archived conversations are
+      // included (flagged isArchived) so the list's Archived view can show
+      // them and unarchive works; the main list filters them out client-side.
+      const result = await messagingApi.getConversations(userId!, { includeArchived: true });
       return result.conversations;
     },
     enabled: !!userId,
@@ -479,70 +481,46 @@ export function useConversations() {
     }
   }, [refreshConversations, setConversationsData]);
 
-  // Function to mark a conversation as read
-  const markConversationAsRead = useCallback(async (conversationId: string) => {
-    if (!userId) {
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useConversations.markRead', 'skip:no-user', {
-          conversationId,
-        });
-      }
-      return;
-    }
+  // Record receipts for messages the viewer actually saw (Phase 4: "read"
+  // means visibly rendered, never "the conversation was opened"). The list's
+  // unread counts are server-computed, so a batch that recorded anything
+  // refetches them instead of guessing a local decrement. Errors propagate so
+  // the caller can retry the batch.
+  const markMessagesAsRead = useCallback(async (conversationId: string, messageIds: readonly string[]) => {
+    if (!userId || messageIds.length === 0) return;
 
-    const instrumentationEnabled = debugLogger.messaging.enabled();
-    const traceId = instrumentationEnabled ? createTraceId('mark-read') : '';
+    const recorded = await messagingApi.markMessagesAsRead(conversationId, messageIds);
 
-    if (instrumentationEnabled) {
-      debugLogger.messaging.event('useConversations.markRead', 'start', {
-        traceId,
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('useConversations.markMessagesRead', 'success', {
         conversationId,
-        userId,
+        submitted: messageIds.length,
+        recorded,
       });
     }
 
-    try {
-      await messagingApi.markConversationAsRead(conversationId, userId);
-
-      // Optimistic update: clear the viewer's unread count
-      setConversationsData((prev) =>
-        prev.map((conversation) =>
-          conversation.id === conversationId && conversation.unreadCount > 0
-            ? { ...conversation, unreadCount: 0 }
-            : conversation
-        )
-      );
-
-      if (instrumentationEnabled) {
-        debugLogger.messaging.event('useConversations.markRead', 'success', {
-          traceId,
-          conversationId,
-        });
-      }
-    } catch (error) {
-      if (instrumentationEnabled) {
-        debugLogger.messaging.error('useConversations.markRead', 'error', {
-          traceId,
-          conversationId,
-          error: error instanceof Error ? error.message : error,
-        });
-      }
-      console.error('Error marking conversation as read:', error);
+    if (recorded > 0) {
+      await queryClient.invalidateQueries({ queryKey: conversationsQueryKey(userId) });
     }
-  }, [userId, setConversationsData]);
+  }, [userId, queryClient]);
 
   // Calculate total unread count (unreadCount is the viewer's own count,
-  // server-computed — Phase 2.2)
+  // server-computed — Phase 2.2). Archived conversations do not count.
   const totalUnreadCount = useMemo(() => {
     if (!userId) return 0;
     return conversations.reduce(
-      (count, conversation) => count + (conversation.unreadCount || 0),
+      (count, conversation) =>
+        conversation.isArchived ? count : count + (conversation.unreadCount || 0),
       0
     );
   }, [conversations, userId]);
 
   // Update conversation with new message (immutable — audit M-04)
-  const updateConversationWithMessage = useCallback((conversationId: string, lastMessage: any, senderId: string) => {
+  const updateConversationWithMessage = useCallback((
+    conversationId: string,
+    lastMessage: Pick<Message, 'timestamp'>,
+    senderId: string
+  ) => {
     const instrumentationEnabled = debugLogger.messaging.enabled();
     if (instrumentationEnabled) {
       debugLogger.messaging.event('useConversations.updateWithMessage', 'incoming', {
@@ -570,12 +548,11 @@ export function useConversations() {
         lastActivity: lastMessage.timestamp,
       };
 
-      // Update unread count if not the active conversation
-      if (
-        (!activeConversation || activeConversation.id !== conversation.id) &&
-        userId &&
-        senderId !== userId
-      ) {
+      // A message from someone else is unread until it is actually seen —
+      // also in the active conversation (the reader may be scrolled up, the
+      // tab hidden, or the drawer closed). Visible-message receipts refetch
+      // the server count once it has been seen.
+      if (userId && senderId !== userId) {
         conversation.unreadCount = (conversation.unreadCount || 0) + 1;
       }
 
@@ -604,7 +581,7 @@ export function useConversations() {
     unarchiveConversation,
     pinConversation,
     unpinConversation,
-    markConversationAsRead,
+    markMessagesAsRead,
     totalUnreadCount,
     updateConversationWithMessage,
     clearLastActiveConversation,

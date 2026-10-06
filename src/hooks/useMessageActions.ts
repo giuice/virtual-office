@@ -2,6 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Message, MessagePin, MessageStar } from '@/types/messaging';
 import { useToast } from '@/components/ui/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
+import type { MessagesInfiniteData } from '@/lib/messaging/message-cache';
+import { starredMessagesQueryKey } from '@/hooks/queries/useStarredMessages';
+
+/** Feed and starred-list caches as they were before an optimistic star change. */
+interface StarCachesSnapshot {
+	previousData: MessagesInfiniteData | undefined;
+	previousStarred: MessagesInfiniteData | undefined;
+}
 
 interface UseMessageActionsProps {
 	conversationId: string;
@@ -12,24 +20,58 @@ export function useMessageActions({ conversationId }: UseMessageActionsProps) {
 	const { toast } = useToast();
 	const { currentUserProfile } = useCompany();
 
+	const feedKey = ['messages', conversationId] as const;
+	const starredKey = starredMessagesQueryKey(conversationId);
+
+	const mapMessageInPages = (
+		oldData: MessagesInfiniteData | undefined,
+		messageId: string,
+		updater: (message: Message) => Message
+	): MessagesInfiniteData | undefined => {
+		if (!oldData || !oldData.pages) return oldData;
+
+		return {
+			...oldData,
+			pages: oldData.pages.map((page) => ({
+				...page,
+				messages: page.messages.map((msg) => (msg.id === messageId ? updater(msg) : msg)),
+			})),
+		};
+	};
+
 	// Helper to update message in cache
 	const updateMessageInCache = (messageId: string, updater: (message: Message) => Message) => {
-		queryClient.setQueryData(['messages', conversationId], (oldData: any) => {
-			if (!oldData || !oldData.pages) return oldData;
+		queryClient.setQueryData<MessagesInfiniteData>(feedKey, (oldData) =>
+			mapMessageInPages(oldData, messageId, updater)
+		);
+	};
 
-			return {
-				...oldData,
-				pages: oldData.pages.map((page: any) => ({
-					...page,
-					messages: page.messages.map((msg: Message) => {
-						if (msg.id === messageId) {
-							return updater(msg);
-						}
-						return msg;
-					}),
-				})),
-			};
-		});
+	// The viewer's starred list for this conversation (useStarredMessages).
+	const updateMessageInStarredCache = (messageId: string, updater: (message: Message) => Message) => {
+		queryClient.setQueryData<MessagesInfiniteData>(starredKey, (oldData) =>
+			mapMessageInPages(oldData, messageId, updater)
+		);
+	};
+
+	const snapshotStarCaches = async (): Promise<StarCachesSnapshot> => {
+		await Promise.all([
+			queryClient.cancelQueries({ queryKey: feedKey }),
+			queryClient.cancelQueries({ queryKey: starredKey }),
+		]);
+		return {
+			previousData: queryClient.getQueryData<MessagesInfiniteData>(feedKey),
+			previousStarred: queryClient.getQueryData<MessagesInfiniteData>(starredKey),
+		};
+	};
+
+	const restoreStarCaches = (snapshot: StarCachesSnapshot | undefined) => {
+		queryClient.setQueryData(feedKey, snapshot?.previousData);
+		queryClient.setQueryData(starredKey, snapshot?.previousStarred);
+	};
+
+	const invalidateStarCaches = () => {
+		void queryClient.invalidateQueries({ queryKey: feedKey });
+		void queryClient.invalidateQueries({ queryKey: starredKey });
 	};
 
 	const pinMessageMutation = useMutation({
@@ -187,36 +229,36 @@ export function useMessageActions({ conversationId }: UseMessageActionsProps) {
 			return response.json();
 		},
 		onMutate: async (messageId) => {
-			await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
-			const previousData = queryClient.getQueryData(['messages', conversationId]);
-
-			// Optimistic update
-			updateMessageInCache(messageId, (msg) => {
-				const newStar: MessageStar = {
-					id: 'temp-star-' + Date.now(),
-					messageId,
-					conversationId,
-					userId: currentUserProfile?.id || 'unknown',
-					starredAt: new Date(),
-				};
-				return {
-					...msg,
-					stars: [...(msg.stars || []), newStar],
-				};
+			const snapshot = await snapshotStarCaches();
+			const newStar: MessageStar = {
+				id: 'temp-star-' + Date.now(),
+				messageId,
+				conversationId,
+				userId: currentUserProfile?.id || 'unknown',
+				starredAt: new Date(),
+			};
+			const addStar = (msg: Message): Message => ({
+				...msg,
+				stars: [...(msg.stars || []), newStar],
 			});
 
-			return { previousData };
+			// Optimistic update. A message not yet in the starred list appears
+			// there on the next open (the list refetches whenever it opens).
+			updateMessageInCache(messageId, addStar);
+			updateMessageInStarredCache(messageId, addStar);
+
+			return snapshot;
 		},
 		onError: (err, messageId, context) => {
-			queryClient.setQueryData(['messages', conversationId], context?.previousData);
+			restoreStarCaches(context);
 			toast({
-				title: 'Error',
-				description: 'Failed to star message. Please try again.',
+				title: 'Erro',
+				description: 'Não foi possível favoritar a mensagem. Tente novamente.',
 				variant: 'destructive',
 			});
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+			invalidateStarCaches();
 		},
 	});
 
@@ -229,27 +271,38 @@ export function useMessageActions({ conversationId }: UseMessageActionsProps) {
 			return response.json();
 		},
 		onMutate: async (messageId) => {
-			await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
-			const previousData = queryClient.getQueryData(['messages', conversationId]);
+			const snapshot = await snapshotStarCaches();
 
-			// Optimistic update
+			// Optimistic update: the star goes away in the feed, and the message
+			// leaves the starred list (stars are personal, so it no longer
+			// belongs there).
 			updateMessageInCache(messageId, (msg) => ({
 				...msg,
 				stars: (msg.stars || []).filter((s) => s.userId !== currentUserProfile?.id),
 			}));
+			queryClient.setQueryData<MessagesInfiniteData>(starredKey, (oldData) => {
+				if (!oldData?.pages) return oldData;
+				return {
+					...oldData,
+					pages: oldData.pages.map((page) => ({
+						...page,
+						messages: page.messages.filter((msg) => msg.id !== messageId),
+					})),
+				};
+			});
 
-			return { previousData };
+			return snapshot;
 		},
 		onError: (err, messageId, context) => {
-			queryClient.setQueryData(['messages', conversationId], context?.previousData);
+			restoreStarCaches(context);
 			toast({
-				title: 'Error',
-				description: 'Failed to unstar message. Please try again.',
+				title: 'Erro',
+				description: 'Não foi possível remover a mensagem dos favoritos. Tente novamente.',
 				variant: 'destructive',
 			});
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+			invalidateStarCaches();
 		},
 	});
 

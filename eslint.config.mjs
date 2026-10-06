@@ -15,6 +15,7 @@ const eslintConfig = [
       ".next/**/*",
       ".next-auth-metrics*/**/*",
       ".next-screen-sharing/**/*",
+      ".next-messaging-local/**/*",
       "node_modules/**/*",
       "playwright-report/**/*",
       "test-results/**/*",

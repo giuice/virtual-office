@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 Source baseline reconciled 2026-10-03 in [phase-4-source-baseline.md](../docs/messaging/phase-4-source-baseline.md). The unchecked requirements below are full user workflows; existing types, APIs, status icons, and debug-only components do not satisfy them.
 
-- [ ] **MSG-01**: User can see read receipts on sent messages showing who read and when (Story 4A.4)
-- [ ] **MSG-02**: User can drag files into composer to attach them with upload progress and inline preview (Stories 4A.7-8)
-- [ ] **MSG-03**: User can record and send voice notes with waveform visualization and playback (Story 4A.9)
-- [ ] **MSG-04**: User can filter message feed to show only starred messages (Story 4A.11)
+- [x] **MSG-01**: User can see read receipts on sent messages showing who read and when (Story 4A.4)
+- [x] **MSG-02**: User can drag files into composer to attach them with upload progress and inline preview (Stories 4A.7-8)
+- [x] **MSG-03**: User can record and send voice notes with waveform visualization and playback (Story 4A.9)
+- [x] **MSG-04**: User can filter message feed to show only starred messages (Story 4A.11)
 
 ### Messaging Resilience
 
@@ -164,17 +164,17 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 | VID-08 | Future — Advanced Collaboration | Deferred |
 | VID-09 | Future — Advanced Collaboration | Deferred |
 | VID-10 | Future — Advanced Collaboration | Deferred |
-| MSG-01 | Phase 4 | Partial — read tracking/status exists; reader/time details missing |
-| MSG-02 | Phase 4 | Partial — upload APIs exist; production composer integration missing |
-| MSG-03 | Phase 4 | Pending — type only; recording/send/playback missing |
-| MSG-04 | Phase 4 | Partial — star infrastructure exists; production filter/actions missing |
-| RESIL-01 | Phase 5 | Pending |
-| RESIL-02 | Phase 5 | Partial — bounded subscription backoff exists; full reconnect acceptance pending |
+| MSG-01 | Phase 4 | Complete — owner accepted 2026-10-06 (app not yet deployed) |
+| MSG-02 | Phase 4 | Complete — owner accepted 2026-10-06 (app not yet deployed) |
+| MSG-03 | Phase 4 | Complete — owner accepted 2026-10-06 (app not yet deployed; Safari untested) |
+| MSG-04 | Phase 4 | Complete — owner accepted 2026-10-06 (app not yet deployed) |
+| RESIL-01 | Phase 5 | Partial — Phase 4 keeps failed sends with single-message retry; no offline queue |
+| RESIL-02 | Phase 5 | Partial — bounded backoff + Phase 4 reconnect catch-up (receipts/stars/attachments); full acceptance pending |
 | RESIL-03 | Phase 5 | Pending |
 | RESIL-04 | Phase 5 | Implemented in production source — two-user acceptance not rechecked |
 | RESIL-05 | Phase 5 | Pending |
 | RESIL-06 | Phase 5 | Pending |
-| RESIL-07 | Phase 5 | Pending |
+| RESIL-07 | Phase 5 | Partial — Phase 4 delivered opt-in DM/group desktop notifications; @mentions pending |
 | MEET-01 | Phase 6 | Pending |
 | MEET-02 | Phase 6 | Pending |
 | MEET-03 | Phase 6 | Pending |
@@ -199,4 +199,4 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-10-03 after owner acceptance and source-based messaging reconciliation; no new runtime/deployment evidence claimed*
+*Last updated: 2026-10-06 after owner acceptance of Phase 4 (MSG-01..04 complete; see spec-interview/phase-4-messaging-timeline/REPORT.md)*

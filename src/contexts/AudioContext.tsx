@@ -25,6 +25,7 @@ import {
 	screenShareRenewResponseSchema,
 	type ScreenSharePublicShare,
 } from '@/lib/webrtc/screen-share-contract';
+import { noteRoomMicUserChoice, registerRoomMicControl } from '@/lib/webrtc/room-mic-recording-hold';
 
 // Permission states
 export type MicPermissionState = 'prompt' | 'granted' | 'denied' | 'unavailable';
@@ -376,6 +377,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 				manager.resumeRemoteAudio();
 				updateMicPermission('granted');
 				updateIsAudioEnabled(true);
+				noteRoomMicUserChoice();
 				updateIsMutedState(false);
 				manager.setMuted(false);
 				return true;
@@ -406,6 +408,7 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 	 * Set mute state
 	 */
 	const setMuted = useCallback((muted: boolean) => {
+		noteRoomMicUserChoice();
 		updateIsMutedState(muted);
 		webrtcManager?.setMuted(muted);
 		}, [webrtcManager, updateIsMutedState]);
@@ -418,9 +421,37 @@ export function AudioProvider({ spaceId, userId, children }: AudioProviderProps)
 			return;
 		}
 		const newMuted = !isMuted;
+		noteRoomMicUserChoice();
 		updateIsMutedState(newMuted);
 		webrtcManager?.setMuted(newMuted);
 		}, [webrtcManager, isMuted, isAudioEnabled, updateIsMutedState]);
+
+	// T17 (FR-016): a voice-note recording in the messaging drawer (mounted
+	// outside this provider) may silence the room mic while it records and
+	// reopen it afterwards. The control is bound to this manager, so a hold
+	// never outlives the room audio session it muted.
+	const roomMicStateRef = useRef({ enabled: isAudioEnabled, muted: isMuted });
+	useEffect(() => {
+		roomMicStateRef.current = { enabled: isAudioEnabled, muted: isMuted };
+	}, [isAudioEnabled, isMuted]);
+	useEffect(() => {
+		if (!webrtcManager) return;
+		const manager = webrtcManager;
+		return registerRoomMicControl({
+			isJoined: () => managerRef.current === manager && roomMicStateRef.current.enabled,
+			isOpen: () => (
+				managerRef.current === manager
+				&& roomMicStateRef.current.enabled
+				&& !roomMicStateRef.current.muted
+			),
+			setMuted: (muted) => {
+				if (managerRef.current !== manager) return;
+				roomMicStateRef.current = { ...roomMicStateRef.current, muted };
+				updateIsMutedState(muted);
+				manager.setMuted(muted);
+			},
+		});
+	}, [webrtcManager, updateIsMutedState]);
 
 	/**
 	 * Update speaking state for a user

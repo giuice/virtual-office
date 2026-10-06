@@ -1,7 +1,7 @@
 # Messaging: source baseline for the next SPEC
 
 Reconciled: 2026-10-03
-Status: reference input; no approved messaging SPEC or execution plan
+Status: historical — superseded. Phase 4 was specified, executed, and owner-accepted on 2026-10-06 in `spec-interview/phase-4-messaging-timeline/` (see REPORT.md there). This inventory describes the source before that work.
 
 The owner confirmed Knock and screen sharing are finished. The next product area in the historical roadmap is **Phase 4 — Messaging Timeline**, followed by Phase 5 — Messaging Resilience. GSD is retired: its skills and `.planning/` files are consultation material only. New development uses `spec-to-done`, with an approved Ready SPEC and its artifacts under `spec-interview/<slug>/`.
 

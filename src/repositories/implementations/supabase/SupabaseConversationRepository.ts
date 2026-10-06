@@ -374,6 +374,24 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
+  async markMessagesRead(id: string, userId: string, messageIds: readonly string[]): Promise<number> {
+    // Phase 4 T5: per-message receipts for messages the user actually saw.
+    // service_role-only RPC; the route authorizes membership first and the RPC
+    // re-checks it. Does not move conversation_members.last_read_at.
+    const { data, error } = await this.supabaseClient.rpc('mark_messages_read', {
+      p_conversation_id: id,
+      p_user_id: userId,
+      p_message_ids: [...messageIds],
+    });
+
+    if (error) {
+      console.error(`Error in mark_messages_read RPC (${id}, ${userId}):`, error);
+      throw error;
+    }
+
+    return typeof data === 'number' ? data : 0;
+  }
+
   async updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null> {
     try {
       const activityTimestamp = timestamp || new Date().toISOString();

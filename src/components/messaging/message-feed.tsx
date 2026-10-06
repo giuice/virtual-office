@@ -1,20 +1,31 @@
 // src/components/messaging/message-feed.tsx
 'use client';
 
-import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Message } from '@/types/messaging';
+import { ConversationType, FileAttachment, Message } from '@/types/messaging';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Star } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { isMessageInFeedCache } from '@/lib/messaging/message-cache';
 import { MessageItem } from './message-item';
 import { MessageComposer } from './message-composer';
+import { StarredMessagesView } from './StarredMessagesView';
+import { FeedJumpStatus } from './FeedJumpStatus';
+import { FeedScrollSnapshot } from './FeedScrollSnapshot';
 import { TypingIndicator } from './TypingIndicator';
 import { useConversationPresence } from '@/hooks/useConversationPresence';
+import { useFeedScrollAnchor } from '@/hooks/ui/use-feed-scroll-anchor';
+import { useFeedJump } from '@/hooks/ui/use-feed-jump';
+import { useVisibleMessageReceipts } from '@/hooks/ui/use-visible-message-receipts';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useMessageActions } from '@/hooks/useMessageActions';
+import { starredMessagesQueryKey, useStarredMessages } from '@/hooks/queries/useStarredMessages';
 
 interface MessageFeedProps {
   conversationId?: string;
@@ -35,15 +46,26 @@ export function MessageFeed({
   const {
     messages,
     loadingMessages,
+    loadingMoreMessages,
+    loadMoreMessagesFailed,
     errorMessages,
     hasMoreMessages,
     loadMoreMessages,
+    loadHistoryUntilMessage,
     sendMessage,
     activeConversation,
     setActiveConversation,
     getOrCreateRoomConversation,
     addReaction,
+    isDrawerOpen,
+    isMinimized,
+    activeView,
+    markMessagesAsRead,
   } = useMessaging();
+  const { currentUserProfile } = useCompany();
+  const queryClient = useQueryClient();
+  const activeConversationId = activeConversation?.id ?? null;
+  const { starMessage, unstarMessage } = useMessageActions({ conversationId: activeConversationId ?? '' });
 
   // Typing indicators ride the conversation presence channel (audit B-02)
   const { typingUsers, notifyTyping, stopTyping } = useConversationPresence(
@@ -53,7 +75,67 @@ export function MessageFeed({
   const [isLoading, setIsLoading] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // The starred view belongs to one conversation: switching conversations
+  // returns to the normal feed without an extra effect.
+  const [starredViewConversationId, setStarredViewConversationId] = useState<string | null>(null);
+  const showStarred = !!activeConversationId && starredViewConversationId === activeConversationId;
+  const starredQuery = useStarredMessages(activeConversationId, showStarred);
+  const starredMessages = useMemo(
+    () => starredQuery.data?.pages.flatMap((page) => page.messages) ?? [],
+    [starredQuery.data]
+  );
+  const isStarredRendered = showStarred && !starredQuery.isPending && !starredQuery.isError;
+
+  // Skeleton only for the first load; refetches and older pages keep the feed.
+  const showSkeleton = isLoading || loadingMessages;
+  // The feed's viewport is unmounted while the starred view is shown, so
+  // returning to the feed starts at the newest message again.
+  const isFeedRendered = !showSkeleton && !errorMessages && !!activeConversation && !showStarred;
+  const { viewportRef, markOwnSend, scrollMessageIntoView, captureBeforeCommit } = useFeedScrollAnchor({
+    conversationId: activeConversationId,
+    messages,
+    isFeedRendered,
+  });
+
+  // The scrolling element (feed or starred view; only one is mounted) is also
+  // the visibility root for read receipts.
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
+  const attachReceiptViewport = useCallback((node: HTMLDivElement | null) => {
+    setViewportElement(node);
+    return () => {
+      setViewportElement((current) => (current === node ? null : current));
+    };
+  }, []);
+  const attachViewport = useCallback(
+    (node: HTMLDivElement | null) => {
+      const detachReceipts = attachReceiptViewport(node);
+      const detachAnchor = viewportRef(node);
+      return () => {
+        detachAnchor?.();
+        detachReceipts();
+      };
+    },
+    [attachReceiptViewport, viewportRef]
+  );
+
+  // Only messages actually seen in the drawer's conversation view count as
+  // read (BR-001). Starred results are messages of this conversation shown in
+  // the same drawer view, so seeing one counts too; the per-conversation
+  // "already reported" set is shared, so nothing is reported twice.
+  useVisibleMessageReceipts({
+    conversationId: activeConversationId,
+    viewport: viewportElement,
+    enabled:
+      (showStarred ? isStarredRendered : isFeedRendered) &&
+      isDrawerOpen &&
+      !isMinimized &&
+      activeView === 'conversation',
+    messages: showStarred ? starredMessages : messages,
+    currentUserId: currentUserProfile?.id ?? null,
+    isDirectConversation: activeConversation?.type === ConversationType.DIRECT,
+    submit: markMessagesAsRead,
+  });
 
   const messageMap = useMemo(() => {
     const map = new Map<string, Message>();
@@ -90,6 +172,41 @@ export function MessageFeed({
     });
   }, [messages, messageMap]);
 
+  // A reply renders only inside its expanded parent thread(s).
+  const revealMessage = useCallback((messageId: string) => {
+    const ancestors: Record<string, boolean> = {};
+    let parentId = messageMap.get(messageId)?.replyToId;
+    while (parentId && messageMap.has(parentId) && !ancestors[parentId]) {
+      ancestors[parentId] = true;
+      parentId = messageMap.get(parentId)?.replyToId;
+    }
+    setExpandedThreads((prev) => ({ ...prev, ...ancestors }));
+  }, [messageMap]);
+
+  // Selecting a starred result opens it in the feed (FR-022).
+  const isJumpTargetCached = useCallback(
+    (messageId: string) =>
+      !!activeConversationId && isMessageInFeedCache(queryClient, activeConversationId, messageId),
+    [activeConversationId, queryClient]
+  );
+  const {
+    jumpToMessage,
+    cancelJump,
+    isLoading: isJumpLoading,
+    isUnavailable: isJumpUnavailable,
+    dismissNotice: dismissJumpNotice,
+    targetMessageId: jumpTargetId,
+    highlightedMessageId,
+  } = useFeedJump({
+    conversationId: activeConversationId,
+    isFeedRendered,
+    messages,
+    isMessageLoaded: isJumpTargetCached,
+    loadHistoryUntilMessage,
+    revealMessage,
+    scrollMessageIntoView,
+  });
+
   // Initialize / switch conversation when roomId changes
   useEffect(() => {
     let cancelled = false;
@@ -111,13 +228,6 @@ export function MessageFeed({
     return () => { cancelled = true; };
   }, [roomId, roomName, getOrCreateRoomConversation, setActiveConversation]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
   const effectiveExpandedThreads = useMemo(() => {
     const next: Record<string, boolean> = {};
     Object.entries(expandedThreads).forEach(([messageId, expanded]) => {
@@ -136,20 +246,26 @@ export function MessageFeed({
     return next;
   }, [expandedThreads, messageMap, repliesByParent, replyToMessage]);
 
-  // Handle sending a message
-  const handleSendMessage = useCallback(async (content: string) => {
+  // Handle sending a message. Failures propagate to the composer, which keeps
+  // the draft with an error and retry; the reply target is only cleared on
+  // success, so a retry replies to the same message.
+  const handleSendMessage = useCallback(async (
+    content: string,
+    { clientMessageId, attachments }: { clientMessageId: string; attachments: FileAttachment[] }
+  ) => {
     if (!activeConversation) return;
 
-    try {
-      stopTyping();
-      await sendMessage(content, {
-        replyToId: replyToMessage?.id,
-      });
-      setReplyToMessage(null);
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  }, [activeConversation, replyToMessage?.id, sendMessage, stopTyping]);
+    const replyToId = replyToMessage?.id;
+    stopTyping();
+    markOwnSend();
+    await sendMessage(content, {
+      replyToId,
+      clientMessageId,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    });
+    // Keep a reply target the user picked while the send was in flight.
+    setReplyToMessage((current) => (current?.id === replyToId ? null : current));
+  }, [activeConversation, markOwnSend, replyToMessage?.id, sendMessage, stopTyping]);
 
   // Handle reply
   const handleReply = useCallback((message: Message) => {
@@ -160,6 +276,30 @@ export function MessageFeed({
   const handleReaction = useCallback((messageId: string, emoji: string) => {
     addReaction(messageId, emoji);
   }, [addReaction]);
+
+  // Reactions update the feed cache optimistically; the starred list picks up
+  // the saved state once the toggle has been stored.
+  const handleStarredReaction = useCallback((messageId: string, emoji: string) => {
+    if (!activeConversationId) return;
+    void addReaction(messageId, emoji).then(
+      () => queryClient.invalidateQueries({ queryKey: starredMessagesQueryKey(activeConversationId) }),
+      // addReaction already reported the failure and rolled the feed back;
+      // the starred list was never changed.
+      () => undefined
+    );
+  }, [activeConversationId, addReaction, queryClient]);
+
+  const toggleStarredView = useCallback(() => {
+    cancelJump();
+    setStarredViewConversationId((current) =>
+      current === activeConversationId ? null : activeConversationId
+    );
+  }, [activeConversationId, cancelJump]);
+
+  const openStarredInFeed = useCallback((messageId: string) => {
+    setStarredViewConversationId(null);
+    jumpToMessage(messageId);
+  }, [jumpToMessage]);
 
   const toggleThread = useCallback((messageId: string) => {
     setExpandedThreads((prev) => ({
@@ -173,9 +313,23 @@ export function MessageFeed({
     const replyCount = replies.length;
     const isExpanded = effectiveExpandedThreads[message.id] ?? false;
     const parentMessage = depth > 0 && message.replyToId ? messageMap.get(message.replyToId) ?? null : null;
+    const isJumpTarget = message.id === jumpTargetId;
+    const isHighlighted = message.id === highlightedMessageId;
 
     return (
-      <div key={`${message.id}-${depth}`} data-thread-depth={depth} className={depth > 0 ? 'mt-2' : undefined}>
+      <div
+        key={`${message.id}-${depth}`}
+        data-message-id={message.id}
+        data-thread-depth={depth}
+        data-jump-highlighted={isHighlighted ? 'true' : undefined}
+        tabIndex={isJumpTarget ? -1 : undefined}
+        className={cn(
+          depth > 0 && 'mt-2',
+          isJumpTarget && 'outline-none',
+          isHighlighted &&
+            'rounded-md bg-yellow-100/70 ring-2 ring-inset ring-yellow-400 transition-colors dark:bg-yellow-500/15'
+        )}
+      >
         <MessageItem
           message={message}
           onReply={handleReply}
@@ -185,6 +339,8 @@ export function MessageFeed({
           isThreadExpanded={isExpanded}
           depth={depth}
           parentMessage={parentMessage}
+          onStar={starMessage}
+          onUnstar={unstarMessage}
         />
         {replyCount > 0 && isExpanded && (
           <div
@@ -196,10 +352,10 @@ export function MessageFeed({
         )}
       </div>
     );
-  }, [effectiveExpandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap]);
+  }, [effectiveExpandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap, starMessage, unstarMessage, jumpTargetId, highlightedMessageId]);
 
   // Render loading state
-  if (isLoading || loadingMessages) {
+  if (showSkeleton) {
     return (
       <Card className={cn("w-full", className)}>
         <CardHeader>
@@ -259,42 +415,93 @@ export function MessageFeed({
     <Card className={cn("size-full min-h-0 flex flex-col", className)} data-testid="messages-feed">
       {/* Legacy test hook for older specs */}
       <div data-testid="message-feed" className="sr-only" />
-      <CardHeader className="pb-2">
-        <CardTitle>{activeConversation.name || 'Conversation'}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+        <CardTitle className="min-w-0 truncate">{activeConversation.name || 'Conversation'}</CardTitle>
+        <Button
+          type="button"
+          variant={showStarred ? 'secondary' : 'ghost'}
+          size="sm"
+          className="h-7 shrink-0 gap-1 px-2 text-xs"
+          aria-pressed={showStarred}
+          title={showStarred ? 'Voltar para todas as mensagens' : 'Mostrar só as minhas mensagens favoritas'}
+          onClick={toggleStarredView}
+          data-testid="starred-filter-toggle"
+        >
+          <Star
+            className={cn('size-3.5', showStarred && 'fill-yellow-400 text-yellow-400')}
+            aria-hidden="true"
+          />
+          Favoritas
+        </Button>
       </CardHeader>
 
-      <CardContent className="flex-1 p-0 overflow-hidden min-h-0">
-        <ScrollArea className="h-full">
-          {hasMoreMessages && (
-            <div className="text-center py-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={loadMoreMessages}
-                disabled={loadingMessages}
-              >
-                Load more messages
-              </Button>
-            </div>
-          )}
+      <CardContent className="relative flex-1 p-0 overflow-hidden min-h-0">
+        {showStarred ? (
+          <StarredMessagesView
+            messages={starredMessages}
+            isLoading={starredQuery.isPending}
+            isError={starredQuery.isError}
+            hasMore={starredQuery.hasNextPage}
+            isLoadingMore={starredQuery.isFetchingNextPage}
+            onLoadMore={() => void starredQuery.fetchNextPage()}
+            onRetry={() => void starredQuery.refetch()}
+            viewportRef={attachReceiptViewport}
+            onReply={handleReply}
+            onReaction={handleStarredReaction}
+            onStar={starMessage}
+            onUnstar={unstarMessage}
+            onOpenInFeed={openStarredInFeed}
+          />
+        ) : (
+          <>
+            <FeedJumpStatus
+              isLoading={isJumpLoading}
+              isUnavailable={isJumpUnavailable}
+              onDismiss={dismissJumpNotice}
+            />
+            <FeedScrollSnapshot messages={messages} onBeforeCommit={captureBeforeCommit} />
+            <ScrollArea className="h-full" viewportRef={attachViewport}>
+              {hasMoreMessages && (
+                <div className="text-center py-2">
+                  {loadMoreMessagesFailed && !loadingMoreMessages && (
+                    <p
+                      role="alert"
+                      className="px-4 pb-1 text-xs text-destructive"
+                      data-testid="load-more-error"
+                    >
+                      Não foi possível carregar mensagens anteriores. Tente de novo.
+                    </p>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void loadMoreMessages()}
+                    disabled={loadingMoreMessages}
+                  >
+                    Load more messages
+                  </Button>
+                </div>
+              )}
 
-          <div className="py-4">
-            {topLevelMessages.length === 0 ? (
-              <div className="text-center text-muted-foreground p-4">
-                <p>No messages yet. Start the conversation!</p>
+              <div className="py-4">
+                {topLevelMessages.length === 0 ? (
+                  <div className="text-center text-muted-foreground p-4">
+                    <p>No messages yet. Start the conversation!</p>
+                  </div>
+                ) : (
+                  topLevelMessages.map((message) => renderMessageTree(message))
+                )}
               </div>
-            ) : (
-              topLevelMessages.map((message) => renderMessageTree(message))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+            </ScrollArea>
+          </>
+        )}
       </CardContent>
 
       <CardFooter className="flex-col items-stretch gap-1 p-4 pt-2">
         <TypingIndicator typingUsers={typingUsers.map((t) => t.displayName)} />
         <MessageComposer
           onSendMessage={handleSendMessage}
+          conversationId={activeConversationId}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
           initialValue={""}

@@ -64,6 +64,18 @@ export interface IConversationRepository {
    */
   markConversationRead(id: string, userId: string): Promise<boolean>;
 
+  /**
+   * Records read receipts for the given visible message ids of a conversation
+   * (mark_messages_read RPC): ids outside the conversation and the user's own
+   * messages are ignored; repeats are idempotent; last_read_at is not moved.
+   * Requires a service-role client; callers must authorize the user first.
+   * @param id The unique ID of the conversation.
+   * @param userId The DB user ID (users.id) who saw the messages.
+   * @param messageIds Visible message ids (at most 100 per call; the RPC rejects more).
+   * @returns The number of receipts newly recorded.
+   */
+  markMessagesRead(id: string, userId: string, messageIds: readonly string[]): Promise<number>;
+
    /**
    * Updates the timestamp of the last message in the conversation.
    * Should typically be called when a new message is added.

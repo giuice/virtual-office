@@ -1,5 +1,6 @@
 'use client';
 
+import type { MouseEvent } from 'react';
 import { Conversation, ConversationType } from '@/types/messaging';
 import type { User } from '@/types/database';
 import { EnhancedAvatarV2 } from '@/components/ui/enhanced-avatar-v2';
@@ -13,6 +14,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+
+// Controls inside a row keep their own behaviour; a click anywhere else on the
+// row selects the conversation (TRACK T30: the row's padding and gaps used to
+// swallow clicks, since only the inner button selected).
+const ROW_INTERACTIVE_SELECTOR =
+  'a, button, input, textarea, select, [role="button"], [role="menuitem"], [data-avatar-interactive], [data-space-action]';
 
 function formatRelativeTime(date: Date | string): string {
   const now = Date.now();
@@ -85,22 +92,34 @@ export function ConversationListItem({
 
   const lastActivityTime = formatRelativeTime(conversation.lastActivity);
 
+  const handleRowClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    // Portal content (the actions menu) bubbles here through React but is
+    // outside the row's DOM.
+    if (!(target instanceof Element) || !event.currentTarget.contains(target)) return;
+    const interactive = target.closest(ROW_INTERACTIVE_SELECTOR);
+    if (interactive && event.currentTarget.contains(interactive)) return;
+    onSelect(conversation.id);
+  };
+
   return (
     <div
       data-testid={`conversation-item-${conversation.id}`}
       data-pinned={isPinned ? 'true' : 'false'}
       data-archived={conversation.isArchived ? 'true' : 'false'}
+      onClick={handleRowClick}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
         onOpenMenuChange(true);
       }}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent w-full',
+        'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent w-full',
         selected ? 'bg-accent' : ''
       )}
     >
-      <div className="relative flex-shrink-0" data-avatar-interactive>
+      {/* The avatar is display-only here, so clicking it selects the row. */}
+      <div className="relative flex-shrink-0">
         {avatarUser ? (
           <EnhancedAvatarV2 user={avatarUser} size="sm" display={{ status: true }} status={avatarUser.status} />
         ) : (
@@ -179,12 +198,12 @@ export function ConversationListItem({
           onKeyDown={(event) => event.stopPropagation()}
           data-avatar-interactive
         >
+          {/* Actions use onSelect without preventDefault so Radix closes the
+              menu (and releases its page-wide pointer lock) before they run. */}
           {isPinned ? (
             <DropdownMenuItem
-              onClick={async (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                await onUnpin(conversation.id);
+              onSelect={() => {
+                void onUnpin(conversation.id);
               }}
               data-testid="conversation-action-unpin"
             >
@@ -192,10 +211,8 @@ export function ConversationListItem({
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
-              onClick={async (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                await onPin(conversation.id);
+              onSelect={() => {
+                void onPin(conversation.id);
               }}
               data-testid="conversation-action-pin"
             >
@@ -207,10 +224,8 @@ export function ConversationListItem({
 
           {conversation.isArchived ? (
             <DropdownMenuItem
-              onClick={async (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                await onUnarchive(conversation.id);
+              onSelect={() => {
+                void onUnarchive(conversation.id);
               }}
               data-testid="conversation-action-unarchive"
             >
@@ -218,10 +233,8 @@ export function ConversationListItem({
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
-              onClick={async (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                await onArchive(conversation.id);
+              onSelect={() => {
+                void onArchive(conversation.id);
               }}
               data-testid="conversation-action-archive"
             >

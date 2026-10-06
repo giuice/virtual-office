@@ -60,7 +60,7 @@ export default defineConfig({
     },
     {
       name: 'messaging-drawer',
-      testMatch: ['**/epic-4A-*.spec.ts', '**/messaging-read-model.spec.ts'],
+      testMatch: ['**/epic-4A-*.spec.ts', '**/messaging-read-model.spec.ts', '**/messaging-feed-stability.spec.ts', '**/messaging-visible-read-receipts.spec.ts', '**/messaging-read-by.spec.ts', '**/messaging-starred.spec.ts', '**/messaging-starred-jump.spec.ts', '**/messaging-attachments-composer.spec.ts', '**/messaging-attachments-preview.spec.ts', '**/messaging-voice-notes.spec.ts', '**/messaging-voice-notes-playback.spec.ts', '**/messaging-desktop-notifications.spec.ts', '**/messaging-reconnect-consistency.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
     {

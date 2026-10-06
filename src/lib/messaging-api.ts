@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, ConversationType, FileAttachment, MessageReaction } from '@/types/messaging';
+import { Message, Conversation, ConversationType, FileAttachment, MessageReaction, MessageReader } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -107,16 +107,23 @@ function normalizeConversation(raw: any): Conversation {
  */
 export const messagingApi = {
   /**
-   * Send a new message
+   * Send a new message. `clientMessageId` is the composition key (Phase 4
+   * FR-024): resending it on a retry returns the message the server already
+   * stored for it instead of creating a duplicate. `attachmentIds` are the
+   * caller's pending uploads (POST /api/messages/upload) linked to the new
+   * message in the same transaction (Phase 4 T12/T13).
    */
-  async sendMessage(message: Partial<Message>): Promise<Message> {
+  async sendMessage(
+    message: Partial<Message>,
+    options?: { clientMessageId?: string; attachmentIds?: string[] }
+  ): Promise<Message> {
     const scope = 'messagingApi.sendMessage';
     const requestId = createRequestId('msg-send');
     const start = getTimestamp();
     debugLogger.messaging.event(scope, 'fetch:start', {
       requestId,
       conversationId: message.conversationId,
-      hasAttachments: Array.isArray(message.attachments) && message.attachments.length > 0,
+      hasAttachments: (options?.attachmentIds?.length ?? 0) > 0,
       type: message.type,
     });
 
@@ -126,7 +133,13 @@ export const messagingApi = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(message),
+        body: JSON.stringify({
+          ...message,
+          // Attachments travel as upload ids; the server returns the linked files.
+          attachments: undefined,
+          ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
+          ...(options?.attachmentIds?.length ? { attachmentIds: options.attachmentIds } : {}),
+        }),
       });
 
       const duration = getTimestamp() - start;
@@ -521,7 +534,36 @@ export const messagingApi = {
   },
 
   /**
-   * Mark a conversation as read for a specific user
+   * Record read receipts for messages the viewer actually saw (Phase 4).
+   * The server accepts 1-100 ids, ignores the viewer's own messages and ids
+   * from other conversations, and is idempotent.
+   * @returns how many receipts were newly recorded
+   */
+  async markMessagesAsRead(conversationId: string, messageIds: readonly string[]): Promise<number> {
+    const response = await fetch('/api/conversations/read', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ conversationId, messageIds }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null) as { error?: unknown } | null;
+      const message = typeof errorData?.error === 'string'
+        ? errorData.error
+        : `Failed to record read receipts (${response.status})`;
+      throw new Error(message);
+    }
+
+    const body = await response.json().catch(() => null) as { recorded?: unknown } | null;
+    return typeof body?.recorded === 'number' ? body.recorded : 0;
+  },
+
+  /**
+   * Legacy mark-all: marks every message in the conversation read. Kept for
+   * API compatibility only — the drawer reports visible messages through
+   * markMessagesAsRead, because "read" means the message was actually seen.
    */
   async markConversationAsRead(conversationId: string, userId: string): Promise<void> {
     try {
@@ -609,6 +651,69 @@ export const messagingApi = {
       console.error('Error deleting file attachment:', error);
       throw error;
     }
+  },
+
+  /**
+   * Who read one of the caller's own messages, most recent first (BR-003).
+   * The API answers 403 for anyone but the message's sender.
+   */
+  async getMessageReaders(messageId: string): Promise<{ readCount: number; readers: MessageReader[] }> {
+    const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}/readers`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const errorData: { error?: string } = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to get message readers');
+    }
+
+    const data: {
+      readCount: number;
+      readers: { userId: string; displayName: string | null; avatarUrl: string | null; readAt: string }[];
+    } = await response.json();
+
+    return {
+      readCount: data.readCount,
+      readers: data.readers.map((reader) => ({ ...reader, readAt: normalizeDate(reader.readAt) })),
+    };
+  },
+
+  /**
+   * The caller's starred messages in one conversation, newest message first
+   * (FR-021). Pass the previous page's `nextCursorBefore` as `cursorBefore`
+   * to load older starred messages.
+   */
+  async getStarredMessages(
+    conversationId: string,
+    options?: { limit?: number; cursorBefore?: string }
+  ): Promise<{ messages: Message[]; nextCursorBefore?: string; hasMoreOlder: boolean }> {
+    const params = new URLSearchParams({ conversationId });
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.cursorBefore) params.append('cursorBefore', options.cursorBefore);
+
+    const response = await fetch(`/api/messages/starred?${params.toString()}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const errorData: { error?: string } = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to get starred messages');
+    }
+
+    const data: { messages: Message[]; nextCursorBefore?: string; hasMoreOlder: boolean } =
+      await response.json();
+
+    return {
+      messages: data.messages.map((message) => ({
+        ...message,
+        timestamp: normalizeDate(message.timestamp),
+        reactions: normalizeReactions(message.reactions),
+      })),
+      nextCursorBefore: data.nextCursorBefore,
+      hasMoreOlder: data.hasMoreOlder,
+    };
   },
 
   /**

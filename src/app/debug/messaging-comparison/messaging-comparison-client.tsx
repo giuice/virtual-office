@@ -318,7 +318,7 @@ export default function MessagingComparisonPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <MessageComposer onSendMessage={handleEnhancedSend} placeholder="Type with MessageComposer…" />
+                  <MessageComposer onSendMessage={handleEnhancedSend} conversationId={activeConversation?.id ?? null} placeholder="Type with MessageComposer…" />
                 </CardContent>
               </Card>
 
