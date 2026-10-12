@@ -67,8 +67,11 @@ export async function GET(request: NextRequest) {
       cursorBefore,
     });
 
+    // Reader counts and the composition key (Phase 5 FR-034) are sender-only.
     const messages = result.items.map((message) =>
-      message.senderId === viewerId ? message : { ...message, readCount: undefined }
+      message.senderId === viewerId
+        ? message
+        : { ...message, readCount: undefined, clientMessageId: undefined }
     );
 
     return NextResponse.json(

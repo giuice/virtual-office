@@ -1,0 +1,19 @@
+ADVERSARIAL RE-REVIEW of task T2 (spec-interview/phase-5-messaging-resilience) in E:/projects/virtual-office. Read-only; never access an online database; read-only queries against LOCAL Supabase allowed.
+
+Your previous review: spec-interview/phase-5-messaging-resilience/reviews/sol-review-t2-r1.md (Medium 1 direct keyed inserts bypass fencing; Medium 2 legacy keyed messages lack delivery records; note on non-self-contained rollback).
+Revision (files changed: supabase/migrations/20261007095045_message_send_attempt_fencing.sql and __tests__/messaging-db/message-attempt-fencing.test.ts; tracked diff unchanged otherwise: reviews/t2-tracked-r2.diff). Performer's claimed fixes:
+- send_message_as_self now requires client_message_id IS NULL (client keyed inserts denied; unkeyed direct inserts still work).
+- Trigger messages_client_message_id_immutable (BEFORE UPDATE OF client_message_id, conversation_id, sender_id) raises 42501 for every role when a key is set/changed/cleared or a keyed message is moved to another conversation/sender; sender FK ON DELETE SET NULL still allowed.
+- Trigger messages_keyed_insert_fence (AFTER INSERT, keyed rows with a sender) fences every keyed insert that did not come through create_message_attempt (e.g. a Phase 4 server's raw service-role insert): commits only while the key has no fence state, else ATTEMPT_SUPERSEDED; records delivery under the key lock. create_message_attempt marks its own INSERT with a pre-generated id in a transaction-local setting and clears it; the trigger skips only that row.
+- Backfill of delivery records for existing keyed messages (fence_generation/composition null); fence and replay record untracked stored messages under the key lock; deleted-after-migration keyed messages → fence 'stored' with message null / 410, never re-created.
+- Migration reordered: backfill before ALTER POLICY/CREATE TRIGGER, delta backfill at the end; header rollback now self-contained (inlined Phase 4 body), app-first.
+
+Attack specifically:
+1. Can the transaction-local marker be forged or leak: can an authenticated client (PostgREST, any RPC, any SECURITY DEFINER function in the schema) set that setting (set_config / request headers / GUC via PostgREST `Prefer`/`db-pre-request`) to make the trigger skip a raw keyed insert? Is it cleared on every path (exceptions, multiple inserts in one transaction, the attachment wrapper)? Could the marker match another row?
+2. Is the AFTER INSERT trigger race-free against a concurrent fence (lock ordering vs create_message_attempt and fence_message_attempt; deadlocks; READ COMMITTED visibility)? Does the trigger fire for inserts through create_message_attempt in a way that double-records or deadlocks?
+3. Does the BEFORE UPDATE trigger break any legitimate existing update path (edit content, status, is_edited, soft delete, sender user deletion SET NULL, conversation deletion cascades, Realtime) in current, Phase 4, or pre-Phase-4 code?
+4. Backfill correctness and lock risk; rows with sender_id null; duplicates; re-run idempotency.
+5. Rollback SQL truly self-contained and correct (restores policy expression exactly, Phase 4 function body, ACLs; drops everything; order).
+6. Tests: real, non-tautological, and would fail on the r1 version of the migration.
+7. Any remaining High/Medium from r1 or new ones.
+Output: Verdict approve | revision required; disposition of r1 findings; new findings High/Medium/Low with file:line, failure scenario, smallest fix. Approve only if no High/Medium remain.

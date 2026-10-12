@@ -1,0 +1,1407 @@
+diff --git a/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts b/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts
+index c4776a7..a661879 100644
+--- a/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts
++++ b/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts
+@@ -109,11 +109,16 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+   });
+ 
+   /**
+-   * FR-024 / AC-029: a failed send keeps the text and reply target in the
+-   * composer with an error and a retry action; the retry delivers exactly one
+-   * message to the other account and leaves no optimistic copy behind.
++   * FR-024 / AC-029, as changed for TEXT messages by Phase 5 FR-001/FR-002
++   * (T8): a text or reply message is written to the durable outbox before it
++   * is sent, so the composer and reply target clear at once and no composer
++   * failure is shown; when its create fails in transit the outbox sends it
++   * again by itself (same composition key, a newer attempt generation), and
++   * exactly one message is stored, threaded under the reply target, for both
++   * accounts. Messages with files keep the Phase 4 composer failure and
++   * "Tentar de novo" (messaging-attachments-composer.spec.ts, Phase 5 AC-011).
+    */
+-  test('should keep a failed send in the composer and deliver exactly one message on retry', async ({
++  test('should deliver a text send whose create fails in transit exactly once, without user action', async ({
+     primaryPage,
+     secondaryPage,
+     messagingData,
+@@ -142,52 +147,47 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     const input = composer.locator('textarea').first();
+     const replyPreview = composer.locator('[data-testid="reply-composer-preview"]');
+     const sendError = composer.locator('[data-testid="composer-send-error"]');
+-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
+ 
+     await primaryPage.locator(`[data-testid="reply-button-${parentId}"]`).click();
+     await expect(replyPreview).toContainText(parentText);
+ 
+-    // Every create request that reaches the app server, by outcome.
+-    const createRequests: Array<{ replyToId?: string; content?: string }> = [];
+-    let createMode: 'fail' | 'hold' = 'fail';
++    // Every create request that reaches the page's network layer: the first
++    // fails in transit; the later ones are held, then passed to the server.
++    const failedRequests: Array<Record<string, unknown>> = [];
++    const createRequests: Array<Record<string, unknown>> = [];
+     let releaseHeldCreate: () => void = () => {};
+     const heldCreateReleased = new Promise<void>((resolve) => {
+       releaseHeldCreate = resolve;
+     });
+     await primaryPage.route('**/api/messages/create', async (route) => {
+-      if (createMode === 'fail') {
++      const body = route.request().postDataJSON() as Record<string, unknown>;
++      if (failedRequests.length === 0) {
++        failedRequests.push(body);
+         await route.abort('failed');
+         return;
+       }
+-      createRequests.push(route.request().postDataJSON());
+-      // Hold the retry in flight so a second trigger races it.
++      createRequests.push(body);
+       await heldCreateReleased;
+       await route.continue();
+     });
+-
+-    const failedText = `Failed then retried ${Date.now()}`;
+-    await input.fill(failedText);
+-    await composer.locator('[data-testid="message-send-button"]').click();
+-
+-    // Failure state: error + retry, text and reply target intact, no message.
+-    await expect(sendError).toBeVisible();
+-    await expect(sendError).toHaveAttribute('role', 'alert');
+-    await expect(retryButton).toBeEnabled();
+-    await expect(input).toHaveValue(failedText);
+-    await expect(replyPreview).toContainText(parentText);
+-    await expect(feedMessages(primaryPage, failedText)).toHaveCount(0);
+-
+-    // Retry, then re-trigger the send while the retry is still in flight.
+-    createMode = 'hold';
+     const createResponse = primaryPage.waitForResponse(
+       (response) =>
+         new URL(response.url()).pathname === '/api/messages/create' &&
+         response.request().method() === 'POST'
+     );
+-    await retryButton.click();
+-    await expect.poll(() => createRequests.length).toBe(1);
+-    await expect(sendError).toBeHidden();
+-    await expect(composer.locator('[data-testid="message-send-button"]')).toBeDisabled();
++
++    const failedText = `Failed then retried ${Date.now()}`;
++    await input.fill(failedText);
++    await composer.locator('[data-testid="message-send-button"]').click();
++
++    // Queued: composer and reply target clear at once; no failure is shown.
++    await expect(input).toHaveValue('');
++    await expect(replyPreview).toBeHidden();
++    await expect.poll(() => failedRequests.length).toBe(1);
++    // The outbox sends it again by itself, while the user does nothing.
++    await expect.poll(() => createRequests.length, { timeout: 15_000 }).toBe(1);
++    await expect(sendError).toHaveCount(0);
++    // Enter on the empty composer while the retry is in flight sends nothing.
+     await input.press('Enter');
+     releaseHeldCreate();
+ 
+@@ -195,18 +195,22 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     expect(response.status()).toBe(201);
+     const { message: created } = (await response.json()) as { message: { id: string; replyToId?: string } };
+     expect(created.replyToId).toBe(parentId);
++    expect(failedRequests[0]).toMatchObject({ content: failedText, replyToId: parentId, attemptGeneration: 1 });
+     expect(createRequests).toEqual([
+-      expect.objectContaining({ content: failedText, replyToId: parentId }),
++      expect.objectContaining({
++        content: failedText,
++        replyToId: parentId,
++        clientMessageId: failedRequests[0].clientMessageId,
++        attemptGeneration: 2,
++      }),
+     ]);
+ 
+-    // Sender: composer reset, exactly one persisted copy, no temp leftover.
+-    await expect(input).toHaveValue('');
+-    await expect(replyPreview).toBeHidden();
+-    await expect(sendError).toBeHidden();
++    // Sender: exactly one persisted copy, no temp leftover.
+     await expect(primaryPage.locator(`[data-testid="reply-count-${parentId}"]`)).toHaveText(/1 reply/);
+     await primaryPage.locator(`[data-testid="reply-count-${parentId}"]`).click();
+     await expect(feedMessages(primaryPage, failedText)).toHaveCount(1);
+     await expect(primaryPage.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
++    await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
+ 
+     // Recipient: exactly one delivery, threaded under the reply target.
+     const recipientReplyCount = secondaryPage.locator(`[data-testid="reply-count-${parentId}"]`);
+@@ -216,15 +220,19 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     await expect(feedMessages(secondaryPage, failedText)).toHaveCount(1);
+     await expect(recipientThread.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
+     expect(createRequests).toHaveLength(1);
++    expect(failedRequests).toHaveLength(1);
+   });
+ 
+   /**
+-   * FR-024 / AC-029 (T23): the create reaches the server and commits, but its
+-   * response never reaches the browser. "Tentar de novo" resends the same
+-   * composition key, the server answers with the stored message, and both
+-   * accounts keep exactly one copy. A new composition gets a new key.
++   * FR-024 / AC-029 (T23), as changed for TEXT messages by Phase 5 FR-002
++   * (T8): the create reaches the server and commits, but its response never
++   * reaches the browser. The composer is already clear (the message is in the
++   * durable outbox); the outbox resolves the message by itself — from the
++   * stored message reaching the feed, or by resending the same composition
++   * key, which the server answers with the stored message — and both accounts
++   * keep exactly one copy. A new composition gets a new key.
+    */
+-  test('should keep exactly one message when a committed send loses its response and is retried', async ({
++  test('should keep exactly one message when a committed send loses its response', async ({
+     primaryPage,
+     secondaryPage,
+     messagingData,
+@@ -284,16 +292,14 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     const input = composer.locator('textarea').first();
+     const sendButton = composer.locator('[data-testid="message-send-button"]');
+     const sendError = composer.locator('[data-testid="composer-send-error"]');
+-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
+ 
+     const text = `Committed but response lost ${Date.now()}`;
+     await input.fill(text);
+     await sendButton.click();
+ 
+-    // The sender sees a failure although the server stored the message.
+-    await expect(sendError).toBeVisible();
+-    await expect(input).toHaveValue(text);
+-    expect(creates).toHaveLength(1);
++    // Queued: the composer clears at once and never shows a failure.
++    await expect(input).toHaveValue('');
++    await expect.poll(() => creates.length).toBe(1);
+     expect(creates[0]).toMatchObject({ content: text, status: 201, deliveredToBrowser: false });
+     const firstKey = creates[0].clientMessageId;
+     expect(firstKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+@@ -302,29 +308,17 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     await expect.poll(() => serverCopies(text)).toEqual([storedId]);
+     await waitForRealtimeMessage(secondaryPage, text);
+ 
+-    // Retry: same composition key, the server returns the stored message.
+-    const retryResponse = primaryPage.waitForResponse(
+-      (response) =>
+-        new URL(response.url()).pathname === '/api/messages/create' &&
+-        response.request().method() === 'POST'
+-    );
+-    await retryButton.click();
+-    expect((await retryResponse).status()).toBe(200);
+-    expect(creates).toHaveLength(2);
+-    expect(creates[1]).toMatchObject({
+-      clientMessageId: firstKey,
+-      content: text,
+-      status: 200,
+-      messageId: storedId,
+-      deliveredToBrowser: true,
+-    });
+-
+-    // Sender: composer reset, one persisted copy, no optimistic leftover.
+-    await expect(input).toHaveValue('');
+-    await expect(sendError).toBeHidden();
+-    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible();
++    // Sender: the stored message replaces the pending copy; nothing else is stored.
++    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible({ timeout: 15_000 });
+     await expect(feedMessages(primaryPage, text)).toHaveCount(1);
+     await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
++    await expect(sendError).toHaveCount(0);
++    // Any resend is the same key, answered with the stored message.
++    await primaryPage.waitForTimeout(3_000);
++    for (const resend of creates.slice(1)) {
++      expect(resend).toMatchObject({ clientMessageId: firstKey, content: text, status: 200, messageId: storedId });
++    }
++    const resends = creates.length;
+ 
+     // Recipient: exactly one copy live, on the server, and after a reload.
+     await expect(feedMessages(secondaryPage, text)).toHaveCount(1);
+@@ -339,11 +333,12 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     // Sending the same text again is a new composition: new key, new message.
+     await input.fill(text);
+     await sendButton.click();
+-    await expect.poll(() => creates.length).toBe(3);
+-    expect(creates[2]).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
+-    expect(creates[2].clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
+-    expect(creates[2].clientMessageId).not.toBe(firstKey);
+-    const secondId = creates[2].messageId;
++    await expect.poll(() => creates.length).toBe(resends + 1);
++    const again = creates[resends];
++    expect(again).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
++    expect(again.clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
++    expect(again.clientMessageId).not.toBe(firstKey);
++    const secondId = again.messageId;
+     await expect(input).toHaveValue('');
+     await expect(feedMessages(primaryPage, text)).toHaveCount(2);
+     await expect(primaryPage.locator(`[data-testid="message-${secondId}"]`)).toBeVisible();
+diff --git a/src/components/messaging/ChatWindow.tsx b/src/components/messaging/ChatWindow.tsx
+index daee92e..cd68139 100644
+--- a/src/components/messaging/ChatWindow.tsx
++++ b/src/components/messaging/ChatWindow.tsx
+@@ -1,7 +1,6 @@
+ 'use client';
+  
+  import React, { useState, useEffect, useRef, useCallback } from 'react';
+- import { useInfiniteQuery } from '@tanstack/react-query';
+  import { MessageList } from './MessageList';
+  import { MessageInput } from './MessageInput';
+  import { ScrollArea } from '@/components/ui/scroll-area';
+@@ -9,6 +8,7 @@
+  import { Message } from '@/types/messaging';
+ 
+ import { useMessaging } from '@/contexts/messaging/MessagingContext';
++import { useMessages } from '@/hooks/useMessages';
+  import { Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+  
+  interface ChatWindowProps {
+@@ -19,13 +19,6 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+    className?: string;
+  }
+  
+- // API response type for paginated messages
+- interface MessagesResponse {
+-   messages: Message[];
+-   nextCursor?: string;
+-   hasMore: boolean;
+- }
+- 
+  export const ChatWindow: React.FC<ChatWindowProps> = ({
+    conversationId,
+    onSendMessage,
+@@ -42,39 +35,19 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+   const { connectionStatus, activeConversation } = useMessaging();
+   const isConnected = activeConversation?.id === conversationId && connectionStatus === 'SUBSCRIBED';
+  
+-   // Windowed message loading with infinite query
++   // The same merged reader as the drawer feed (Phase 5 FR-034): stored
++   // pages (oldest → newest) plus the sender's pending messages, matched to
++   // their stored copies by clientMessageId.
+    const {
+-     data,
+-     fetchNextPage,
+-     hasNextPage,
+-     isFetchingNextPage,
+-     isLoading,
+-     isError,
+-     error,
+-   } = useInfiniteQuery({
+-     queryKey: ['messages', conversationId],
+-     queryFn: async ({ pageParam = 0 }) => {
+-       const params = new URLSearchParams({
+-         conversationId,
+-         limit: '20',
+-         cursor: pageParam.toString(),
+-       });
+-       
+-       const response = await fetch(`/api/messages/get?${params}`);
+-       if (!response.ok) {
+-         throw new Error('Failed to fetch messages');
+-       }
+-       
+-       return response.json() as Promise<MessagesResponse>;
+-     },
+-     getNextPageParam: (lastPage) => 
+-       lastPage.hasMore && lastPage.nextCursor ? parseInt(lastPage.nextCursor) : undefined,
+-     initialPageParam: 0,
+-   });
+- 
+-   // Flatten all messages from all pages
+-   const allMessages = data?.pages.flatMap(page => page.messages) || [];
+- 
++     messages: allMessages,
++     loadingMessages: isLoading,
++     loadingMoreMessages: isFetchingNextPage,
++     errorMessages,
++     hasMoreMessages: hasNextPage,
++     loadMoreMessages: fetchNextPage,
++   } = useMessages(conversationId);
++   const isError = errorMessages !== null;
++
+    const handleStartReply = useCallback((message: Message) => {
+      setReplyingToMessage(message);
+    }, []);
+@@ -93,7 +66,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+      
+      // Load more messages when scrolled near the top
+      if (isNearTop && hasNextPage && !isFetchingNextPage) {
+-       fetchNextPage();
++       void fetchNextPage();
+      }
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  
+@@ -114,7 +87,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+            <div className="text-center">
+              <AlertCircle className="size-8 text-destructive mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+-               Failed to load messages: {error?.message}
++               Failed to load messages: {errorMessages}
+              </p>
+              <Button 
+                variant="outline" 
+@@ -177,7 +150,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+-                   onClick={() => fetchNextPage()}
++                   onClick={() => void fetchNextPage()}
+                    className="text-sm text-muted-foreground"
+                  >
+                    Load older messages
+@@ -201,7 +174,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
+        <div className="p-3 border-t">
+          <MessageInput
+            onSendMessage={onSendMessage}
+-           replyingToMessage={replyingToMessage}
++           replyingToMessage={replyingToMessage?.conversationId === conversationId ? replyingToMessage : null}
+            onCancelReply={handleCancelReply}
+            isLoading={isLoading}
+          />
+diff --git a/src/components/messaging/message-composer.tsx b/src/components/messaging/message-composer.tsx
+index ba8b11a..5cd5d4f 100644
+--- a/src/components/messaging/message-composer.tsx
++++ b/src/components/messaging/message-composer.tsx
+@@ -12,6 +12,7 @@ import { VOICE_NOTE_ALONE_FILES_TEXT, useComposerAttachments } from '@/hooks/ui/
+ import { useVoiceRecorder } from '@/hooks/ui/use-voice-recorder';
+ import { ATTACHMENT_INPUT_ACCEPT, IMAGE_ATTACHMENT_INPUT_ACCEPT } from '@/lib/messaging/attachment-policy';
+ import { describeVoiceRecordingProblem } from '@/lib/messaging/voice-recording';
++import { isOutboxStorageError } from '@/lib/messaging/outbox/outbox-db';
+ import { cn } from '@/lib/utils';
+ import { ComposerFileRejections, ComposerPendingFiles } from './ComposerPendingFiles';
+ import { PendingVoiceNotePreview, VoiceRecordingNotice, VoiceRecordingPanel } from './ComposerVoiceNote';
+@@ -76,6 +77,9 @@ function MessageComposerReplyPreview({
+ // Copy follows the SPEC journey J6 (Portuguese); the rest of this composer
+ // predates it and is still in English.
+ const SEND_FAILED_TEXT = 'Mensagem não enviada.';
++// Phase 5 FR-033 (owner decision D5): the outbox could not store the message,
++// so nothing was sent.
++const STORAGE_UNAVAILABLE_TEXT = 'Este navegador não permite guardar mensagens; libere o armazenamento do site';
+ const RETRY_SEND_TEXT = 'Tentar de novo';
+ const DROP_FILES_TEXT = 'Solte os arquivos para anexar';
+ const RECORD_VOICE_TEXT = 'Gravar nota de voz';
+@@ -120,6 +124,19 @@ function MessageComposerSendError({
+   );
+ }
+ 
++function MessageComposerStorageError() {
++  return (
++    <div
++      role="alert"
++      className="flex items-center gap-2 rounded-md bg-destructive/10 px-2 py-1 mb-2 text-sm text-destructive"
++      data-testid="composer-storage-error"
++    >
++      <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
++      <span className="flex-1">{STORAGE_UNAVAILABLE_TEXT}</span>
++    </div>
++  );
++}
++
+ export function MessageComposer({
+   onSendMessage,
+   conversationId,
+@@ -132,11 +149,15 @@ export function MessageComposer({
+ }: MessageComposerProps) {
+   const [content, setContent] = useState(initialValue);
+   // A failed send keeps the draft (text and, via the parent, the reply
+-  // target) in the composer; this flag drives the error + retry row.
+-  const [sendFailed, setSendFailed] = useState(false);
++  // target) in the composer; 'send' drives the error + retry row, 'storage'
++  // the message that the outbox cannot store messages (FR-033).
++  const [sendError, setSendError] = useState<'send' | 'storage' | null>(null);
++  const sendFailed = sendError === 'send';
+   const [isSending, setIsSending] = useState(false);
+   // Synchronous guard: a double click/Enter lands before React re-renders
+-  // the disabled send button, and must not create a second message.
++  // the disabled send button, and must not create a second message. For a
++  // text message (Phase 5 T8) it spans only the outbox write: delivery runs
++  // in the background, so the next message can be written at once.
+   const sendInFlightRef = useRef(false);
+   // The last composition submitted without a confirmed send. A retry of the
+   // same text and reply target reuses its key, so a create that committed on
+@@ -198,7 +219,7 @@ export function MessageComposer({
+     setContent(newContent);
+     // Nothing left to retry once the draft is erased.
+     if (!newContent.trim() && pendingFiles.length === 0) {
+-      setSendFailed(false);
++      setSendError(null);
+       unconfirmedSendRef.current = null;
+     }
+     
+@@ -231,7 +252,7 @@ export function MessageComposer({
+     sendInFlightRef.current = true;
+     setSendingUploadIds(attachmentIds);
+     setIsSending(true);
+-    setSendFailed(false);
++    setSendError(null);
+     try {
+       await onSendMessage(submittedContent, { clientMessageId, attachments });
+       unconfirmedSendRef.current = null;
+@@ -243,7 +264,7 @@ export function MessageComposer({
+       console.error('Failed to send message:', error);
+       // The draft (text, reply target, files) stays in the composer; the
+       // user can retry it.
+-      setSendFailed(true);
++      setSendError(isOutboxStorageError(error) ? 'storage' : 'send');
+     } finally {
+       sendInFlightRef.current = false;
+       setSendingUploadIds([]);
+@@ -376,6 +397,7 @@ export function MessageComposer({
+           onRetry={handleRetry}
+         />
+       )}
++      {sendError === 'storage' && <MessageComposerStorageError />}
+ 
+       <ComposerFileRejections rejections={fileRejections} onDismiss={dismissRejections} />
+       {recorder.problem && <VoiceRecordingNotice problem={recorder.problem} onDismiss={recorder.clearProblem} />}
+diff --git a/src/components/messaging/message-feed.tsx b/src/components/messaging/message-feed.tsx
+index ad3e46d..69687b8 100644
+--- a/src/components/messaging/message-feed.tsx
++++ b/src/components/messaging/message-feed.tsx
+@@ -13,6 +13,7 @@ import { AlertCircle, Star } from 'lucide-react';
+ import { useQueryClient } from '@tanstack/react-query';
+ import { cn } from '@/lib/utils';
+ import { isMessageInFeedCache } from '@/lib/messaging/message-cache';
++import { OutboxInvalidReplyTargetError } from '@/lib/messaging/outbox/message-outbox';
+ import { MessageItem } from './message-item';
+ import { MessageComposer } from './message-composer';
+ import { StarredMessagesView } from './StarredMessagesView';
+@@ -53,6 +54,7 @@ export function MessageFeed({
+     loadMoreMessages,
+     loadHistoryUntilMessage,
+     sendMessage,
++    queueTextMessage,
+     activeConversation,
+     setActiveConversation,
+     getOrCreateRoomConversation,
+@@ -73,7 +75,27 @@ export function MessageFeed({
+   );
+ 
+   const [isLoading, setIsLoading] = useState(false);
+-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
++  // The reply target belongs to the conversation it was chosen in: any switch
++  // of conversation (list, notification, an avatar's "Send Message") drops it
++  // (Phase 5 T8: a reply to another conversation's message is refused by the
++  // server, and a queued one would block that conversation's outbox).
++  const [replyState, setReplyState] = useState<{ conversationId: string | null; message: Message | null }>(() => ({
++    conversationId: activeConversationId,
++    message: null,
++  }));
++  if (replyState.conversationId !== activeConversationId) {
++    setReplyState({ conversationId: activeConversationId, message: null });
++  }
++  const replyToMessage = replyState.conversationId === activeConversationId ? replyState.message : null;
++  const setReplyToMessage = useCallback(
++    (next: Message | null | ((current: Message | null) => Message | null)) => {
++      setReplyState((state) => ({
++        conversationId: state.conversationId,
++        message: typeof next === 'function' ? next(state.message) : next,
++      }));
++    },
++    []
++  );
+   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+ 
+   // The starred view belongs to one conversation: switching conversations
+@@ -247,8 +269,11 @@ export function MessageFeed({
+   }, [expandedThreads, messageMap, repliesByParent, replyToMessage]);
+ 
+   // Handle sending a message. Failures propagate to the composer, which keeps
+-  // the draft with an error and retry; the reply target is only cleared on
+-  // success, so a retry replies to the same message.
++  // the draft with an error; the reply target is only cleared on success, so
++  // a retry replies to the same message. Phase 5 T8 (FR-001, BR-002): a text
++  // or reply message goes to the durable outbox, which delivers it (also
++  // offline, later, in order); files and voice notes are never queued and
++  // keep the Phase 4 direct send.
+   const handleSendMessage = useCallback(async (
+     content: string,
+     { clientMessageId, attachments }: { clientMessageId: string; attachments: FileAttachment[] }
+@@ -256,21 +281,31 @@ export function MessageFeed({
+     if (!activeConversation) return;
+ 
+     const replyToId = replyToMessage?.id;
++    // Never send a reply to a message of another conversation (the draft stays).
++    if (replyToMessage?.conversationId && replyToMessage.conversationId !== activeConversation.id) {
++      throw new OutboxInvalidReplyTargetError();
++    }
+     stopTyping();
+     markOwnSend();
+-    await sendMessage(content, {
+-      replyToId,
+-      clientMessageId,
+-      attachments: attachments.length > 0 ? attachments : undefined,
+-    });
++    if (attachments.length === 0) {
++      await queueTextMessage({
++        conversationId: activeConversation.id,
++        clientMessageId,
++        content,
++        replyToId,
++        replyToConversationId: replyToMessage?.conversationId,
++      });
++    } else {
++      await sendMessage(content, { replyToId, clientMessageId, attachments });
++    }
+     // Keep a reply target the user picked while the send was in flight.
+     setReplyToMessage((current) => (current?.id === replyToId ? null : current));
+-  }, [activeConversation, markOwnSend, replyToMessage?.id, sendMessage, stopTyping]);
++  }, [activeConversation, markOwnSend, queueTextMessage, replyToMessage, sendMessage, setReplyToMessage, stopTyping]);
+ 
+   // Handle reply
+   const handleReply = useCallback((message: Message) => {
+     setReplyToMessage(message);
+-  }, []);
++  }, [setReplyToMessage]);
+ 
+   // Handle reaction
+   const handleReaction = useCallback((messageId: string, emoji: string) => {
+diff --git a/src/components/messaging/message-item.tsx b/src/components/messaging/message-item.tsx
+index 3bac82d..bd87093 100644
+--- a/src/components/messaging/message-item.tsx
++++ b/src/components/messaging/message-item.tsx
+@@ -3,7 +3,8 @@
+ 
+ import { useMemo, useState } from 'react';
+ import { formatDistanceToNow } from 'date-fns';
+-import { Message, MessageStatus, MessageType } from '@/types/messaging';
++import { Message, MessageStatus, MessageType, type MessageDeliveryState } from '@/types/messaging';
++import { PENDING_MESSAGE_ID_PREFIX } from '@/lib/messaging/message-cache';
+ import { usePresence } from '@/contexts/PresenceContext';
+ import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
+ import { Button } from '@/components/ui/button';
+@@ -43,6 +44,26 @@ const getMessageStatusIcon = (status: MessageStatus) => {
+   }
+ };
+ 
++// Phase 5 T8 (SPEC §13): a pending copy's state as text, not colour only.
++const DELIVERY_STATE_LABELS: Record<MessageDeliveryState, string> = {
++  pending: 'pendente',
++  sending: 'enviando',
++  failed: 'não enviada',
++  expired: 'expirada',
++};
++
++function MessageDeliveryLabel({ state, messageId }: { state: MessageDeliveryState; messageId: string }) {
++  return (
++    <span
++      className={cn('font-medium', state === 'failed' || state === 'expired' ? 'text-destructive' : 'text-muted-foreground')}
++      data-testid={`message-delivery-state-${messageId}`}
++      data-delivery-state={state}
++    >
++      {DELIVERY_STATE_LABELS[state]}
++    </span>
++  );
++}
++
+ // Render message content based on type
+ 
+ const containsTarget = (container: HTMLElement, target: EventTarget | null): boolean => {
+@@ -139,13 +160,13 @@ function MessageActions({
+   onMenuOpenChange: (open: boolean) => void;
+ }) {
+   if (!showActions) return null;
+-  return <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1" data-avatar-interactive>
+-      <Button variant="ghost" size="icon" className="size-7" onClick={e => {
++  return <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1" data-avatar-interactive data-testid={`message-actions-${message.id}`}>
++      {onReply && <Button variant="ghost" size="icon" className="size-7" aria-label="Responder" onClick={e => {
+       e.stopPropagation();
+-      onReply?.(message);
+-    }} data-avatar-interactive>
++      onReply(message);
++    }} data-avatar-interactive data-testid={`message-action-reply-${message.id}`}>
+         <Reply className="size-4" />
+-      </Button>
++      </Button>}
+       <EmojiPicker onEmojiSelect={emoji => onReaction?.(message.id, emoji)} />
+       <DropdownMenu onOpenChange={onMenuOpenChange}>
+         <DropdownMenuTrigger asChild>
+@@ -244,6 +265,11 @@ export function MessageItem({
+     };
+   }, [message.senderId, resolvedUser, sender]);
+   const isCurrentUser = message.senderId === currentUserProfile?.id;
++  // Phase 5 T8: a pending copy (temp-<key>) is not a stored message yet, so it
++  // cannot be a reply target (the server would refuse its id and the queued
++  // reply would fail): its Reply controls are not offered.
++  const isPendingCopy = message.id.startsWith(PENDING_MESSAGE_ID_PREFIX);
++  const replyHandler = isPendingCopy ? undefined : onReply;
+   const showAvatar = !isCurrentUser;
+   const fallbackDisplayName = fallbackAvatarUser?.displayName || (message.senderId ? `User ${message.senderId.slice(0, 4)}` : 'System');
+   const interactiveUser = useMemo(() => {
+@@ -328,6 +354,9 @@ export function MessageItem({
+               {getMessageStatusIcon(message.status)}
+             </span>
+           )}
++          {isCurrentUser && isPendingCopy && (
++            <MessageDeliveryLabel state={message.deliveryState ?? 'sending'} messageId={message.id} />
++          )}
+           {isCurrentUser && (message.readCount ?? 0) > 0 && (
+             <MessageReadReceipts messageId={message.id} readCount={message.readCount ?? 0} />
+           )}
+@@ -346,12 +375,12 @@ export function MessageItem({
+           })} />
+               {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+             </Button>}
+-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => onReply?.(message)} data-testid={`reply-button-${message.id}`}>
++          {replyHandler && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => replyHandler(message)} data-testid={`reply-button-${message.id}`}>
+             Reply
+-          </Button>
++          </Button>}
+         </div>
+       </div>
+ 
+-      <MessageActions showActions={showActions || isActionsMenuOpen} onMenuOpenChange={setIsActionsMenuOpen} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={onReply} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
++      <MessageActions showActions={showActions || isActionsMenuOpen} onMenuOpenChange={setIsActionsMenuOpen} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={replyHandler} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
+     </div>;
+ }
+diff --git a/src/contexts/messaging/MessagingContext.tsx b/src/contexts/messaging/MessagingContext.tsx
+index 629f998..fcbb712 100644
+--- a/src/contexts/messaging/MessagingContext.tsx
++++ b/src/contexts/messaging/MessagingContext.tsx
+@@ -13,6 +13,7 @@ import { useConversations } from '@/hooks/useConversations';
+ import { useMessages } from '@/hooks/useMessages';
+ import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
+ import { useIncomingMessageNotifications } from '@/hooks/ui/use-message-notifications';
++import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+ import { debugLogger } from '@/utils/debug-logger';
+ 
+ // LocalStorage keys for drawer state persistence
+@@ -144,6 +145,8 @@ function useMessagingProviderValue(): MessagingContextType {
+ 
+   // Get message management hooks
+   const messagesManager = useMessages(activeConversation?.id || null);
++  // Phase 5 T8: the signed-in user's durable outbox (text/reply sends).
++  const queueTextMessage = useMessageOutbox(currentUserProfile?.id);
+ 
+   // The conversation whose feed the drawer shows (same choice as
+   // MessagingDrawer), or null when the drawer is closed, minimized, or on the
+@@ -359,6 +362,7 @@ function useMessagingProviderValue(): MessagingContextType {
+     loadHistoryUntilMessage,
+     refreshMessages,
+     sendMessage,
++    queueTextMessage,
+     addReaction,
+     removeReaction,
+     uploadAttachment,
+@@ -398,6 +402,7 @@ function useMessagingProviderValue(): MessagingContextType {
+     loadHistoryUntilMessage,
+     refreshMessages,
+     sendMessage,
++    queueTextMessage,
+     addReaction,
+     removeReaction,
+     uploadAttachment,
+diff --git a/src/contexts/messaging/types.ts b/src/contexts/messaging/types.ts
+index ded5827..b154a6e 100644
+--- a/src/contexts/messaging/types.ts
++++ b/src/contexts/messaging/types.ts
+@@ -6,6 +6,7 @@ import {
+   FileAttachment,
+   MessageHistorySearchResult,
+ } from '@/types/messaging';
++import type { OutboxEnqueueInput } from '@/types/message-outbox';
+ 
+ // Drawer view types
+ export type DrawerView = 'list' | 'conversation' | 'search';
+@@ -68,6 +69,13 @@ export interface MessagingContextType {
+     /** Composition key; reuse it on a retry so the server never stores a duplicate (FR-024). */
+     clientMessageId?: string;
+   }) => Promise<Message | undefined>;
++  /**
++   * Phase 5 T8 (FR-001, BR-002): queues a text or reply message (no files or
++   * voice) in the durable outbox; resolves once it is stored and shown as
++   * pending, rejects (OutboxStorageError, FR-033) when it cannot be stored —
++   * then nothing is sent.
++   */
++  queueTextMessage: (input: OutboxEnqueueInput) => Promise<void>;
+   addReaction: (messageId: string, emoji: string) => Promise<void>;
+   removeReaction: (messageId: string, emoji: string) => Promise<void>;
+   uploadAttachment: (file: File) => Promise<FileAttachment>;
+diff --git a/src/hooks/useMessages.ts b/src/hooks/useMessages.ts
+index 5c92181..e2437c2 100644
+--- a/src/hooks/useMessages.ts
++++ b/src/hooks/useMessages.ts
+@@ -1,6 +1,7 @@
+ // src/hooks/useMessages.ts
+-import { useCallback, useMemo, useState } from 'react';
+-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
++import { useCallback, useEffect, useMemo, useState } from 'react';
++import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
++import { v4 as uuidv4 } from 'uuid';
+ import { useCompany } from '@/contexts/CompanyContext';
+ import {
+   Message,
+@@ -14,8 +15,14 @@ import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+ import { attachmentMessageType } from '@/lib/messaging/attachment-policy';
+ import {
+   appendMessageToPages,
++  isMessageDeleted,
++  isPendingMessage,
+   keepMessageThroughInflightFetch,
+-  replaceMessageInPages,
++  normalizeClientMessageId,
++  pendingMessagesQueryKey,
++  PENDING_MESSAGE_ID_PREFIX,
++  resolvePendingMessages,
++  visiblePendingMessages,
+   type MessagesInfiniteData,
+ } from '@/lib/messaging/message-cache';
+ import { debugLogger } from '@/utils/debug-logger';
+@@ -51,6 +58,23 @@ const MAX_HISTORY_SEARCH_ROUNDS = 100;
+ const pagesContainMessage = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
+   data?.pages.some((page) => page.messages.some((message) => message.id === messageId)) ?? false;
+ 
++const NO_PENDING_MESSAGES: Message[] = [];
++
++/** Adds (or replaces) or removes one pending message, by key, in the sender's pending list. */
++const updatePendingMessages = (
++  queryClient: QueryClient,
++  queryKey: ReturnType<typeof pendingMessagesQueryKey>,
++  clientMessageId: string,
++  pendingMessage?: Message
++) => {
++  queryClient.setQueryData<Message[]>(queryKey, (current) => {
++    const others = (current ?? []).filter(
++      (message) => normalizeClientMessageId(message.clientMessageId) !== clientMessageId
++    );
++    return pendingMessage ? [...others, pendingMessage] : others;
++  });
++};
++
+ export function useMessages(activeConversationId: string | null) {
+   const queryClient = useQueryClient();
+   const { currentUserProfile } = useCompany();
+@@ -86,14 +110,47 @@ export function useMessages(activeConversationId: string | null) {
+     getNextPageParam: (lastPage) => lastPage.nextCursorBefore,
+   });
+ 
+-  const messages: Message[] = useMemo(() => {
+-    if (!data?.pages) return [];
+-    // Pages are returned Newest -> Oldest (Page 0 is newest)
+-    // We want to display Oldest -> Newest
+-    // So we reverse the pages array before flattening
+-    const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
+-    return flattened;
+-  }, [data]);
++  // Phase 5 FR-034: the sender's pending messages are kept apart from the
++  // stored feed (a feed fetch replaces the cached pages and must not drop
++  // them) and keyed by the signed-in user (users.id), so they never show to
++  // another account. Client-only state: this query never fetches.
++  const pendingQueryKey = pendingMessagesQueryKey(currentUserProfile?.id ?? '', activeConversationId ?? '');
++  const { data: pendingMessages = NO_PENDING_MESSAGES } = useQuery<Message[]>({
++    queryKey: pendingQueryKey,
++    queryFn: () => queryClient.getQueryData<Message[]>(pendingQueryKey) ?? [],
++    enabled: false,
++    staleTime: Infinity,
++    // Phase 5 T8: also the render view of the durable outbox; never collected.
++    gcTime: Infinity,
++  });
++
++  // Pages are returned Newest -> Oldest (Page 0 is newest)
++  // We want to display Oldest -> Newest
++  // So we reverse the pages array before flattening
++  const storedMessages: Message[] = useMemo(
++    () => (data?.pages ? [...data.pages].reverse().flatMap((p) => p.messages) : []),
++    [data]
++  );
++  // A pending message shows until the feed holds the stored message with its
++  // key (Realtime, fetch or create response, whichever comes first).
++  const visiblePending = useMemo(
++    () => (activeConversationId ? visiblePendingMessages(storedMessages, pendingMessages) : []),
++    [activeConversationId, storedMessages, pendingMessages]
++  );
++  const messages: Message[] = useMemo(
++    () => (visiblePending.length > 0 ? [...storedMessages, ...visiblePending] : storedMessages),
++    [storedMessages, visiblePending]
++  );
++  // Once the rendered feed holds a pending message's stored copy (e.g. from
++  // a fetch), the pending message is resolved for good: if the stored message
++  // later leaves the feed (e.g. a Realtime DELETE), it is not shown again as
++  // "sending".
++  const hasObservedPending = pendingMessages.length > visiblePending.length;
++  useEffect(() => {
++    if (activeConversationId && hasObservedPending) {
++      resolvePendingMessages(queryClient, activeConversationId, storedMessages);
++    }
++  }, [activeConversationId, hasObservedPending, queryClient, storedMessages]);
+ 
+   // Initial load only. Background refetches (realtime/receipt invalidations,
+   // focus) and older-page fetches must not swap the feed for a skeleton: that
+@@ -215,7 +272,9 @@ export function useMessages(activeConversationId: string | null) {
+         attachments?: FileAttachment[];
+         type?: MessageType;
+         // Composition key (FR-024): a retry with the same key gets back the
+-        // message already stored, which then replaces this optimistic copy.
++        // message already stored. Phase 5 FR-034: every send is keyed (one
++        // is generated when the caller has none), because the pending copy
++        // is matched to the stored message only by this key.
+         clientMessageId?: string;
+       }
+     ) => {
+@@ -252,9 +311,12 @@ export function useMessages(activeConversationId: string | null) {
+         });
+       }
+ 
++      const clientMessageId = normalizeClientMessageId(options?.clientMessageId) ?? uuidv4();
++      const conversationId = activeConversationId;
++      const pendingKey = pendingMessagesQueryKey(currentUserProfile.id, conversationId);
+       const now = new Date();
+       const optimisticMessage: Message = {
+-        id: `temp-${now.getTime()}`,
++        id: `${PENDING_MESSAGE_ID_PREFIX}${clientMessageId}`,
+         conversationId: activeConversationId,
+         senderId: currentUserProfile.id, // DB ID for UI representation
+         content: trimmedContent,
+@@ -265,13 +327,11 @@ export function useMessages(activeConversationId: string | null) {
+         attachments,
+         reactions: [],
+         isEdited: false,
++        clientMessageId,
+       };
+ 
+-      // Optimistically add to page 0 (newest window) via the shared helper (B-04)
+-      queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-        ['messages', activeConversationId],
+-        (oldData) => appendMessageToPages(oldData, optimisticMessage)
+-      );
++      // Shown after the stored feed until its stored message arrives (FR-034).
++      updatePendingMessages(queryClient, pendingKey, clientMessageId, optimisticMessage);
+ 
+       if (instrumentationEnabled) {
+         debugLogger.messaging.event('useMessages.sendMessage', 'optimistic:applied', {
+@@ -291,7 +351,7 @@ export function useMessages(activeConversationId: string | null) {
+             type: messageType,
+           },
+           {
+-            clientMessageId: options?.clientMessageId,
++            clientMessageId,
+             attachmentIds: attachments?.map((attachment) => attachment.id),
+           }
+         );
+@@ -312,14 +372,28 @@ export function useMessages(activeConversationId: string | null) {
+           });
+         }
+ 
+-        // Replace optimistic with saved (drops the temp copy if realtime
+-        // already delivered the saved id)
+-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-          ['messages', activeConversationId],
+-          (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
+-        );
+-        keepMessageThroughInflightFetch(queryClient, activeConversationId, savedMessage);
+-        return savedMessage;
++        // The server stored (or replayed) the message of this key. Unless the
++        // feed already observed it (the pending copy is then resolved: its
++        // stored copy came by Realtime or a fetch, and that copy stays the
++        // feed's) or this client saw a Realtime DELETE for it (bounded
++        // registry; a deletion missed during a stream gap is not known here),
++        // merge it into the feed first, then drop the pending copy: the copy
++        // is hidden as soon as the feed holds the key, so neither step shows
++        // two bubbles or none.
++        const confirmed: Message = {
++          ...savedMessage,
++          clientMessageId: normalizeClientMessageId(savedMessage.clientMessageId) ?? clientMessageId,
++        };
++        const unresolved = isPendingMessage(queryClient.getQueryData<Message[]>(pendingKey), clientMessageId);
++        if (unresolved && !isMessageDeleted(queryClient, confirmed.id)) {
++          queryClient.setQueryData<MessagesInfiniteData | undefined>(
++            ['messages', conversationId],
++            (oldData) => appendMessageToPages(oldData, confirmed)
++          );
++          keepMessageThroughInflightFetch(queryClient, conversationId, confirmed);
++        }
++        updatePendingMessages(queryClient, pendingKey, clientMessageId);
++        return confirmed;
+       } catch (err) {
+         if (instrumentationEnabled) {
+           const duration = start ? getTimestamp() - start : 0;
+@@ -330,18 +404,9 @@ export function useMessages(activeConversationId: string | null) {
+             error: err instanceof Error ? err.message : err,
+           });
+         }
+-        // Remove the optimistic message on failure so UI does not show a failed temp message
+-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-          ['messages', activeConversationId],
+-          (oldData) => {
+-            if (!oldData || !oldData.pages) return oldData;
+-            const updatedPages = oldData.pages.map((page) => ({
+-              ...page,
+-              messages: page.messages.filter((m) => m.id !== optimisticMessage.id),
+-            }));
+-            return { ...oldData, pages: updatedPages };
+-          }
+-        );
++        // Remove the pending copy on failure so the UI does not show a failed
++        // temp message (the composer keeps the draft for a retry).
++        updatePendingMessages(queryClient, pendingKey, clientMessageId);
+         throw err;
+       }
+     },
+diff --git a/src/lib/messaging-api.ts b/src/lib/messaging-api.ts
+index 11dc7de..8c1f996 100644
+--- a/src/lib/messaging-api.ts
++++ b/src/lib/messaging-api.ts
+@@ -102,6 +102,18 @@ function normalizeConversation(raw: any): Conversation {
+   } as Conversation;
+ }
+ 
++/**
++ * Phase 5 T8: a create response's stored message, validated by the caller,
++ * in the feed's shape (Date timestamp, normalized reactions).
++ */
++export function toStoredMessage(raw: Record<string, unknown>): Message {
++  return {
++    ...(raw as unknown as Message),
++    timestamp: normalizeDate(raw.timestamp),
++    reactions: normalizeReactions(raw.reactions),
++  };
++}
++
+ /**
+  * API client for messaging system
+  */
+@@ -164,7 +176,13 @@ export const messagingApi = {
+         messageId: data.message?.id,
+         status: data.message?.status,
+       });
+-      return data.message;
++      // Same shape as feed messages (Date timestamps), since the sent
++      // message joins the feed cache when Realtime has not delivered it.
++      return {
++        ...data.message,
++        timestamp: normalizeDate(data.message?.timestamp),
++        reactions: normalizeReactions(data.message?.reactions),
++      };
+     } catch (error) {
+       const duration = getTimestamp() - start;
+       debugLogger.messaging.error(scope, 'fetch:error', {
+@@ -177,6 +195,51 @@ export const messagingApi = {
+     }
+   },
+ 
++  /**
++   * Phase 5 T8: one attempt of an outbox item (POST /api/messages/create
++   * with `attemptGeneration` and `expectedSenderId`, FR-006/FR-011). Resolves
++   * with the HTTP status, the error code of a refusal and, on 200/201, the
++   * response's `message` object exactly as received — unverified: the caller
++   * confirms the item only if it is that item's stored, renderable message
++   * (outbox-outcome isStoredMessageOf) and then normalizes it
++   * (toStoredMessage). Rejects only when no response arrived (network error),
++   * which the caller treats as an unknown outcome.
++   */
++  async createMessageAttempt(attempt: {
++    conversationId: string;
++    content: string;
++    replyToId: string | null;
++    clientMessageId: string;
++    attemptGeneration: number;
++    expectedSenderId: string;
++    mentionIds: readonly string[];
++  }): Promise<{ status: number; code?: string; message?: Record<string, unknown> }> {
++    const response = await fetch('/api/messages/create', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({
++        conversationId: attempt.conversationId,
++        content: attempt.content,
++        type: 'text',
++        ...(attempt.replyToId ? { replyToId: attempt.replyToId } : {}),
++        clientMessageId: attempt.clientMessageId,
++        attemptGeneration: attempt.attemptGeneration,
++        expectedSenderId: attempt.expectedSenderId,
++        // Unchanged on every attempt of the key (an empty set is not sent).
++        ...(attempt.mentionIds.length > 0 ? { mentionIds: [...attempt.mentionIds] } : {}),
++      }),
++    });
++    const data = (await response.json().catch(() => null)) as
++      | { code?: unknown; message?: Record<string, unknown> }
++      | null;
++    const code = typeof data?.code === 'string' ? data.code : undefined;
++    const message = data?.message;
++    if (!response.ok || typeof message !== 'object' || message === null || Array.isArray(message)) {
++      return { status: response.status, code };
++    }
++    return { status: response.status, message };
++  },
++
+   /**
+    * Get messages for a conversation with pagination
+    */
+diff --git a/src/lib/messaging/message-cache.ts b/src/lib/messaging/message-cache.ts
+index ed1c0f0..a50c5d3 100644
+--- a/src/lib/messaging/message-cache.ts
++++ b/src/lib/messaging/message-cache.ts
+@@ -18,53 +18,145 @@ export interface MessagesInfiniteData {
+   pageParams: unknown[];
+ }
+ 
+-const OPTIMISTIC_ID_PREFIX = 'temp-';
++/** Query key of the sender's pending (not yet confirmed) messages of a conversation. */
++export const pendingMessagesQueryKey = (userId: string, conversationId: string) =>
++  ['messages-pending', userId, conversationId] as const;
+ 
+-const getTimeMs = (value: Date | string): number => {
+-  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+-  return Number.isFinite(time) ? time : NaN;
++/** Prefix of a pending message's id (`temp-<clientMessageId>`); never a stored id. */
++export const PENDING_MESSAGE_ID_PREFIX = 'temp-';
++
++/** A composition key in canonical form (lowercase), or null when absent. */
++export const normalizeClientMessageId = (value: string | null | undefined): string | null =>
++  typeof value === 'string' && value.length > 0 ? value.toLowerCase() : null;
++
++const correlationKey = (message: Message): string | null => {
++  const key = normalizeClientMessageId(message.clientMessageId);
++  return key ? `${message.senderId}:${key}` : null;
+ };
+ 
+-export const isOptimisticMatch = (existing: Message, incoming: Message): boolean => {
+-  if (!existing.id.startsWith(OPTIMISTIC_ID_PREFIX)) {
+-    return false;
++/**
++ * Phase 5 FR-034: the pending messages still to show next to the stored feed.
++ * A pending message is matched to a stored one ONLY by its sender and
++ * `clientMessageId` (the server stores at most one message per sender,
++ * conversation and key): once the feed holds the stored message — from a
++ * Realtime INSERT, a feed fetch or the create response, in any order — the
++ * pending copy is hidden, so the message is one bubble. Content, timestamps
++ * and reply targets are never compared; a stored message without a key (an
++ * unkeyed or pre-Phase-4 create) matches nothing.
++ */
++export function visiblePendingMessages(stored: readonly Message[], pending: readonly Message[]): Message[] {
++  if (pending.length === 0) return [];
++  const storedKeys = new Set<string>();
++  for (const message of stored) {
++    const key = correlationKey(message);
++    if (key) storedKeys.add(key);
+   }
+-  if (existing.senderId !== incoming.senderId) {
+-    return false;
++  return pending.filter((message) => {
++    const key = correlationKey(message);
++    return key === null || !storedKeys.has(key);
++  });
++}
++
++type StoredMessageObserver = (conversationId: string, stored: readonly Message[]) => void;
++const storedMessageObservers = new WeakMap<QueryClient, Set<StoredMessageObserver>>();
++
++/**
++ * Phase 5 T8: calls `observer` with every batch of stored keyed messages
++ * that resolvePendingMessages sees (a Realtime INSERT, the rendered feed after
++ * a fetch), so the durable outbox confirms an item the first time its stored
++ * key is observed from any source. Returns the unsubscribe function.
++ */
++export function observeStoredMessages(queryClient: QueryClient, observer: StoredMessageObserver): () => void {
++  let observers = storedMessageObservers.get(queryClient);
++  if (!observers) {
++    observers = new Set();
++    storedMessageObservers.set(queryClient, observers);
+   }
+-  if (existing.content !== incoming.content) {
+-    return false;
++  observers.add(observer);
++  return () => {
++    storedMessageObservers.get(queryClient)?.delete(observer);
++  };
++}
++
++/**
++ * Phase 5 FR-034: retires the sender's pending messages of a conversation
++ * whose stored message has been observed (`stored`: a Realtime INSERT just
++ * merged, or the feed as rendered after a fetch). A pending message is
++ * resolved the first time its key is seen: it is removed from every pending
++ * list of that conversation, so it is not shown again as "sending" if the
++ * stored message later leaves the feed (for example a Realtime DELETE). Call
++ * it only after the stored message is in the feed cache, so no render shows
++ * neither copy.
++ */
++export function resolvePendingMessages(
++  queryClient: QueryClient,
++  conversationId: string,
++  stored: readonly Message[]
++): void {
++  const storedKeys = new Set<string>();
++  for (const message of stored) {
++    const key = correlationKey(message);
++    if (key) storedKeys.add(key);
+   }
++  if (storedKeys.size === 0) return;
++  // Phase 5 T8: the outbox confirms (and deletes) the items of these keys.
++  storedMessageObservers.get(queryClient)?.forEach((observer) => observer(conversationId, stored));
++  queryClient
++    .getQueriesData<Message[]>({ queryKey: ['messages-pending'] })
++    .forEach(([queryKey, pending]) => {
++      if (queryKey[2] !== conversationId || !pending?.length) return;
++      const remaining = pending.filter((message) => {
++        const key = correlationKey(message);
++        return key === null || !storedKeys.has(key);
++      });
++      if (remaining.length !== pending.length) {
++        queryClient.setQueryData<Message[]>(queryKey, remaining);
++      }
++    });
++}
+ 
+-  const existingTime = getTimeMs(existing.timestamp);
+-  const incomingTime = getTimeMs(incoming.timestamp);
++/** Whether `pending` still holds the pending message of `clientMessageId` (not yet resolved). */
++export function isPendingMessage(pending: readonly Message[] | undefined, clientMessageId: string): boolean {
++  return Boolean(pending?.some((message) => normalizeClientMessageId(message.clientMessageId) === clientMessageId));
++}
+ 
+-  return (
+-    Number.isFinite(existingTime) &&
+-    Number.isFinite(incomingTime) &&
+-    Math.abs(existingTime - incomingTime) <= 1000
+-  );
+-};
++// Ids of messages this client saw deleted through a Realtime DELETE event, per
++// query client, bounded to the last 1000 (the oldest are forgotten first).
++// Only three merges consult it: a create response (useMessages), a Realtime
++// INSERT (useMessageSubscription) and the re-merge after an in-flight fetch
++// (keepMessageThroughInflightFetch). It does not reconcile deletions this
++// client missed (e.g. during a Realtime stream gap), and fetched pages are
++// not filtered by it: a feed GET that read the row before it was deleted can
++// still return it. No product path deletes stored messages today; the only
++// deletion is a sender's own Data API delete under RLS (delete_own_messages).
++const MAX_REMEMBERED_DELETIONS = 1000;
++const deletedMessageIds = new WeakMap<QueryClient, Set<string>>();
++
++export function markMessageDeleted(queryClient: QueryClient, messageId: string): void {
++  let ids = deletedMessageIds.get(queryClient);
++  if (!ids) {
++    ids = new Set();
++    deletedMessageIds.set(queryClient, ids);
++  }
++  ids.delete(messageId);
++  ids.add(messageId);
++  if (ids.size > MAX_REMEMBERED_DELETIONS) {
++    const oldest = ids.values().next().value;
++    if (oldest !== undefined) ids.delete(oldest);
++  }
++}
+ 
+-const replaceAt = (
+-  oldData: MessagesInfiniteData,
+-  pageIndex: number,
+-  messageIndex: number,
+-  message: Message
+-): MessagesInfiniteData => {
+-  const pages = [...oldData.pages];
+-  const messages = [...pages[pageIndex].messages];
+-  messages[messageIndex] = message;
+-  pages[pageIndex] = { ...pages[pageIndex], messages };
+-  return { ...oldData, pages };
+-};
++export function isMessageDeleted(queryClient: QueryClient, messageId: string): boolean {
++  return deletedMessageIds.get(queryClient)?.has(messageId) ?? false;
++}
+ 
+ /**
+- * Merges an incoming message into the infinite-query cache:
++ * Merges a stored message (a Realtime INSERT, a create response) into the
++ * infinite-query cache:
+  * - id already present in ANY page → no-op (realtime echo / duplicate event);
+- * - a matching optimistic `temp-` message → replaced in place (attachments
+- *   from the optimistic copy survive, because realtime rows never carry them);
+  * - otherwise → appended to page 0, the newest window.
++ * Pending messages live outside this cache (pendingMessagesQueryKey) and are
++ * matched to stored ones by key only (visiblePendingMessages).
+  */
+ export function appendMessageToPages(
+   oldData: MessagesInfiniteData | undefined,
+@@ -80,69 +172,11 @@ export function appendMessageToPages(
+     }
+   }
+ 
+-  // An optimistic incoming message (the send path) must never swallow another
+-  // pending temp- message with identical content sent moments before.
+-  if (!message.id.startsWith(OPTIMISTIC_ID_PREFIX)) {
+-    for (let pageIndex = 0; pageIndex < oldData.pages.length; pageIndex++) {
+-      const messageIndex = oldData.pages[pageIndex].messages.findIndex((existing) =>
+-        isOptimisticMatch(existing, message)
+-      );
+-      if (messageIndex >= 0) {
+-        const optimistic = oldData.pages[pageIndex].messages[messageIndex];
+-        const merged: Message = {
+-          ...message,
+-          attachments: message.attachments?.length ? message.attachments : optimistic.attachments,
+-        };
+-        return replaceAt(oldData, pageIndex, messageIndex, merged);
+-      }
+-    }
+-  }
+-
+   const pages = [...oldData.pages];
+   pages[0] = { ...pages[0], messages: [...pages[0].messages, message] };
+   return { ...oldData, pages };
+ }
+ 
+-/** Replaces a message by id across all pages (optimistic → saved swap). */
+-export function replaceMessageInPages(
+-  oldData: MessagesInfiniteData | undefined,
+-  previousId: string,
+-  message: Message
+-): MessagesInfiniteData | undefined {
+-  if (!oldData || !oldData.pages) {
+-    return oldData;
+-  }
+-
+-  // If the saved id already landed via realtime, drop the optimistic copy
+-  // instead of swapping it in twice.
+-  const savedAlreadyPresent = oldData.pages.some((page) =>
+-    page.messages.some((existing) => existing.id === message.id)
+-  );
+-  if (savedAlreadyPresent) {
+-    return {
+-      ...oldData,
+-      pages: oldData.pages.map((page) => ({
+-        ...page,
+-        messages: page.messages.filter((existing) => existing.id !== previousId),
+-      })),
+-    };
+-  }
+-
+-  for (let pageIndex = 0; pageIndex < oldData.pages.length; pageIndex++) {
+-    const messageIndex = oldData.pages[pageIndex].messages.findIndex(
+-      (existing) => existing.id === previousId
+-    );
+-    if (messageIndex >= 0) {
+-      return replaceAt(oldData, pageIndex, messageIndex, message);
+-    }
+-  }
+-
+-  // Neither copy is cached: a refetch that read the server before the save
+-  // committed replaced the page and dropped the optimistic copy. The saved
+-  // message is persisted, so it belongs in the feed.
+-  return appendMessageToPages(oldData, message);
+-}
+-
+ const messagesQueryKey = (conversationId: string) => ['messages', conversationId] as const;
+ 
+ const isMessageCached = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
+@@ -175,7 +209,9 @@ export function isMessageInFeedCache(
+  * refetch. Once the in-flight fetch settles the message is merged again
+  * (a no-op when the result already has it). If the message leaves the cache
+  * while the fetch is still running (deleted, or a failed send rolled back),
+- * it is not brought back.
++ * it is not brought back, and neither is a message this client has seen
++ * deleted by a Realtime DELETE (isMessageDeleted) by the time the fetch
++ * settles.
+  */
+ export function keepMessageThroughInflightFetch(
+   queryClient: QueryClient,
+@@ -208,6 +244,9 @@ export function keepMessageThroughInflightFetch(
+       return;
+     }
+     unsubscribe();
++    if (isMessageDeleted(queryClient, message.id)) {
++      return;
++    }
+     queryClient.setQueryData<MessagesInfiniteData | undefined>(queryKey, (oldData) =>
+       oldData ? appendMessageToPages(oldData, message) : oldData
+     );
+diff --git a/src/types/messaging.ts b/src/types/messaging.ts
+index 55c8acf..fce19f0 100644
+--- a/src/types/messaging.ts
++++ b/src/types/messaging.ts
+@@ -52,8 +52,62 @@ export interface PendingAttachmentUpload {
+ export interface MessageWithAttachmentsCreateResult {
+   messageId: string;
+   created: boolean;
++  /**
++   * Phase 5 T2: on a replay (created: false), the original composition
++   * recorded when the message was created under its key; null when none was
++   * recorded (keyed messages created before Phase 5).
++   */
++  storedComposition?: MessageComposition | null;
+ }
+ 
++/**
++ * Phase 5 T2 (FR-024): the original submitted composition of a keyed create,
++ * normalized by the create route, which replays of the same key are compared
++ * against. `type` is null for attachment messages (their type derives from
++ * the attachments); `attachmentIds` is sorted. Phase 5 T4: `mentionIds` are
++ * the REQUESTED mention user ids (users.id; lowercase, distinct, sorted), not
++ * only the stored ones; a stored composition without them (created before T4)
++ * means none were requested, like an empty list.
++ */
++export interface MessageComposition {
++  content: string;
++  type: MessageType | null;
++  replyToId: string | null;
++  attachmentIds: string[];
++  mentionIds: string[];
++}
++
++/**
++ * Phase 5 T2 (FR-006): one dispatch of a keyed composition. `generation` is
++ * monotonic per (sender, conversation, clientMessageId); absent for Phase 4
++ * clients, whose keyed creates commit only while the key has no fence state.
++ */
++export interface MessageAttempt {
++  generation?: number;
++  composition: MessageComposition;
++}
++
++/**
++ * Phase 5 T3 (FR-008, D1): the sender's message insertion quota (at most
++ * `limit` stored messages per fixed `windowSeconds` window). The database
++ * charges it in the transaction of a winning insertion only; replays, lost
++ * same-key races and refused creates never consume it.
++ */
++export interface InsertionQuota {
++  limit: number;
++  windowSeconds: number;
++}
++
++/**
++ * Phase 5 T2: result of fencing/looking up the caller's own key. `superseded`
++ * means a newer generation exists (nothing was changed). `stored` with a null
++ * messageId: a message was committed under the key and deleted since.
++ */
++export type MessageAttemptFenceResult =
++  | { outcome: 'superseded' }
++  | { outcome: 'stored'; messageId: string | null }
++  | { outcome: 'not_stored' };
++
+ // Voice Note Attachment (extends FileAttachment with voice-specific metadata)
+ export interface VoiceNoteAttachment extends FileAttachment {
+   duration: number; // Duration in seconds
+@@ -121,6 +175,35 @@ export interface Message {
+   pins?: MessagePin[]; // Optional: user-specific pins for this message
+   stars?: MessageStar[]; // Optional: user-specific stars for this message
+   isEdited: boolean;
++  // Phase 5 FR-034: the sender's composition key (messages.client_message_id),
++  // absent on unkeyed messages. Carried by the create and fence responses,
++  // the feed (own messages only), Realtime INSERTs and pending messages; a
++  // pending message is matched to its stored message only by this key.
++  clientMessageId?: string;
++  // Phase 5 T4 (FR-024): users (users.id) this message mentions, stored with
++  // its first creation (members other than the sender at that time), sorted.
++  // Set on messages read by the repository (feed, create/fence responses).
++  mentionedUserIds?: string[];
++  // Phase 5 T8 (client only, never sent by the server): delivery state of the
++  // sender's outbox copy of a text message, shown as a text label.
++  deliveryState?: MessageDeliveryState;
++}
++
++/**
++ * Phase 5 T8: label state of a pending outbox copy — `pending` (waiting to
++ * be sent), `sending` (an attempt is or may be in progress), `failed`
++ * (definitively rejected), `expired` (not sent within 24 h, T9).
++ */
++export type MessageDeliveryState = 'pending' | 'sending' | 'failed' | 'expired';
++
++/**
++ * Phase 5 T4 (FR-023): a current member of a conversation
++ * (public.conversation_members), as listed to other current members.
++ */
++export interface ConversationMember {
++  userId: string; // users.id
++  displayName: string | null;
++  avatarUrl: string | null;
+ }
+ 
+ /**
+@@ -131,6 +214,8 @@ export interface Message {
+ export interface MessageCreateResult {
+   message: Message;
+   created: boolean;
++  /** Phase 5 T2: see MessageWithAttachmentsCreateResult.storedComposition. */
++  storedComposition?: MessageComposition | null;
+ }
+ 
+ /**

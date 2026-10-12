@@ -1,7 +1,9 @@
 // src/lib/messaging/desktop-notifications.ts
 // Phase 4 FR-023 / BR-010: desktop notifications for new messages from others
-// in direct and group conversations. Page-level Notifications API only (no
-// service worker): a notification can be shown while a tab of the app is open.
+// in direct and group conversations; Phase 5 FR-025 / BR-011 adds mentions
+// (rooms included) and browser-wide suppression. Page-level Notifications API
+// only (no service worker): a notification can be shown while a tab of the
+// app is open.
 
 import { ConversationType, MessageType, type Conversation, type Message } from '@/types/messaging';
 
@@ -121,12 +123,27 @@ export function subscribeDesktopNotificationStatus(listener: () => void): () => 
   };
 }
 
-export type IncomingMessageDecision = 'notify' | 'viewing' | 'skip';
+/**
+ * - notify: a direct/group message from someone else (every new one);
+ * - mention-only: a room message that may mention the user — announced only
+ *   if the server lists the user among its mentions (Phase 5 FR-025);
+ * - viewing: this tab shows that conversation right now;
+ * - skip: never announced.
+ */
+export type IncomingMessageDecision = 'notify' | 'mention-only' | 'viewing' | 'skip';
 
 /**
- * BR-010: others' messages in direct/group conversations notify when the tab
- * is hidden or the drawer is not open on that conversation. "Tab hidden" is
- * the foreground-tab definition used by read receipts (TRACK T6):
+ * A mention is written "@<name>" by the composer (Phase 5 T17), so a room
+ * message without "@" mentions nobody and needs no server read. Live INSERTs
+ * carry no mentions (TRACK T4); the server's list decides for the others.
+ */
+const mayMention = (message: Message): boolean => message.content.includes('@');
+
+/**
+ * Phase 4 BR-010 / Phase 5 BR-011: others' messages in direct/group
+ * conversations, and room messages that mention the user, notify when the
+ * tab is hidden or the drawer is not open on that conversation. "Tab hidden"
+ * is the foreground-tab definition used by read receipts (TRACK T6):
  * `document.visibilityState`, not window focus.
  */
 export function decideIncomingMessage(input: {
@@ -140,11 +157,81 @@ export function decideIncomingMessage(input: {
   // users.id comparison (the realtime row's sender_id is the application id).
   if (message.senderId === currentUserId) return 'skip';
   if (message.type === MessageType.SYSTEM) return 'skip';
-  if (conversation.type !== ConversationType.DIRECT && conversation.type !== ConversationType.GROUP) {
-    return 'skip';
-  }
+  const directOrGroup = conversation.type === ConversationType.DIRECT || conversation.type === ConversationType.GROUP;
+  if (!directOrGroup && !(conversation.type === ConversationType.ROOM && mayMention(message))) return 'skip';
   if (tabVisible && viewedConversationId === conversation.id) return 'viewing';
-  return 'notify';
+  return directOrGroup ? 'notify' : 'mention-only';
+}
+
+/**
+ * Phase 5 FR-025 (browser-wide suppression): each tab of the user records in
+ * localStorage, under its own key, the conversation it shows while it is
+ * visible; a tab about to announce a message first reads every other tab's
+ * record, synchronously. So no tab announces a conversation another visible
+ * tab of the same user is viewing, whichever tab received the message first.
+ * A visible tab refreshes its record (VIEW_HEARTBEAT_MS); a record older than
+ * VIEW_TTL_MS (a tab that crashed or froze without hiding) no longer counts.
+ */
+const VIEW_KEY_PREFIX = 'vo:messaging:notification-view:';
+export const VIEW_HEARTBEAT_MS = 10_000;
+const VIEW_TTL_MS = 30_000;
+
+const viewKeyPrefix = (userId: string) => `${VIEW_KEY_PREFIX}${userId}:`;
+
+interface ConversationViewRecord {
+  conversationId: string;
+  at: number;
+}
+
+function parseViewRecord(raw: string | null): ConversationViewRecord | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const { conversationId, at } = parsed as Record<string, unknown>;
+    return typeof conversationId === 'string' && typeof at === 'number' ? { conversationId, at } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Records (or, with null, removes) the conversation this visible tab shows. */
+export function publishConversationView(userId: string, tabId: string, conversationId: string | null): void {
+  try {
+    const key = `${viewKeyPrefix(userId)}${tabId}`;
+    if (conversationId) {
+      window.localStorage.setItem(key, JSON.stringify({ conversationId, at: Date.now() }));
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage unavailable: other tabs cannot see this one (best effort).
+  }
+}
+
+/** Whether another visible tab of the user shows `conversationId` now. Removes expired records. */
+export function isConversationViewedElsewhere(userId: string, tabId: string, conversationId: string): boolean {
+  try {
+    const prefix = viewKeyPrefix(userId);
+    const own = `${prefix}${tabId}`;
+    const now = Date.now();
+    const expired: string[] = [];
+    let viewed = false;
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key || !key.startsWith(prefix) || key === own) continue;
+      const record = parseViewRecord(window.localStorage.getItem(key));
+      if (!record || now - record.at >= VIEW_TTL_MS) {
+        expired.push(key);
+      } else if (record.conversationId === conversationId) {
+        viewed = true;
+      }
+    }
+    expired.forEach((key) => window.localStorage.removeItem(key));
+    return viewed;
+  } catch {
+    return false;
+  }
 }
 
 const tabClaims = new Set<string>();
@@ -159,9 +246,9 @@ function rememberTabClaim(messageId: string): boolean {
   return true;
 }
 
-function claimAcrossTabs(messageId: string): boolean {
+/** Live cross-tab claims (expired ones dropped), or null without shared storage. */
+function readCrossTabClaims(now: number): Record<string, number> | null {
   try {
-    const now = Date.now();
     const raw = window.localStorage.getItem(NOTIFIED_STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const claims: Record<string, number> = {};
@@ -170,33 +257,59 @@ function claimAcrossTabs(messageId: string): boolean {
         if (typeof at === 'number' && now - at < NOTIFIED_TTL_MS) claims[id] = at;
       }
     }
-    if (claims[messageId] !== undefined) return false;
-    claims[messageId] = now;
-    window.localStorage.setItem(NOTIFIED_STORAGE_KEY, JSON.stringify(claims));
-    return true;
+    return claims;
   } catch {
-    // No shared storage: this tab alone decides.
-    return true;
+    return null;
   }
+}
+
+function claimAcrossTabs(messageId: string): boolean {
+  const now = Date.now();
+  const claims = readCrossTabClaims(now);
+  // No shared storage: this tab alone decides.
+  if (!claims) return true;
+  if (claims[messageId] !== undefined) return false;
+  claims[messageId] = now;
+  try {
+    window.localStorage.setItem(NOTIFIED_STORAGE_KEY, JSON.stringify(claims));
+  } catch {
+    // Storage became unavailable: this tab alone decides.
+  }
+  return true;
+}
+
+/**
+ * Not yet claimed by another tab, `confirm` (if any) still holds, then
+ * claimed. A `confirm` that fails leaves the message unclaimed for the
+ * browser's other tabs (final review r2 #1).
+ */
+async function confirmAndClaim(messageId: string, confirm?: () => Promise<boolean>): Promise<boolean> {
+  const claims = readCrossTabClaims(Date.now());
+  if (claims && claims[messageId] !== undefined) return false;
+  if (confirm && !(await confirm())) return false;
+  return claimAcrossTabs(messageId);
 }
 
 /**
  * Claims a message so it is announced (or knowingly left unannounced) once:
  * once per tab, and once across this browser's tabs of the app. The
- * cross-tab check-and-set runs under a Web Lock, which makes it atomic
- * between tabs; without Web Locks it is best effort.
+ * cross-tab check, `confirm` and set run under one Web Lock, which makes them
+ * atomic between tabs; without Web Locks it is best effort.
  */
-export async function claimMessageNotification(messageId: string): Promise<boolean> {
+export async function claimMessageNotification(
+  messageId: string,
+  confirm?: () => Promise<boolean>
+): Promise<boolean> {
   if (!rememberTabClaim(messageId)) return false;
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
   if (locks?.request) {
     try {
-      return await locks.request(NOTIFIED_LOCK_NAME, () => claimAcrossTabs(messageId));
+      return await locks.request(NOTIFIED_LOCK_NAME, () => confirmAndClaim(messageId, confirm));
     } catch {
-      return claimAcrossTabs(messageId);
+      return confirmAndClaim(messageId, confirm);
     }
   }
-  return claimAcrossTabs(messageId);
+  return confirmAndClaim(messageId, confirm);
 }
 
 /** Notification body: the text preview, or what kind of content was sent. */
@@ -215,6 +328,23 @@ export function notificationTitle(conversation: Conversation, senderName: string
     return `${senderName} em ${conversation.name?.trim() || 'grupo'}`;
   }
   return senderName;
+}
+
+function mentionPlace(conversation: Conversation): string {
+  const name = conversation.name?.trim();
+  if (conversation.type === ConversationType.ROOM) return name || 'uma sala';
+  if (conversation.type === ConversationType.GROUP) return name || 'um grupo';
+  return 'uma conversa direta';
+}
+
+/** Phase 5 FR-025: "<Autor> mencionou você em <conversa>". */
+export function mentionNotificationTitle(conversation: Conversation, senderName: string): string {
+  return `${senderName} mencionou você em ${mentionPlace(conversation)}`;
+}
+
+/** Phase 5 FR-025: a mention shows the message's full text (no preview cut). */
+export function mentionNotificationBody(message: Message, attachmentKind: 'voice' | 'file' | null): string {
+  return message.content.trim() || notificationBody(message, attachmentKind);
 }
 
 /** One notification per conversation on screen: a newer one replaces it. */

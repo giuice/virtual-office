@@ -1,0 +1,32 @@
+ADVERSARIAL BLOCK REVIEW — block A (tasks T8, T27, T10, T9, T11, T12) of spec-interview/phase-5-messaging-resilience in E:/projects/virtual-office.
+Read-only. Never access an online/hosted database or service. Read-only queries against LOCAL Supabase are allowed (npx supabase db query --local). Do NOT start Playwright, a dev server, or any long-running process; reason from code, the SPEC, and TRACK.
+
+Contract: SPEC.md (approved Final v4) and state.md decisions D1–D11 in that folder. Owner decision D11 governs this review (AGENTS.md "Adversarial review gate"): this is the single review for the whole block; tasks were not reviewed one by one. Rank each finding and state how it is triggered:
+- High/Medium only when a real user or a realistic failure (network loss/latency, browser/tab close, crash, sleep/freeze, several tabs, concurrency, clock skew) can trigger it.
+- A finding that needs the application's own server to be broken or tampered with (malformed responses from our own routes, a compromised server) is a follow-up, not High/Medium — label it "server-tamper follow-up".
+- Low for the rest. Do not pad: no style nits, no speculative refactors.
+
+Scope (what block A added — the client durable outbox):
+- Untracked, read directly: src/lib/messaging/outbox/{message-outbox.ts,outbox-db.ts,outbox-outcome.ts,outbox-ack.ts,outbox-view.ts,outbox-identity.ts,outbox-sign-out.ts}, src/types/message-outbox.ts, src/hooks/useMessageOutbox.ts.
+- Tracked edits (in reviews/blockA-tracked-cumulative.diff, which also carries earlier T1–T7/T24/T25/T28 server work already reviewed — focus on block A's client parts): src/lib/messaging-api.ts (createMessageAttempt, fenceMessageAttempt, AbortSignal), src/lib/messaging/message-cache.ts (observeStoredMessages), src/types/messaging.ts (deliveryState, cancellable), src/contexts/messaging/{types.ts,MessagingContext.tsx}, src/components/messaging/{message-feed.tsx,message-composer.tsx,message-item.tsx,ChatWindow.tsx}, src/hooks/useMessages.ts, src/components/shell/enhanced-user-menu.tsx.
+- Server contract the client relies on (reviewed earlier; read as needed): src/app/api/messages/create/route.ts, src/app/api/messages/fence/route.ts, src/lib/messaging/message-attempts.ts, src/repositories/implementations/supabase/message-attempt-rpc.ts.
+- E2E specs (read to judge whether they prove what they claim): __tests__/api/playwright/messaging-phase5/{durable-outbox,unknown-outcome-fence,cross-tab-outbox,definitive-failures-expiry,identity-fencing,sign-out-unsent,client-correlation}.spec.ts and helpers/messaging-outbox-e2e.ts.
+
+What each task claims: read TRACK.md entries "## T8", "## T27", "## T10", "## T9", "## T11", "## T12" (State delta, Deviation, Discovered). Verify the claims against the code; flag any claim or code comment that is false.
+
+Attack at least these (each was carried to this review by a task):
+1. Exactly-once and order per conversation across tabs: lock steal when a lease ended (T10) — can a robbed tab that resumes before learning of the steal take over a live claim, double-send, reorder, or stall an item indefinitely? Claim generation fencing + releaseUnsentClaim lowering the generation back (T11) — any path where a lower generation is sent after a higher one, or a claim restored over a newer one?
+2. Unknown outcomes: fence-first rules (T27/T9) incl. gen-0/waiting items past 24 h, 403 never "not stored", the item resolved by A's own feed/Realtime before its fence (T9), a copy kept as "delivered elsewhere" whose stored message was then deleted (T10).
+3. 409 key reuse rekey (T9): can the rekey lose content, duplicate, or reorder; can another tab still hold the old key; rekeyed copy id changes.
+4. Shared 429/401 backoff via retryNotBefore (T9) under clock jumps and multiple tabs.
+5. Cancel (T10): only waiting gen-0; atomic vs a claim in another tab; any path where a cancelled item is still sent.
+6. Identity (T11): owner check uses users.supabase_uid vs session.user.id; every dispatch/fence/response path covered; resume after the same user signs in; another user never sees, sends or deletes A's items; stale tab whose cookies were swapped to another user; 'unverified' state handling.
+7. Sign-out (T12): stop-first ordering vs the Presence logout; enqueue-vs-purge race (a send committed right after the delete); a tab that misses the stop broadcast; 3 s bounds and their fallbacks; dialog text/focus/Esc; N=1 singular wording deviation.
+8. IndexedDB: relaxed durability on claim/delete (T8), versionchange/close, quota/write failure (D5 alert), schema of stored items, owner isolation by users.id.
+9. Rendering: pending copies vs stored messages — duplicates, vanishing bubbles, reply/reaction actions on temp copies, per-conversation isolation.
+10. Test validity: any spec whose assertion would still pass with the behavior broken; tests that use request shaping beyond SPEC §15 (T11 401 test forwarding without the cookie; AC-047 cookie swap; CDP Debugger.pause hung tab) — are they realistic enough to prove the clause?
+
+Output (markdown):
+- Verdict: approve | revision required (revision required only for High/Medium that a real user or realistic failure can trigger).
+- Findings, most severe first. For each: severity; trigger (real user | realistic failure | server-tamper follow-up); file:line; concrete failure scenario (inputs/state → wrong outcome); smallest fix; which test should prove the fix.
+- A short list of claims you verified true (one line each) and any false claims.

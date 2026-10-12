@@ -1,0 +1,45 @@
+diff --git a/__tests__/presence-db/phase6-realtime.test.ts b/__tests__/presence-db/phase6-realtime.test.ts
+index a6ff699..5fb6832 100644
+--- a/__tests__/presence-db/phase6-realtime.test.ts
++++ b/__tests__/presence-db/phase6-realtime.test.ts
+@@ -45,6 +45,17 @@ describe("presence-db Phase 6 private company Realtime", () => {
+       policies.map(({ policyname, cmd }) => ({ policyname, cmd })),
+     ).toEqual([
+       { policyname: "phase4_knock_broadcast_receive", cmd: "SELECT" },
++      // Messaging Phase 5 T5: members-only typing topic, broadcast only,
++      // 'conversation:<uuid>:typing' (contract asserted in
++      // __tests__/messaging-db/conversation-typing-topic.test.ts).
++      {
++        policyname: "phase5_conversation_typing_broadcast_receive",
++        cmd: "SELECT",
++      },
++      {
++        policyname: "phase5_conversation_typing_broadcast_send",
++        cmd: "INSERT",
++      },
+       {
+         policyname: "phase6_company_presence_channel_broadcast_receive",
+         cmd: "SELECT",
+@@ -71,6 +82,22 @@ describe("presence-db Phase 6 private company Realtime", () => {
+       expect(expression).toContain("current_presence_company_id");
+       expect(expression).toContain("is_presence_auth_session_unfenced");
+     }
++    // The messaging typing policies never grant the presence extension, apply
++    // the same session fence, and only authorize the joined
++    // 'conversation:<uuid>:typing' topic.
++    for (const policy of policies.filter(({ policyname }) =>
++      policyname.startsWith("phase5_"),
++    )) {
++      expect(policy.roles).toEqual(["authenticated"]);
++      const expression = `${policy.qual ?? ""} ${policy.with_check ?? ""}`;
++      expect(expression).toContain("extension = 'broadcast'");
++      expect(expression).not.toContain("'presence'");
++      expect(expression).toContain("realtime.topic()");
++      expect(expression).toContain(
++        "private.can_use_conversation_typing_topic(topic)",
++      );
++      expect(expression).toContain("is_presence_auth_session_unfenced");
++    }
+ 
+     const mediaPolicyExtensions = new Map([
+       ["phase8_media_broadcast_receive", "broadcast"],

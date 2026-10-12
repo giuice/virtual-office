@@ -1,0 +1,19 @@
+ADVERSARIAL REVIEW of task T1 of work item spec-interview/phase-5-messaging-resilience in E:/projects/virtual-office. Read-only: do not modify files. Do not touch any online database.
+
+The diff consists of two NEW untracked files (read them fully):
+- supabase/migrations/20261007031057_read_state_membership_guard_and_unread_counts_acl.sql
+- __tests__/messaging-db/read-state-membership-acl.test.ts
+
+Task contract (PLAN.md T1; SPEC.md FR-029, FR-030, AC-030, AC-031, §10, BR-014):
+- mark_conversation_read refuses (no read-state or receipt change) when the user is not a member, for every role that can execute it; get_unread_counts not executable by anon; authenticated members keep correct counts; existing callers unchanged; rollback SQL recorded; backward compatible with the hosted pre-Phase-4 build and the Phase 4 build (SPEC §10).
+
+Performer claims to verify independently (do not trust them):
+1. The old mark_conversation_read UPSERTED conversation_members, so calling it for a non-member enrolled them; the new body only UPDATEs and raises 42501 when no row exists. No caller in src/ depends on the auto-enroll: PATCH /api/conversations/read runs requireConversationParticipant (conversation_members check) first — verify in src/app/api/conversations/read/route.ts and src/lib/auth/authorize.ts, AND verify the same holds for the hosted pre-Phase-4 build: inspect git history (e.g. `git log --oneline -- src/app/api/conversations/read src/lib/auth/authorize.ts`, `git show <ref>:path`) for any older version that authorized via conversations.participants instead of conversation_members — if an older still-deployed build could call it for a user who is in participants but has no conversation_members row (e.g. room joiners, DMs created before conversation_members backfill), that is a regression; check how rooms are joined and how conversation_members rows are created (join route, conversation creation, triggers) to see whether participants without member rows can exist in production data.
+2. get_unread_counts body unchanged; only ACL changed; the authenticated browser/server path (SupabaseConversationRepository.findByUser) still works; anon now denied. Check whether any code path calls get_unread_counts with the anon role or an unauthenticated client (e.g. SSR before session, public pages), in current code and in the hosted/Phase 4 builds.
+3. The rollback SQL in the header restores the exact previous state; the migration is transactional and re-runnable.
+4. Tests are real integration tests (no mocks), would fail before the migration, and assert AC-030 "every role that can execute it" and AC-031 fully. Look for weak or tautological assertions.
+5. search_path='' with schema-qualified references is complete (no unqualified reference left, e.g. operators, types, now()).
+
+Repository traps: users.id (app UUID, FKs) vs users.supabase_uid (= auth.uid()::text); messages link to rooms via conversations.room_id; roles admin|member.
+
+Output (markdown): Verdict approve | revision required; findings ranked High/Medium/Low with file:line evidence and smallest fix; list of claims you verified true.

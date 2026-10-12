@@ -1,0 +1,24 @@
+**Verdict: revision required. Two Medium findings remain.**
+
+- **Medium — A missed deletion is undone by the held create response.** [useMessages.ts:383](E:/projects/virtual-office/src/hooks/useMessages.ts:383). Drop the messages stream before creation; hold the committed 201; delete the row from another authorized session; recover and finish both tabs’ catch-up fetches, which correctly omit it; then release the 201. The originating tab still has an unresolved pending entry and no tombstone, so it inserts the deleted row. The other tab remains empty. **The stated residual risk is a reachable deletion defect:** an authoritative recovery is overwritten by an older response. **Smallest fix:** after a stream gap, reconcile a late success with a fresh authoritative lookup/refetch before inserting it; retire a delivered-but-deleted item without rendering the response snapshot. Add this ordering to the deletion regression.
+
+- **Medium — A stale feed fetch can undo an observed DELETE.** [useMessages.ts:104](E:/projects/virtual-office/src/hooks/useMessages.ts:104), [message-cache.ts:215](E:/projects/virtual-office/src/lib/messaging/message-cache.ts:215). Hold a feed GET containing the stored message, deliver DELETE to both tabs, then release that GET. The query returns its rows unchanged, and TanStack replaces the cached pages with them. The tombstone check protects subsequent helper merges, but does not remove deleted IDs from fetched results. Thus the bubble returns even though DELETE was observed. **Smallest fix:** enforce tombstones at the final fetched-page merge/read boundary, including multi-page fetches. Add a held-GET/DELETE regression. Protect tombstones needed by outstanding operations from cap eviction, or require fresh reconciliation after eviction.
+
+- **Low — Test 5 does not replace the older-page append-deduplication case.** [client-correlation.spec.ts:763](E:/projects/virtual-office/__tests__/api/playwright/messaging-phase5/client-correlation.spec.ts:763). It verifies a refetch of loaded pages with shifted boundaries. The older keyed ID never passes through `appendMessageToPages` again; only new filler IDs do. Removing the helper’s older-page duplicate check would leave this test green. **Smallest fix:** redeliver a captured real INSERT after its row is loaded in an older page, assert one bubble, and demonstrate failure when cross-page append deduplication is broken.
+
+| r1 finding | r2 disposition |
+|---|---|
+| Medium: deleted stored message returns as pending | **Fixed for the original ordering.** Test 4 and both broken variants corroborate retirement and held-response protection. Broader deletion protection remains incomplete above. |
+| Low: ChatWindow loses optimistic sends | **Fixed by inspection.** It consumes the merged reader and shares the keyset query shape. Browser behavior remains unverified. |
+| Low: older-page deduplication coverage missing | **Partially addressed.** Refetch coverage is valid; duplicate append coverage remains missing. |
+
+The remaining attacks produced these conclusions:
+
+- **HTTP failure after observation:** the hook still throws, and the composer retains its draft and key. An unchanged retry gets the original row through replay 200 and deduplicates by ID. This is existing Phase 4 behavior, rather than a new r2 regression. T8/T27 must retain delivery and attempt state separately; absence from the pending query cannot serve as the delivery record.
+- **Identity and effects:** correlation includes sender identity, normalization, and conversation scope. Another sender’s reused key cannot resolve the item. The fetch effect reads current pending lists and converges without a render loop. The pre-existing shared feed/account-cache issue remains outside this fix.
+- **Registry:** per-QueryClient WeakMap isolation and globally unique message IDs avoid conversation collisions. The 1,000-ID cap can nevertheless forget a deletion while an unresolved send remains outstanding; the protection is bounded, not permanent.
+- **Seeding:** the keyed target uses real creation; SQL inserts only unkeyed filler rows into the fixture conversation, whose cleanup cascades to those rows. This is valid pagination setup, but proves neither create-path quota behavior nor the missing duplicate-append case.
+
+Verified the saved diff matches the working tree. Retained records confirm three consecutive **10/10** runs, zero retries/flaky/skipped tests, and the annotated ordering. Regression evidence is **101/102**, followed by **24/24** for the affected spec. The sole failure points to fixture teardown’s seed-route DELETE, supporting a teardown classification without establishing ECONNRESET’s root cause.
+
+Fresh typecheck and diff check passed; focused ESLint reported **0 errors, 23 warnings**. These additional races are static findings, not newly reproduced browser failures. No files changed, database accessed, Playwright started, or dev server launched.

@@ -21,6 +21,8 @@
     "test:api:ci": "playwright test --project=messaging-drawer --repeat-each=3",
     "test:messaging:local:e2e": "playwright test -c playwright.messaging-local.config.ts --project=messaging-drawer",
     "test:messaging:db": "vitest run --config vitest.messaging-db.config.mts",
+    "test:messaging:phase5:e2e": "playwright test -c playwright.messaging-phase5.config.ts --project=phase5-chrome --project=phase5-edge",
+    "test:messaging:phase5:regression:e2e": "playwright test -c playwright.messaging-phase5.config.ts --project=regression-chrome --project=regression-edge",
     "test:messaging:voice:cross-browser": "playwright test -c playwright.messaging-cross-browser.config.ts",
     "test:all": "node run-tests.js",
     "db:local:start": "supabase start",

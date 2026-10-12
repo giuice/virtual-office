@@ -83,3 +83,4 @@ bmad-bak/
 /memory-bank
 _bmad/
 memory-bank-deprecated-docs/
+/.playwright-server-logs/

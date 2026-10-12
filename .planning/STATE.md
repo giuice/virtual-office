@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 05
-current_phase_name: messaging-resilience
+current_phase: 06
+current_phase_name: meeting-notes
 status: reference_only
-stopped_at: Phase 4 owner accepted (spec-to-done REPORT COMPLETED); Phase 5 needs a SPEC
-last_updated: "2026-10-06T00:00:00Z"
-last_activity: 2026-10-06
+stopped_at: Phase 5 owner accepted (spec-to-done REPORT COMPLETED); next spec per owner is a design/usability refresh
+last_updated: "2026-10-12T00:00:00Z"
+last_activity: 2026-10-12
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 26
   completed_plans: 26
 ---
@@ -24,18 +24,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-03)
 
 **Core value:** When a user logs in, they instantly see where colleagues are, what's happening in each room, and can walk into any space to talk -- the end-to-end spatial office loop must work flawlessly.
-**Next product area:** Phase 05 — Messaging Resilience, as input for a new spec-to-done SPEC; no contract is approved yet. Phase 04 is complete (owner accepted 2026-10-06; record in `spec-interview/phase-4-messaging-timeline/`).
+**Next product area:** the owner has said the next spec is a design and usability refresh of the current app (appearance and usability); Phase 06 — Meeting Notes is next in roadmap order. No contract is approved yet. Phase 05 is complete (owner accepted 2026-10-12; record in `spec-interview/phase-5-messaging-resilience/`).
 
 ## Current Position
 
-Next reference phase: 05 (messaging-resilience) — NEEDS SPEC
+Next reference work: design/usability refresh (owner, 2026-10-11) or Phase 06 (meeting-notes) — NEEDS SPEC
+Phase 05 (messaging-resilience): COMPLETE — owner final test accepted 2026-10-12; SPEC/PLAN/TRACK/REPORT in `spec-interview/phase-5-messaging-resilience/`. 7 migrations applied online to `vhabpcoyypobgasacsko` (2026-10-10); app deployment follows the owner's merge to staging and main (order: migrations → app; rollback app first).
 Phase 04 (messaging-timeline): COMPLETE — owner UAT accepted 2026-10-06; SPEC/PLAN/TRACK/REPORT in `spec-interview/phase-4-messaging-timeline/`. 6 migrations applied online to `vhabpcoyypobgasacsko` (2026-10-05); new app NOT yet deployed (order: migrations → app; rollback app first).
 
 Phase 03 is closed for routing by the owner's 2026-10-03 completion confirmation, 15/15 execution summaries, and subsequent recorded corrections. Old UAT failures and manual handoff instructions describe earlier snapshots; they do not instruct a new session to rerun completed waves.
 
 ### Next action
 
-Start spec-to-done Specify for Phase 05 (Messaging Resilience) under a new spec-interview/<slug>/. Start from Phase 04's delivered state: DM/group desktop notifications, failed-send preservation with single-message retry, and Realtime reconnect catch-up already exist; the Phase 04 REPORT lists follow-ups (two need migrations). Owner deploy of the Phase 04 app is still pending. Require a user-confirmed Ready SPEC before planning or implementation.
+Start spec-to-done Specify for the next work under a new spec-interview/<slug>/ (owner: design and usability refresh). The Phase 05 REPORT lists messaging follow-ups. Require a user-confirmed Ready SPEC before planning or implementation.
 
 ### Current planning inventory
 
@@ -46,9 +47,9 @@ Start spec-to-done Specify for Phase 05 (Messaging Resilience) under a new spec-
 | 02.1 — Presence Reload Fixes | 1 | 1 | Complete |
 | 03 — Spatial Audio and Screen Sharing | 15 | 15 | Complete — owner accepted |
 | 04 — Messaging Timeline | spec-to-done (T1–T32) | REPORT | Complete — owner accepted 2026-10-06 |
-| 05 — Messaging Resilience | 0 | 0 | Next — needs SPEC |
+| 05 — Messaging Resilience | spec-to-done (T1–T28) | REPORT | Complete — owner accepted 2026-10-12 |
 
-There are 8 roadmap phases, including 02.1; 5 are complete. All 26 existing execution plans have summaries. Future plan counts and durations are not estimated from old placeholders. Historical per-plan timing remains in the phase summaries.
+There are 8 roadmap phases, including 02.1; 6 are complete. All 26 existing execution plans have summaries. Future plan counts and durations are not estimated from old placeholders. Historical per-plan timing remains in the phase summaries.
 
 ## Accumulated Context
 

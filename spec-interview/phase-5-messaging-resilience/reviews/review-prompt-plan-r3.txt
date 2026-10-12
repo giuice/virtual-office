@@ -1,0 +1,12 @@
+You are performing an ADVERSARIAL RE-REVIEW of an execution PLAN (not code) in the repository at E:/projects/virtual-office. Read-only: do not modify any file.
+
+Artifacts:
+- Contract (read-only, approved): spec-interview/phase-5-messaging-resilience/SPEC.md (Final v4).
+- Under review: spec-interview/phase-5-messaging-resilience/PLAN.md (version 3; execution order is file order).
+- Previous version: reviews/PLAN-v2-reviewed.md; your review of it: reviews/sol-review-plan-r2.md (partials R1, R8, R12; new N1–N4).
+- Owner decisions: state.md (D1–D7). Repository rules: AGENTS.md.
+
+Do two things:
+1. For R1, R8, R12 and N1–N4 from r2, state resolved / partial / unresolved with evidence from PLAN v3.
+2. Attack only the v3 changes for new problems: the generation-less commit-time exclusion definition of "fence state" (does it preserve Phase 4 retry/replay, and does it stop every late insert of an outbox item?), the Phoenix-frame shaping boundary vs SPEC §15 (does it amount to mocking the application, or is it network shaping of a single stream?), the T27 transition wording vs FR-005/FR-009/BR-006/BR-007, the T25 matrix checkability, and the T19 latency check.
+Output (markdown): Verdict approve | revision required; disposition table; new findings ranked High/Medium/Low with PLAN location, evidence, smallest fix. Approve if only Low findings remain. Be concrete.

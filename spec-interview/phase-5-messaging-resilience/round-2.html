@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<!--
+  TEMPLATE - Spec interview round (HTML fallback path).
+
+  Runtime use:
+  1. Copy this file to spec-interview/<slug>/round-N.html.
+  2. Set round and topic in collect().
+  3. Replace QUESTIONS with the round's real questions.
+     - multi: false renders radio buttons; multi: true renders checkboxes.
+     - Options are [key, label, recommended(bool), short-reason].
+     - Mark exactly one recommended option unless none is sensible.
+     - Every question automatically gets an Other / note textarea.
+  4. Keep copy/download logic intact. It emits
+     { "round": N, "topic": "...", "answers": [{"id":"...","selected":[],"note":""}] }.
+
+  The examples demonstrate both radio and checkbox questions. Replace them.
+  This file is self-contained and works without a network connection.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fase 5 — Rodada 2</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --card-2:#1f232c; --border:#2b303b;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#6ea8fe; --accent-soft:#2a3b57; --ok:#3ddc97; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; }
+  .wrap { max-width:820px; margin:0 auto; padding:32px 20px 120px; }
+  header h1 { font-size:1.5rem; margin:0 0 6px; }
+  header p { color:var(--muted); margin:0 0 8px; }
+  .hint { background:var(--accent-soft); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; font-size:.92rem; margin:18px 0 28px; }
+  fieldset { border:1px solid var(--border); border-radius:12px; background:var(--card);
+    margin:0 0 20px; padding:18px 20px; }
+  legend { font-weight:600; padding:0 8px; font-size:1.02rem; }
+  .domain { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); margin:-4px 0 12px; }
+  .opt { display:flex; gap:10px; align-items:flex-start; padding:9px 11px;
+    border:1px solid transparent; border-radius:8px; cursor:pointer; transition:background .12s,border-color .12s; }
+  .opt:hover { background:var(--card-2); }
+  .opt:focus-within { border-color:var(--accent); outline:2px solid var(--accent); outline-offset:1px; }
+  .opt input { margin-top:4px; accent-color:var(--accent); width:16px; height:16px; flex:none; }
+  .rec { color:var(--ok); font-size:.78rem; font-weight:600; margin-left:6px; }
+  .reason { color:var(--muted); }
+  textarea { width:100%; margin-top:12px; background:var(--card-2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font:inherit; resize:vertical; min-height:44px; }
+  textarea:focus, button:focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .note-label { font-size:.8rem; color:var(--muted); display:block; margin-top:12px; }
+  .bar { position:fixed; bottom:0; left:0; right:0; background:rgba(15,17,21,.92);
+    backdrop-filter:blur(6px); border-top:1px solid var(--border); padding:14px 20px;
+    display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; cursor:pointer; border-radius:9px; padding:11px 20px; border:1px solid var(--border); }
+  .primary { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  .primary:hover { filter:brightness(1.08); }
+  .ghost { background:transparent; color:var(--text); }
+  .ghost:hover { background:var(--card-2); }
+  #status { color:var(--ok); font-size:.9rem; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fase 5 · Resiliência do chat — Rodada 2</h1>
+    <p>13 perguntas. Clique nas opções; use o campo de nota para ajustar ou escrever sua própria resposta.</p>
+  </header>
+  <div class="hint">
+    Pick the option that fits best. <strong>Every question has a free-text field</strong>: use it to write your own answer, adjust the selected option, or explain. When done, click <strong>Copy answers</strong> and paste the block back into the chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copy answers</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Download answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+// Replace this array with the real questions for this round.
+const QUESTIONS = [
+  { id: "q1", domain: "Escopo — métricas (conflito da rodada 1)", multi: false,
+    title: "Na rodada 1 você deixou métricas (R6) fora da lista obrigatória, mas escolheu 'só logs' na pergunta 12. O que vale?",
+    options: [
+      ["A", "Entram nesta fase, obrigatórias, como logs técnicos (sem tela)", true, "custo baixo; ajuda a ver se a resiliência funciona em produção"],
+      ["B", "Entram só se sobrar tempo (desejável, não bloqueia o fim da fase)", false, "a fase pode fechar sem elas"],
+      ["C", "Ficam para uma fase futura", false, "escopo mínimo"]
+    ] },
+  { id: "q2", domain: "Requisitos — métricas (só se entrarem)", multi: true,
+    title: "Se métricas entrarem, o que registrar? (nunca o texto das mensagens)",
+    options: [
+      ["A", "Tempo de envio (clique → servidor confirmou) e tempo na fila offline", true, "latência"],
+      ["B", "Envios com sucesso x falhas, por motivo (sem rede, acesso perdido, expirado, limite)", true, "taxa de entrega"],
+      ["C", "Quedas e reconexões do Realtime, e quanto tempo ficou fora", true, "saúde da conexão"],
+      ["D", "Quantas vezes o polling de reserva foi ativado e por quanto tempo", true, "saúde da conexão"],
+      ["E", "Uso: mensagens por dia por empresa / conversas ativas", false, "engajamento; mais dado guardado"]
+    ] },
+  { id: "q3", domain: "Regras de negócio — fila offline", multi: false,
+    title: "Depois de quanto tempo uma mensagem pendente expira (vira falha visível, sem envio automático)?",
+    options: [
+      ["A", "1 hora", false, "mensagem velha não chega fora de contexto; notebook que dorme à noite perde a fila"],
+      ["B", "24 horas", true, "cobre um dia de trabalho / noite com o notebook fechado"],
+      ["C", "7 dias", false, "quase nunca expira; mensagem pode chegar muito atrasada"]
+    ] },
+  { id: "q4", domain: "Regras de negócio — fila offline", multi: false,
+    title: "Se o servidor recusar por LIMITE DE ENVIOS (muitas mensagens rápido demais):",
+    options: [
+      ["A", "Esperar e tentar de novo sozinho, mantendo a ordem (não é falha definitiva)", true, "limite é temporário; na rodada 1 eu o listei como definitivo por engano"],
+      ["B", "Tratar como falha definitiva: para e mostra 'Tentar de novo'", false, "o que a opção da rodada 1 dizia"]
+    ] },
+  { id: "q5", domain: "Casos de borda — sessão", multi: false,
+    title: "A sessão expira (login venceu) enquanto há mensagens pendentes, sem você ter clicado em Sair:",
+    options: [
+      ["A", "Guardar a fila; ao entrar de novo o MESMO usuário, envia (se não expirou pelo prazo); outro usuário nunca vê", true, "não perde nada; respeita a regra 'nunca enviar por outro usuário'"],
+      ["B", "Apagar a fila como no Sair", false, "mais simples; perde mensagens"]
+    ] },
+  { id: "q6", domain: "Casos de borda — sair com pendências", multi: false,
+    title: "Você clica em Sair e há mensagens pendentes:",
+    options: [
+      ["A", "Avisar antes: 'Você tem N mensagens não enviadas. Sair apaga essas mensagens.' com Sair mesmo / Cancelar", true, "evita perda acidental"],
+      ["B", "Sair e apagar sem avisar", false, "simples; perda silenciosa contraria a regra 'nada se perde em silêncio'"],
+      ["C", "Não deixar sair até enviar", false, "pode prender o usuário offline"]
+    ] },
+  { id: "q7", domain: "Requisitos — várias abas", multi: false,
+    title: "Mensagem pendente escrita na aba 1: aparece também na aba 2 do mesmo navegador?",
+    options: [
+      ["A", "Sim, aparece como pendente nas duas; só uma aba envia (sem duplicar); cancelar em qualquer uma cancela", true, "consistente; usa a fila compartilhada no IndexedDB"],
+      ["B", "Só na aba onde foi escrita (a outra vê quando for entregue)", false, "mais simples; aba 2 não sabe que há pendência"]
+    ] },
+  { id: "q8", domain: "Requisitos — @menções", multi: false,
+    title: "Preferência de notificação para menções:",
+    options: [
+      ["A", "Usa o mesmo botão 'notificações no computador' da Fase 4 (ligado = DM, grupo e menções)", true, "uma preferência só; você não marcou 'notificar mesmo desligado'"],
+      ["B", "Botão separado: 'Só menções' / 'Tudo' / 'Nada'", false, "mais controle; mais tela e regras"]
+    ] },
+  { id: "q9", domain: "Regras de negócio — @menções", multi: true,
+    title: "Regras da notificação de menção:",
+    options: [
+      ["A", "Uma notificação por mensagem: se é DM/grupo e me menciona, não chega em dobro", true, "evita duplicar"],
+      ["B", "Texto: 'Ana mencionou você em <sala/conversa>' + texto completo da mensagem (igual à decisão da Fase 4)", true, "consistente com a Fase 4"],
+      ["C", "Menção em resposta de thread também notifica", true, "resposta é mensagem normal"],
+      ["D", "Clicar na notificação abre a conversa e rola até a mensagem", false, "Fase 4 só abre a conversa; rolar é extra"],
+      ["E", "Mensagem que menciona alguém fica destacada no feed para o mencionado", true, "fácil achar no histórico"]
+    ] },
+  { id: "q10", domain: "Requisitos — @menções em salas", multi: false,
+    title: "Em uma SALA, quem aparece na lista do @ ?",
+    options: [
+      ["A", "Só quem já é membro da conversa da sala (quem já entrou no chat da sala)", true, "segue sua regra 'menção só vale para membros'; quem nunca abriu o chat da sala não aparece"],
+      ["B", "Todos com acesso ao espaço; mencionar adiciona a pessoa como membro", false, "mais completo; muda quem vê o histórico da sala (risco de privacidade)"]
+    ] },
+  { id: "q11", domain: "Requisitos — voltar à conversa após recarregar", multi: true,
+    title: "Ao recarregar a página, o chat deve:",
+    options: [
+      ["A", "Reabrir o chat, se estava aberto, na mesma conversa", true, "item C da pendência T21"],
+      ["B", "Se perdeu acesso à conversa (saiu da sala, foi removido), abrir a lista de conversas sem erro", true, "caso de borda"],
+      ["C", "Guardar o rascunho do campo de texto na mesma conversa", false, "não pedido na rodada 1"],
+      ["D", "Só no mesmo navegador e mesmo usuário (outro usuário não herda)", true, "privacidade entre contas"]
+    ] },
+  { id: "q12", domain: "Requisitos — faixa de conexão e polling", multi: true,
+    title: "Detalhes da faixa e do polling:",
+    options: [
+      ["A", "Faixa 'Reconectando…' só aparece se a queda durar mais de ~5s (evita piscar)", true, "quedas curtas não incomodam"],
+      ["B", "'Sem conexão' aparece logo que o navegador fica offline", true, "estado certo é claro"],
+      ["C", "Ao voltar para a aba com o Realtime ainda fora, busca na hora e depois a cada 15s", true, "não espera 15s"],
+      ["D", "Ao reconectar, a faixa mostra 'Conectado' por 2s antes de sumir", false, "feedback extra; opcional"]
+    ] },
+  { id: "q13", domain: "Estratégia de testes", multi: true,
+    title: "Regras extras dos testes:",
+    options: [
+      ["A", "Cada teste novo de tela precisa passar 3 vezes seguidas antes de contar (a suíte da Fase 4 teve instabilidade)", true, "evidência confiável"],
+      ["B", "Queda simulada de internet (navegador offline) e queda só do Realtime, nos dois sentidos", true, "duas falhas diferentes"],
+      ["C", "Teste com duas abas do mesmo usuário e um segundo dispositivo (outro contexto do navegador)", true, "várias abas e multi-dispositivo"],
+      ["D", "Teste de banco: só membro marca leitura; visitante sem login não chama contagem de não lidas", true, "pendências T21-A"]
+    ] }
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " / multiple choice" : ""}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recommended)</span>' : ""}
+      ${reason ? ` - <span class="reason">${reason}</span>` : ""}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Other / note (write your own answer):</label>
+    <textarea id="${q.id}-note" placeholder="Write here if no option fits, or to add detail..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 2,
+    topic: "phase-5-messaging-resilience",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(data).then(
+      () => setStatus("Copied! Paste the block into the chat."),
+      () => fallbackCopy(data)
+    );
+  } else {
+    fallbackCopy(data);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("Copied! Paste the block into the chat."); }
+  catch (e) { setStatus("Couldn't copy - use Download answers.json."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Downloaded answers file.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>

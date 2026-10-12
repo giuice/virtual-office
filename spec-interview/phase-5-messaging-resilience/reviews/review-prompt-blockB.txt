@@ -1,0 +1,31 @@
+ADVERSARIAL BLOCK REVIEW — block B (tasks T13, T14, T15, T16) of spec-interview/phase-5-messaging-resilience in E:/projects/virtual-office.
+Read-only. Never access an online/hosted database or service. Read-only queries against LOCAL Supabase are allowed (npx supabase db query --local). Do NOT start Playwright, a dev server, or any long-running process; reason from code, the SPEC, and TRACK.
+
+Contract: SPEC.md (approved Final v4) and state.md decisions D1–D11 in that folder. Owner decision D11 governs this review (AGENTS.md "Adversarial review gate"): this is the single review for the whole block; tasks were not reviewed one by one. Rank each finding and state how it is triggered:
+- High/Medium only when a real user or a realistic failure (network loss/latency, lost or late Realtime replies, socket drop, browser/tab close, sleep/freeze, several tabs/devices, account switch, membership removal, concurrency, clock skew) can trigger it.
+- A finding that needs the application's own server to be broken or tampered with (malformed responses from our own routes, a compromised server) is a follow-up, not High/Medium — label it "server-tamper follow-up".
+- Low for the rest. Do not pad: no style nits, no speculative refactors.
+
+Scope (what block B added — Realtime health/recovery, banner, polling fallback, typing, cross-device sync; all client-side unless T16 says otherwise):
+- Read the current files directly (most are untracked or heavily edited): src/lib/messaging/realtime-health.ts, src/lib/messaging/polling-fallback.ts, src/hooks/realtime/{useMessageSubscription.ts,useConversationRealtime.ts,useConversationTyping.ts,useMessagingPollingFallback.ts}, src/hooks/queries/useConversationMembers.ts, src/hooks/useConversations.ts, src/lib/messaging/message-cache.ts (compareFeedOrder, mergePolledMessages), src/lib/messaging-api.ts (source=poll, getConversationMembers), src/contexts/messaging/{MessagingContext.tsx,types.ts}, src/components/messaging/{MessagingConnectionBanner.tsx,MessagingDrawer.tsx,TypingIndicator.tsx,message-feed.tsx,message-composer.tsx,message-item.tsx}, src/lib/messaging/outbox/{message-outbox.ts,outbox-db.ts} (T13 resumeDrains, reconnectedAt/holderTakeover/supersedeBefore for block A finding #7), src/hooks/useMessageOutbox.ts, plus any file T16's TRACK entry lists.
+- Block A (outbox) was reviewed already (reviews/sol-review-blockA-r1.md); only judge its T13 changes (#7 outage supersede, recovery drain).
+- E2E specs (judge whether they prove what they claim): __tests__/api/playwright/messaging-phase5/{realtime-recovery-banner,realtime-polling-fallback,typing-indicator}.spec.ts, the T16 spec named in TRACK, cross-tab-outbox.spec.ts (#7 test), realtime-stream-faults-probe.spec.ts, helpers/realtime-stream-faults.ts.
+
+What each task claims: read TRACK.md entries "## T13", "## T14", "## T15" (incl. its crash-fix addendum), "## T16" (State delta, Deviation, Discovered). Verify the claims against the code; flag any claim or code comment that is false.
+
+Attack at least these:
+1. Recovery lifecycle (T13): rejoin on CHANNEL_ERROR/TIMED_OUT/CLOSED with capped backoff on new topics; no join while the socket is down; orphan server channels; stale callbacks after an account switch or unmount (isCurrent); double catch-up; a recovered stream that never catches up; `healthy` meaning SUBSCRIBED only.
+2. Event routing (T15 addendum): realtime-js dispatches every change to '*' listeners until the join reply — are all handlers now safe, including the messages handler receiving a malformed or foreign row; any remaining path where a bad payload crashes or corrupts caches.
+3. Banner (T13 + orchestrator fix): offline vs reconnecting, 5 s threshold, flashes, live region; render-time Date.now decision.
+4. #7 outage supersede (T13): holderTakeover / supersedeBefore / reconnectedAt grace and skew — can an active tab replace a claim that is still live and not pre-outage, causing two creates of one conversation in flight, a duplicate, or reordering; clock skew between tabs.
+5. Polling (T14): gating (30 s, 15 s, visibility, healthy stop), in-flight flag not per user and without deadline, merge monotonicity (unchanged-since guard, older pages, deletions, inflight fetches), starvation under continuous writes, stale reader lists, account switch mid-round.
+6. Typing (T15): private topic only, never REST fallback, own typing hidden on other tabs/devices, roster-based names, refused join vs recoverable closure, removal signal via conversation_members DELETE (fan-out to every client, own-row id matching, missed removals during an outage), deadlines (tab close ≈4 s), spoofed userId.
+7. Cross-device sync (T16): partial reads, read state on other devices within 5 s, sender receipt summaries/details, own messages once on other devices; races with polling and the outbox pending copies.
+8. Silent miss: a SUBSCRIBED channel that drops INSERTs (seen twice in local runs) — confirm it is out of FR-016's scope as written or argue it violates a clause; do not demand polling while healthy unless a SPEC clause requires it.
+9. Known and routed (do not re-report unless you find it worse than recorded): same-browser tab jump (MessagingContext.tsx:126-151) → T20; T16 5 s margin; silent miss → REPORT.
+10. Test validity: any spec whose assertion would still pass with the behavior broken; harness shaping beyond SPEC §15 / the D4 frame-shaping rule; removed assertions (T14 :261 "stale until polled", T13 #7 route.abort model) — are the remaining assertions enough for the clause.
+
+Output (markdown):
+- Verdict: approve | revision required (revision required only for High/Medium that a real user or realistic failure can trigger).
+- Findings, most severe first. For each: severity; trigger (real user | realistic failure | server-tamper follow-up); file:line; concrete failure scenario (inputs/state → wrong outcome); smallest fix; which test should prove the fix.
+- A short list of claims you verified true (one line each) and any false claims.

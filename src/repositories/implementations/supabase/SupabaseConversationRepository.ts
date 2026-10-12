@@ -1,6 +1,11 @@
 // src/repositories/implementations/supabase/SupabaseConversationRepository.ts
-import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
-import { Conversation, ConversationType, ConversationVisibility, ConversationPreferences } from '@/types/messaging';
+import {
+  ConversationMembershipError,
+  type ConversationMembershipErrorCode,
+  IConversationRepository,
+} from '@/repositories/interfaces/IConversationRepository';
+import { NotParticipantError } from '@/repositories/interfaces/IMessageRepository';
+import { Conversation, ConversationMember, ConversationType, ConversationVisibility, ConversationPreferences } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -16,6 +21,47 @@ type ConversationRow = {
   visibility: string | null;
   participants_fingerprint: string | null;
 };
+/** A row of public.list_conversation_members (Phase 5 T4). */
+type ConversationMemberRow = { user_id: string; display_name: string | null; avatar_url: string | null };
+
+function isConversationMemberRow(value: unknown): value is ConversationMemberRow {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.user_id === 'string' &&
+    (row.display_name === null || typeof row.display_name === 'string') &&
+    (row.avatar_url === null || typeof row.avatar_url === 'string')
+  );
+}
+
+const MEMBERSHIP_REFUSAL_CODES: readonly ConversationMembershipErrorCode[] = [
+  'CONVERSATION_NOT_FOUND',
+  'ROOM_NOT_FOUND',
+  'USER_NOT_FOUND',
+  'JOIN_FORBIDDEN',
+  'MEMBERSHIP_REVOKED',
+  'ROOM_ACCESS_DENIED',
+];
+
+/** The exact refusal markers of public.join_room_conversation (Phase 5 T28). */
+function membershipRefusalCode(error: { code?: string; message?: string }): ConversationMembershipErrorCode | null {
+  if (error.code !== '42501' && error.code !== 'P0002') return null;
+  const code = MEMBERSHIP_REFUSAL_CODES.find((candidate) => candidate === error.message);
+  return code ?? null;
+}
+
+/**
+ * mark_conversation_read / mark_messages_read refusing a user without a
+ * membership row (e.g. removed after the route authorized the request).
+ */
+function isReadStateNotMemberError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === '42501' &&
+    (error.message === 'mark_conversation_read: user is not a member of the conversation' ||
+      error.message === 'mark_messages_read: user is not a member of the conversation')
+  );
+}
+
 function mapToCamelCase(data: ConversationRow): Conversation {
 
   // Ensure we have the correct structure with necessary checks
@@ -363,13 +409,18 @@ export class SupabaseConversationRepository implements IConversationRepository {
       });
 
       if (error) {
+        if (isReadStateNotMemberError(error)) {
+          throw new NotParticipantError();
+        }
         console.error('Error in mark_conversation_read RPC:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error(`Repository error in markConversationRead(${id}, ${userId}):`, error);
+      if (!(error instanceof NotParticipantError)) {
+        console.error(`Repository error in markConversationRead(${id}, ${userId}):`, error);
+      }
       throw error;
     }
   }
@@ -385,6 +436,9 @@ export class SupabaseConversationRepository implements IConversationRepository {
     });
 
     if (error) {
+      if (isReadStateNotMemberError(error)) {
+        throw new NotParticipantError();
+      }
       console.error(`Error in mark_messages_read RPC (${id}, ${userId}):`, error);
       throw error;
     }
@@ -417,46 +471,24 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
-  async addParticipant(id: string, userId: string): Promise<Conversation | null> {
-    try {
-      // Fetch current participants
-      const { data: conversation, error: fetchError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .select('participants')
-        .eq('id', id)
-        .single();
+  async joinRoomConversation(id: string, userId: string): Promise<boolean> {
+    const { data, error } = await this.supabaseClient.rpc('join_room_conversation', {
+      p_conversation_id: id,
+      p_user_id: userId,
+    });
 
-      if (fetchError) {
-        console.error('Error fetching conversation for addParticipant:', fetchError);
-        return null;
+    if (error) {
+      const refusal = membershipRefusalCode(error);
+      if (refusal) {
+        throw new ConversationMembershipError(refusal);
       }
-
-      const participants: string[] = Array.isArray(conversation?.participants) ? conversation.participants : [];
-      if (participants.includes(userId)) {
-        // Already a participant; return current conversation state
-        const existing = await this.findById(id);
-        return existing;
-      }
-
-      const updatedParticipants = [...participants, userId];
-
-      const { data: updated, error: updateError } = await this.supabaseClient
-        .from(this.TABLE_NAME)
-        .update({ participants: updatedParticipants })
-        .eq('id', id)
-        .select('*')
-        .single();
-
-      if (updateError) {
-        console.error('Error updating participants in addParticipant:', updateError);
-        return null;
-      }
-
-      return updated ? mapToCamelCase(updated as ConversationRow) : null;
-    } catch (error) {
-      console.error(`Repository error in addParticipant(${id}, ${userId}):`, error);
+      console.error(`Error in join_room_conversation RPC (${id}, ${userId}):`, error);
       throw error;
     }
+    if (typeof data !== 'boolean') {
+      throw new Error('join_room_conversation returned an unexpected result');
+    }
+    return data;
   }
 
   async findDirectByFingerprint(fingerprint: string): Promise<Conversation | null> {
@@ -528,21 +560,16 @@ export class SupabaseConversationRepository implements IConversationRepository {
       // Always set updated_at
       dbPreferences.updated_at = new Date().toISOString();
 
-      // Upsert: insert if not exists, update if exists
+      // Phase 5 T28: update the EXISTING membership only — a preference write
+      // never creates a membership (a row removed after the caller authorized
+      // the request stays removed).
       const { data, error } = await this.supabaseClient
         .from('conversation_members')
-        .upsert(
-          {
-            conversation_id: conversationId,
-            user_id: userId,
-            ...dbPreferences,
-          },
-          {
-            onConflict: 'conversation_id,user_id',
-          }
-        )
+        .update(dbPreferences)
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error setting user preference:', error);
@@ -550,12 +577,14 @@ export class SupabaseConversationRepository implements IConversationRepository {
       }
 
       if (!data) {
-        throw new Error('Failed to retrieve user preference after upsert');
+        throw new NotParticipantError();
       }
 
       return mapPreferencesToCamelCase(data as ConversationPreferencesRow);
     } catch (error) {
-      console.error(`Repository error in setUserPreference(${conversationId}, ${userId}):`, error);
+      if (!(error instanceof NotParticipantError)) {
+        console.error(`Repository error in setUserPreference(${conversationId}, ${userId}):`, error);
+      }
       throw error;
     }
   }
@@ -624,4 +653,33 @@ export class SupabaseConversationRepository implements IConversationRepository {
     }
   }
 
+  /**
+   * Phase 5 T4 (FR-023): current members of the conversation through
+   * public.list_conversation_members, which answers only a caller (auth.uid())
+   * who is a current member, as ONE jsonb array (never truncated by
+   * PostgREST's max-rows; review T4 r1 finding 2). Requires the user-scoped
+   * client; throws NotParticipantError on the database's membership refusal.
+   */
+  async listMembers(conversationId: string): Promise<ConversationMember[]> {
+    const { data, error } = await this.supabaseClient.rpc('list_conversation_members', {
+      p_conversation_id: conversationId,
+    });
+
+    if (error) {
+      if (error.code === '42501' && error.message === 'NOT_PARTICIPANT') {
+        throw new NotParticipantError();
+      }
+      console.error('Error listing conversation members:', error);
+      throw error;
+    }
+
+    if (!Array.isArray(data) || !data.every(isConversationMemberRow)) {
+      throw new Error('list_conversation_members returned an unexpected result');
+    }
+    return data.map((row) => ({
+      userId: row.user_id,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url,
+    }));
+  }
 }

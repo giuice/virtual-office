@@ -28,7 +28,7 @@ interface EnhancedMessageComposerProps {
   disabled?: boolean;
   className?: string;
   /** Broadcast-based typing callbacks (audit B-02) — owned by the parent's
-   * useConversationPresence so the conversation channel stays single. */
+   * typing hook (useConversationTyping) so the typing channel stays single. */
   onTyping?: () => void;
   onStopTyping?: () => void;
 }

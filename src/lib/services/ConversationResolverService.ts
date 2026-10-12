@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
+import { ConversationMembershipError, IConversationRepository } from '@/repositories/interfaces/IConversationRepository';
 import { IUserRepository } from '@/repositories/interfaces/IUserRepository';
 import { ISpaceRepository } from '@/repositories/interfaces/ISpaceRepository';
 import { Conversation, ConversationType, ConversationVisibility } from '@/types/messaging';
@@ -119,9 +119,12 @@ export class ConversationResolverService {
         if (retry) {
           return retry;
         }
+        // Phase 5 T28: the direct conversation exists but the requester cannot
+        // read it — its membership was removed (revoked). Not a server error.
+        throw new ConversationResolverError('Direct conversation not accessible for this user', 403);
       }
       this.log('resolveDirect.error', { message: (error as Error).message });
-      throw error;
+      throw this.asCreationRefusal(error) ?? error;
     }
   }
 
@@ -169,7 +172,7 @@ export class ConversationResolverService {
           conversation = await this.adminConversationRepository.findRoomByRoomId(roomId);
         } else {
           this.log('resolveRoom.error', { message: (error as Error).message });
-          throw error;
+          throw this.asCreationRefusal(error) ?? error;
         }
       }
     }
@@ -178,12 +181,21 @@ export class ConversationResolverService {
       throw new Error('Failed to resolve room conversation after conflict retry');
     }
 
-    if (!conversation.participants.includes(requesterId)) {
-      const updated = await this.adminConversationRepository.addParticipant(conversation.id, requesterId);
-      if (updated) {
-        conversation = updated;
-        this.log('resolveRoom.addedParticipant', { conversationId: conversation.id, requesterId });
+    // Phase 5 T28: membership (not the participants array) decides; the
+    // database re-checks the room's access rules and revocations under row
+    // locks when it writes the membership. Idempotent for a current member.
+    let joined: boolean;
+    try {
+      joined = await this.adminConversationRepository.joinRoomConversation(conversation.id, requesterId);
+    } catch (error) {
+      if (error instanceof ConversationMembershipError) {
+        throw new ConversationResolverError('Room conversation not accessible for this user', error.status);
       }
+      throw error;
+    }
+    if (joined) {
+      this.log('resolveRoom.addedParticipant', { conversationId: conversation.id, requesterId });
+      conversation = (await this.adminConversationRepository.findById(conversation.id)) ?? conversation;
     }
 
     return conversation;
@@ -239,6 +251,22 @@ export class ConversationResolverService {
     const sorted = participants.toSorted();
     const fingerprintSource = sorted.join(':');
     return createHash('md5').update(fingerprintSource).digest('hex');
+  }
+
+  /**
+   * Phase 5 T28: the database authorizes a user-scoped conversation INSERT
+   * under row locks; its refusal (42501, e.g. access revoked after the checks
+   * above) or a vanished user/room (P0002) is a 403/404, not a server error.
+   */
+  private asCreationRefusal(error: unknown): ConversationResolverError | null {
+    const code = this.getSupabaseErrorCode(error);
+    if (code === '42501') {
+      return new ConversationResolverError('Conversation not accessible for this user', 403);
+    }
+    if (code === 'P0002') {
+      return new ConversationResolverError('User or room not found', 404);
+    }
+    return null;
   }
 
   private getSupabaseErrorCode(error: unknown): string | undefined {

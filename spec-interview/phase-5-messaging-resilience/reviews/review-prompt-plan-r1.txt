@@ -1,0 +1,22 @@
+You are performing an ADVERSARIAL REVIEW of an execution PLAN (not code) in the repository at E:/projects/virtual-office. Read-only: do not modify any file.
+
+Artifacts:
+- Contract (read-only, approved): spec-interview/phase-5-messaging-resilience/SPEC.md (Final v4; 34 FRs, 16 BRs, 50 ACs).
+- Under review: spec-interview/phase-5-messaging-resilience/PLAN.md (version 1, 23 tasks T1..T23).
+- Decisions context: spec-interview/phase-5-messaging-resilience/state.md (owner decisions D1–D7).
+- Repository rules: AGENTS.md (test policy: integration + E2E only, no unit tests; users.id vs users.supabase_uid; migrations local until phase end; Supabase/RLS review gate; adversarial review gates).
+- Phase 4 precedent: spec-interview/phase-4-messaging-timeline/PLAN.md and TRACK.md (how tasks were executed and where they failed).
+
+Your job is to attack the plan, not only to check its conformance. Specifically:
+1. Coverage: for every FR, BR, and AC in SPEC.md, is the work that makes it true actually inside some task's Task/Done when/Verify by — not merely listed in Covers? Find any AC whose clauses are split across tasks so that no task's Done when actually requires a clause (orphan clauses). Find any Must FR whose server or client half is missing.
+2. Ordering and dependencies: find hidden dependencies that are missing or wrong (e.g. a client task that needs a server contract or a health signal that a later task provides; mention IDs carried by the outbox before the outbox exists; removal-detection signal needed by notifications; typing-stream health needed by the banner; metrics instrumentation needing hooks that do not yet exist). Find tasks that would need migrations but are ordered after T21 compatibility smoke assumptions, or migrations whose compatibility with the hosted pre-Phase-4 build and the Phase 4 build (SPEC §10) is not checked where the risk arises.
+3. Feasibility vs. the actual code: verify the "Observations grounding this plan" claims against the source (src/app/api/messages/create/route.ts, src/lib/auth/rate-limit.ts, src/hooks/useConversationPresence.ts, src/hooks/realtime/*, src/contexts/messaging/MessagingContext.tsx, src/contexts/AuthContext.tsx, src/components/shell/*, supabase/migrations/*). Report any observation that is false or incomplete and any premise a task relies on that does not hold (e.g. fail-open rate limiting interacting with budgets, check_rate_limit semantics, Realtime private-topic authorization prerequisites, receipts/conversation_members in the Realtime publication for cross-device sync, own-removal signal availability).
+4. Task sizing and checkability: tasks that are too coarse (several independent failure surfaces in one Done when), Done when conditions that are activity rather than state, Verify by checks that cannot actually produce the evidence (e.g. E2E clauses that need network shaping not possible in Playwright, test-controlled clocks, log capture from Next.js route logs, row-lock-blocked inserts through the real route, Edge availability), and "3 consecutive runs in Chrome and Edge" feasibility.
+5. Safety: anything in the plan that could apply a migration online before T23, change the Presence logout sequence, weaken an acceptance criterion, or permit a unit test.
+6. Risk ordering: is the riskiest work (server fencing, cross-tab leases) placed where its failure is discovered early enough? Is anything missing that Phase 4's TRACK shows is needed (e.g. seed/fixture endpoints, local quota exhaustion helper, second-device contexts)?
+
+Output format (markdown):
+- Verdict: approve | revision required
+- Findings ranked by severity (High / Medium / Low). Each: id, severity, the PLAN location (task id/field), the concrete problem with evidence (file:line or SPEC id), and the smallest fix.
+- A short list of claims you verified as correct.
+Be concrete; no generic advice.

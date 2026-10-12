@@ -1,0 +1,17 @@
+You are performing an ADVERSARIAL RE-REVIEW of an execution PLAN (not code) in the repository at E:/projects/virtual-office. Read-only: do not modify any file.
+
+Artifacts:
+- Contract (read-only, approved): spec-interview/phase-5-messaging-resilience/SPEC.md (Final v4).
+- Under review: spec-interview/phase-5-messaging-resilience/PLAN.md (version 2, 26 tasks; execution order is file order: T1 T2 T3 T4 T5 T6 T24 T25 T7 T8 T27 T10 T9 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23).
+- Previous version: spec-interview/phase-5-messaging-resilience/reviews/PLAN-v1-reviewed.md
+- Your previous review of v1: spec-interview/phase-5-messaging-resilience/reviews/sol-review-plan-r1.md (16 findings R1–R16; all accepted).
+- Owner decisions: spec-interview/phase-5-messaging-resilience/state.md (D1–D7). Repository rules: AGENTS.md, delegation-anthropic.md.
+
+Do two things:
+1. For each r1 finding R1–R16, state resolved / partial / unresolved with evidence from PLAN v2.
+2. Attack PLAN v2 for NEW problems introduced by the revision, in particular:
+   - the two "Planning decisions under D4" in Standing rules (fail-closed budgets returning 429; Phase 4 keyed requests without a generation keep the Phase 4 contract unless the key has fence state). Do they contradict any SPEC clause (FR-008, FR-028, §10 compatibility, BR-005), weaken a guarantee (can a generation-less keyed request bypass fencing and create a late duplicate of an outbox item?), or need an owner decision rather than a planning decision?
+   - dependency ordering in file order and missing producers (e.g. T9 depends on T10 — is that right; T17 depending on T14; T19 now covering FR-009; T25 covering AC-015).
+   - whether T24 and T25 are checkable and whether T25's per-stream fault method is feasible with Playwright WebSocket routing over one multiplexed Phoenix socket without mocking the application.
+   - any AC clause still unowned by any task's Done when.
+Output (markdown): Verdict approve | revision required; per-R disposition table; new findings ranked High/Medium/Low with PLAN location, evidence, smallest fix. Approve if only Low findings remain. Be concrete.

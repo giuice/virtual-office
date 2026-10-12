@@ -1,0 +1,22 @@
+ADVERSARIAL FINAL REVIEW — whole work-item diff of spec-interview/phase-5-messaging-resilience (T22) in E:/projects/virtual-office.
+Read-only. Never access an online/hosted database or service. Read-only queries against LOCAL Supabase are allowed (npx supabase db query --local). Do NOT start Playwright, a dev server, or any long-running process; reason from code, the SPEC, and TRACK.
+
+Contract: SPEC.md (approved Final v4, AC-036 amended by D13, AC-034 amended by D14) and state.md decisions D1–D15 in that folder. AGENTS.md "Adversarial review gate" point 4 governs this review. Rank each finding and state how it is triggered:
+- High/Medium only when a real user or a realistic failure (network loss/latency, lost or late Realtime replies, socket drop, browser/tab close, sleep/freeze, several tabs/devices, account switch, membership removal, concurrency, clock skew) can trigger it.
+- A finding that needs the application's own server to be broken or tampered with is a follow-up — label it "server-tamper follow-up".
+- Low for the rest. Do not pad: no style nits, no speculative refactors. The owner is time-constrained: report only what matters to a real user or to data/security.
+
+The diff: everything the working tree changes against HEAD (`git diff HEAD` plus untracked files under src/, supabase/migrations/, __tests__/, scripts/, playwright.messaging-phase5.config.ts). Ignore spec-interview/, test-results/, AGENTS.md and other docs. Blocks A, B and C each had one adversarial review (reviews/sol-review-block{A,B,C}-r1.md) and one fix round; TRACK gate checkpoints record every disposition.
+
+Priorities, in this order:
+1. Block C fix round (never reviewed; its E2E specs have NOT been run yet — per D15 their first run is after this review). TRACK "## Gate checkpoint — block C closed (fix round completed under D15, 2026-10-10)" lists F1, F2, F4, F6, F7, F8, F9 with file:line. Verify each fixes its finding in sol-review-blockC-r1.md without regressions: src/lib/messaging/membership-removals.ts, src/hooks/realtime/useConversationRealtime.ts, src/hooks/realtime/useMessageSubscription.ts, src/hooks/ui/use-message-notifications.ts, src/hooks/ui/use-composer-mentions.ts, src/components/messaging/message-composer.tsx; and judge whether the new/changed tests in __tests__/api/playwright/messaging-phase5/{mentions,mention-notifications,messaging-metrics}.spec.ts can prove them (an assertion that would pass with the fix reverted is a finding).
+2. Cross-block integration on the final tree: outbox exactly-once and per-conversation order (T7–T12, T27), identity fencing and sign-out hold, Realtime recovery + polling fallback (T13, T14), typing on the private topic (T15), read state (T16), mentions/notifications/metrics/drawer restore (T17–T20). Look for interactions that each block review could not see (e.g. a block C change breaking a block A/B guarantee, two recovery paths racing, duplicated refetch storms, a listener leaked across user switch).
+3. Database contract: the seven migrations under supabase/migrations/2026100* (RLS, SECURITY DEFINER search_path, grants, users.id vs users.supabase_uid = auth.uid()::text, membership integrity, rate-limit serialization) and the routes that use them (src/app/api/messages/{create,fence,metrics,get,starred}, src/app/api/conversations/{members,join,read,archive,preferences}). Rollout: D14 publishes database and app together; rollback is app first, then SQL in reverse order.
+4. Claims: check code comments and TRACK "State delta" statements of T22's predecessors for false claims; list the ones you checked.
+
+Known and routed (do not re-report unless worse than recorded): block A/B/C follow-ups and Low items in TRACK gate checkpoints (#3 duplicate-name/paste mention identity, #5 restore on failed list / > 50 conversations, silent miss on a SUBSCRIBED channel, retries never classified, persisted sign-out epoch, discard intent on storage failure, feed-before-409 rekey, OutboxNotOwnerError copy, dead dashboard-header handleSignOut, D1 margin, stored-message deletion races, presence fixture loopback guard, seed route legacy actions); the D14 rollout window.
+
+Output (markdown):
+- Verdict: approve | revision required (revision required only for High/Medium that a real user or realistic failure can trigger).
+- Findings, most severe first. For each: severity; trigger (real user | realistic failure | server-tamper follow-up); file:line; concrete failure scenario; smallest fix; which test should prove the fix.
+- A short list of claims verified true and any false claims.

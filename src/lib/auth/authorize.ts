@@ -77,13 +77,35 @@ async function loadConversationAccess(
   };
 }
 
+export interface ConversationParticipantOptions {
+  /**
+   * Phase 5 FR-011: the sender the client expects (users.id of its outbox
+   * item's owner). When the authenticated user differs, the request is refused
+   * with 403 SENDER_MISMATCH before the conversation is read.
+   */
+  expectedSenderId?: string;
+  /**
+   * Phase 5 BR-005: answer a missing conversation like a non-member (403
+   * NOT_PARTICIPANT) instead of 404, so the outcome is uniform and does not
+   * reveal whether a conversation exists.
+   */
+  missingConversationAsNotParticipant?: boolean;
+}
+
+function notParticipant(): AuthzFailure {
+  return {
+    errorResponse: jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation'),
+  };
+}
+
 /**
  * Resolves the session and asserts the requester participates in the
  * conversation. Membership authority is now conversation_members (synced from
  * participants[] by DB trigger; participants[] will be removed in Phase 3).
  */
 export async function requireConversationParticipant(
-  conversationId: string
+  conversationId: string,
+  options: ConversationParticipantOptions = {}
 ): Promise<ParticipantContext | AuthzFailure> {
   if (!conversationId || typeof conversationId !== 'string') {
     return { errorResponse: jsonError(400, 'BAD_REQUEST', 'conversationId is required') };
@@ -95,15 +117,49 @@ export async function requireConversationParticipant(
   }
 
   const serviceClient = await createSupabaseServerClient('service_role');
+  return authorizeConversationParticipant(auth, serviceClient, conversationId, options);
+}
+
+/** A requester already authenticated by requireAuthUser (auth.getUser + users.supabase_uid). */
+export interface AuthenticatedRequester {
+  supabase: SupabaseClient;
+  dbUser: User;
+}
+
+/**
+ * The participation check of requireConversationParticipant for a requester
+ * the route already authenticated — e.g. to charge a per-user budget before
+ * validating the request body (Phase 5 T3).
+ */
+export async function authorizeConversationParticipant(
+  auth: AuthenticatedRequester,
+  serviceClient: SupabaseClient,
+  conversationId: string,
+  options: ConversationParticipantOptions = {}
+): Promise<ParticipantContext | AuthzFailure> {
+  if (!conversationId || typeof conversationId !== 'string') {
+    return { errorResponse: jsonError(400, 'BAD_REQUEST', 'conversationId is required') };
+  }
+
+  if (
+    options.expectedSenderId !== undefined &&
+    options.expectedSenderId.toLowerCase() !== auth.dbUser.id.toLowerCase()
+  ) {
+    return {
+      errorResponse: jsonError(403, 'SENDER_MISMATCH', 'The authenticated user is not the expected sender'),
+    };
+  }
+
   const access = await loadConversationAccess(serviceClient, conversationId, auth.dbUser.id);
   if (isAuthzFailure(access)) {
+    if (options.missingConversationAsNotParticipant && access.errorResponse.status === 404) {
+      return notParticipant();
+    }
     return access;
   }
 
   if (!access.isMember) {
-    return {
-      errorResponse: jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation'),
-    };
+    return notParticipant();
   }
 
   const { conversation } = access;

@@ -59,10 +59,16 @@ export async function GET(request: NextRequest) {
 
     // Phase 4 FR-003: reader counts are sender-only. Another member's
     // message never carries one (RLS would only have let the viewer count
-    // their own receipt anyway).
+    // their own receipt anyway). Phase 5 FR-034: the composition key
+    // (clientMessageId) is echoed only to its sender, who matches pending
+    // messages with it. Not a confidentiality boundary: members can read the
+    // column (RLS, Realtime payloads); a key grants nothing, since create and
+    // fence act only on the caller's own (sender, conversation, key).
     const viewerId = ctx.dbUser.id;
     const messages = result.items.map((message) =>
-      message.senderId === viewerId ? message : { ...message, readCount: undefined }
+      message.senderId === viewerId
+        ? message
+        : { ...message, readCount: undefined, clientMessageId: undefined }
     );
 
     return NextResponse.json({

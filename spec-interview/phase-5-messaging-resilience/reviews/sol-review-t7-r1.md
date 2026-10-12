@@ -1,0 +1,13 @@
+**Verdict: revision required.** One Medium finding remains.
+
+- **Medium — A deleted stored message reappears as pending.** [message-cache.ts:54](E:/projects/virtual-office/src/lib/messaging/message-cache.ts:54). Hold HTTP after creation commits; let Realtime hide the pending copy; then delete the stored row through another authorized session. Once DELETE removes the cached row, its key disappears from `storedKeys`, so the originating tab renders `temp-<key>` as sending again; the other tab shows nothing. Pending entries are removed only when HTTP settles. **Smallest fix:** retire the pending representation when its stored key is first observed, preserve that resolution across deletion, and respect deletion when merging a held response. Add a held-response/deletion E2E regression.
+
+- **Low — Legacy ChatWindow loses optimistic sends.** [useMessages.ts:312](E:/projects/virtual-office/src/hooks/useMessages.ts:312) now writes optimism exclusively to the pending query, but [ChatWindow.tsx:76](E:/projects/virtual-office/src/components/messaging/ChatWindow.tsx:76) renders only stored pages. Holding creation before the server leaves its cleared input without a pending bubble. This affects the reachable debug comparison; the floor-plan entry currently has an empty People list. **Smallest fix:** make ChatWindow consume the existing merged message reader.
+
+- **Low — Cross-page deduplication lacks the claimed replacement coverage.** The deleted case at [t7-tracked-cumulative.diff:70](E:/projects/virtual-office/spec-interview/phase-5-messaging-resilience/reviews/t7-tracked-cumulative.diff:70) explicitly exercised an incoming ID already in an older page. The named E2Es cover newest-page placement and ordinary duplicate delivery, but not that scenario. **Smallest fix:** replay a real keyed message already loaded in an older page and assert one bubble.
+
+The untouched `use-messages-pagination.test.tsx` does **not** require deletion merely because its imported hook changed; the touched-test rule applies when the test itself needs modification.
+
+Verified: the saved diff matches the working tree; retained runs confirm three consecutive 6/6 passes, 102/102 regressions, and the 170/170 DB summary. INSERT timestamps precede HTTP release in both tabs. Fresh typecheck and diff check passed; focused lint reported zero errors.
+
+No files changed, browser/server started, or online database accessed. Fresh local catalog verification was unavailable because the CLI attempted a telemetry write prohibited by the read-only environment.

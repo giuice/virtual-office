@@ -6,6 +6,7 @@ import { Conversation, ConversationType, Message } from '@/types/messaging';
 import { messagingApi } from '@/lib/messaging-api';
 import { useConversationRealtime } from '@/hooks/realtime/useConversationRealtime';
 import { debugLogger } from '@/utils/debug-logger';
+import type { MessagingRealtimeHealth } from '@/lib/messaging/realtime-health';
 
 // Query key shared with useConversationRealtime invalidations (audit B-06):
 // both sides MUST use ['conversations', <DB user id>].
@@ -13,6 +14,22 @@ export const conversationsQueryKey = (userId: string | undefined) =>
   ['conversations', userId] as const;
 
 const NO_CONVERSATIONS: Conversation[] = [];
+
+/**
+ * The conversation list of `userId` (users.id) as the list query loads it.
+ * Archived conversations are included (flagged isArchived) so the list's
+ * Archived view can show them and unarchive works; the main list filters them
+ * out client-side. `source: 'poll'`: the T14 polling fallback's request
+ * (`signal`: its round deadline, block B fix F6).
+ */
+export async function fetchConversationList(
+  userId: string,
+  source?: 'poll',
+  signal?: AbortSignal
+): Promise<Conversation[]> {
+  const result = await messagingApi.getConversations(userId, { includeArchived: true, source, signal });
+  return result.conversations;
+}
 
 // Archive is a per-user preference (audit M-02); keep the effective flag and
 // the preference object in sync on optimistic updates.
@@ -35,7 +52,8 @@ const createTraceId = (prefix: string): string => {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 
-export function useConversations() {
+/** `realtimeHealth`: where the conversation-list stream reports its health (T13). */
+export function useConversations(realtimeHealth: MessagingRealtimeHealth) {
   const { currentUserProfile } = useCompany();
   const queryClient = useQueryClient();
   const userId = currentUserProfile?.id;
@@ -45,7 +63,7 @@ export function useConversations() {
 
   // Subscribe to realtime updates using the Database User ID (canonical).
   // Invalidations target the same query key as the query below.
-  useConversationRealtime(userId);
+  useConversationRealtime(userId, realtimeHealth);
 
   useEffect(() => {
     if (!debugLogger.messaging.enabled()) {
@@ -71,13 +89,8 @@ export function useConversations() {
 
   const conversationsQuery = useQuery<Conversation[], Error>({
     queryKey: conversationsQueryKey(userId),
-    queryFn: async () => {
-      // Query conversations by Database User ID. Archived conversations are
-      // included (flagged isArchived) so the list's Archived view can show
-      // them and unarchive works; the main list filters them out client-side.
-      const result = await messagingApi.getConversations(userId!, { includeArchived: true });
-      return result.conversations;
-    },
+    // Query conversations by Database User ID.
+    queryFn: () => fetchConversationList(userId!),
     enabled: !!userId,
     // Realtime invalidation (useConversationRealtime) is the primary freshness
     // signal; staleTime only guards against redundant mount refetches.

@@ -1,0 +1,13 @@
+You are an adversarial reviewer for the repository at E:/projects/virtual-office (Next.js App Router + TypeScript + Supabase Postgres/Auth/Realtime/RLS + TanStack Query). Read-only review. Do not edit files.
+
+ARTIFACT UNDER REVIEW
+spec-interview/phase-5-messaging-resilience/SPEC.md (Draft v2). The previous version (reviews/SPEC-v1-reviewed.md) was reviewed in reviews/sol-review-spec-r2.md with verdict "revision required" (19 findings). Owner decisions D1–D4 taken after that review, and the disposition of every finding, are at the end of spec-interview/phase-5-messaging-resilience/state.md. Interview evidence: same state.md (rounds 1–2, confirmation). Repository rules: AGENTS.md (test policy: integration + E2E only, no mocks of Supabase/repositories/code under test; users.id vs users.supabase_uid; online DB rules).
+
+YOUR JOB
+1. Verify each r2 finding is actually resolved by v2 (not just renamed). List any that remain open, with why.
+2. Attack v2 itself as in the r2 review: fidelity to state.md answers and D1–D4 (flag invented scope/numbers/copy or dropped answers), feasibility against the actual code (read the sources), testability under the repo test policy, edge/failure holes introduced by the new mechanisms (claims/leases, unknown-state lookup, sender fencing, quota-free replay as an abuse vector, atomic mentions, browser-wide notification suppression, per-stream health, metrics route), security/privacy (RLS identity traps, anon exposure, service role, redaction), and internal contradictions between FRs, BRs, ACs, edge-case table, and test strategy.
+3. Traceability: every Must FR has an AC; every BR and must-not-happen condition (state.md R1-q16 A–F) is validated by at least one AC.
+Do not re-raise items the owner explicitly decided (D1–D4) unless v2 misstates them.
+
+OUTPUT
+Severity-ranked findings (Critical / High / Medium / Low), each with SPEC location, problem, evidence (file:line or state.md), and a concrete SPEC-text fix. Then exactly one final line: "Verdict: approve" or "Verdict: revision required". Be concise; no praise.

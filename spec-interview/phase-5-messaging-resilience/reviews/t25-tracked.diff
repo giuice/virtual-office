@@ -1,0 +1,25 @@
+diff --git a/src/hooks/realtime/useConversationRealtime.ts b/src/hooks/realtime/useConversationRealtime.ts
+index 04ee282..ac989a4 100644
+--- a/src/hooks/realtime/useConversationRealtime.ts
++++ b/src/hooks/realtime/useConversationRealtime.ts
+@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
+ import { useQueryClient } from '@tanstack/react-query';
+ import type { RealtimeSystemPayload } from '@supabase/supabase-js';
+ import { supabase } from '@/lib/supabase/client';
++import { debugLogger } from '@/utils/debug-logger';
+ 
+ /**
+  * Subscribe to real-time conversation changes and keep React Query caches fresh.
+@@ -62,6 +63,12 @@ export function useConversationRealtime(userId?: string) {
+       });
+ 
+     const subscription = channel.subscribe((status) => {
++      if (debugLogger.messaging.enabled()) {
++        debugLogger.messaging.trace('useConversationRealtime', 'status', {
++          channel: 'conversations-changes',
++          status,
++        });
++      }
+       setConnectionStatus(status);
+     });
+ 

@@ -8,29 +8,21 @@ import { type Page, type Locator, type WebSocketRoute, expect } from '@playwrigh
 /**
  * Opens the messaging drawer by clicking the messaging trigger button.
  * Waits for drawer to be visible before returning.
+ *
+ * After a reload the app may reopen the drawer by itself once the
+ * conversation list has loaded (Phase 5 T20), which removes the trigger: a
+ * click that loses that race is retried only while the drawer is still closed.
  */
 export async function openDrawer(page: Page): Promise<void> {
-  // Check if drawer is already visible (expanded state)
   const drawer = page.locator('[data-testid="messaging-drawer"]');
-  const isVisible = await drawer.isVisible().catch(() => false);
-
-  if (isVisible) {
-    // Drawer is already open
-    return;
-  }
-
   // Look for the messaging trigger button (floating action button)
   const triggerButton = page.locator('[data-testid="messaging-drawer-trigger"]');
 
-  // Wait for trigger to be visible and click it
-  await triggerButton.waitFor({ state: 'visible', timeout: 10_000 });
-  await triggerButton.click();
-
-  // Wait for drawer to be visible
-  await page.waitForSelector('[data-testid="messaging-drawer"]', {
-    state: 'visible',
-    timeout: 10_000
-  });
+  await expect(async () => {
+    if (await drawer.isVisible()) return;
+    await triggerButton.click({ timeout: 5_000 });
+    await drawer.waitFor({ state: 'visible', timeout: 5_000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 /**

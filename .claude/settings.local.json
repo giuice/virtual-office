@@ -25,7 +25,8 @@
       "Bash(supabase init *)",
       "Bash(npm install *)",
       "Bash(psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -tAc ' *)",
-      "Bash(docker exec supabase_db_virtual-office psql -U postgres -tAc ' *)"
+      "Bash(docker exec supabase_db_virtual-office psql -U postgres -tAc ' *)",
+      "Bash(npx supabase db query --linked *)"
     ]
   },
   "enabledMcpjsonServers": [

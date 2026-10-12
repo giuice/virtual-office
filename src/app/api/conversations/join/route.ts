@@ -3,11 +3,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server-client';
 import { requireAuthUser } from '@/lib/auth/session';
 import { jsonError } from '@/lib/auth/authorize';
-import { ConversationType } from '@/types/messaging';
-import { IConversationRepository, ISpaceRepository } from '@/repositories/interfaces';
-import { SupabaseConversationRepository, SupabaseSpaceRepository } from '@/repositories/implementations/supabase';
-import { ConversationResolverError, ConversationResolverService } from '@/lib/services/ConversationResolverService';
+import { ConversationMembershipError, IConversationRepository } from '@/repositories/interfaces';
+import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 
+/**
+ * POST { conversationId } — joins the requester to a ROOM conversation.
+ *
+ * Phase 5 T28: the membership is written by public.join_room_conversation,
+ * which re-checks, under row locks, that the conversation is a room
+ * conversation, that the requester passes the room's access rules
+ * (ConversationResolverService.assertRoomAccess, mirrored in SQL), and that
+ * the requester's membership was not revoked — so a revocation that commits
+ * while this request is in flight is never overridden. Direct/group
+ * conversations are never joinable (audit S-01). Idempotent for a current
+ * member (membership row, not the participants array).
+ */
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuthUser();
@@ -36,41 +46,39 @@ export async function POST(request: NextRequest) {
       return jsonError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found');
     }
 
-    // Idempotent: already a participant — nothing to join.
-    if (existing.participants.includes(dbUser.id)) {
-      return NextResponse.json({ conversation: existing }, { status: 200 });
-    }
-
-    // Only room conversations are joinable. Direct/group membership is fixed
-    // at creation (resolver/invite paths) — joining someone else's DM would
-    // grant full read/write of its history (audit S-01).
-    if (existing.type !== ConversationType.ROOM || !existing.roomId) {
-      return jsonError(403, 'JOIN_FORBIDDEN', 'Only room conversations can be joined');
-    }
-
-    const spaceRepo: ISpaceRepository = new SupabaseSpaceRepository(serviceClient);
-    const space = await spaceRepo.findById(existing.roomId);
-    if (!space) {
-      return jsonError(404, 'ROOM_NOT_FOUND', 'Room not found');
-    }
-
     try {
-      ConversationResolverService.assertRoomAccess(dbUser, space);
-    } catch (accessError) {
-      if (accessError instanceof ConversationResolverError) {
-        return jsonError(accessError.status, 'ROOM_ACCESS_DENIED', accessError.message);
+      await convoRepo.joinRoomConversation(conversationId, dbUser.id);
+    } catch (joinError) {
+      if (joinError instanceof ConversationMembershipError) {
+        return jsonError(joinError.status, joinError.code, joinMessage(joinError));
       }
-      throw accessError;
+      throw joinError;
     }
 
-    const conversation = await convoRepo.addParticipant(conversationId, dbUser.id);
+    const conversation = await convoRepo.findById(conversationId);
     if (!conversation) {
-      return jsonError(500, 'INTERNAL_ERROR', 'Failed to join conversation');
+      return jsonError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found');
     }
-
     return NextResponse.json({ conversation }, { status: 200 });
   } catch (error) {
     console.error('Error joining conversation:', error);
     return jsonError(500, 'INTERNAL_ERROR', 'Internal server error');
+  }
+}
+
+function joinMessage(error: ConversationMembershipError): string {
+  switch (error.code) {
+    case 'JOIN_FORBIDDEN':
+      return 'Only room conversations can be joined';
+    case 'ROOM_ACCESS_DENIED':
+      return 'Room conversation not accessible for this user';
+    case 'MEMBERSHIP_REVOKED':
+      return 'Your membership in this conversation was removed';
+    case 'ROOM_NOT_FOUND':
+      return 'Room not found';
+    case 'USER_NOT_FOUND':
+      return 'User not found';
+    case 'CONVERSATION_NOT_FOUND':
+      return 'Conversation not found';
   }
 }

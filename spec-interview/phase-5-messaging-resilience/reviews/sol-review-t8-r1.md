@@ -1,0 +1,16 @@
+**Verdict: revision required.**
+
+1. **High — Replying to a pending bubble permanently blocks the conversation.**  
+   [message-feed.tsx:262](E:/projects/virtual-office/src/components/messaging/message-feed.tsx:262) passes the bubble’s `temp-…` ID into the outbox. Both Reply controls remain enabled. After reconnect, the route rejects that non-UUID target with 400; the reply becomes failed and blocks every later item, with no recovery UI. T9 may own failure recovery, but this newly persistent invalid-target path needs a guard now. **Smallest fix:** disable both Reply controls for temporary messages and reject temporary targets before enqueue, keeping the draft intact. Add E2E coverage proving subsequent valid messages still drain.
+
+2. **Medium — An unusable success payload can delete an undelivered item.**  
+   [messaging-api.ts:217](E:/projects/virtual-office/src/lib/messaging-api.ts:217) accepts `{ message: {} }` or `{ message: [] }` because it checks only `typeof === 'object'`, then casts it to `Message`. The outcome classifier treats this truthy object as delivered, and `applyOutcome` deletes the durable item without a usable acknowledgement. This contradicts the claimed unreadable-2xx handling. **Smallest fix:** validate the message shape and its sender/conversation/client-key correlation before confirming; retain unusable success responses as unknown.
+
+3. **Medium — A post-commit read failure clears the composer without publishing pending content.**  
+   [message-outbox.ts:217](E:/projects/virtual-office/src/lib/messaging/outbox/message-outbox.ts:217) swallows the refresh transaction’s failure. If enqueue commits and the following read aborts, `enqueue()` nevertheless resolves, clearing text and reply while the pending query remains empty. If storage also prevents claiming, the message stays durable but invisible, with only a debug trace. **Smallest fix:** publish the committed item directly into the pending view before resolving enqueue; make subsequent re-reading best effort. Cover a read abort immediately after commit.
+
+The generation-N+1 shortcut is sound for **storage uniqueness under the existing T2/T4 contract**: the route fences first, insertion rechecks under the key-row lock, and delivery tombstones prevent resurrection. Explicit unknown fencing, hung-request/lease recovery, cross-tab synchronization, session holds, sign-out cleanup, and Realtime recovery triggers remain assigned to later tasks.
+
+The retained evidence corroborates three **24/24** runs and **102/102** regression results, with zero retries, flakes, or skips. D1 timing starts before reconnect and checks actual arrivals, request completion, database ordering, and uniqueness. The storage fault injection is explicitly permitted by SPEC §15; the rewritten tests retain meaningful correlation and delivery assertions.
+
+Typecheck passed; touched-file lint reported **0 errors, 17 warnings**; diff checks passed. Review was read-only, with no database access and no browser or dev server started.

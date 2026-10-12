@@ -1,7 +1,6 @@
 'use client';
  
  import React, { useState, useEffect, useRef, useCallback } from 'react';
- import { useInfiniteQuery } from '@tanstack/react-query';
  import { MessageList } from './MessageList';
  import { MessageInput } from './MessageInput';
  import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,6 +8,7 @@
  import { Message } from '@/types/messaging';
 
 import { useMessaging } from '@/contexts/messaging/MessagingContext';
+import { useMessages } from '@/hooks/useMessages';
  import { Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
  
  interface ChatWindowProps {
@@ -17,13 +17,6 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
    title?: string;
    onClose?: () => void;
    className?: string;
- }
- 
- // API response type for paginated messages
- interface MessagesResponse {
-   messages: Message[];
-   nextCursor?: string;
-   hasMore: boolean;
  }
  
  export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -42,39 +35,19 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
   const { connectionStatus, activeConversation } = useMessaging();
   const isConnected = activeConversation?.id === conversationId && connectionStatus === 'SUBSCRIBED';
  
-   // Windowed message loading with infinite query
+   // The same merged reader as the drawer feed (Phase 5 FR-034): stored
+   // pages (oldest → newest) plus the sender's pending messages, matched to
+   // their stored copies by clientMessageId.
    const {
-     data,
-     fetchNextPage,
-     hasNextPage,
-     isFetchingNextPage,
-     isLoading,
-     isError,
-     error,
-   } = useInfiniteQuery({
-     queryKey: ['messages', conversationId],
-     queryFn: async ({ pageParam = 0 }) => {
-       const params = new URLSearchParams({
-         conversationId,
-         limit: '20',
-         cursor: pageParam.toString(),
-       });
-       
-       const response = await fetch(`/api/messages/get?${params}`);
-       if (!response.ok) {
-         throw new Error('Failed to fetch messages');
-       }
-       
-       return response.json() as Promise<MessagesResponse>;
-     },
-     getNextPageParam: (lastPage) => 
-       lastPage.hasMore && lastPage.nextCursor ? parseInt(lastPage.nextCursor) : undefined,
-     initialPageParam: 0,
-   });
- 
-   // Flatten all messages from all pages
-   const allMessages = data?.pages.flatMap(page => page.messages) || [];
- 
+     messages: allMessages,
+     loadingMessages: isLoading,
+     loadingMoreMessages: isFetchingNextPage,
+     errorMessages,
+     hasMoreMessages: hasNextPage,
+     loadMoreMessages: fetchNextPage,
+   } = useMessages(conversationId);
+   const isError = errorMessages !== null;
+
    const handleStartReply = useCallback((message: Message) => {
      setReplyingToMessage(message);
    }, []);
@@ -93,7 +66,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
      
      // Load more messages when scrolled near the top
      if (isNearTop && hasNextPage && !isFetchingNextPage) {
-       fetchNextPage();
+       void fetchNextPage();
      }
    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
  
@@ -114,7 +87,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
            <div className="text-center">
              <AlertCircle className="size-8 text-destructive mx-auto mb-2" />
              <p className="text-sm text-muted-foreground">
-               Failed to load messages: {error?.message}
+               Failed to load messages: {errorMessages}
              </p>
              <Button 
                variant="outline" 
@@ -177,7 +150,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
                  <Button 
                    variant="ghost" 
                    size="sm" 
-                   onClick={() => fetchNextPage()}
+                   onClick={() => void fetchNextPage()}
                    className="text-sm text-muted-foreground"
                  >
                    Load older messages
@@ -201,7 +174,7 @@ import { useMessaging } from '@/contexts/messaging/MessagingContext';
        <div className="p-3 border-t">
          <MessageInput
            onSendMessage={onSendMessage}
-           replyingToMessage={replyingToMessage}
+           replyingToMessage={replyingToMessage?.conversationId === conversationId ? replyingToMessage : null}
            onCancelReply={handleCancelReply}
            isLoading={isLoading}
          />

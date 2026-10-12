@@ -1,62 +1,45 @@
 // src/components/messaging/TypingIndicator.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface TypingIndicatorProps {
+  /** Display names of the typists, in arrival order. */
   typingUsers: string[];
   className?: string;
 }
 
+/** Phase 5 FR-018: 1 → "<Nome> está digitando…", 2 → "<A> e <B> estão digitando…", 3+ → "N pessoas estão digitando…". */
+export function typingMessage(typingUsers: readonly string[]): string {
+  if (typingUsers.length === 1) return `${typingUsers[0]} está digitando…`;
+  if (typingUsers.length === 2) return `${typingUsers[0]} e ${typingUsers[1]} estão digitando…`;
+  return `${typingUsers.length} pessoas estão digitando…`;
+}
+
 export function TypingIndicator({ typingUsers, className }: TypingIndicatorProps) {
-  const [dots, setDots] = useState('');
-
-  // Animate the dots
-  useEffect(() => {
-    if (typingUsers.length === 0) return;
-
-    const interval = setInterval(() => {
-      setDots(prev => {
-        if (prev === '...') return '';
-        return prev + '.';
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [typingUsers.length]);
-
   if (typingUsers.length === 0) return null;
 
-  // Format typing message
-  const getTypingMessage = () => {
-    if (typingUsers.length === 1) {
-      return `${typingUsers[0]} is typing${dots}`;
-    } else if (typingUsers.length === 2) {
-      return `${typingUsers[0]} and ${typingUsers[1]} are typing${dots}`;
-    } else {
-      return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing${dots}`;
-    }
-  };
-
   return (
-    <div className={cn(
-      "flex items-center px-4 py-2 text-sm text-muted-foreground italic",
-      className
-    )}>
-      <div className="flex gap-x-1 mr-2">
+    <div
+      data-testid="typing-indicator"
+      className={cn(
+        "flex items-center px-4 py-2 text-sm text-muted-foreground italic",
+        className
+      )}
+    >
+      <div className="flex gap-x-1 mr-2" aria-hidden="true">
         {/* Animated typing dots */}
         <div className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"></div>
-        <div 
+        <div
           className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"
           style={{ animationDelay: '0.2s' }}
         ></div>
-        <div 
+        <div
           className="size-2 bg-muted-foreground/40 rounded-full animate-pulse"
           style={{ animationDelay: '0.4s' }}
         ></div>
       </div>
-      <span>{getTypingMessage()}</span>
+      <span>{typingMessage(typingUsers)}</span>
     </div>
   );
 }

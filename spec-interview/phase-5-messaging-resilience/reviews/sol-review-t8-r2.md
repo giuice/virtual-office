@@ -1,0 +1,14 @@
+**Verdict: revision required.**
+
+1. **High — A stale reply target still blocks another conversation.**  
+   [message-feed.tsx:262](/E:/projects/virtual-office/src/components/messaging/message-feed.tsx:262): select Reply in a room, then use an avatar’s **Send Message** action to switch directly to a DM. The drawer retains the same feed instance and its reply selection. Enqueue accepts the room message’s UUID, clears the composer, and the server returns `400 INVALID_REPLY_TARGET`. The failed item blocks every later DM send, with no recovery UI yet. **Smallest fix:** clear stale reply selections on conversation changes and reject a target whose `conversationId` differs before enqueue, preserving the draft. Cover this direct-switch path with E2E.
+
+2. **Medium — Correlated malformed acknowledgements still delete durable content.**  
+   [outbox-outcome.ts:33](/E:/projects/virtual-office/src/lib/messaging/outbox/outbox-outcome.ts:33): a 201 containing the correct sender, conversation, key, and UUID `id`, but omitting `content`, passes as a `Message`. The API supplies fallback timestamp/reactions; `applyOutcome` inserts an unusable message, removes pending content, and deletes the outbox item. A malformed network answer without a server commit therefore still loses the send. The new test covers empty objects, arrays, and mismatched keys, but misses this case. **Smallest fix:** validate the renderable message shape and stored UUID before confirming; malformed objects remain unknown. Add a correlated malformed-payload case.
+
+3. **Medium — Bodyless success responses become permanent failures.**  
+   [outbox-outcome.ts:58](/E:/projects/virtual-office/src/lib/messaging/outbox/outbox-outcome.ts:58): a bodyless 204 falls through to `failed`, blocking subsequent messages. This contradicts the unusable-2xx comment and BR-005’s definitive rejection classes. **Smallest fix:** classify other unconfirmed 2xx responses as unknown and cover automatic recovery.
+
+The temporary-ID Reply controls and post-commit publication fixes address their original cases. Normal create/replay responses use compatible camelCase fields and application user IDs; case-normalized keys, `410 MESSAGE_DELETED`, and Realtime/feed confirmation remain compatible. The read-abort test targets the application’s reread in this flow; response interception exercises the network boundary.
+
+Retained records corroborate **three 30/30 runs**, **51/51 regression**, and meaningful reverted-fix failures. Typecheck passed; touched-file lint reports **0 errors, 16 warnings**; diff checks passed. The tracked diff matches the r2 snapshot; untracked restoration byte identity lacks independent retained hash evidence. No database access, browser, or dev server was started.

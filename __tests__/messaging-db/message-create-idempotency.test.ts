@@ -169,7 +169,8 @@ describe('message create idempotency key (local Supabase)', () => {
 
     // A concurrent writer inserts the same key and keeps its transaction open:
     // the route's lookup cannot see it, so its INSERT blocks on the unique index
-    // and must turn the unique violation into a read of the committed row.
+    // and must turn the conflict into a read of the committed row. Since Phase 5
+    // T2 the keyed insert runs inside public.create_message_attempt.
     const holder = new Client({ connectionString: MESSAGING_DB_URL });
     await holder.connect();
     try {
@@ -189,8 +190,8 @@ describe('message create idempotency key (local Supabase)', () => {
             (
               await world.query<{ waiting: string }>(
                 `select count(*)::text as waiting from pg_catalog.pg_stat_activity
-                 where pid <> $1 and wait_event_type = 'Lock'
-                   and query ilike '%insert into "public"."messages"%'`,
+                 where pid <> $1 and pid <> pg_backend_pid() and wait_event_type = 'Lock'
+                   and query ilike '%create_message_attempt%'`,
                 [holderPid],
               )
             )[0].waiting,

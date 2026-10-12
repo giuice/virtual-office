@@ -1,7 +1,7 @@
 // src/app/api/conversations/read/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { IConversationRepository } from '@/repositories/interfaces';
+import { IConversationRepository, NotParticipantError } from '@/repositories/interfaces';
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
 import { isAuthzFailure, jsonError, requireConversationParticipant } from '@/lib/auth/authorize';
 import { enforceRateLimit } from '@/lib/auth/rate-limit';
@@ -92,6 +92,10 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
+    if (error instanceof NotParticipantError) {
+      // Phase 5 T28: the membership vanished after authorization; nothing written.
+      return jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation');
+    }
     console.error('Error marking conversation as read:', error);
     return jsonError(500, 'INTERNAL_ERROR', 'Internal Server Error');
   }

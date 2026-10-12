@@ -52,7 +52,61 @@ export interface PendingAttachmentUpload {
 export interface MessageWithAttachmentsCreateResult {
   messageId: string;
   created: boolean;
+  /**
+   * Phase 5 T2: on a replay (created: false), the original composition
+   * recorded when the message was created under its key; null when none was
+   * recorded (keyed messages created before Phase 5).
+   */
+  storedComposition?: MessageComposition | null;
 }
+
+/**
+ * Phase 5 T2 (FR-024): the original submitted composition of a keyed create,
+ * normalized by the create route, which replays of the same key are compared
+ * against. `type` is null for attachment messages (their type derives from
+ * the attachments); `attachmentIds` is sorted. Phase 5 T4: `mentionIds` are
+ * the REQUESTED mention user ids (users.id; lowercase, distinct, sorted), not
+ * only the stored ones; a stored composition without them (created before T4)
+ * means none were requested, like an empty list.
+ */
+export interface MessageComposition {
+  content: string;
+  type: MessageType | null;
+  replyToId: string | null;
+  attachmentIds: string[];
+  mentionIds: string[];
+}
+
+/**
+ * Phase 5 T2 (FR-006): one dispatch of a keyed composition. `generation` is
+ * monotonic per (sender, conversation, clientMessageId); absent for Phase 4
+ * clients, whose keyed creates commit only while the key has no fence state.
+ */
+export interface MessageAttempt {
+  generation?: number;
+  composition: MessageComposition;
+}
+
+/**
+ * Phase 5 T3 (FR-008, D1): the sender's message insertion quota (at most
+ * `limit` stored messages per fixed `windowSeconds` window). The database
+ * charges it in the transaction of a winning insertion only; replays, lost
+ * same-key races and refused creates never consume it.
+ */
+export interface InsertionQuota {
+  limit: number;
+  windowSeconds: number;
+}
+
+/**
+ * Phase 5 T2: result of fencing/looking up the caller's own key. `superseded`
+ * means a newer generation exists (nothing was changed). `stored` with a null
+ * messageId: a message was committed under the key and deleted since.
+ */
+export type MessageAttemptFenceResult =
+  | { outcome: 'superseded' }
+  | { outcome: 'stored'; messageId: string | null }
+  | { outcome: 'not_stored' };
 
 // Voice Note Attachment (extends FileAttachment with voice-specific metadata)
 export interface VoiceNoteAttachment extends FileAttachment {
@@ -121,6 +175,38 @@ export interface Message {
   pins?: MessagePin[]; // Optional: user-specific pins for this message
   stars?: MessageStar[]; // Optional: user-specific stars for this message
   isEdited: boolean;
+  // Phase 5 FR-034: the sender's composition key (messages.client_message_id),
+  // absent on unkeyed messages. Carried by the create and fence responses,
+  // the feed (own messages only), Realtime INSERTs and pending messages; a
+  // pending message is matched to its stored message only by this key.
+  clientMessageId?: string;
+  // Phase 5 T4 (FR-024): users (users.id) this message mentions, stored with
+  // its first creation (members other than the sender at that time), sorted.
+  // Set on messages read by the repository (feed, create/fence responses).
+  mentionedUserIds?: string[];
+  // Phase 5 T8 (client only, never sent by the server): delivery state of the
+  // sender's outbox copy of a text message, shown as a text label.
+  deliveryState?: MessageDeliveryState;
+  // Phase 5 T10 (client only): the outbox copy is known not to be stored
+  // (waiting, never dispatched), so it may be cancelled (FR-005).
+  cancellable?: boolean;
+}
+
+/**
+ * Phase 5 T8: label state of a pending outbox copy — `pending` (waiting to
+ * be sent), `sending` (an attempt is or may be in progress), `failed`
+ * (definitively rejected), `expired` (not sent within 24 h, T9).
+ */
+export type MessageDeliveryState = 'pending' | 'sending' | 'failed' | 'expired';
+
+/**
+ * Phase 5 T4 (FR-023): a current member of a conversation
+ * (public.conversation_members), as listed to other current members.
+ */
+export interface ConversationMember {
+  userId: string; // users.id
+  displayName: string | null;
+  avatarUrl: string | null;
 }
 
 /**
@@ -131,6 +217,8 @@ export interface Message {
 export interface MessageCreateResult {
   message: Message;
   created: boolean;
+  /** Phase 5 T2: see MessageWithAttachmentsCreateResult.storedComposition. */
+  storedComposition?: MessageComposition | null;
 }
 
 /**

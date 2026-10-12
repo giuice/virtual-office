@@ -16,6 +16,7 @@ import {
 } from './ConversationList';
 import { ConversationSearch } from './ConversationSearch';
 import { DesktopNotificationsToggle } from './DesktopNotificationsToggle';
+import { MessagingConnectionBanner } from './MessagingConnectionBanner';
 import { cn } from '@/lib/utils';
 
 interface MessagingDrawerProps {
@@ -259,6 +260,9 @@ export function MessagingDrawer({ className }: MessagingDrawerProps) {
             </Button>
           </div>
         </CardHeader>
+
+        {/* Phase 5 T13 (FR-014): offline / "Reconectando…" (polite live region) */}
+        <MessagingConnectionBanner />
 
         <CardContent className="flex-1 p-0 overflow-hidden">
           {/* List view - show conversation list */}

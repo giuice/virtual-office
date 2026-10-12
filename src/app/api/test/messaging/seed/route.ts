@@ -27,6 +27,16 @@ const removeMemberSchema = z.object({
   userId: z.guid(),
 });
 
+/**
+ * Re-adds a removed member through the only authorized rejoin,
+ * `restore_conversation_membership` (Phase 5 T24 fixture; local Supabase only).
+ */
+const restoreMemberSchema = z.object({
+  action: z.literal('restore-member'),
+  conversationId: z.guid(),
+  userId: z.guid(),
+}).strict();
+
 /** Pre-run sweep of seeded data left by interrupted runs (local Supabase only). */
 const sweepLeftoversSchema = z.object({ action: z.literal('sweep-leftovers') }).strict();
 
@@ -83,8 +93,8 @@ function requireSecret(request: NextRequest): NextResponse | null {
 
 /**
  * Lower-cased emails of the Playwright test accounts
- * (PLAYWRIGHT_PRIMARY/SECONDARY/TERTIARY_EMAIL). The route only provisions,
- * resets, or acts as these accounts.
+ * (PLAYWRIGHT_PRIMARY/SECONDARY/TERTIARY/FOURTH/FIFTH_EMAIL). The route only
+ * provisions, resets, or acts as these accounts.
  */
 function seededAccountEmails(): Set<string> {
   return new Set(
@@ -92,6 +102,8 @@ function seededAccountEmails(): Set<string> {
       process.env.PLAYWRIGHT_PRIMARY_EMAIL,
       process.env.PLAYWRIGHT_SECONDARY_EMAIL,
       process.env.PLAYWRIGHT_TERTIARY_EMAIL,
+      process.env.PLAYWRIGHT_FOURTH_EMAIL,
+      process.env.PLAYWRIGHT_FIFTH_EMAIL,
     ]
       .filter((email): email is string => typeof email === 'string' && email.trim().length > 0)
       .map((email) => email.trim().toLowerCase()),
@@ -137,6 +149,25 @@ function resolveThirdUser(): SeedUserDefinition {
     role: 'member',
     status: 'offline',
   };
+}
+
+/**
+ * Phase 5 E2E world members C, D, E (A and B are the default users). All five
+ * sign in, so every password is required (local mode sets them).
+ */
+function resolvePhase5WorldMembers(): SeedUserDefinition[] {
+  const members: Array<[prefix: string, fallbackName: string]> = [
+    ['PLAYWRIGHT_TERTIARY', 'Playwright Tertiary'],
+    ['PLAYWRIGHT_FOURTH', 'Playwright Fourth'],
+    ['PLAYWRIGHT_FIFTH', 'Playwright Fifth'],
+  ];
+  return members.map(([prefix, fallbackName]): SeedUserDefinition => ({
+    email: requiredEnv(`${prefix}_EMAIL`),
+    password: requiredEnv(`${prefix}_PASSWORD`),
+    displayName: process.env[`${prefix}_DISPLAY_NAME`] ?? fallbackName,
+    role: 'member',
+    status: 'online',
+  }));
 }
 
 function normalizeSeedUsers(users?: SeedUserDefinition[]): [SeedUserDefinition, SeedUserDefinition] {
@@ -214,7 +245,12 @@ export async function POST(request: NextRequest) {
   }
 
   let payload: Partial<
-    MessagingSeedOptions & { users?: SeedUserDefinition[]; includeThirdMember?: boolean }
+    MessagingSeedOptions & {
+      users?: SeedUserDefinition[];
+      includeThirdMember?: boolean;
+      /** Phase 5 E2E world: users A–E, a DM (A–B), a group and room conversations of all five. */
+      includePhase5World?: boolean;
+    }
   > = {};
 
   // Accept empty body (defaults) and only error on malformed non-empty JSON
@@ -228,11 +264,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // The Phase 5 world is a local-Supabase-only fixture.
+  if (payload.includePhase5World === true && !isLocalSupabaseMode()) {
+    return notFound();
+  }
+
   let users: [SeedUserDefinition, SeedUserDefinition];
   let thirdUser: SeedUserDefinition | undefined;
+  let worldMembers: SeedUserDefinition[] = [];
   try {
+    if (payload.includePhase5World === true && (payload.includeThirdMember || payload.users)) {
+      throw new Error('includePhase5World cannot be combined with includeThirdMember or users');
+    }
     users = normalizeSeedUsers(payload.users);
     thirdUser = payload.includeThirdMember ? resolveThirdUser() : undefined;
+    worldMembers = payload.includePhase5World === true ? resolvePhase5WorldMembers() : [];
   } catch (error) {
     return NextResponse.json(
       { error: (error as Error).message },
@@ -243,7 +289,7 @@ export async function POST(request: NextRequest) {
   // The seeder creates auth users or resets their passwords by email, so it
   // may only touch the configured Playwright accounts.
   const allowedEmails = seededAccountEmails();
-  const seedUsers = thirdUser ? [...users, thirdUser] : users;
+  const seedUsers = [...users, ...(thirdUser ? [thirdUser] : []), ...worldMembers];
   if (seedUsers.some((user) => !allowedEmails.has(user.email.trim().toLowerCase()))) {
     return NextResponse.json(
       { error: 'Seed users must be the configured PLAYWRIGHT_*_EMAIL accounts' },
@@ -264,6 +310,7 @@ export async function POST(request: NextRequest) {
       includeGroupConversation: payload.includeGroupConversation,
       historyMessageCount: payload.historyMessageCount,
       thirdUser,
+      worldMembers,
     });
 
     return NextResponse.json(
@@ -338,7 +385,11 @@ export async function DELETE(request: NextRequest) {
  * opt-in third member). Body: { conversationId, userId, messageIds }.
  * With { action: 'remove-member', conversationId, userId } it instead removes
  * that member from the conversation (deletes the conversation_members row;
- * star rows are kept), to test a member who lost access.
+ * star rows are kept), to test a member who lost access. Since Phase 5 T28
+ * that service-role delete is an administrative revocation.
+ * With { action: 'restore-member', conversationId, userId } (local Supabase
+ * only) it re-adds a removed participant through
+ * restore_conversation_membership, the only authorized rejoin.
  * 403 unless userId is a PLAYWRIGHT_*_EMAIL account and every member of the
  * conversation is one too.
  */
@@ -366,6 +417,11 @@ export async function PATCH(request: NextRequest) {
     !!payload && typeof payload === 'object' && (payload as { action?: unknown }).action === 'remove-member';
   if (isRemoveMember) {
     return removeSeededMember(payload);
+  }
+  const isRestoreMember =
+    !!payload && typeof payload === 'object' && (payload as { action?: unknown }).action === 'restore-member';
+  if (isRestoreMember) {
+    return restoreSeededMember(payload);
   }
 
   const parsed = markReadSchema.safeParse(payload);
@@ -463,6 +519,49 @@ async function removeSeededMember(payload: unknown): Promise<NextResponse> {
     console.error('[Messaging Seed Route] Failed to remove conversation member', error);
     return NextResponse.json(
       { error: 'Failed to remove conversation member', details: (error as Error).message },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * PATCH { action: 'restore-member', conversationId, userId }: re-adds a seeded
+ * participant through `public.restore_conversation_membership` (lifts the
+ * revocation and re-creates the conversation_members row under the
+ * conversation's own rules). Local messaging test mode only (404 otherwise);
+ * 403 unless userId is a participant and every participant and member of the
+ * conversation is a PLAYWRIGHT_*_EMAIL account.
+ */
+async function restoreSeededMember(payload: unknown): Promise<NextResponse> {
+  if (!isLocalSupabaseMode()) {
+    return notFound();
+  }
+  const parsed = restoreMemberSchema.safeParse(payload);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "action 'restore-member', conversationId and userId (UUIDs) are required" },
+      { status: 400 },
+    );
+  }
+  const conversationId = parsed.data.conversationId.toLowerCase();
+  const userId = parsed.data.userId.toLowerCase();
+
+  try {
+    const supabase = await createSupabaseServerClient('service_role');
+    const seeder = new MessagingTestSeeder(supabase);
+    const isSeeded = await seeder.isSeededConversationParticipant(conversationId, userId, seededAccountEmails());
+    if (!isSeeded) {
+      return NextResponse.json(
+        { error: 'Only seeded Playwright participants of seeded conversations can be restored' },
+        { status: 403 },
+      );
+    }
+    await seeder.restoreConversationMembership(conversationId, userId);
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error('[Messaging Seed Route] Failed to restore conversation member', error);
+    return NextResponse.json(
+      { error: 'Failed to restore conversation member', details: (error as Error).message },
       { status: 500 },
     );
   }

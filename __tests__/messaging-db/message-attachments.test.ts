@@ -688,7 +688,9 @@ describe('message attachments (local Supabase + Storage)', () => {
     const stillText = await world.query<{ content: string }>(`select content from public.messages where id = $1`, [messageId]);
     expect(stillText[0].content).toBe('T12 own text');
 
-    // Ordinary client writes the published policies allowed still work.
+    // Phase 5 T3: clients cannot insert messages at all (every create goes
+    // through the budgeted service-role route); editing their own message
+    // still works.
     const { error: textInsert } = await primary.client.from('messages').insert({
       conversation_id: directConversationId,
       sender_id: primary.appUserId,
@@ -696,7 +698,7 @@ describe('message attachments (local Supabase + Storage)', () => {
       type: 'text',
       status: 'sent',
     });
-    expect(textInsert).toBeNull();
+    expect(textInsert?.code).toBe('42501');
     const { error: textUpdate } = await primary.client
       .from('messages')
       .update({ content: 'T12 own text edited' })

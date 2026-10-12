@@ -1,0 +1,986 @@
+diff --git a/__tests__/messaging/message-cache.test.ts b/__tests__/messaging/message-cache.test.ts
+deleted file mode 100644
+index 7d0083c..0000000
+--- a/__tests__/messaging/message-cache.test.ts
++++ /dev/null
+@@ -1,141 +0,0 @@
+-// __tests__/messaging/message-cache.test.ts
+-// Audit B-04 regression suite: realtime inserts must land in page 0 (the
+-// newest window), dedupe must run across ALL pages, and the optimistic and
+-// realtime paths must not produce duplicates in either arrival order.
+-import { describe, expect, it } from 'vitest';
+-import {
+-  appendMessageToPages,
+-  replaceMessageInPages,
+-  type MessagesInfiniteData,
+-} from '@/lib/messaging/message-cache';
+-import { Message, MessageStatus, MessageType } from '@/types/messaging';
+-
+-const CONVERSATION_ID = '66666666-6666-4666-8666-666666666666';
+-
+-function makeMessage(overrides: Partial<Message> & { id: string }): Message {
+-  return {
+-    conversationId: CONVERSATION_ID,
+-    senderId: 'user-1',
+-    content: 'hello',
+-    timestamp: new Date('2026-06-10T12:00:00Z'),
+-    type: MessageType.TEXT,
+-    status: MessageStatus.SENT,
+-    reactions: [],
+-    attachments: [],
+-    isEdited: false,
+-    ...overrides,
+-  };
+-}
+-
+-/** Two loaded pages: page 0 = newest window, page 1 = older history. */
+-function makeMultiPageData(): MessagesInfiniteData {
+-  return {
+-    pages: [
+-      {
+-        messages: [
+-          makeMessage({ id: 'new-1', timestamp: new Date('2026-06-10T11:58:00Z') }),
+-          makeMessage({ id: 'new-2', timestamp: new Date('2026-06-10T11:59:00Z') }),
+-        ],
+-        hasMoreOlder: true,
+-        nextCursorBefore: '2026-06-10T11:58:00Z',
+-      },
+-      {
+-        messages: [
+-          makeMessage({ id: 'old-1', timestamp: new Date('2026-06-10T10:00:00Z') }),
+-          makeMessage({ id: 'old-2', timestamp: new Date('2026-06-10T10:01:00Z') }),
+-        ],
+-        hasMoreOlder: false,
+-      },
+-    ],
+-    pageParams: [undefined, '2026-06-10T11:58:00Z'],
+-  };
+-}
+-
+-describe('appendMessageToPages', () => {
+-  it('appends an incoming message to page 0, never the last (oldest) page', () => {
+-    const incoming = makeMessage({ id: 'incoming-1' });
+-
+-    const result = appendMessageToPages(makeMultiPageData(), incoming);
+-
+-    expect(result.pages[0].messages.map((m) => m.id)).toEqual(['new-1', 'new-2', 'incoming-1']);
+-    expect(result.pages[1].messages.map((m) => m.id)).toEqual(['old-1', 'old-2']);
+-  });
+-
+-  it('no-ops when the id already exists in another page (cross-page dedupe)', () => {
+-    const data = makeMultiPageData();
+-    const duplicate = makeMessage({ id: 'old-2' });
+-
+-    const result = appendMessageToPages(data, duplicate);
+-
+-    expect(result).toBe(data);
+-  });
+-
+-  it('replaces a matching optimistic message in place, preserving its attachments', () => {
+-    const data = makeMultiPageData();
+-    const attachment = { id: 'att-1', name: 'a.png', url: 'u', type: 'image/png', size: 1 };
+-    data.pages[0].messages.push(
+-      makeMessage({
+-        id: 'temp-123',
+-        content: 'sent with file',
+-        status: MessageStatus.SENDING,
+-        attachments: [attachment as never],
+-      })
+-    );
+-    const saved = makeMessage({ id: 'real-1', content: 'sent with file', attachments: [] });
+-
+-    const result = appendMessageToPages(data, saved);
+-
+-    const ids = result.pages.flatMap((p) => p.messages.map((m) => m.id));
+-    expect(ids).not.toContain('temp-123');
+-    expect(ids.filter((id) => id === 'real-1')).toHaveLength(1);
+-    const merged = result.pages[0].messages.find((m) => m.id === 'real-1');
+-    expect(merged?.attachments).toEqual([attachment]);
+-  });
+-
+-  it('does not let a second optimistic send swallow a pending one with identical content', () => {
+-    const data = makeMultiPageData();
+-    const first = makeMessage({ id: 'temp-1', content: 'same', status: MessageStatus.SENDING });
+-    const second = makeMessage({ id: 'temp-2', content: 'same', status: MessageStatus.SENDING });
+-
+-    const afterFirst = appendMessageToPages(data, first);
+-    const afterSecond = appendMessageToPages(afterFirst, second);
+-
+-    const ids = afterSecond.pages[0].messages.map((m) => m.id);
+-    expect(ids).toContain('temp-1');
+-    expect(ids).toContain('temp-2');
+-  });
+-
+-  it('creates a single-page skeleton when the cache is empty', () => {
+-    const incoming = makeMessage({ id: 'incoming-1' });
+-
+-    const result = appendMessageToPages(undefined, incoming);
+-
+-    expect(result.pages).toHaveLength(1);
+-    expect(result.pages[0].messages.map((m) => m.id)).toEqual(['incoming-1']);
+-  });
+-});
+-
+-describe('replaceMessageInPages', () => {
+-  it('swaps the optimistic message for the saved one in place', () => {
+-    const data = makeMultiPageData();
+-    data.pages[0].messages.push(makeMessage({ id: 'temp-1', status: MessageStatus.SENDING }));
+-    const saved = makeMessage({ id: 'real-1' });
+-
+-    const result = replaceMessageInPages(data, 'temp-1', saved);
+-
+-    const ids = result!.pages[0].messages.map((m) => m.id);
+-    expect(ids).toEqual(['new-1', 'new-2', 'real-1']);
+-  });
+-
+-  it('drops the optimistic copy when realtime already delivered the saved id', () => {
+-    const data = makeMultiPageData();
+-    const saved = makeMessage({ id: 'real-1' });
+-    data.pages[0].messages.push(saved, makeMessage({ id: 'temp-1', status: MessageStatus.SENDING }));
+-
+-    const result = replaceMessageInPages(data, 'temp-1', saved);
+-
+-    const ids = result!.pages.flatMap((p) => p.messages.map((m) => m.id));
+-    expect(ids.filter((id) => id === 'real-1')).toHaveLength(1);
+-    expect(ids).not.toContain('temp-1');
+-  });
+-});
+diff --git a/src/app/api/messages/get/route.ts b/src/app/api/messages/get/route.ts
+index fb728b3..19f6811 100644
+--- a/src/app/api/messages/get/route.ts
++++ b/src/app/api/messages/get/route.ts
+@@ -59,10 +59,16 @@ export async function GET(request: NextRequest) {
+ 
+     // Phase 4 FR-003: reader counts are sender-only. Another member's
+     // message never carries one (RLS would only have let the viewer count
+-    // their own receipt anyway).
++    // their own receipt anyway). Phase 5 FR-034: the composition key
++    // (clientMessageId) is echoed only to its sender, who matches pending
++    // messages with it. Not a confidentiality boundary: members can read the
++    // column (RLS, Realtime payloads); a key grants nothing, since create and
++    // fence act only on the caller's own (sender, conversation, key).
+     const viewerId = ctx.dbUser.id;
+     const messages = result.items.map((message) =>
+-      message.senderId === viewerId ? message : { ...message, readCount: undefined }
++      message.senderId === viewerId
++        ? message
++        : { ...message, readCount: undefined, clientMessageId: undefined }
+     );
+ 
+     return NextResponse.json({
+diff --git a/src/app/api/messages/starred/route.ts b/src/app/api/messages/starred/route.ts
+index 27feb31..e38edc4 100644
+--- a/src/app/api/messages/starred/route.ts
++++ b/src/app/api/messages/starred/route.ts
+@@ -67,8 +67,11 @@ export async function GET(request: NextRequest) {
+       cursorBefore,
+     });
+ 
++    // Reader counts and the composition key (Phase 5 FR-034) are sender-only.
+     const messages = result.items.map((message) =>
+-      message.senderId === viewerId ? message : { ...message, readCount: undefined }
++      message.senderId === viewerId
++        ? message
++        : { ...message, readCount: undefined, clientMessageId: undefined }
+     );
+ 
+     return NextResponse.json(
+diff --git a/src/hooks/realtime/useMessageSubscription.ts b/src/hooks/realtime/useMessageSubscription.ts
+index fd8b442..6933b63 100644
+--- a/src/hooks/realtime/useMessageSubscription.ts
++++ b/src/hooks/realtime/useMessageSubscription.ts
+@@ -59,6 +59,9 @@ const mapRowToMessage = (row: any): Message => ({
+   attachments: [],
+   reactions: [],
+   isEdited: Boolean(row.is_edited),
++  // Phase 5 FR-034: the sender's composition key; the sender's pending copy
++  // is matched to this stored message only by it (null on unkeyed messages).
++  clientMessageId: typeof row.client_message_id === 'string' ? row.client_message_id : undefined,
+ });
+ 
+ // Message types whose payload lives in message_attachments — the realtime
+diff --git a/src/hooks/useMessages.ts b/src/hooks/useMessages.ts
+index 5c92181..71df36a 100644
+--- a/src/hooks/useMessages.ts
++++ b/src/hooks/useMessages.ts
+@@ -1,6 +1,7 @@
+ // src/hooks/useMessages.ts
+ import { useCallback, useMemo, useState } from 'react';
+-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
++import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
++import { v4 as uuidv4 } from 'uuid';
+ import { useCompany } from '@/contexts/CompanyContext';
+ import {
+   Message,
+@@ -15,7 +16,10 @@ import { attachmentMessageType } from '@/lib/messaging/attachment-policy';
+ import {
+   appendMessageToPages,
+   keepMessageThroughInflightFetch,
+-  replaceMessageInPages,
++  normalizeClientMessageId,
++  pendingMessagesQueryKey,
++  PENDING_MESSAGE_ID_PREFIX,
++  visiblePendingMessages,
+   type MessagesInfiniteData,
+ } from '@/lib/messaging/message-cache';
+ import { debugLogger } from '@/utils/debug-logger';
+@@ -51,6 +55,23 @@ const MAX_HISTORY_SEARCH_ROUNDS = 100;
+ const pagesContainMessage = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
+   data?.pages.some((page) => page.messages.some((message) => message.id === messageId)) ?? false;
+ 
++const NO_PENDING_MESSAGES: Message[] = [];
++
++/** Adds (or replaces) or removes one pending message, by key, in the sender's pending list. */
++const updatePendingMessages = (
++  queryClient: QueryClient,
++  queryKey: ReturnType<typeof pendingMessagesQueryKey>,
++  clientMessageId: string,
++  pendingMessage?: Message
++) => {
++  queryClient.setQueryData<Message[]>(queryKey, (current) => {
++    const others = (current ?? []).filter(
++      (message) => normalizeClientMessageId(message.clientMessageId) !== clientMessageId
++    );
++    return pendingMessage ? [...others, pendingMessage] : others;
++  });
++};
++
+ export function useMessages(activeConversationId: string | null) {
+   const queryClient = useQueryClient();
+   const { currentUserProfile } = useCompany();
+@@ -86,14 +107,28 @@ export function useMessages(activeConversationId: string | null) {
+     getNextPageParam: (lastPage) => lastPage.nextCursorBefore,
+   });
+ 
++  // Phase 5 FR-034: the sender's pending messages are kept apart from the
++  // stored feed (a feed fetch replaces the cached pages and must not drop
++  // them) and keyed by the signed-in user (users.id), so they never show to
++  // another account. Client-only state: this query never fetches.
++  const pendingQueryKey = pendingMessagesQueryKey(currentUserProfile?.id ?? '', activeConversationId ?? '');
++  const { data: pendingMessages = NO_PENDING_MESSAGES } = useQuery<Message[]>({
++    queryKey: pendingQueryKey,
++    queryFn: () => queryClient.getQueryData<Message[]>(pendingQueryKey) ?? [],
++    enabled: false,
++    staleTime: Infinity,
++  });
++
+   const messages: Message[] = useMemo(() => {
+-    if (!data?.pages) return [];
+     // Pages are returned Newest -> Oldest (Page 0 is newest)
+     // We want to display Oldest -> Newest
+     // So we reverse the pages array before flattening
+-    const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
+-    return flattened;
+-  }, [data]);
++    const stored = data?.pages ? [...data.pages].reverse().flatMap((p) => p.messages) : [];
++    // A pending message shows until the feed holds the stored message with
++    // its key (Realtime, fetch or create response, whichever comes first).
++    const pending = activeConversationId ? visiblePendingMessages(stored, pendingMessages) : [];
++    return pending.length > 0 ? [...stored, ...pending] : stored;
++  }, [activeConversationId, data, pendingMessages]);
+ 
+   // Initial load only. Background refetches (realtime/receipt invalidations,
+   // focus) and older-page fetches must not swap the feed for a skeleton: that
+@@ -215,7 +250,9 @@ export function useMessages(activeConversationId: string | null) {
+         attachments?: FileAttachment[];
+         type?: MessageType;
+         // Composition key (FR-024): a retry with the same key gets back the
+-        // message already stored, which then replaces this optimistic copy.
++        // message already stored. Phase 5 FR-034: every send is keyed (one
++        // is generated when the caller has none), because the pending copy
++        // is matched to the stored message only by this key.
+         clientMessageId?: string;
+       }
+     ) => {
+@@ -252,9 +289,12 @@ export function useMessages(activeConversationId: string | null) {
+         });
+       }
+ 
++      const clientMessageId = normalizeClientMessageId(options?.clientMessageId) ?? uuidv4();
++      const conversationId = activeConversationId;
++      const pendingKey = pendingMessagesQueryKey(currentUserProfile.id, conversationId);
+       const now = new Date();
+       const optimisticMessage: Message = {
+-        id: `temp-${now.getTime()}`,
++        id: `${PENDING_MESSAGE_ID_PREFIX}${clientMessageId}`,
+         conversationId: activeConversationId,
+         senderId: currentUserProfile.id, // DB ID for UI representation
+         content: trimmedContent,
+@@ -265,13 +305,11 @@ export function useMessages(activeConversationId: string | null) {
+         attachments,
+         reactions: [],
+         isEdited: false,
++        clientMessageId,
+       };
+ 
+-      // Optimistically add to page 0 (newest window) via the shared helper (B-04)
+-      queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-        ['messages', activeConversationId],
+-        (oldData) => appendMessageToPages(oldData, optimisticMessage)
+-      );
++      // Shown after the stored feed until its stored message arrives (FR-034).
++      updatePendingMessages(queryClient, pendingKey, clientMessageId, optimisticMessage);
+ 
+       if (instrumentationEnabled) {
+         debugLogger.messaging.event('useMessages.sendMessage', 'optimistic:applied', {
+@@ -291,7 +329,7 @@ export function useMessages(activeConversationId: string | null) {
+             type: messageType,
+           },
+           {
+-            clientMessageId: options?.clientMessageId,
++            clientMessageId,
+             attachmentIds: attachments?.map((attachment) => attachment.id),
+           }
+         );
+@@ -312,14 +350,22 @@ export function useMessages(activeConversationId: string | null) {
+           });
+         }
+ 
+-        // Replace optimistic with saved (drops the temp copy if realtime
+-        // already delivered the saved id)
++        // The server stored (or replayed) the message of this key. Merge it
++        // into the feed first (a no-op when Realtime or a fetch already
++        // delivered it), then drop the pending copy: the copy is hidden as
++        // soon as the feed holds the key, so neither step shows two bubbles
++        // or none.
++        const confirmed: Message = {
++          ...savedMessage,
++          clientMessageId: normalizeClientMessageId(savedMessage.clientMessageId) ?? clientMessageId,
++        };
+         queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-          ['messages', activeConversationId],
+-          (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
++          ['messages', conversationId],
++          (oldData) => appendMessageToPages(oldData, confirmed)
+         );
+-        keepMessageThroughInflightFetch(queryClient, activeConversationId, savedMessage);
+-        return savedMessage;
++        keepMessageThroughInflightFetch(queryClient, conversationId, confirmed);
++        updatePendingMessages(queryClient, pendingKey, clientMessageId);
++        return confirmed;
+       } catch (err) {
+         if (instrumentationEnabled) {
+           const duration = start ? getTimestamp() - start : 0;
+@@ -330,18 +376,9 @@ export function useMessages(activeConversationId: string | null) {
+             error: err instanceof Error ? err.message : err,
+           });
+         }
+-        // Remove the optimistic message on failure so UI does not show a failed temp message
+-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-          ['messages', activeConversationId],
+-          (oldData) => {
+-            if (!oldData || !oldData.pages) return oldData;
+-            const updatedPages = oldData.pages.map((page) => ({
+-              ...page,
+-              messages: page.messages.filter((m) => m.id !== optimisticMessage.id),
+-            }));
+-            return { ...oldData, pages: updatedPages };
+-          }
+-        );
++        // Remove the pending copy on failure so the UI does not show a failed
++        // temp message (the composer keeps the draft for a retry).
++        updatePendingMessages(queryClient, pendingKey, clientMessageId);
+         throw err;
+       }
+     },
+diff --git a/src/lib/messaging-api.ts b/src/lib/messaging-api.ts
+index 11dc7de..f4dc3b8 100644
+--- a/src/lib/messaging-api.ts
++++ b/src/lib/messaging-api.ts
+@@ -164,7 +164,13 @@ export const messagingApi = {
+         messageId: data.message?.id,
+         status: data.message?.status,
+       });
+-      return data.message;
++      // Same shape as feed messages (Date timestamps), since the sent
++      // message joins the feed cache when Realtime has not delivered it.
++      return {
++        ...data.message,
++        timestamp: normalizeDate(data.message?.timestamp),
++        reactions: normalizeReactions(data.message?.reactions),
++      };
+     } catch (error) {
+       const duration = getTimestamp() - start;
+       debugLogger.messaging.error(scope, 'fetch:error', {
+diff --git a/src/lib/messaging/message-cache.ts b/src/lib/messaging/message-cache.ts
+index ed1c0f0..35ae4e5 100644
+--- a/src/lib/messaging/message-cache.ts
++++ b/src/lib/messaging/message-cache.ts
+@@ -18,53 +18,52 @@ export interface MessagesInfiniteData {
+   pageParams: unknown[];
+ }
+ 
+-const OPTIMISTIC_ID_PREFIX = 'temp-';
++/** Query key of the sender's pending (not yet confirmed) messages of a conversation. */
++export const pendingMessagesQueryKey = (userId: string, conversationId: string) =>
++  ['messages-pending', userId, conversationId] as const;
+ 
+-const getTimeMs = (value: Date | string): number => {
+-  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+-  return Number.isFinite(time) ? time : NaN;
+-};
+-
+-export const isOptimisticMatch = (existing: Message, incoming: Message): boolean => {
+-  if (!existing.id.startsWith(OPTIMISTIC_ID_PREFIX)) {
+-    return false;
+-  }
+-  if (existing.senderId !== incoming.senderId) {
+-    return false;
+-  }
+-  if (existing.content !== incoming.content) {
+-    return false;
+-  }
++/** Prefix of a pending message's id (`temp-<clientMessageId>`); never a stored id. */
++export const PENDING_MESSAGE_ID_PREFIX = 'temp-';
+ 
+-  const existingTime = getTimeMs(existing.timestamp);
+-  const incomingTime = getTimeMs(incoming.timestamp);
++/** A composition key in canonical form (lowercase), or null when absent. */
++export const normalizeClientMessageId = (value: string | null | undefined): string | null =>
++  typeof value === 'string' && value.length > 0 ? value.toLowerCase() : null;
+ 
+-  return (
+-    Number.isFinite(existingTime) &&
+-    Number.isFinite(incomingTime) &&
+-    Math.abs(existingTime - incomingTime) <= 1000
+-  );
++const correlationKey = (message: Message): string | null => {
++  const key = normalizeClientMessageId(message.clientMessageId);
++  return key ? `${message.senderId}:${key}` : null;
+ };
+ 
+-const replaceAt = (
+-  oldData: MessagesInfiniteData,
+-  pageIndex: number,
+-  messageIndex: number,
+-  message: Message
+-): MessagesInfiniteData => {
+-  const pages = [...oldData.pages];
+-  const messages = [...pages[pageIndex].messages];
+-  messages[messageIndex] = message;
+-  pages[pageIndex] = { ...pages[pageIndex], messages };
+-  return { ...oldData, pages };
+-};
++/**
++ * Phase 5 FR-034: the pending messages still to show next to the stored feed.
++ * A pending message is matched to a stored one ONLY by its sender and
++ * `clientMessageId` (the server stores at most one message per sender,
++ * conversation and key): once the feed holds the stored message — from a
++ * Realtime INSERT, a feed fetch or the create response, in any order — the
++ * pending copy is hidden, so the message is one bubble. Content, timestamps
++ * and reply targets are never compared; a stored message without a key (an
++ * unkeyed or pre-Phase-4 create) matches nothing.
++ */
++export function visiblePendingMessages(stored: readonly Message[], pending: readonly Message[]): Message[] {
++  if (pending.length === 0) return [];
++  const storedKeys = new Set<string>();
++  for (const message of stored) {
++    const key = correlationKey(message);
++    if (key) storedKeys.add(key);
++  }
++  return pending.filter((message) => {
++    const key = correlationKey(message);
++    return key === null || !storedKeys.has(key);
++  });
++}
+ 
+ /**
+- * Merges an incoming message into the infinite-query cache:
++ * Merges a stored message (a Realtime INSERT, a create response) into the
++ * infinite-query cache:
+  * - id already present in ANY page → no-op (realtime echo / duplicate event);
+- * - a matching optimistic `temp-` message → replaced in place (attachments
+- *   from the optimistic copy survive, because realtime rows never carry them);
+  * - otherwise → appended to page 0, the newest window.
++ * Pending messages live outside this cache (pendingMessagesQueryKey) and are
++ * matched to stored ones by key only (visiblePendingMessages).
+  */
+ export function appendMessageToPages(
+   oldData: MessagesInfiniteData | undefined,
+@@ -80,69 +79,11 @@ export function appendMessageToPages(
+     }
+   }
+ 
+-  // An optimistic incoming message (the send path) must never swallow another
+-  // pending temp- message with identical content sent moments before.
+-  if (!message.id.startsWith(OPTIMISTIC_ID_PREFIX)) {
+-    for (let pageIndex = 0; pageIndex < oldData.pages.length; pageIndex++) {
+-      const messageIndex = oldData.pages[pageIndex].messages.findIndex((existing) =>
+-        isOptimisticMatch(existing, message)
+-      );
+-      if (messageIndex >= 0) {
+-        const optimistic = oldData.pages[pageIndex].messages[messageIndex];
+-        const merged: Message = {
+-          ...message,
+-          attachments: message.attachments?.length ? message.attachments : optimistic.attachments,
+-        };
+-        return replaceAt(oldData, pageIndex, messageIndex, merged);
+-      }
+-    }
+-  }
+-
+   const pages = [...oldData.pages];
+   pages[0] = { ...pages[0], messages: [...pages[0].messages, message] };
+   return { ...oldData, pages };
+ }
+ 
+-/** Replaces a message by id across all pages (optimistic → saved swap). */
+-export function replaceMessageInPages(
+-  oldData: MessagesInfiniteData | undefined,
+-  previousId: string,
+-  message: Message
+-): MessagesInfiniteData | undefined {
+-  if (!oldData || !oldData.pages) {
+-    return oldData;
+-  }
+-
+-  // If the saved id already landed via realtime, drop the optimistic copy
+-  // instead of swapping it in twice.
+-  const savedAlreadyPresent = oldData.pages.some((page) =>
+-    page.messages.some((existing) => existing.id === message.id)
+-  );
+-  if (savedAlreadyPresent) {
+-    return {
+-      ...oldData,
+-      pages: oldData.pages.map((page) => ({
+-        ...page,
+-        messages: page.messages.filter((existing) => existing.id !== previousId),
+-      })),
+-    };
+-  }
+-
+-  for (let pageIndex = 0; pageIndex < oldData.pages.length; pageIndex++) {
+-    const messageIndex = oldData.pages[pageIndex].messages.findIndex(
+-      (existing) => existing.id === previousId
+-    );
+-    if (messageIndex >= 0) {
+-      return replaceAt(oldData, pageIndex, messageIndex, message);
+-    }
+-  }
+-
+-  // Neither copy is cached: a refetch that read the server before the save
+-  // committed replaced the page and dropped the optimistic copy. The saved
+-  // message is persisted, so it belongs in the feed.
+-  return appendMessageToPages(oldData, message);
+-}
+-
+ const messagesQueryKey = (conversationId: string) => ['messages', conversationId] as const;
+ 
+ const isMessageCached = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
+diff --git a/src/repositories/implementations/supabase/SupabaseMessageRepository.ts b/src/repositories/implementations/supabase/SupabaseMessageRepository.ts
+index efb764c..083547b 100644
+--- a/src/repositories/implementations/supabase/SupabaseMessageRepository.ts
++++ b/src/repositories/implementations/supabase/SupabaseMessageRepository.ts
+@@ -1,10 +1,12 @@
+ // src/repositories/implementations/supabase/SupabaseMessageRepository.ts
+-import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
+-import { Message, FileAttachment, VoiceNoteAttachment, MessageReaction, MessageType, MessageStatus, MessageReader, MessagePin, MessageStar, MessageCreateResult } from '@/types/messaging';
++import type { ClientMessageKey, IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
++import { Message, FileAttachment, VoiceNoteAttachment, MessageReaction, MessageType, MessageStatus, MessageReader, MessagePin, MessageStar, MessageCreateResult, MessageAttempt, MessageAttemptFenceResult, InsertionQuota } from '@/types/messaging';
+ import { toVoiceNoteWaveform } from '@/lib/messaging/attachment-policy';
+ import { PaginationOptions, PaginatedResult } from '@/types/common';
+ import { SupabaseClient } from '@supabase/supabase-js';
+ 
++import { createMessageAttempt, fenceMessageAttempt } from './message-attempt-rpc';
++
+ // --- Helper Functions ---
+ 
+ // Composite keyset cursor "{raw_pg_timestamp}|{id}" (audit M-03). The raw
+@@ -34,7 +36,40 @@ type MessageRow = {
+   status: string;
+   reply_to_id: string | null;
+   is_edited: boolean;
++  // Phase 5 FR-034: the sender's composition key; null on unkeyed messages
++  // (pre-Phase 4 or unkeyed creates). Absent only on partial selects.
++  client_message_id?: string | null;
+ };
++/** A messages row returned by create_message_attempt (Phase 5 T3); null if malformed. */
++function parseCreatedRow(value: Record<string, unknown> | null): MessageRow | null {
++  if (
++    !value ||
++    typeof value.id !== 'string' ||
++    typeof value.conversation_id !== 'string' ||
++    typeof value.sender_id !== 'string' ||
++    typeof value.content !== 'string' ||
++    typeof value.timestamp !== 'string' ||
++    typeof value.type !== 'string' ||
++    typeof value.status !== 'string' ||
++    typeof value.is_edited !== 'boolean' ||
++    (value.reply_to_id !== null && typeof value.reply_to_id !== 'string')
++  ) {
++    return null;
++  }
++  return {
++    id: value.id,
++    conversation_id: value.conversation_id,
++    sender_id: value.sender_id,
++    content: value.content,
++    timestamp: value.timestamp,
++    type: value.type,
++    status: value.status,
++    reply_to_id: value.reply_to_id,
++    is_edited: value.is_edited,
++    client_message_id: typeof value.client_message_id === 'string' ? value.client_message_id : null,
++  };
++}
++
+ function mapMessageToCamelCase(data: MessageRow): Message {
+   if (!data) return data;
+   return {
+@@ -47,6 +82,7 @@ function mapMessageToCamelCase(data: MessageRow): Message {
+     status: data.status as MessageStatus,
+     replyToId: data.reply_to_id || undefined,
+     isEdited: data.is_edited,
++    clientMessageId: data.client_message_id ?? undefined,
+     attachments: [], // Placeholder - fetch separately
+     reactions: []    // Placeholder - fetch separately
+   };
+@@ -139,20 +175,16 @@ function toMessageInsertRow(messageData: MessageCreateData) {
+   };
+ }
+ 
+-function mapCreatedMessage(row: MessageRow): Message {
++function mapCreatedMessage(row: MessageRow, mentionedUserIds?: string[]): Message {
+   const message = mapMessageToCamelCase(row);
+   message.reactions = message.reactions || [];
+   message.attachments = message.attachments || [];
++  if (mentionedUserIds) {
++    message.mentionedUserIds = [...mentionedUserIds].sort();
++  }
+   return message;
+ }
+ 
+-// unique_violation. On a keyed insert the only reachable unique index is
+-// messages_sender_conversation_client_message_id_key (id is defaulted); the
+-// caller confirms by reading the winning row and rethrows if there is none.
+-function isUniqueViolation(error: { code?: string }): boolean {
+-  return error.code === '23505';
+-}
+-
+ function mapMessageArrayToCamelCase(dataArray: MessageRow[]): Message[] {
+   if (!dataArray) return [];
+   return dataArray.map(item => mapMessageToCamelCase(item));
+@@ -170,6 +202,8 @@ type AttachmentRow = AttachmentFields & { message_id: string };
+ type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
+ type MessagePinRow = { id: string; message_id: string; conversation_id: string; pinned_by: string; pinned_at: string };
+ type MessageStarRow = { id: string; message_id: string; conversation_id: string; user_id: string; starred_at: string };
++/** Most message ids per public.list_message_mentions call (the function accepts 1000). */
++const MENTION_READ_BATCH_SIZE = 500;
+ type MessageReaderRow = {
+   user_id: string;
+   read_at: string;
+@@ -190,12 +224,57 @@ export class SupabaseMessageRepository implements IMessageRepository {
+     this.supabaseClient = supabaseClient;
+   }
+ 
++  /**
++   * Phase 5 T4 (FR-024): mentioned users (users.id, sorted) per message id;
++   * every requested id gets an entry (empty when none). Read through
++   * public.list_message_mentions, which answers ONE jsonb object per call, so
++   * PostgREST's max-rows can never truncate it (review T4 r1 finding 1); ids
++   * are sent in batches of MENTION_READ_BATCH_SIZE. SECURITY INVOKER: under a
++   * user-scoped client, mention RLS limits the answer to conversations the
++   * caller belongs to. Throws when they cannot be read: an empty list would
++   * silently drop a mention (highlight, notification).
++   */
++  private async loadMentionedUserIds(messageIds: readonly string[]): Promise<Map<string, string[]>> {
++    // Keys lowercase: the database answers with lowercase uuid text.
++    const byMessageId = new Map<string, string[]>(messageIds.map((id) => [id.toLowerCase(), []]));
++    const uniqueIds = [...byMessageId.keys()];
++    const batches: string[][] = [];
++    for (let start = 0; start < uniqueIds.length; start += MENTION_READ_BATCH_SIZE) {
++      batches.push(uniqueIds.slice(start, start + MENTION_READ_BATCH_SIZE));
++    }
++    const answers = await Promise.all(
++      batches.map((batch) => this.supabaseClient.rpc('list_message_mentions', { p_message_ids: batch }))
++    );
++    for (const { data, error } of answers) {
++      if (error) {
++        console.error('Error fetching message mentions:', error);
++        throw error;
++      }
++      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
++        throw new Error('list_message_mentions returned an unexpected result');
++      }
++      for (const [messageId, ids] of Object.entries(data as Record<string, unknown>)) {
++        const target = byMessageId.get(messageId);
++        if (!target || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
++          throw new Error('list_message_mentions returned an unexpected result');
++        }
++        target.push(...(ids as string[]));
++      }
++    }
++    byMessageId.forEach((ids) => ids.sort());
++    return byMessageId;
++  }
++
+   private async enrichMessages(messages: Message[]): Promise<Message[]> {
+     if (messages.length === 0) {
+       return messages;
+     }
+ 
+     const messageIds = messages.map(m => m.id);
++    // Started first, awaited after the other reads (one fewer serial round trip).
++    const mentionsPromise = this.loadMentionedUserIds(messageIds);
++    // Settle it even when an await below throws (no unhandled rejection).
++    mentionsPromise.catch(() => undefined);
+ 
+     const { data: attachmentsData } = await this.supabaseClient
+       .from(this.ATTACHMENT_TABLE_NAME)
+@@ -221,9 +300,11 @@ export class SupabaseMessageRepository implements IMessageRepository {
+       return acc;
+     }, {} as Record<string, MessageReaction[]>);
+ 
++    const mentionsByMessageId = await mentionsPromise;
+     messages.forEach(message => {
+       message.attachments = attachmentsByMessageId[message.id] || [];
+       message.reactions = reactionsByMessageId[message.id] || [];
++      message.mentionedUserIds = mentionsByMessageId.get(message.id.toLowerCase()) ?? [];
+     });
+ 
+     return messages;
+@@ -328,6 +409,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
+ 
+     // Map the core message data
+     const message = mapMessageToCamelCase(data);
++    const mentionsPromise = this.loadMentionedUserIds([message.id]);
++    mentionsPromise.catch(() => undefined);
+ 
+     const [
+       { data: attachmentsData, error: attachmentsError },
+@@ -352,6 +435,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
+         .select('*')
+         .eq('message_id', message.id)
+     ]);
++    message.mentionedUserIds = (await mentionsPromise).get(message.id.toLowerCase()) ?? [];
+ 
+     if (attachmentsError) {
+       console.error(`Error fetching attachments for message ID ${message.id}:`, attachmentsError);
+@@ -522,55 +606,87 @@ export class SupabaseMessageRepository implements IMessageRepository {
+     return mapCreatedMessage(data as MessageRow);
+   }
+ 
+-  // Idempotent create (Phase 4 FR-024): the composition key is unique per
+-  // (sender_id, conversation_id) through the partial unique index
+-  // messages_sender_conversation_client_message_id_key. A retry finds the
+-  // stored row; a concurrent create with the same key loses the INSERT race
+-  // with a unique violation and reads the winner instead.
+-  async createWithClientKey(messageData: MessageCreateData, clientMessageId: string): Promise<MessageCreateResult> {
+-    const stored = await this.findByClientMessageId(messageData, clientMessageId);
+-    if (stored) {
+-      return { message: stored, created: false };
++  // Phase 5 T3: unkeyed create in public.create_message_attempt (null key and
++  // generation) so the insertion quota is charged in the insertion's own
++  // transaction — a failed INSERT is never charged (migration 20261007114454).
++  // The answer is the row the function built in that transaction: no
++  // post-commit read can fail after the message is stored (a keyless retry
++  // would duplicate it).
++  async createUnkeyed(messageData: MessageCreateData, insertQuota: InsertionQuota): Promise<Message> {
++    const result = await createMessageAttempt(this.supabaseClient, {
++      data: messageData,
++      uploadIds: [],
++      insertQuota,
++    });
++    if (!result.created) {
++      throw new Error(`create_message_attempt replayed unkeyed message ${result.messageId}`);
++    }
++    // An unkeyed create carries no composition, hence no mention (T4): its
++    // legacy response shape is unchanged (no mentionedUserIds).
++    const row = parseCreatedRow(result.createdRow);
++    if (row) {
++      return mapCreatedMessage(row);
+     }
++    // Unreachable while the function returns its RETURNING row; the message is
++    // committed, so read it rather than answer 500 for a stored message.
++    console.error('create_message_attempt returned a malformed created row:', result.messageId);
++    return this.readCreatedMessage(result.messageId, false);
++  }
+ 
++  private async readCreatedMessage(messageId: string, withMentions: boolean): Promise<Message> {
+     const { data, error } = await this.supabaseClient
+       .from(this.MSG_TABLE_NAME)
+-      .insert({ ...toMessageInsertRow(messageData), client_message_id: clientMessageId })
+-      .select()
++      .select('*')
++      .eq('id', messageId)
+       .single();
+ 
+-    if (!error && data) {
+-      return { message: mapCreatedMessage(data as MessageRow), created: true };
++    if (error || !data) {
++      console.error('Error reading message after create:', error);
++      throw error || new Error(`Message ${messageId} not found after create`);
+     }
+-
+-    if (error && isUniqueViolation(error)) {
+-      const winner = await this.findByClientMessageId(messageData, clientMessageId);
+-      if (winner) {
+-        return { message: winner, created: false };
+-      }
++    if (!withMentions) {
++      return mapCreatedMessage(data as MessageRow);
+     }
+-
+-    console.error('Error creating message:', error);
+-    throw error || new Error('Failed to create message or retrieve created data.');
++    const mentions = await this.loadMentionedUserIds([messageId]);
++    return mapCreatedMessage(data as MessageRow, mentions.get(messageId.toLowerCase()) ?? []);
+   }
+ 
+-  private async findByClientMessageId(
+-    messageData: Pick<MessageCreateData, 'senderId' | 'conversationId'>,
+-    clientMessageId: string
+-  ): Promise<Message | null> {
+-    const { data, error } = await this.supabaseClient
+-      .from(this.MSG_TABLE_NAME)
+-      .select('*')
+-      .eq('sender_id', messageData.senderId)
+-      .eq('conversation_id', messageData.conversationId)
+-      .eq('client_message_id', clientMessageId)
+-      .maybeSingle();
++  // Idempotent create (Phase 4 FR-024): the composition key is unique per
++  // (sender_id, conversation_id) through the partial unique index
++  // messages_sender_conversation_client_message_id_key. Phase 5 T2: the insert
++  // runs in public.create_message_attempt, which returns the stored message on
++  // a replay or a lost same-key race, and refuses to commit a fenced attempt
++  // (AttemptSupersededError) — see migration 20261007095045. Phase 5 T3: a
++  // winning insertion charges insertQuota in the same transaction
++  // (InsertionRateLimitError, nothing stored) — migration 20261007114454.
++  async createWithClientKey(
++    messageData: MessageCreateData,
++    clientMessageId: string,
++    attempt: MessageAttempt | undefined,
++    insertQuota: InsertionQuota | null
++  ): Promise<MessageCreateResult> {
++    const result = await createMessageAttempt(this.supabaseClient, {
++      data: messageData,
++      clientMessageId,
++      attempt,
++      uploadIds: [],
++      insertQuota,
++    });
+ 
+-    if (error) {
+-      console.error('Error looking up message by client key:', error);
+-      throw error;
+-    }
+-    return data ? mapCreatedMessage(data as MessageRow) : null;
++    // Phase 5 T4: a winning insertion answers with the mentions it stored in
++    // its own transaction; a replay reads the stored message and mentions.
++    const createdRow = result.created ? parseCreatedRow(result.createdRow) : null;
++    return {
++      message: createdRow
++        ? mapCreatedMessage(createdRow, result.mentionedUserIds ?? [])
++        : await this.readCreatedMessage(result.messageId, true),
++      created: result.created,
++      storedComposition: result.storedComposition,
++    };
++  }
++
++  async fenceClientMessage(key: ClientMessageKey, generation: number): Promise<MessageAttemptFenceResult> {
++    return fenceMessageAttempt(this.supabaseClient, key, generation);
+   }
+ 
+   async update(id: string, updates: Partial<Pick<Message, 'content' | 'status' | 'isEdited'>>): Promise<Message | null> {
+diff --git a/src/types/messaging.ts b/src/types/messaging.ts
+index 55c8acf..140cf80 100644
+--- a/src/types/messaging.ts
++++ b/src/types/messaging.ts
+@@ -52,8 +52,62 @@ export interface PendingAttachmentUpload {
+ export interface MessageWithAttachmentsCreateResult {
+   messageId: string;
+   created: boolean;
++  /**
++   * Phase 5 T2: on a replay (created: false), the original composition
++   * recorded when the message was created under its key; null when none was
++   * recorded (keyed messages created before Phase 5).
++   */
++  storedComposition?: MessageComposition | null;
+ }
+ 
++/**
++ * Phase 5 T2 (FR-024): the original submitted composition of a keyed create,
++ * normalized by the create route, which replays of the same key are compared
++ * against. `type` is null for attachment messages (their type derives from
++ * the attachments); `attachmentIds` is sorted. Phase 5 T4: `mentionIds` are
++ * the REQUESTED mention user ids (users.id; lowercase, distinct, sorted), not
++ * only the stored ones; a stored composition without them (created before T4)
++ * means none were requested, like an empty list.
++ */
++export interface MessageComposition {
++  content: string;
++  type: MessageType | null;
++  replyToId: string | null;
++  attachmentIds: string[];
++  mentionIds: string[];
++}
++
++/**
++ * Phase 5 T2 (FR-006): one dispatch of a keyed composition. `generation` is
++ * monotonic per (sender, conversation, clientMessageId); absent for Phase 4
++ * clients, whose keyed creates commit only while the key has no fence state.
++ */
++export interface MessageAttempt {
++  generation?: number;
++  composition: MessageComposition;
++}
++
++/**
++ * Phase 5 T3 (FR-008, D1): the sender's message insertion quota (at most
++ * `limit` stored messages per fixed `windowSeconds` window). The database
++ * charges it in the transaction of a winning insertion only; replays, lost
++ * same-key races and refused creates never consume it.
++ */
++export interface InsertionQuota {
++  limit: number;
++  windowSeconds: number;
++}
++
++/**
++ * Phase 5 T2: result of fencing/looking up the caller's own key. `superseded`
++ * means a newer generation exists (nothing was changed). `stored` with a null
++ * messageId: a message was committed under the key and deleted since.
++ */
++export type MessageAttemptFenceResult =
++  | { outcome: 'superseded' }
++  | { outcome: 'stored'; messageId: string | null }
++  | { outcome: 'not_stored' };
++
+ // Voice Note Attachment (extends FileAttachment with voice-specific metadata)
+ export interface VoiceNoteAttachment extends FileAttachment {
+   duration: number; // Duration in seconds
+@@ -121,6 +175,25 @@ export interface Message {
+   pins?: MessagePin[]; // Optional: user-specific pins for this message
+   stars?: MessageStar[]; // Optional: user-specific stars for this message
+   isEdited: boolean;
++  // Phase 5 FR-034: the sender's composition key (messages.client_message_id),
++  // absent on unkeyed messages. Carried by the create and fence responses,
++  // the feed (own messages only), Realtime INSERTs and pending messages; a
++  // pending message is matched to its stored message only by this key.
++  clientMessageId?: string;
++  // Phase 5 T4 (FR-024): users (users.id) this message mentions, stored with
++  // its first creation (members other than the sender at that time), sorted.
++  // Set on messages read by the repository (feed, create/fence responses).
++  mentionedUserIds?: string[];
++}
++
++/**
++ * Phase 5 T4 (FR-023): a current member of a conversation
++ * (public.conversation_members), as listed to other current members.
++ */
++export interface ConversationMember {
++  userId: string; // users.id
++  displayName: string | null;
++  avatarUrl: string | null;
+ }
+ 
+ /**
+@@ -131,6 +204,8 @@ export interface Message {
+ export interface MessageCreateResult {
+   message: Message;
+   created: boolean;
++  /** Phase 5 T2: see MessageWithAttachmentsCreateResult.storedComposition. */
++  storedComposition?: MessageComposition | null;
+ }
+ 
+ /**

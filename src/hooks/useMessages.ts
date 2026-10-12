@@ -1,6 +1,7 @@
 // src/hooks/useMessages.ts
-import { useCallback, useMemo, useState } from 'react';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { v4 as uuidv4 } from 'uuid';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
   Message,
@@ -14,8 +15,14 @@ import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import { attachmentMessageType } from '@/lib/messaging/attachment-policy';
 import {
   appendMessageToPages,
+  isMessageDeleted,
+  isPendingMessage,
   keepMessageThroughInflightFetch,
-  replaceMessageInPages,
+  normalizeClientMessageId,
+  pendingMessagesQueryKey,
+  PENDING_MESSAGE_ID_PREFIX,
+  resolvePendingMessages,
+  visiblePendingMessages,
   type MessagesInfiniteData,
 } from '@/lib/messaging/message-cache';
 import { debugLogger } from '@/utils/debug-logger';
@@ -50,6 +57,23 @@ const MAX_HISTORY_SEARCH_ROUNDS = 100;
 
 const pagesContainMessage = (data: MessagesInfiniteData | undefined, messageId: string): boolean =>
   data?.pages.some((page) => page.messages.some((message) => message.id === messageId)) ?? false;
+
+const NO_PENDING_MESSAGES: Message[] = [];
+
+/** Adds (or replaces) or removes one pending message, by key, in the sender's pending list. */
+const updatePendingMessages = (
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof pendingMessagesQueryKey>,
+  clientMessageId: string,
+  pendingMessage?: Message
+) => {
+  queryClient.setQueryData<Message[]>(queryKey, (current) => {
+    const others = (current ?? []).filter(
+      (message) => normalizeClientMessageId(message.clientMessageId) !== clientMessageId
+    );
+    return pendingMessage ? [...others, pendingMessage] : others;
+  });
+};
 
 export function useMessages(activeConversationId: string | null) {
   const queryClient = useQueryClient();
@@ -86,14 +110,47 @@ export function useMessages(activeConversationId: string | null) {
     getNextPageParam: (lastPage) => lastPage.nextCursorBefore,
   });
 
-  const messages: Message[] = useMemo(() => {
-    if (!data?.pages) return [];
-    // Pages are returned Newest -> Oldest (Page 0 is newest)
-    // We want to display Oldest -> Newest
-    // So we reverse the pages array before flattening
-    const flattened = [...data.pages].reverse().flatMap((p) => p.messages);
-    return flattened;
-  }, [data]);
+  // Phase 5 FR-034: the sender's pending messages are kept apart from the
+  // stored feed (a feed fetch replaces the cached pages and must not drop
+  // them) and keyed by the signed-in user (users.id), so they never show to
+  // another account. Client-only state: this query never fetches.
+  const pendingQueryKey = pendingMessagesQueryKey(currentUserProfile?.id ?? '', activeConversationId ?? '');
+  const { data: pendingMessages = NO_PENDING_MESSAGES } = useQuery<Message[]>({
+    queryKey: pendingQueryKey,
+    queryFn: () => queryClient.getQueryData<Message[]>(pendingQueryKey) ?? [],
+    enabled: false,
+    staleTime: Infinity,
+    // Phase 5 T8: also the render view of the durable outbox; never collected.
+    gcTime: Infinity,
+  });
+
+  // Pages are returned Newest -> Oldest (Page 0 is newest)
+  // We want to display Oldest -> Newest
+  // So we reverse the pages array before flattening
+  const storedMessages: Message[] = useMemo(
+    () => (data?.pages ? [...data.pages].reverse().flatMap((p) => p.messages) : []),
+    [data]
+  );
+  // A pending message shows until the feed holds the stored message with its
+  // key (Realtime, fetch or create response, whichever comes first).
+  const visiblePending = useMemo(
+    () => (activeConversationId ? visiblePendingMessages(storedMessages, pendingMessages) : []),
+    [activeConversationId, storedMessages, pendingMessages]
+  );
+  const messages: Message[] = useMemo(
+    () => (visiblePending.length > 0 ? [...storedMessages, ...visiblePending] : storedMessages),
+    [storedMessages, visiblePending]
+  );
+  // Once the rendered feed holds a pending message's stored copy (e.g. from
+  // a fetch), the pending message is resolved for good: if the stored message
+  // later leaves the feed (e.g. a Realtime DELETE), it is not shown again as
+  // "sending".
+  const hasObservedPending = pendingMessages.length > visiblePending.length;
+  useEffect(() => {
+    if (activeConversationId && hasObservedPending) {
+      resolvePendingMessages(queryClient, activeConversationId, storedMessages);
+    }
+  }, [activeConversationId, hasObservedPending, queryClient, storedMessages]);
 
   // Initial load only. Background refetches (realtime/receipt invalidations,
   // focus) and older-page fetches must not swap the feed for a skeleton: that
@@ -215,8 +272,13 @@ export function useMessages(activeConversationId: string | null) {
         attachments?: FileAttachment[];
         type?: MessageType;
         // Composition key (FR-024): a retry with the same key gets back the
-        // message already stored, which then replaces this optimistic copy.
+        // message already stored. Phase 5 FR-034: every send is keyed (one
+        // is generated when the caller has none), because the pending copy
+        // is matched to the stored message only by this key.
         clientMessageId?: string;
+        // Phase 5 T17 (FR-024): requested mentions (users.id), sent with the
+        // key and identical on every retry of it (else 409).
+        mentionIds?: string[];
       }
     ) => {
       const trimmedContent = content.trim();
@@ -252,9 +314,13 @@ export function useMessages(activeConversationId: string | null) {
         });
       }
 
+      const clientMessageId = normalizeClientMessageId(options?.clientMessageId) ?? uuidv4();
+      const conversationId = activeConversationId;
+      const pendingKey = pendingMessagesQueryKey(currentUserProfile.id, conversationId);
       const now = new Date();
+      const mentionIds = options?.mentionIds?.length ? options.mentionIds : undefined;
       const optimisticMessage: Message = {
-        id: `temp-${now.getTime()}`,
+        id: `${PENDING_MESSAGE_ID_PREFIX}${clientMessageId}`,
         conversationId: activeConversationId,
         senderId: currentUserProfile.id, // DB ID for UI representation
         content: trimmedContent,
@@ -265,13 +331,12 @@ export function useMessages(activeConversationId: string | null) {
         attachments,
         reactions: [],
         isEdited: false,
+        clientMessageId,
+        ...(mentionIds ? { mentionedUserIds: [...mentionIds] } : {}),
       };
 
-      // Optimistically add to page 0 (newest window) via the shared helper (B-04)
-      queryClient.setQueryData<MessagesInfiniteData | undefined>(
-        ['messages', activeConversationId],
-        (oldData) => appendMessageToPages(oldData, optimisticMessage)
-      );
+      // Shown after the stored feed until its stored message arrives (FR-034).
+      updatePendingMessages(queryClient, pendingKey, clientMessageId, optimisticMessage);
 
       if (instrumentationEnabled) {
         debugLogger.messaging.event('useMessages.sendMessage', 'optimistic:applied', {
@@ -291,8 +356,9 @@ export function useMessages(activeConversationId: string | null) {
             type: messageType,
           },
           {
-            clientMessageId: options?.clientMessageId,
+            clientMessageId,
             attachmentIds: attachments?.map((attachment) => attachment.id),
+            mentionIds,
           }
         );
 
@@ -312,14 +378,28 @@ export function useMessages(activeConversationId: string | null) {
           });
         }
 
-        // Replace optimistic with saved (drops the temp copy if realtime
-        // already delivered the saved id)
-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
-          ['messages', activeConversationId],
-          (oldData) => replaceMessageInPages(oldData, optimisticMessage.id, savedMessage)
-        );
-        keepMessageThroughInflightFetch(queryClient, activeConversationId, savedMessage);
-        return savedMessage;
+        // The server stored (or replayed) the message of this key. Unless the
+        // feed already observed it (the pending copy is then resolved: its
+        // stored copy came by Realtime or a fetch, and that copy stays the
+        // feed's) or this client saw a Realtime DELETE for it (bounded
+        // registry; a deletion missed during a stream gap is not known here),
+        // merge it into the feed first, then drop the pending copy: the copy
+        // is hidden as soon as the feed holds the key, so neither step shows
+        // two bubbles or none.
+        const confirmed: Message = {
+          ...savedMessage,
+          clientMessageId: normalizeClientMessageId(savedMessage.clientMessageId) ?? clientMessageId,
+        };
+        const unresolved = isPendingMessage(queryClient.getQueryData<Message[]>(pendingKey), clientMessageId);
+        if (unresolved && !isMessageDeleted(queryClient, confirmed.id)) {
+          queryClient.setQueryData<MessagesInfiniteData | undefined>(
+            ['messages', conversationId],
+            (oldData) => appendMessageToPages(oldData, confirmed)
+          );
+          keepMessageThroughInflightFetch(queryClient, conversationId, confirmed);
+        }
+        updatePendingMessages(queryClient, pendingKey, clientMessageId);
+        return confirmed;
       } catch (err) {
         if (instrumentationEnabled) {
           const duration = start ? getTimestamp() - start : 0;
@@ -330,18 +410,9 @@ export function useMessages(activeConversationId: string | null) {
             error: err instanceof Error ? err.message : err,
           });
         }
-        // Remove the optimistic message on failure so UI does not show a failed temp message
-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
-          ['messages', activeConversationId],
-          (oldData) => {
-            if (!oldData || !oldData.pages) return oldData;
-            const updatedPages = oldData.pages.map((page) => ({
-              ...page,
-              messages: page.messages.filter((m) => m.id !== optimisticMessage.id),
-            }));
-            return { ...oldData, pages: updatedPages };
-          }
-        );
+        // Remove the pending copy on failure so the UI does not show a failed
+        // temp message (the composer keeps the draft for a retry).
+        updatePendingMessages(queryClient, pendingKey, clientMessageId);
         throw err;
       }
     },

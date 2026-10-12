@@ -58,6 +58,15 @@ export function buildLocalSupabaseEnv(): Record<string, string> {
     PLAYWRIGHT_TERTIARY_EMAIL: 'messaging-tertiary@local.test',
     PLAYWRIGHT_TERTIARY_PASSWORD: 'local-messaging-tertiary-pw',
     PLAYWRIGHT_TERTIARY_DISPLAY_NAME: 'Local Tertiary',
+    // Phase 5 E2E world (users A–E): primary = A, secondary = B, tertiary = C,
+    // plus D and E below. Local mode only (the seed route refuses the Phase 5
+    // world elsewhere); all five sign in.
+    PLAYWRIGHT_FOURTH_EMAIL: 'messaging-fourth@local.test',
+    PLAYWRIGHT_FOURTH_PASSWORD: 'local-messaging-fourth-pw',
+    PLAYWRIGHT_FOURTH_DISPLAY_NAME: 'Local Quaternary',
+    PLAYWRIGHT_FIFTH_EMAIL: 'messaging-fifth@local.test',
+    PLAYWRIGHT_FIFTH_PASSWORD: 'local-messaging-fifth-pw',
+    PLAYWRIGHT_FIFTH_DISPLAY_NAME: 'Local Quinary',
     // Hosted-account credentials from .env.local must not leak into local runs.
     AUTH_E2E_EMAIL: '',
     AUTH_E2E_PASSWORD: '',
@@ -67,6 +76,18 @@ export function buildLocalSupabaseEnv(): Record<string, string> {
     VO_NEXT_TSCONFIG: 'tsconfig.messaging-local.json',
   };
 }
+
+/**
+ * Env keys of every messaging Playwright test account, the same set the seed
+ * route accepts (A = primary, B = secondary, C = tertiary, D = fourth, E = fifth).
+ */
+export const MESSAGING_TEST_ACCOUNT_EMAIL_KEYS = [
+  'PLAYWRIGHT_PRIMARY_EMAIL',
+  'PLAYWRIGHT_SECONDARY_EMAIL',
+  'PLAYWRIGHT_TERTIARY_EMAIL',
+  'PLAYWRIGHT_FOURTH_EMAIL',
+  'PLAYWRIGHT_FIFTH_EMAIL',
+] as const;
 
 export function isLoopbackUrl(value: string): boolean {
   try {

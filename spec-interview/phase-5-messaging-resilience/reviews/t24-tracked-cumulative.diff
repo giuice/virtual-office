@@ -1,0 +1,518 @@
+diff --git a/.gitignore b/.gitignore
+index e964fbb..1066e1e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -83,3 +83,4 @@ bmad-bak/
+ /memory-bank
+ _bmad/
+ memory-bank-deprecated-docs/
++/.playwright-server-logs/
+diff --git a/__tests__/api/playwright/fixtures/messaging.ts b/__tests__/api/playwright/fixtures/messaging.ts
+index 9c3bbd3..62cdef7 100644
+--- a/__tests__/api/playwright/fixtures/messaging.ts
++++ b/__tests__/api/playwright/fixtures/messaging.ts
+@@ -179,7 +179,7 @@ const isPasswordSignInRequest = (request: Request) =>
+  * recorded on the test. Every other outcome (wrong credentials, a rate limit,
+  * a second transport failure, no redirect) fails with what the page showed.
+  */
+-async function login(page: Page, email: string, password: string) {
++export async function login(page: Page, email: string, password: string) {
+   await page.goto('/login');
+   // The login page is localized (pt-BR today); match either language.
+   await page.getByLabel(/^email$/i).fill(email);
+@@ -251,7 +251,7 @@ const isLocalSupabaseMode = process.env[LOCAL_MESSAGING_FLAG] === '1';
+  * them reached a hosted Supabase domain. The Supabase hosts seen are attached
+  * as an annotation so each run carries its own network evidence.
+  */
+-function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
++export function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
+   if (!isLocalSupabaseMode) {
+     return () => {};
+   }
+@@ -284,7 +284,7 @@ function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
+  * whenever it is visible before an action; it is never what a messaging test
+  * is exercising.
+  */
+-async function closePlacementToasts(page: Page): Promise<void> {
++export async function closePlacementToasts(page: Page): Promise<void> {
+   const placementToast = page
+     .locator('[data-sonner-toast]')
+     .filter({ hasText: /Welcome! You've been placed in|Reconnected to/ });
+diff --git a/__tests__/api/playwright/helpers/local-supabase-mode.ts b/__tests__/api/playwright/helpers/local-supabase-mode.ts
+index fcbd1ca..439013c 100644
+--- a/__tests__/api/playwright/helpers/local-supabase-mode.ts
++++ b/__tests__/api/playwright/helpers/local-supabase-mode.ts
+@@ -58,6 +58,15 @@ export function buildLocalSupabaseEnv(): Record<string, string> {
+     PLAYWRIGHT_TERTIARY_EMAIL: 'messaging-tertiary@local.test',
+     PLAYWRIGHT_TERTIARY_PASSWORD: 'local-messaging-tertiary-pw',
+     PLAYWRIGHT_TERTIARY_DISPLAY_NAME: 'Local Tertiary',
++    // Phase 5 E2E world (users A–E): primary = A, secondary = B, tertiary = C,
++    // plus D and E below. Local mode only (the seed route refuses the Phase 5
++    // world elsewhere); all five sign in.
++    PLAYWRIGHT_FOURTH_EMAIL: 'messaging-fourth@local.test',
++    PLAYWRIGHT_FOURTH_PASSWORD: 'local-messaging-fourth-pw',
++    PLAYWRIGHT_FOURTH_DISPLAY_NAME: 'Local Quaternary',
++    PLAYWRIGHT_FIFTH_EMAIL: 'messaging-fifth@local.test',
++    PLAYWRIGHT_FIFTH_PASSWORD: 'local-messaging-fifth-pw',
++    PLAYWRIGHT_FIFTH_DISPLAY_NAME: 'Local Quinary',
+     // Hosted-account credentials from .env.local must not leak into local runs.
+     AUTH_E2E_EMAIL: '',
+     AUTH_E2E_PASSWORD: '',
+@@ -68,6 +77,18 @@ export function buildLocalSupabaseEnv(): Record<string, string> {
+   };
+ }
+ 
++/**
++ * Env keys of every messaging Playwright test account, the same set the seed
++ * route accepts (A = primary, B = secondary, C = tertiary, D = fourth, E = fifth).
++ */
++export const MESSAGING_TEST_ACCOUNT_EMAIL_KEYS = [
++  'PLAYWRIGHT_PRIMARY_EMAIL',
++  'PLAYWRIGHT_SECONDARY_EMAIL',
++  'PLAYWRIGHT_TERTIARY_EMAIL',
++  'PLAYWRIGHT_FOURTH_EMAIL',
++  'PLAYWRIGHT_FIFTH_EMAIL',
++] as const;
++
+ export function isLoopbackUrl(value: string): boolean {
+   try {
+     return LOOPBACK_HOSTS.has(new URL(value).hostname);
+diff --git a/__tests__/api/playwright/messaging-desktop-notifications.spec.ts b/__tests__/api/playwright/messaging-desktop-notifications.spec.ts
+index 3466f39..bf14167 100644
+--- a/__tests__/api/playwright/messaging-desktop-notifications.spec.ts
++++ b/__tests__/api/playwright/messaging-desktop-notifications.spec.ts
+@@ -1,6 +1,7 @@
+ import type { BrowserContext, Locator, Page } from '@playwright/test';
+ 
+ import { test, expect } from './fixtures/messaging';
++import { fullBrowserChannel } from './helpers/browser-channel';
+ import {
+   backToConversationList,
+   openDrawer,
+@@ -22,9 +23,10 @@ import { recordToneInBrowser, sendVoiceNoteViaApi } from './helpers/voice-note-h
+  * browser's own denial when nothing is granted).
+  */
+ test.use({
+-  // Full Chromium: the default headless shell always reports
+-  // Notification.permission "denied", even when it was granted.
+-  channel: 'chromium',
++  // A full browser: the default headless shell always reports
++  // Notification.permission "denied", even when it was granted. Keeps the
++  // project's Chrome/Edge channel where one is set.
++  channel: fullBrowserChannel,
+   messagingSeedOptions: { includeGroupConversation: true },
+ });
+ 
+diff --git a/__tests__/api/playwright/messaging-voice-notes-playback.spec.ts b/__tests__/api/playwright/messaging-voice-notes-playback.spec.ts
+index 7609c35..1197d4f 100644
+--- a/__tests__/api/playwright/messaging-voice-notes-playback.spec.ts
++++ b/__tests__/api/playwright/messaging-voice-notes-playback.spec.ts
+@@ -1,6 +1,7 @@
+ import type { Locator, Page, Request, Route } from '@playwright/test';
+ 
+ import { test, expect } from './fixtures/messaging';
++import { fullBrowserChannel } from './helpers/browser-channel';
+ import { openDrawer, selectConversation, waitForRealtimeReady } from './helpers/drawer-helpers';
+ import {
+   mediaState,
+@@ -21,8 +22,8 @@ import {
+  * `npm run test:messaging:voice:cross-browser`, not from this suite.
+  */
+ test.use({
+-  // Full Chromium with the fake microphone, as in messaging-voice-notes.spec.ts.
+-  channel: 'chromium',
++  // A full browser with the fake microphone, as in messaging-voice-notes.spec.ts.
++  channel: fullBrowserChannel,
+   launchOptions: { args: ['--use-fake-device-for-media-stream'] },
+ });
+ 
+diff --git a/__tests__/api/playwright/messaging-voice-notes.spec.ts b/__tests__/api/playwright/messaging-voice-notes.spec.ts
+index 09e2e0e..531b2f8 100644
+--- a/__tests__/api/playwright/messaging-voice-notes.spec.ts
++++ b/__tests__/api/playwright/messaging-voice-notes.spec.ts
+@@ -1,6 +1,7 @@
+ import type { Page, Request } from '@playwright/test';
+ 
+ import { test, expect } from './fixtures/messaging';
++import { fullBrowserChannel } from './helpers/browser-channel';
+ import { backToConversationList, openDrawer, selectConversation, waitForRealtimeReady } from './helpers/drawer-helpers';
+ 
+ /**
+@@ -19,9 +20,10 @@ import { backToConversationList, openDrawer, selectConversation, waitForRealtime
+  * production.
+  */
+ test.use({
+-  // Full Chromium in new headless mode: the default headless shell has no
+-  // media capture (getUserMedia rejects with NotSupportedError).
+-  channel: 'chromium',
++  // A full browser in new headless mode: the default headless shell has no
++  // media capture (getUserMedia rejects with NotSupportedError). Keeps the
++  // project's Chrome/Edge channel where one is set.
++  channel: fullBrowserChannel,
+   launchOptions: {
+     // Fake microphone only: no --use-fake-ui-for-media-stream, which would
+     // accept every permission prompt and make the denied case impossible.
+diff --git a/package.json b/package.json
+index bb42dd9..06f8786 100644
+--- a/package.json
++++ b/package.json
+@@ -21,6 +21,8 @@
+     "test:api:ci": "playwright test --project=messaging-drawer --repeat-each=3",
+     "test:messaging:local:e2e": "playwright test -c playwright.messaging-local.config.ts --project=messaging-drawer",
+     "test:messaging:db": "vitest run --config vitest.messaging-db.config.mts",
++    "test:messaging:phase5:e2e": "playwright test -c playwright.messaging-phase5.config.ts --project=phase5-chrome --project=phase5-edge",
++    "test:messaging:phase5:regression:e2e": "playwright test -c playwright.messaging-phase5.config.ts --project=regression-chrome --project=regression-edge",
+     "test:messaging:voice:cross-browser": "playwright test -c playwright.messaging-cross-browser.config.ts",
+     "test:all": "node run-tests.js",
+     "db:local:start": "supabase start",
+diff --git a/src/app/api/test/messaging/seed/route.ts b/src/app/api/test/messaging/seed/route.ts
+index 2c5d9cf..deda046 100644
+--- a/src/app/api/test/messaging/seed/route.ts
++++ b/src/app/api/test/messaging/seed/route.ts
+@@ -27,6 +27,16 @@ const removeMemberSchema = z.object({
+   userId: z.guid(),
+ });
+ 
++/**
++ * Re-adds a removed member through the only authorized rejoin,
++ * `restore_conversation_membership` (Phase 5 T24 fixture; local Supabase only).
++ */
++const restoreMemberSchema = z.object({
++  action: z.literal('restore-member'),
++  conversationId: z.guid(),
++  userId: z.guid(),
++}).strict();
++
+ /** Pre-run sweep of seeded data left by interrupted runs (local Supabase only). */
+ const sweepLeftoversSchema = z.object({ action: z.literal('sweep-leftovers') }).strict();
+ 
+@@ -83,8 +93,8 @@ function requireSecret(request: NextRequest): NextResponse | null {
+ 
+ /**
+  * Lower-cased emails of the Playwright test accounts
+- * (PLAYWRIGHT_PRIMARY/SECONDARY/TERTIARY_EMAIL). The route only provisions,
+- * resets, or acts as these accounts.
++ * (PLAYWRIGHT_PRIMARY/SECONDARY/TERTIARY/FOURTH/FIFTH_EMAIL). The route only
++ * provisions, resets, or acts as these accounts.
+  */
+ function seededAccountEmails(): Set<string> {
+   return new Set(
+@@ -92,6 +102,8 @@ function seededAccountEmails(): Set<string> {
+       process.env.PLAYWRIGHT_PRIMARY_EMAIL,
+       process.env.PLAYWRIGHT_SECONDARY_EMAIL,
+       process.env.PLAYWRIGHT_TERTIARY_EMAIL,
++      process.env.PLAYWRIGHT_FOURTH_EMAIL,
++      process.env.PLAYWRIGHT_FIFTH_EMAIL,
+     ]
+       .filter((email): email is string => typeof email === 'string' && email.trim().length > 0)
+       .map((email) => email.trim().toLowerCase()),
+@@ -139,6 +151,25 @@ function resolveThirdUser(): SeedUserDefinition {
+   };
+ }
+ 
++/**
++ * Phase 5 E2E world members C, D, E (A and B are the default users). All five
++ * sign in, so every password is required (local mode sets them).
++ */
++function resolvePhase5WorldMembers(): SeedUserDefinition[] {
++  const members: Array<[prefix: string, fallbackName: string]> = [
++    ['PLAYWRIGHT_TERTIARY', 'Playwright Tertiary'],
++    ['PLAYWRIGHT_FOURTH', 'Playwright Fourth'],
++    ['PLAYWRIGHT_FIFTH', 'Playwright Fifth'],
++  ];
++  return members.map(([prefix, fallbackName]): SeedUserDefinition => ({
++    email: requiredEnv(`${prefix}_EMAIL`),
++    password: requiredEnv(`${prefix}_PASSWORD`),
++    displayName: process.env[`${prefix}_DISPLAY_NAME`] ?? fallbackName,
++    role: 'member',
++    status: 'online',
++  }));
++}
++
+ function normalizeSeedUsers(users?: SeedUserDefinition[]): [SeedUserDefinition, SeedUserDefinition] {
+   if (!users || users.length === 0) {
+     return resolveDefaultUsers();
+@@ -214,7 +245,12 @@ export async function POST(request: NextRequest) {
+   }
+ 
+   let payload: Partial<
+-    MessagingSeedOptions & { users?: SeedUserDefinition[]; includeThirdMember?: boolean }
++    MessagingSeedOptions & {
++      users?: SeedUserDefinition[];
++      includeThirdMember?: boolean;
++      /** Phase 5 E2E world: users A–E, a DM (A–B), a group and room conversations of all five. */
++      includePhase5World?: boolean;
++    }
+   > = {};
+ 
+   // Accept empty body (defaults) and only error on malformed non-empty JSON
+@@ -228,11 +264,21 @@ export async function POST(request: NextRequest) {
+     );
+   }
+ 
++  // The Phase 5 world is a local-Supabase-only fixture.
++  if (payload.includePhase5World === true && !isLocalSupabaseMode()) {
++    return notFound();
++  }
++
+   let users: [SeedUserDefinition, SeedUserDefinition];
+   let thirdUser: SeedUserDefinition | undefined;
++  let worldMembers: SeedUserDefinition[] = [];
+   try {
++    if (payload.includePhase5World === true && (payload.includeThirdMember || payload.users)) {
++      throw new Error('includePhase5World cannot be combined with includeThirdMember or users');
++    }
+     users = normalizeSeedUsers(payload.users);
+     thirdUser = payload.includeThirdMember ? resolveThirdUser() : undefined;
++    worldMembers = payload.includePhase5World === true ? resolvePhase5WorldMembers() : [];
+   } catch (error) {
+     return NextResponse.json(
+       { error: (error as Error).message },
+@@ -243,7 +289,7 @@ export async function POST(request: NextRequest) {
+   // The seeder creates auth users or resets their passwords by email, so it
+   // may only touch the configured Playwright accounts.
+   const allowedEmails = seededAccountEmails();
+-  const seedUsers = thirdUser ? [...users, thirdUser] : users;
++  const seedUsers = [...users, ...(thirdUser ? [thirdUser] : []), ...worldMembers];
+   if (seedUsers.some((user) => !allowedEmails.has(user.email.trim().toLowerCase()))) {
+     return NextResponse.json(
+       { error: 'Seed users must be the configured PLAYWRIGHT_*_EMAIL accounts' },
+@@ -264,6 +310,7 @@ export async function POST(request: NextRequest) {
+       includeGroupConversation: payload.includeGroupConversation,
+       historyMessageCount: payload.historyMessageCount,
+       thirdUser,
++      worldMembers,
+     });
+ 
+     return NextResponse.json(
+@@ -338,7 +385,11 @@ export async function DELETE(request: NextRequest) {
+  * opt-in third member). Body: { conversationId, userId, messageIds }.
+  * With { action: 'remove-member', conversationId, userId } it instead removes
+  * that member from the conversation (deletes the conversation_members row;
+- * star rows are kept), to test a member who lost access.
++ * star rows are kept), to test a member who lost access. Since Phase 5 T28
++ * that service-role delete is an administrative revocation.
++ * With { action: 'restore-member', conversationId, userId } (local Supabase
++ * only) it re-adds a removed participant through
++ * restore_conversation_membership, the only authorized rejoin.
+  * 403 unless userId is a PLAYWRIGHT_*_EMAIL account and every member of the
+  * conversation is one too.
+  */
+@@ -367,6 +418,11 @@ export async function PATCH(request: NextRequest) {
+   if (isRemoveMember) {
+     return removeSeededMember(payload);
+   }
++  const isRestoreMember =
++    !!payload && typeof payload === 'object' && (payload as { action?: unknown }).action === 'restore-member';
++  if (isRestoreMember) {
++    return restoreSeededMember(payload);
++  }
+ 
+   const parsed = markReadSchema.safeParse(payload);
+   if (!parsed.success) {
+@@ -467,3 +523,46 @@ async function removeSeededMember(payload: unknown): Promise<NextResponse> {
+     );
+   }
+ }
++
++/**
++ * PATCH { action: 'restore-member', conversationId, userId }: re-adds a seeded
++ * participant through `public.restore_conversation_membership` (lifts the
++ * revocation and re-creates the conversation_members row under the
++ * conversation's own rules). Local messaging test mode only (404 otherwise);
++ * 403 unless userId is a participant and every participant and member of the
++ * conversation is a PLAYWRIGHT_*_EMAIL account.
++ */
++async function restoreSeededMember(payload: unknown): Promise<NextResponse> {
++  if (!isLocalSupabaseMode()) {
++    return notFound();
++  }
++  const parsed = restoreMemberSchema.safeParse(payload);
++  if (!parsed.success) {
++    return NextResponse.json(
++      { error: "action 'restore-member', conversationId and userId (UUIDs) are required" },
++      { status: 400 },
++    );
++  }
++  const conversationId = parsed.data.conversationId.toLowerCase();
++  const userId = parsed.data.userId.toLowerCase();
++
++  try {
++    const supabase = await createSupabaseServerClient('service_role');
++    const seeder = new MessagingTestSeeder(supabase);
++    const isSeeded = await seeder.isSeededConversationParticipant(conversationId, userId, seededAccountEmails());
++    if (!isSeeded) {
++      return NextResponse.json(
++        { error: 'Only seeded Playwright participants of seeded conversations can be restored' },
++        { status: 403 },
++      );
++    }
++    await seeder.restoreConversationMembership(conversationId, userId);
++    return NextResponse.json({ success: true }, { status: 200 });
++  } catch (error) {
++    console.error('[Messaging Seed Route] Failed to restore conversation member', error);
++    return NextResponse.json(
++      { error: 'Failed to restore conversation member', details: (error as Error).message },
++      { status: 500 },
++    );
++  }
++}
+diff --git a/src/lib/test-utils/messaging-test-seeder.ts b/src/lib/test-utils/messaging-test-seeder.ts
+index 65f01f8..07e332d 100644
+--- a/src/lib/test-utils/messaging-test-seeder.ts
++++ b/src/lib/test-utils/messaging-test-seeder.ts
+@@ -50,6 +50,14 @@ export type MessagingSeedOptions = {
+    * through markMessagesRead, the same RPC the read route uses.
+    */
+   thirdUser?: SeedUserDefinition;
++  /**
++   * Opt-in (Phase 5 E2E world, users C–E): more company members who sign in.
++   * Each joins the company like the secondary and is a participant of the group
++   * conversation (created when this is non-empty) and of every room
++   * conversation; the direct conversation stays between the first two users.
++   * Not combined with thirdUser.
++   */
++  worldMembers?: SeedUserDefinition[];
+ };
+ 
+ export const MAX_HISTORY_MESSAGE_COUNT = 200;
+@@ -204,12 +212,27 @@ export class MessagingTestSeeder {
+       await this.ensureCompanyMember(company.id, profiles[0].id, thirdProfile, options.thirdUser);
+     }
+ 
++    const worldDefinitions = options.worldMembers ?? [];
++    if (worldDefinitions.length > 0 && options.thirdUser) {
++      throw new Error('worldMembers and thirdUser cannot be combined');
++    }
++    const worldProfiles = [];
++    for (const definition of worldDefinitions) {
++      const profile = await this.ensureProfileForAuthUser(
++        definition,
++        await this.ensureAuthUser(definition, allowedEmails),
++      );
++      await this.ensureCompanyMember(company.id, profiles[0].id, profile, definition);
++      worldProfiles.push(profile);
++    }
++    const worldIds = worldProfiles.map((profile) => profile.id);
++
+     const spaces = await this.ensureReusableSpaces(company.id, primaryProfile.id, roomCount, created);
+ 
+     const participants = profiles.map((profile) => profile.id);
+     const directPromise = this.createDirectConversation(participants, runId, created);
+     const roomsPromise = this.createRoomConversations({
+-      participants,
++      participants: [...participants, ...worldIds],
+       runId,
+       spaces,
+       includePinnedRoom,
+@@ -254,9 +277,9 @@ export class MessagingTestSeeder {
+       MAX_HISTORY_MESSAGE_COUNT,
+     );
+     const groupConversation =
+-      options.includeGroupConversation || historyMessageCount > 0 || thirdProfile
++      options.includeGroupConversation || historyMessageCount > 0 || thirdProfile || worldIds.length > 0
+         ? await this.createGroupConversation(
+-            thirdProfile ? [...participants, thirdProfile.id] : participants,
++            [...participants, ...(thirdProfile ? [thirdProfile.id] : []), ...worldIds],
+             runId,
+             created,
+           )
+@@ -295,6 +318,12 @@ export class MessagingTestSeeder {
+               role: options.thirdUser.role,
+             }]
+           : []),
++        ...worldProfiles.map((profile, index) => ({
++          id: profile.id,
++          email: worldDefinitions[index].email,
++          supabaseUid: profile.supabase_uid,
++          role: worldDefinitions[index].role,
++        })),
+       ],
+       spaces: spaces.map((space) => ({
+         id: space.id,
+@@ -610,6 +639,54 @@ export class MessagingTestSeeder {
+     return data?.length ?? 0;
+   }
+ 
++  /**
++   * Re-adds `userId` to `conversationId` through
++   * `public.restore_conversation_membership` (service role), the only
++   * authorized rejoin (Phase 5 T28): it lifts the revocation and re-creates the
++   * conversation_members row only when the conversation's own rules still
++   * allow it (room access under lock; original participants of direct/group
++   * conversations), and is a no-op for a current member. Callers must check
++   * isSeededConversationParticipant.
++   */
++  async restoreConversationMembership(conversationId: string, userId: string): Promise<void> {
++    await this.restoreMemberships(conversationId, [userId]);
++  }
++
++  /**
++   * True only when `userId` is in `conversationId`'s participants, every
++   * participant and every current member has one of `allowedEmails` (the
++   * shape of every seeded conversation), whether or not `userId` is still a
++   * member. Unknown ids are false.
++   */
++  async isSeededConversationParticipant(
++    conversationId: string,
++    userId: string,
++    allowedEmails: ReadonlySet<string>,
++  ): Promise<boolean> {
++    if (allowedEmails.size === 0) {
++      return false;
++    }
++    const { data: conversation, error } = await this.supabase
++      .from('conversations')
++      .select('participants')
++      .eq('id', conversationId)
++      .maybeSingle()
++      .overrideTypes<{ participants: string[] | null }, { merge: false }>();
++    if (error) {
++      throw new Error(`Failed to read conversation participants: ${error.message}`);
++    }
++    const participants = conversation?.participants ?? [];
++    if (!participants.includes(userId)) {
++      return false;
++    }
++    const accountIds = await this.findTestAccountIds(allowedEmails);
++    if (!participants.every((id) => accountIds.has(id))) {
++      return false;
++    }
++    const foreign = await this.findConversationsWithForeignMembers([conversationId], accountIds);
++    return !foreign.has(conversationId);
++  }
++
+   /**
+    * True only when `userId` is a member of `conversationId` and every member
+    * of that conversation (including `userId`) has one of `allowedEmails` — the
+@@ -785,6 +862,10 @@ export class MessagingTestSeeder {
+     const existing = await this.conversationRepository.findDirectByFingerprint(fingerprint);
+ 
+     if (existing) {
++      // A reused direct conversation may have lost a member in an earlier run
++      // (remove-member). Preference writes no longer re-create memberships
++      // (Phase 5 T28), so seeding restores them explicitly (authorized rejoin).
++      await this.restoreMemberships(existing.id, participants);
+       await this.conversationRepository.updateLastActivityTimestamp(existing.id, now.toISOString());
+       return {
+         ...existing,
+@@ -806,6 +887,19 @@ export class MessagingTestSeeder {
+     return conversation;
+   }
+ 
++  /** Restores each participant's membership (service-role RPC; no-op for members). */
++  private async restoreMemberships(conversationId: string, userIds: readonly string[]): Promise<void> {
++    for (const userId of userIds) {
++      const { error } = await this.supabase.rpc('restore_conversation_membership', {
++        p_conversation_id: conversationId,
++        p_user_id: userId,
++      });
++      if (error) {
++        throw new Error(`Failed to restore conversation membership: ${error.message}`);
++      }
++    }
++  }
++
+   private async createRoomConversations(options: {
+     participants: string[];
+     runId: string;

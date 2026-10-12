@@ -1,0 +1,22 @@
+ADVERSARIAL REVIEW of task T3 of work item spec-interview/phase-5-messaging-resilience in E:/projects/virtual-office. Read-only: do not modify files; never access an online database; read-only queries against LOCAL Supabase allowed.
+
+T2 (already accepted, still uncommitted) and T3 changes are both in the working tree. T2's tracked diff snapshot: reviews/t2-tracked-r2.diff. Current cumulative tracked diff: reviews/t3-tracked-cumulative.diff — the T3 delta is the difference. T3-touched files (review fully in their current form, focusing on T3 changes):
+- NEW supabase/migrations/20261007114454_message_create_budgets_insert_quota.sql
+- NEW __tests__/messaging-db/message-send-budgets.test.ts
+- src/lib/auth/rate-limit.ts; src/lib/auth/authorize.ts; src/app/api/messages/create/route.ts; src/app/api/messages/fence/route.ts; src/repositories/implementations/supabase/message-attempt-rpc.ts; SupabaseMessageRepository.ts; SupabaseMessageAttachmentUploadRepository.ts; src/repositories/interfaces/IMessageRepository.ts; IMessageAttachmentUploadRepository.ts; src/types/messaging.ts; __tests__/messaging-db/message-attempt-fencing.test.ts.
+
+Contract: PLAN.md T3 + Standing rules (fail-closed D4 decision); SPEC FR-008, AC-009, D1 (≤10 pending with quota delivered within 10 s), §10 compatibility, §12 ("every create request consumes a per-user request budget and fence/lookup calls their own").
+
+Performer claims to attack:
+1. Insertion quota ('message:create', 30/60 s) charged inside create_message_attempt as the last step of a winning insertion, same transaction; replays, same-key losers, refused creates never charged; exhausted/unavailable → rollback of insertion, attachment links, and counter; route 429. Look for paths that store a message without charging (Phase 4 wrapper create_message_with_attachments, raw keyed insert trigger, unkeyed direct insert, generation-less keyed path) or charge twice (route-level legacy charge + DB charge), and for boundary overshoot under concurrency or across fixed windows.
+2. Request budget 'message:create-request' (60/60 s) charged after auth and before body parsing in its own transaction for every authenticated create, surviving insertion rollback; unauthenticated 401 charges nobody. Does moving auth before validation change any status code the hosted or Phase 4 clients depend on (401 vs 400 ordering)? Is any authenticated create path uncharged?
+3. Fence budget 'message:fence' (90/60 s) on every authenticated fence call and the create fence step; replaced T2's fail-open limiter.
+4. Fail-closed for create, create-request, fence: RPC error, revoked/missing function, non-boolean result → 429; react/upload/upload-cancel/read-receipts keep fail-open. Does fail-closed create a way for one user to deny service to others (shared counters, the counter row lock serializing a user's creates until commit, lock_timeout/deadlock)? Statement timeout → 500 (not 429) by design.
+5. Unkeyed legacy creates charged by the route right before their direct insert; Phase 4 server builds charge at their own route — verify no double charge and no free path when a Phase 4 server and the new server run against the same DB.
+6. D1: can a user with quota drain ≥ 10 pending items (each: create, possibly a fence and a replay) within budgets without 429? Check the numbers.
+7. Dropping the 9-arg create_message_attempt: any caller left (repositories, tests, wrapper)? Rollback SQL self-contained and correct?
+8. Attempt-row growth bound (≤120 new rows/user/min via budgets, no retention): is the reasoning right; is there any path creating attempt rows without consuming a budget?
+9. message-attempt-rpc.ts maps every 42501 from create_message_attempt to 403 NOT_PARTICIPANT — a real misclassification risk (definitive failure in the client) under limiter or grant errors?
+10. Tests real (no mocks), non-tautological, fail pre-change; the 'limiter unavailable' tests restore state in finally; no cross-test interference.
+Repository traps: users.id vs users.supabase_uid; createSupabaseServerClient + auth.getUser(); service role never replaces authorization.
+Output: Verdict approve | revision required; findings High/Medium/Low with file:line, failure scenario, smallest fix; claims verified true. Approve only if no High/Medium remain.

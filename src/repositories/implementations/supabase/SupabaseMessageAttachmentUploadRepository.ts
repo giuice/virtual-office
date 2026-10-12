@@ -3,11 +3,17 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
   AttachmentLinkError,
-  type AttachmentLinkFailureCode,
   type IMessageAttachmentUploadRepository,
   type MessageWithAttachmentsCreateData,
 } from '@/repositories/interfaces/IMessageAttachmentUploadRepository';
-import type { MessageWithAttachmentsCreateResult, PendingAttachmentUpload } from '@/types/messaging';
+import type {
+  InsertionQuota,
+  MessageAttempt,
+  MessageWithAttachmentsCreateResult,
+  PendingAttachmentUpload,
+} from '@/types/messaging';
+
+import { createMessageAttempt } from './message-attempt-rpc';
 
 interface PendingUploadRow {
   id: string;
@@ -23,14 +29,6 @@ interface PendingUploadRow {
 }
 
 const COLUMNS = 'id, conversation_id, uploader_id, storage_path, name, type, size, created_at, duration, waveform_data';
-
-const LINK_FAILURE_CODES: readonly AttachmentLinkFailureCode[] = [
-  'ATTACHMENT_UPLOAD_NOT_FOUND',
-  'ATTACHMENT_COUNT_INVALID',
-  'ATTACHMENT_DUPLICATE',
-  'INVALID_REPLY_TARGET',
-  'VOICE_NOTE_NOT_ALONE',
-];
 
 function mapRow(row: PendingUploadRow): PendingAttachmentUpload {
   const upload: PendingAttachmentUpload = {
@@ -49,15 +47,6 @@ function mapRow(row: PendingUploadRow): PendingAttachmentUpload {
     upload.waveformData = Array.isArray(row.waveform_data) ? (row.waveform_data as number[]) : [];
   }
   return upload;
-}
-
-function isLinkResult(value: unknown): value is { message_id: string; created: boolean } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { message_id?: unknown }).message_id === 'string' &&
-    typeof (value as { created?: unknown }).created === 'boolean'
-  );
 }
 
 /** Requires the service-role client (the table has no client policies). */
@@ -175,32 +164,23 @@ export class SupabaseMessageAttachmentUploadRepository implements IMessageAttach
   async createMessageWithAttachments(
     data: MessageWithAttachmentsCreateData,
     uploadIds: readonly string[],
-    clientMessageId?: string
+    clientMessageId: string | undefined,
+    attempt: MessageAttempt | undefined,
+    insertQuota: InsertionQuota | null
   ): Promise<MessageWithAttachmentsCreateResult> {
-    const { data: result, error } = await this.supabaseClient.rpc('create_message_with_attachments', {
-      p_conversation_id: data.conversationId,
-      p_sender_id: data.senderId,
-      p_content: data.content,
-      p_type: data.type,
-      p_reply_to_id: data.replyToId ?? null,
-      p_client_message_id: clientMessageId ?? null,
-      p_upload_ids: [...uploadIds],
+    // Phase 5 T2: public.create_message_attempt (fenced at commit time) took
+    // over create_message_with_attachments' body; that function now delegates
+    // to it for older builds. Without uploads it would create a text message.
+    if (uploadIds.length === 0) {
+      throw new AttachmentLinkError('ATTACHMENT_COUNT_INVALID');
+    }
+    const result = await createMessageAttempt(this.supabaseClient, {
+      data,
+      clientMessageId,
+      attempt,
+      uploadIds,
+      insertQuota,
     });
-
-    if (error) {
-      const linkFailure = LINK_FAILURE_CODES.find((code) => error.message === code);
-      if (error.code === '22023' && linkFailure) {
-        throw new AttachmentLinkError(linkFailure);
-      }
-      if (error.code === '42501') {
-        throw new AttachmentLinkError('NOT_PARTICIPANT');
-      }
-      console.error('Error in create_message_with_attachments RPC:', error);
-      throw error;
-    }
-    if (!isLinkResult(result)) {
-      throw new Error('create_message_with_attachments returned an unexpected result');
-    }
-    return { messageId: result.message_id, created: result.created };
+    return { messageId: result.messageId, created: result.created, storedComposition: result.storedComposition };
   }
 }

@@ -179,7 +179,7 @@ const isPasswordSignInRequest = (request: Request) =>
  * recorded on the test. Every other outcome (wrong credentials, a rate limit,
  * a second transport failure, no redirect) fails with what the page showed.
  */
-async function login(page: Page, email: string, password: string) {
+export async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
   // The login page is localized (pt-BR today); match either language.
   await page.getByLabel(/^email$/i).fill(email);
@@ -251,7 +251,7 @@ const isLocalSupabaseMode = process.env[LOCAL_MESSAGING_FLAG] === '1';
  * them reached a hosted Supabase domain. The Supabase hosts seen are attached
  * as an annotation so each run carries its own network evidence.
  */
-function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
+export function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
   if (!isLocalSupabaseMode) {
     return () => {};
   }
@@ -284,7 +284,7 @@ function guardLocalSupabaseTraffic(page: Page, label: string): () => void {
  * whenever it is visible before an action; it is never what a messaging test
  * is exercising.
  */
-async function closePlacementToasts(page: Page): Promise<void> {
+export async function closePlacementToasts(page: Page): Promise<void> {
   const placementToast = page
     .locator('[data-sonner-toast]')
     .filter({ hasText: /Welcome! You've been placed in|Reconnected to/ });

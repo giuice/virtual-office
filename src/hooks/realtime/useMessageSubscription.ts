@@ -3,22 +3,30 @@
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { hashKey, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
 import { Message } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
 import {
   appendMessageToPages,
+  isMessageDeleted,
   keepMessageThroughInflightFetch,
+  lacksStoredMentions,
+  markMessageDeleted,
+  resolvePendingMessages,
   type MessagesInfiniteData,
 } from '@/lib/messaging/message-cache';
 import { MESSAGE_READERS_QUERY_KEY, messageReadersQueryKey } from '@/hooks/queries/useMessageReaders';
 import { STARRED_MESSAGES_QUERY_KEY } from '@/hooks/queries/useStarredMessages';
 import {
-  type RealtimeChannel,
   type RealtimePostgresChangesPayload,
   type RealtimeSystemPayload,
 } from '@supabase/supabase-js';
+import {
+  createJoinCatchUp,
+  isPostgresChangeOf,
+  startRecoveringChannel,
+  type MessagingRealtimeHealth,
+} from '@/lib/messaging/realtime-health';
 
 interface UseMessageSubscriptionOptions {
   isActive?: boolean;
@@ -26,13 +34,17 @@ interface UseMessageSubscriptionOptions {
   currentUserId?: string;
   onInsert?: (message: Message) => void;
   ignoreSenderId?: string;
+  /** T13: the per-stream health store this stream reports to (stream 'messages'). */
+  health: MessagingRealtimeHealth;
+  /**
+   * T13 (FR-002, FR-015): the stream is SUBSCRIBED again after a failure. The
+   * feeds' catch-up runs here anyway (once the rejoin is SUBSCRIBED and
+   * server-confirmed, F5).
+   */
+  onRecovered?: () => void;
 }
 
 const CHANNEL_NAME = 'messaging-db-changes';
-const FAILURE_STATUSES = new Set(['TIMED_OUT', 'CHANNEL_ERROR', 'CLOSED']);
-const RETRY_BASE_DELAY_MS = 250;
-const RETRY_MAX_DELAY_MS = 5000;
-const RETRY_STABLE_AFTER_MS = 30_000;
 // A mark-read writes one receipt row per message; each row is its own event.
 const RECEIPT_REFETCH_DELAY_MS = 100;
 let channelTopicSequence = 0;
@@ -59,6 +71,9 @@ const mapRowToMessage = (row: any): Message => ({
   attachments: [],
   reactions: [],
   isEdited: Boolean(row.is_edited),
+  // Phase 5 FR-034: the sender's composition key; the sender's pending copy
+  // is matched to this stored message only by it (null on unkeyed messages).
+  clientMessageId: typeof row.client_message_id === 'string' ? row.client_message_id : undefined,
 });
 
 // Message types whose payload lives in message_attachments — the realtime
@@ -75,11 +90,17 @@ const appendMessageToCache = (queryClient: QueryClient, message: Message) => {
   if (!queryClient.getQueryData(['messages', message.conversationId])) {
     return;
   }
+  if (isMessageDeleted(queryClient, message.id)) {
+    return;
+  }
   queryClient.setQueryData<MessagesInfiniteData | undefined>(
     ['messages', message.conversationId],
     (oldData) => appendMessageToPages(oldData, message)
   );
   keepMessageThroughInflightFetch(queryClient, message.conversationId, message);
+  // Phase 5 FR-034: the sender's pending copy of this key is resolved now
+  // (after the stored message is in the feed), and stays resolved.
+  resolvePendingMessages(queryClient, message.conversationId, [message]);
 };
 
 const updateMessageInCache = (queryClient: QueryClient, conversationId: string, row: any) => {
@@ -191,10 +212,11 @@ const removeMessageFromAllCaches = (queryClient: QueryClient, messageId: string)
  * never re-subscribes when conversations change. The reported status is the
  * real status of the one channel carrying every messaging event.
  */
-export function useMessageSubscription(options?: UseMessageSubscriptionOptions) {
-  const isActive = options?.isActive ?? true;
-  const companyId = options?.companyId;
-  const currentUserId = options?.currentUserId;
+export function useMessageSubscription(options: UseMessageSubscriptionOptions) {
+  const isActive = options.isActive ?? true;
+  const companyId = options.companyId;
+  const currentUserId = options.currentUserId;
+  const health = options.health;
   const queryClient = useQueryClient();
   const statusRef = useRef<string | null>(null);
   const statusListenersRef = useRef<Set<() => void> | null>(null);
@@ -203,8 +225,9 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
   }
   const statusListeners = statusListenersRef.current;
 
-  const onInsertRef = useRef(options?.onInsert);
-  const ignoreSenderIdRef = useRef(options?.ignoreSenderId);
+  const onInsertRef = useRef(options.onInsert);
+  const ignoreSenderIdRef = useRef(options.ignoreSenderId);
+  const onRecoveredRef = useRef(options.onRecovered);
 
   const publishStatus = useCallback((nextStatus: string | null) => {
     statusRef.current = nextStatus;
@@ -222,12 +245,16 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
   const status = useSyncExternalStore(subscribeStatus, getStatusSnapshot, getStatusSnapshot);
 
   useEffect(() => {
-    onInsertRef.current = options?.onInsert;
-  }, [options?.onInsert]);
+    onInsertRef.current = options.onInsert;
+  }, [options.onInsert]);
 
   useEffect(() => {
-    ignoreSenderIdRef.current = options?.ignoreSenderId;
-  }, [options?.ignoreSenderId]);
+    ignoreSenderIdRef.current = options.ignoreSenderId;
+  }, [options.ignoreSenderId]);
+
+  useEffect(() => {
+    onRecoveredRef.current = options.onRecovered;
+  }, [options.onRecovered]);
 
   useEffect(() => {
     publishStatus(null);
@@ -236,11 +263,6 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
     }
 
     let isMounted = true;
-    let channel: RealtimeChannel | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let stableSubscriptionTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempt = 0;
-    let channelGeneration = 0;
 
     const handleMessageChange = (
       payload: RealtimePostgresChangesPayload<Record<string, unknown>>
@@ -259,6 +281,19 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
           scheduleFeedRefetch(message.conversationId);
         } else {
           appendMessageToCache(queryClient, message);
+          // Phase 5 T17: the row carries no mentions; a message that may have
+          // some is shown at once and enriched by the same deferred,
+          // non-cancelling feed refetch (no polling while healthy).
+          // Block C fix F2: a feed fetch in flight (the first one too, when
+          // there is no cache to append to) may have read the server before
+          // this message; the same refetch runs once it settles.
+          const feedFetchInFlight = queryClient
+            .getQueryCache()
+            .find({ queryKey: ['messages', message.conversationId], exact: true })
+            ?.state.fetchStatus === 'fetching';
+          if (feedFetchInFlight || lacksStoredMentions(queryClient, message)) {
+            scheduleFeedRefetch(message.conversationId);
+          }
         }
 
         const ignoreSenderId = ignoreSenderIdRef.current;
@@ -279,6 +314,10 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       }
 
       if (eventType === 'DELETE' && payload.old) {
+        // Remembered (bounded, this client only) so a later create response,
+        // INSERT or in-flight-fetch re-merge does not add it back; fetched
+        // pages are not filtered by it.
+        markMessageDeleted(queryClient, payload.old.id as string);
         removeMessageFromAllCaches(queryClient, payload.old.id as string);
       }
     };
@@ -323,21 +362,34 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       if (typeof conversationId === 'string') {
         scheduleFeedRefetch(conversationId);
       }
-      // Phase 4 FR-005: an open reader list refetches right away (only active
-      // queries refetch; a closed one is refetched on its next open). Its
-      // request is small and per message, so superseding one in flight —
-      // which may predate this receipt — is the safe default.
+      // Phase 4 FR-005: an open reader list refetches (only active queries
+      // refetch; a closed one is refetched on its next open). Block B fix F7:
+      // through the same deferred refetch as the feed — a fetch already in
+      // flight (which may predate this receipt) settles first, then the list
+      // refetches. Superseding it instead fails while the list has no data
+      // yet: TanStack then reuses the fetch in flight, whose older answer
+      // would end the invalidation.
       const messageId = row?.message_id;
       if (typeof messageId === 'string') {
-        void queryClient.invalidateQueries({ queryKey: messageReadersQueryKey(messageId) });
+        scheduleDeferredRefetch(messageReadersQueryKey(messageId));
+      }
+      // Phase 5 T16 (FR-021): the viewer's own receipt, written by this or
+      // any other of their tabs/devices, lowers their server-computed unread
+      // counts; the list refetches them (same deferred, non-cancelling
+      // refetch, one per burst). Receipt RLS delivers the viewer's own rows
+      // to every session of theirs; other readers' rows (seen as a sender)
+      // leave the viewer's counts unchanged.
+      if (row?.user_id === currentUserId) {
+        scheduleDeferredRefetch(['conversations', currentUserId]);
       }
     };
 
     // Changes committed while the channel was not yet (or no longer) streaming
     // never arrive as events: on first load, a message sent between the
     // initial fetches and the join would leave the unread count and the feed
-    // stale until some later event. Once the server confirms the
-    // postgres_changes stream for this (re)join, every cached feed refetches
+    // stale until some later event. Once this (re)join is both SUBSCRIBED and
+    // server-confirmed (block B fix F5, createJoinCatchUp: on whichever comes
+    // second), every cached feed refetches
     // (receipt counts, stars, attachment messages), and so do the caches kept
     // outside the feed: an open reader list (receipts) and an open starred
     // list (stars have no Realtime event at all; another session's change
@@ -357,20 +409,25 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       queryCache
         .findAll({ queryKey: STARRED_MESSAGES_QUERY_KEY })
         .forEach((query) => scheduleDeferredRefetch(query.queryKey));
-      // Same policy as the receipt handler: a small per-message request, so
-      // superseding one in flight (which may predate the reconnect) is safe.
-      void queryClient.invalidateQueries({ queryKey: MESSAGE_READERS_QUERY_KEY });
+      // Same policy as the receipt handler (F7): after a fetch in flight settles.
+      queryCache
+        .findAll({ queryKey: MESSAGE_READERS_QUERY_KEY })
+        .forEach((query) => scheduleDeferredRefetch(query.queryKey));
     };
+    const joinCatchUp = createJoinCatchUp(catchUpTimelineCaches);
 
     const handleReactionChange = (
       payload: RealtimePostgresChangesPayload<Record<string, unknown>>
     ) => {
       if (payload.eventType === 'INSERT' && payload.new) {
-        const messageId = payload.new.message_id as string;
-        const userId = payload.new.user_id as string;
-        const emoji = payload.new.emoji as string;
+        const { message_id: messageId, user_id: userId, emoji } = payload.new;
+        // Only a well-formed reaction row reaches the cache.
+        if (typeof messageId !== 'string' || typeof userId !== 'string' || typeof emoji !== 'string' || !emoji) {
+          return;
+        }
         const timestampValue = payload.new.created_at ?? payload.new.timestamp;
-        const timestamp = timestampValue ? new Date(timestampValue as string) : new Date();
+        const parsed = typeof timestampValue === 'string' ? new Date(timestampValue) : null;
+        const timestamp = parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
         handleReactionUpdate(queryClient, messageId, userId, emoji, 'INSERT', timestamp);
         return;
       }
@@ -383,168 +440,66 @@ export function useMessageSubscription(options?: UseMessageSubscriptionOptions) 
       }
     };
 
-    const clearRetryTimer = () => {
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
-    };
-
-    const clearStableSubscriptionTimer = () => {
-      if (stableSubscriptionTimer) {
-        clearTimeout(stableSubscriptionTimer);
-        stableSubscriptionTimer = null;
-      }
-    };
-
-    const retireChannel = (ownedChannel: RealtimeChannel) => {
-      if (channel === ownedChannel) {
-        channel = null;
-        channelGeneration += 1;
-        clearStableSubscriptionTimer();
-        if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.trace('useMessageSubscription', 'unsubscribe', {
-            channel: CHANNEL_NAME,
-          });
-        }
-      }
-      void supabase.removeChannel(ownedChannel).then((status) => {
-        if (status !== 'ok') ownedChannel.teardown();
-      }).catch(() => {
-        ownedChannel.teardown();
-      });
-    };
-
-    const subscribeChannel = () => {
-      if (!isMounted) return;
-
-      clearRetryTimer();
-      clearStableSubscriptionTimer();
-      if (channel) retireChannel(channel);
-      attempt += 1;
-
-      if (debugLogger.messaging.enabled()) {
-        debugLogger.messaging.trace('useMessageSubscription', 'subscribe:attempt', {
-          channel: CHANNEL_NAME,
-          attempt,
-        });
-      }
-
-      const generation = channelGeneration + 1;
-      channelGeneration = generation;
-      let nextChannel: RealtimeChannel;
-      const isOwnedChannel = (): boolean => (
-        isMounted
-        && channel === nextChannel
-        && channelGeneration === generation
-      );
-      nextChannel = supabase
-        .channel(createChannelTopic(companyId, currentUserId))
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'messages' },
-          (payload) => {
-            if (isOwnedChannel()) handleMessageChange(payload);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
-          (payload) => {
-            if (isOwnedChannel()) handleReceiptInsert(payload);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'message_reactions' },
-          (payload) => {
-            if (isOwnedChannel()) handleReactionChange(payload);
-          }
-        )
-        .on('system', {}, (payload: RealtimeSystemPayload) => {
-          if (
-            isOwnedChannel()
-            && payload.extension === 'postgres_changes'
-            && payload.status === 'ok'
-          ) {
-            catchUpTimelineCaches();
-          }
-        });
-      channel = nextChannel;
-
-      nextChannel.subscribe((channelStatus) => {
-        if (
-          !isMounted
-          || channel !== nextChannel
-          || channelGeneration !== generation
-        ) return;
-
-        publishStatus(channelStatus);
-
-        if (debugLogger.messaging.enabled()) {
-          debugLogger.messaging.trace('useMessageSubscription', 'status', {
-            channel: CHANNEL_NAME,
-            status: channelStatus,
-          });
-        }
-
-        if (channelStatus === 'SUBSCRIBED') {
-          clearRetryTimer();
-          clearStableSubscriptionTimer();
-          stableSubscriptionTimer = setTimeout(() => {
-            stableSubscriptionTimer = null;
+    // T13 (FR-015): the shared recovering lifecycle (realtime-health.ts) —
+    // rejoins after an error, a timeout or a terminal closure with capped
+    // backoff, on a new topic each time, and reports the stream's health.
+    const stop = startRecoveringChannel({
+      stream: 'messages',
+      health,
+      traceScope: 'useMessageSubscription',
+      traceChannel: CHANNEL_NAME,
+      createTopic: () => createChannelTopic(companyId, currentUserId),
+      bind: (channel, isCurrent) => {
+        joinCatchUp.joinStarted();
+        return channel
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'messages' },
+            (payload) => {
+              // Only this binding's own table (see isPostgresChangeOf).
+              if (isCurrent() && isPostgresChangeOf(payload, 'messages')) handleMessageChange(payload);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
+            (payload) => {
+              if (isCurrent() && isPostgresChangeOf(payload, 'message_read_receipts', ['INSERT'])) {
+                handleReceiptInsert(payload);
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'message_reactions' },
+            (payload) => {
+              if (isCurrent() && isPostgresChangeOf(payload, 'message_reactions')) handleReactionChange(payload);
+            }
+          )
+          .on('system', {}, (payload: RealtimeSystemPayload) => {
             if (
-              !isMounted
-              || channel !== nextChannel
-              || channelGeneration !== generation
-            ) return;
-            attempt = 0;
-          }, RETRY_STABLE_AFTER_MS);
-          return;
-        }
-
-        if (FAILURE_STATUSES.has(channelStatus)) {
-          clearStableSubscriptionTimer();
-          if (retryTimer) return;
-          const delay = Math.min(
-            RETRY_MAX_DELAY_MS,
-            RETRY_BASE_DELAY_MS * Math.pow(2, Math.max(attempt - 1, 0))
-          );
-
-          if (debugLogger.messaging.enabled()) {
-            debugLogger.messaging.warn('useMessageSubscription', 'retry', {
-              channel: CHANNEL_NAME,
-              status: channelStatus,
-              delay,
-              attempt,
-            });
-          }
-
-          retryTimer = setTimeout(() => {
-            retryTimer = null;
-            if (
-              !isMounted
-              || channel !== nextChannel
-              || channelGeneration !== generation
-            ) return;
-            subscribeChannel();
-          }, delay);
-        }
-      });
-    };
-
-    subscribeChannel();
+              isCurrent()
+              && payload.extension === 'postgres_changes'
+              && payload.status === 'ok'
+            ) {
+              joinCatchUp.confirmed();
+            }
+          });
+      },
+      onStatus: (nextStatus) => {
+        publishStatus(nextStatus);
+        joinCatchUp.status(nextStatus);
+      },
+      onRecovered: () => onRecoveredRef.current?.(),
+    });
 
     return () => {
       isMounted = false;
-      clearRetryTimer();
-      clearStableSubscriptionTimer();
       deferredRefetchTimers.forEach((timer) => clearTimeout(timer));
       deferredRefetchTimers.clear();
-      if (channel) retireChannel(channel);
-      publishStatus(null);
+      stop();
     };
-  }, [companyId, currentUserId, isActive, queryClient, publishStatus]);
+  }, [companyId, currentUserId, health, isActive, queryClient, publishStatus]);
 
   return { status: isActive && companyId && currentUserId ? status : null };
 }

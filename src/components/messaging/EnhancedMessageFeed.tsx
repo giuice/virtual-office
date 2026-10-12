@@ -4,8 +4,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Message } from '@/types/messaging';
 import { MessageItem } from './message-item';
-import { TypingIndicator } from './TypingIndicator';
-import { useConversationPresence } from '@/hooks/useConversationPresence';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { ChevronDown } from 'lucide-react';
@@ -39,8 +37,8 @@ export function EnhancedMessageFeed({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { companyUsers, currentUserProfile } = useCompany();
 
-  // Use conversation presence for typing indicators
-  const { typingUsers, presentUsers } = useConversationPresence(conversationId);
+  // Typing (Phase 5 T15) lives on the drawer's MessageFeed only: one owner of
+  // a conversation's private typing topic per tab.
 
   const {
     pinMessage,
@@ -68,15 +66,6 @@ export function EnhancedMessageFeed({
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      {/* Present users indicator (optional) */}
-      {presentUsers.length > 0 && (
-        <div className="px-4 py-2 border-b bg-muted/20">
-          <div className="text-xs text-muted-foreground">
-            {presentUsers.length} user{presentUsers.length !== 1 ? 's' : ''} online
-          </div>
-        </div>
-      )}
-
       {/* Messages area */}
       <ScrollArea ref={scrollAreaRef} className="flex-1">
         <div className="space-y-1">
@@ -108,9 +97,6 @@ export function EnhancedMessageFeed({
               onUnstar={unstarMessage}
             />
           ))}
-
-          {/* Typing indicator */}
-          <TypingIndicator typingUsers={typingUsers.map((t) => t.displayName)} />
 
           {/* Scroll anchor */}
           <div ref={messagesEndRef} />

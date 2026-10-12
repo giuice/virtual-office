@@ -1,8 +1,8 @@
 // src/app/api/conversations/preferences/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
-import { IConversationRepository } from '@/repositories/interfaces';
-import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
+import { IConversationRepository, NotParticipantError } from '@/repositories/interfaces';
+import { isAuthzFailure, jsonError, requireConversationParticipant } from '@/lib/auth/authorize';
 
 /**
  * GET /api/conversations/preferences?conversationId={id}
@@ -122,6 +122,10 @@ export async function PATCH(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof NotParticipantError) {
+      // Phase 5 T28: the membership vanished after authorization; nothing written.
+      return jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation');
+    }
     console.error('Error updating conversation preferences:', error);
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });

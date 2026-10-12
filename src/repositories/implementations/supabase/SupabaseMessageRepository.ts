@@ -1,9 +1,11 @@
 // src/repositories/implementations/supabase/SupabaseMessageRepository.ts
-import { IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
-import { Message, FileAttachment, VoiceNoteAttachment, MessageReaction, MessageType, MessageStatus, MessageReader, MessagePin, MessageStar, MessageCreateResult } from '@/types/messaging';
+import type { ClientMessageKey, IMessageRepository } from '@/repositories/interfaces/IMessageRepository';
+import { Message, FileAttachment, VoiceNoteAttachment, MessageReaction, MessageType, MessageStatus, MessageReader, MessagePin, MessageStar, MessageCreateResult, MessageAttempt, MessageAttemptFenceResult, InsertionQuota } from '@/types/messaging';
 import { toVoiceNoteWaveform } from '@/lib/messaging/attachment-policy';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { SupabaseClient } from '@supabase/supabase-js';
+
+import { createMessageAttempt, fenceMessageAttempt } from './message-attempt-rpc';
 
 // --- Helper Functions ---
 
@@ -34,7 +36,40 @@ type MessageRow = {
   status: string;
   reply_to_id: string | null;
   is_edited: boolean;
+  // Phase 5 FR-034: the sender's composition key; null on unkeyed messages
+  // (pre-Phase 4 or unkeyed creates). Absent only on partial selects.
+  client_message_id?: string | null;
 };
+/** A messages row returned by create_message_attempt (Phase 5 T3); null if malformed. */
+function parseCreatedRow(value: Record<string, unknown> | null): MessageRow | null {
+  if (
+    !value ||
+    typeof value.id !== 'string' ||
+    typeof value.conversation_id !== 'string' ||
+    typeof value.sender_id !== 'string' ||
+    typeof value.content !== 'string' ||
+    typeof value.timestamp !== 'string' ||
+    typeof value.type !== 'string' ||
+    typeof value.status !== 'string' ||
+    typeof value.is_edited !== 'boolean' ||
+    (value.reply_to_id !== null && typeof value.reply_to_id !== 'string')
+  ) {
+    return null;
+  }
+  return {
+    id: value.id,
+    conversation_id: value.conversation_id,
+    sender_id: value.sender_id,
+    content: value.content,
+    timestamp: value.timestamp,
+    type: value.type,
+    status: value.status,
+    reply_to_id: value.reply_to_id,
+    is_edited: value.is_edited,
+    client_message_id: typeof value.client_message_id === 'string' ? value.client_message_id : null,
+  };
+}
+
 function mapMessageToCamelCase(data: MessageRow): Message {
   if (!data) return data;
   return {
@@ -47,6 +82,7 @@ function mapMessageToCamelCase(data: MessageRow): Message {
     status: data.status as MessageStatus,
     replyToId: data.reply_to_id || undefined,
     isEdited: data.is_edited,
+    clientMessageId: data.client_message_id ?? undefined,
     attachments: [], // Placeholder - fetch separately
     reactions: []    // Placeholder - fetch separately
   };
@@ -139,18 +175,14 @@ function toMessageInsertRow(messageData: MessageCreateData) {
   };
 }
 
-function mapCreatedMessage(row: MessageRow): Message {
+function mapCreatedMessage(row: MessageRow, mentionedUserIds?: string[]): Message {
   const message = mapMessageToCamelCase(row);
   message.reactions = message.reactions || [];
   message.attachments = message.attachments || [];
+  if (mentionedUserIds) {
+    message.mentionedUserIds = [...mentionedUserIds].sort();
+  }
   return message;
-}
-
-// unique_violation. On a keyed insert the only reachable unique index is
-// messages_sender_conversation_client_message_id_key (id is defaulted); the
-// caller confirms by reading the winning row and rethrows if there is none.
-function isUniqueViolation(error: { code?: string }): boolean {
-  return error.code === '23505';
 }
 
 function mapMessageArrayToCamelCase(dataArray: MessageRow[]): Message[] {
@@ -170,6 +202,8 @@ type AttachmentRow = AttachmentFields & { message_id: string };
 type ReactionRow = { message_id: string; user_id: string; emoji: string; timestamp: string };
 type MessagePinRow = { id: string; message_id: string; conversation_id: string; pinned_by: string; pinned_at: string };
 type MessageStarRow = { id: string; message_id: string; conversation_id: string; user_id: string; starred_at: string };
+/** Most message ids per public.list_message_mentions call (the function accepts 1000). */
+const MENTION_READ_BATCH_SIZE = 500;
 type MessageReaderRow = {
   user_id: string;
   read_at: string;
@@ -190,12 +224,57 @@ export class SupabaseMessageRepository implements IMessageRepository {
     this.supabaseClient = supabaseClient;
   }
 
+  /**
+   * Phase 5 T4 (FR-024): mentioned users (users.id, sorted) per message id;
+   * every requested id gets an entry (empty when none). Read through
+   * public.list_message_mentions, which answers ONE jsonb object per call, so
+   * PostgREST's max-rows can never truncate it (review T4 r1 finding 1); ids
+   * are sent in batches of MENTION_READ_BATCH_SIZE. SECURITY INVOKER: under a
+   * user-scoped client, mention RLS limits the answer to conversations the
+   * caller belongs to. Throws when they cannot be read: an empty list would
+   * silently drop a mention (highlight, notification).
+   */
+  private async loadMentionedUserIds(messageIds: readonly string[]): Promise<Map<string, string[]>> {
+    // Keys lowercase: the database answers with lowercase uuid text.
+    const byMessageId = new Map<string, string[]>(messageIds.map((id) => [id.toLowerCase(), []]));
+    const uniqueIds = [...byMessageId.keys()];
+    const batches: string[][] = [];
+    for (let start = 0; start < uniqueIds.length; start += MENTION_READ_BATCH_SIZE) {
+      batches.push(uniqueIds.slice(start, start + MENTION_READ_BATCH_SIZE));
+    }
+    const answers = await Promise.all(
+      batches.map((batch) => this.supabaseClient.rpc('list_message_mentions', { p_message_ids: batch }))
+    );
+    for (const { data, error } of answers) {
+      if (error) {
+        console.error('Error fetching message mentions:', error);
+        throw error;
+      }
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        throw new Error('list_message_mentions returned an unexpected result');
+      }
+      for (const [messageId, ids] of Object.entries(data as Record<string, unknown>)) {
+        const target = byMessageId.get(messageId);
+        if (!target || !Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
+          throw new Error('list_message_mentions returned an unexpected result');
+        }
+        target.push(...(ids as string[]));
+      }
+    }
+    byMessageId.forEach((ids) => ids.sort());
+    return byMessageId;
+  }
+
   private async enrichMessages(messages: Message[]): Promise<Message[]> {
     if (messages.length === 0) {
       return messages;
     }
 
     const messageIds = messages.map(m => m.id);
+    // Started first, awaited after the other reads (one fewer serial round trip).
+    const mentionsPromise = this.loadMentionedUserIds(messageIds);
+    // Settle it even when an await below throws (no unhandled rejection).
+    mentionsPromise.catch(() => undefined);
 
     const { data: attachmentsData } = await this.supabaseClient
       .from(this.ATTACHMENT_TABLE_NAME)
@@ -221,9 +300,11 @@ export class SupabaseMessageRepository implements IMessageRepository {
       return acc;
     }, {} as Record<string, MessageReaction[]>);
 
+    const mentionsByMessageId = await mentionsPromise;
     messages.forEach(message => {
       message.attachments = attachmentsByMessageId[message.id] || [];
       message.reactions = reactionsByMessageId[message.id] || [];
+      message.mentionedUserIds = mentionsByMessageId.get(message.id.toLowerCase()) ?? [];
     });
 
     return messages;
@@ -328,6 +409,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     // Map the core message data
     const message = mapMessageToCamelCase(data);
+    const mentionsPromise = this.loadMentionedUserIds([message.id]);
+    mentionsPromise.catch(() => undefined);
 
     const [
       { data: attachmentsData, error: attachmentsError },
@@ -352,6 +435,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
         .select('*')
         .eq('message_id', message.id)
     ]);
+    message.mentionedUserIds = (await mentionsPromise).get(message.id.toLowerCase()) ?? [];
 
     if (attachmentsError) {
       console.error(`Error fetching attachments for message ID ${message.id}:`, attachmentsError);
@@ -522,55 +606,87 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return mapCreatedMessage(data as MessageRow);
   }
 
-  // Idempotent create (Phase 4 FR-024): the composition key is unique per
-  // (sender_id, conversation_id) through the partial unique index
-  // messages_sender_conversation_client_message_id_key. A retry finds the
-  // stored row; a concurrent create with the same key loses the INSERT race
-  // with a unique violation and reads the winner instead.
-  async createWithClientKey(messageData: MessageCreateData, clientMessageId: string): Promise<MessageCreateResult> {
-    const stored = await this.findByClientMessageId(messageData, clientMessageId);
-    if (stored) {
-      return { message: stored, created: false };
+  // Phase 5 T3: unkeyed create in public.create_message_attempt (null key and
+  // generation) so the insertion quota is charged in the insertion's own
+  // transaction — a failed INSERT is never charged (migration 20261007114454).
+  // The answer is the row the function built in that transaction: no
+  // post-commit read can fail after the message is stored (a keyless retry
+  // would duplicate it).
+  async createUnkeyed(messageData: MessageCreateData, insertQuota: InsertionQuota): Promise<Message> {
+    const result = await createMessageAttempt(this.supabaseClient, {
+      data: messageData,
+      uploadIds: [],
+      insertQuota,
+    });
+    if (!result.created) {
+      throw new Error(`create_message_attempt replayed unkeyed message ${result.messageId}`);
     }
-
-    const { data, error } = await this.supabaseClient
-      .from(this.MSG_TABLE_NAME)
-      .insert({ ...toMessageInsertRow(messageData), client_message_id: clientMessageId })
-      .select()
-      .single();
-
-    if (!error && data) {
-      return { message: mapCreatedMessage(data as MessageRow), created: true };
+    // An unkeyed create carries no composition, hence no mention (T4): its
+    // legacy response shape is unchanged (no mentionedUserIds).
+    const row = parseCreatedRow(result.createdRow);
+    if (row) {
+      return mapCreatedMessage(row);
     }
-
-    if (error && isUniqueViolation(error)) {
-      const winner = await this.findByClientMessageId(messageData, clientMessageId);
-      if (winner) {
-        return { message: winner, created: false };
-      }
-    }
-
-    console.error('Error creating message:', error);
-    throw error || new Error('Failed to create message or retrieve created data.');
+    // Unreachable while the function returns its RETURNING row; the message is
+    // committed, so read it rather than answer 500 for a stored message.
+    console.error('create_message_attempt returned a malformed created row:', result.messageId);
+    return this.readCreatedMessage(result.messageId, false);
   }
 
-  private async findByClientMessageId(
-    messageData: Pick<MessageCreateData, 'senderId' | 'conversationId'>,
-    clientMessageId: string
-  ): Promise<Message | null> {
+  private async readCreatedMessage(messageId: string, withMentions: boolean): Promise<Message> {
     const { data, error } = await this.supabaseClient
       .from(this.MSG_TABLE_NAME)
       .select('*')
-      .eq('sender_id', messageData.senderId)
-      .eq('conversation_id', messageData.conversationId)
-      .eq('client_message_id', clientMessageId)
-      .maybeSingle();
+      .eq('id', messageId)
+      .single();
 
-    if (error) {
-      console.error('Error looking up message by client key:', error);
-      throw error;
+    if (error || !data) {
+      console.error('Error reading message after create:', error);
+      throw error || new Error(`Message ${messageId} not found after create`);
     }
-    return data ? mapCreatedMessage(data as MessageRow) : null;
+    if (!withMentions) {
+      return mapCreatedMessage(data as MessageRow);
+    }
+    const mentions = await this.loadMentionedUserIds([messageId]);
+    return mapCreatedMessage(data as MessageRow, mentions.get(messageId.toLowerCase()) ?? []);
+  }
+
+  // Idempotent create (Phase 4 FR-024): the composition key is unique per
+  // (sender_id, conversation_id) through the partial unique index
+  // messages_sender_conversation_client_message_id_key. Phase 5 T2: the insert
+  // runs in public.create_message_attempt, which returns the stored message on
+  // a replay or a lost same-key race, and refuses to commit a fenced attempt
+  // (AttemptSupersededError) — see migration 20261007095045. Phase 5 T3: a
+  // winning insertion charges insertQuota in the same transaction
+  // (InsertionRateLimitError, nothing stored) — migration 20261007114454.
+  async createWithClientKey(
+    messageData: MessageCreateData,
+    clientMessageId: string,
+    attempt: MessageAttempt | undefined,
+    insertQuota: InsertionQuota | null
+  ): Promise<MessageCreateResult> {
+    const result = await createMessageAttempt(this.supabaseClient, {
+      data: messageData,
+      clientMessageId,
+      attempt,
+      uploadIds: [],
+      insertQuota,
+    });
+
+    // Phase 5 T4: a winning insertion answers with the mentions it stored in
+    // its own transaction; a replay reads the stored message and mentions.
+    const createdRow = result.created ? parseCreatedRow(result.createdRow) : null;
+    return {
+      message: createdRow
+        ? mapCreatedMessage(createdRow, result.mentionedUserIds ?? [])
+        : await this.readCreatedMessage(result.messageId, true),
+      created: result.created,
+      storedComposition: result.storedComposition,
+    };
+  }
+
+  async fenceClientMessage(key: ClientMessageKey, generation: number): Promise<MessageAttemptFenceResult> {
+    return fenceMessageAttempt(this.supabaseClient, key, generation);
   }
 
   async update(id: string, updates: Partial<Pick<Message, 'content' | 'status' | 'isEdited'>>): Promise<Message | null> {

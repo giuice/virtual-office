@@ -1,6 +1,7 @@
 import type { Page, Request } from '@playwright/test';
 
 import { test, expect } from './fixtures/messaging';
+import { fullBrowserChannel } from './helpers/browser-channel';
 import { backToConversationList, openDrawer, selectConversation, waitForRealtimeReady } from './helpers/drawer-helpers';
 
 /**
@@ -19,9 +20,10 @@ import { backToConversationList, openDrawer, selectConversation, waitForRealtime
  * production.
  */
 test.use({
-  // Full Chromium in new headless mode: the default headless shell has no
-  // media capture (getUserMedia rejects with NotSupportedError).
-  channel: 'chromium',
+  // A full browser in new headless mode: the default headless shell has no
+  // media capture (getUserMedia rejects with NotSupportedError). Keeps the
+  // project's Chrome/Edge channel where one is set.
+  channel: fullBrowserChannel,
   launchOptions: {
     // Fake microphone only: no --use-fake-ui-for-media-stream, which would
     // accept every permission prompt and make the denied case impossible.

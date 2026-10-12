@@ -25,13 +25,26 @@ GSD is retired in this repository. Never invoke or execute GSD skills, workflows
 
 ### Adversarial review gate
 
-Every spec-to-done work item gets an adversarial review at each of these
-points, and the point does not pass until the review is accepted:
+Every spec-to-done work item gets an adversarial review at these points:
 
 1. SPEC: before asking the user to approve it.
 2. PLAN: before executing the first task, and after every replan.
-3. Each task: its diff, before the task is recorded as done.
+3. Block: the PLAN groups tasks into blocks of related work (about 4–5
+   tasks). After a block's last task, its combined diff is reviewed once.
+   Tasks are not reviewed one by one; a task is recorded done after its own
+   light checks (see Verification), with its block review still ahead.
 4. Final: the whole work-item diff, before the REPORT.
+
+Keep review rounds few:
+
+- A finding needs another round only when it is High or Medium and a real
+  user or a realistic failure (network, browser, crash, concurrency) can
+  trigger it. Low findings are fixed or rejected and recorded, without
+  another round.
+- A finding that needs the application's own server to be broken or tampered
+  with is recorded as a follow-up with its reason, not fixed in the block.
+- Each block gets at most one fix round after its review. Findings left after
+  that round are recorded in TRACK and carried to the final review.
 
 The review is important work under Cross-model delegation: a Claude
 orchestrator runs it through `delegation-anthropic.md`, and an OpenAI
@@ -206,9 +219,24 @@ Choose evidence proportional to risk:
 - browser smoke tests for user-visible workflows;
 - final diff inspection and diff check.
 
+Inside spec-to-done, run checks at this cadence:
+
+- Per task: type-check and lint. New E2E specs are written with the task but
+  not run yet.
+- Per block, after its last task and its fix round: type-check, lint, and the
+  DB integration suite when server code changed. No E2E run per block.
+- E2E runs only at the end (owner decision, 2026-10-10: the per-task and
+  per-block runs cost days and froze the machine). Run one Playwright process
+  at a time, never alongside another heavy job (review, agents running tests).
+- Final: one run of every new spec of the work item and of the full
+  regression E2E suite in one browser only (Chrome) with zero retries; no
+  Edge or Firefox runs (owner decision, 2026-10-10). A test that fails is
+  analysed and rerun alone; the suite is not repeated.
+
 Use meaningful regression coverage for changed behavior; do not add tests that
-only mirror trivial edits. After checks pass, rerun or broaden them only for
-new changes, failures, or unresolved risk. A required runtime check without its
+only mirror trivial edits or that probe failures no real user or realistic
+failure can cause. After checks pass, rerun or broaden them only for new
+changes, failures, or unresolved risk. A required runtime check without its
 prerequisites remains unverified; it does not block unrelated local checks.
 
 Do not weaken assertions or treat skipped critical tests as passing. Mocks do not
@@ -252,9 +280,8 @@ matches the model you are running as, and follow it completely:
 - OpenAI model (GPT/Codex family) orchestrating: read `delegation-openai.md`.
 
 Both files are at the repository root. Do not improvise a delegation path that
-is not described there; both were written after real incidents. Correctness and
-regression prevention take priority over cost: never silently downgrade the
-model or effort level a delegation file mandates.
+is not described there; both were written after real incidents. Never silently
+downgrade the model or effort level a delegation file mandates.
 
 ## Git and files
 

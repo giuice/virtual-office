@@ -1,7 +1,7 @@
 // src/contexts/messaging/MessagingContext.tsx
 'use client';
 
-import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
   Message,
@@ -12,22 +12,30 @@ import { MessagingContextType, DrawerView } from './types';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useMessageSubscription } from '@/hooks/realtime/useMessageSubscription';
+import { useMessagingMetrics } from '@/hooks/realtime/useMessagingMetrics';
+import { useMessagingPollingFallback } from '@/hooks/realtime/useMessagingPollingFallback';
 import { useIncomingMessageNotifications } from '@/hooks/ui/use-message-notifications';
+import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+import { isSocketOutage, MessagingRealtimeHealth } from '@/lib/messaging/realtime-health';
+import {
+  isRestoringPageLoad,
+  readSavedDrawer,
+  removeLegacyDrawerKeys,
+  saveDrawer,
+} from '@/lib/messaging/drawer-restore';
 import { debugLogger } from '@/utils/debug-logger';
-
-// LocalStorage keys for drawer state persistence
-const DRAWER_STORAGE_KEYS = {
-  IS_MINIMIZED: 'messaging_drawer_minimized',
-  ACTIVE_VIEW: 'messaging_drawer_active_view',
-  ACTIVE_CONVERSATION_ID: 'messaging_active_conversation_id',
-} as const;
 
 // Create the context with a default undefined value
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
 
 function useMessagingProviderValue(): MessagingContextType {
+  // T13 (FR-014, FR-015): health of this tab's messaging Realtime streams
+  // (the list stream reports from useConversations, the messages stream from
+  // useMessageSubscription); read by the drawer banner and later consumers.
+  const [realtimeHealth] = useState(() => new MessagingRealtimeHealth());
   // Conversation list lives in TanStack Query (key ['conversations', userId]);
-  // useConversationRealtime invalidations keep it fresh — no polling (audit B-06).
+  // useConversationRealtime invalidations keep it fresh; it is polled only
+  // while Realtime is unhealthy (T14, useMessagingPollingFallback).
   const {
     conversations,
     activeConversation,
@@ -49,48 +57,17 @@ function useMessagingProviderValue(): MessagingContextType {
     totalUnreadCount,
     updateConversationWithMessage,
     clearLastActiveConversation,
-  } = useConversations();
+  } = useConversations(realtimeHealth);
   const { company, currentUserProfile } = useCompany();
 
-  // Drawer state with localStorage persistence
-  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem(DRAWER_STORAGE_KEYS.IS_MINIMIZED);
-    return stored === 'true';
-  });
+  const ownerId = currentUserProfile?.id;
 
-  const [activeView, setActiveView] = useState<DrawerView>(() => {
-    if (typeof window === 'undefined') return 'list';
-    const stored = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_VIEW);
-    return (stored as DrawerView) || 'list';
-  });
+  // Drawer state; restored after a reload per users.id (T20, below).
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [activeView, setActiveView] = useState<DrawerView>('list');
 
   // Drawer explicit open state (decoupled from activeConversation)
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-
-  // Persist drawer state to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DRAWER_STORAGE_KEYS.IS_MINIMIZED, String(isMinimized));
-    }
-  }, [isMinimized]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_VIEW, activeView);
-    }
-  }, [activeView]);
-
-  // Persist active conversation ID to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (activeConversation?.id) {
-        localStorage.setItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID, activeConversation.id);
-      } else {
-        localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
-      }
-    }
-  }, [activeConversation?.id]);
 
   // Drawer control functions
   const openDrawer = useCallback(() => {
@@ -114,36 +91,34 @@ function useMessagingProviderValue(): MessagingContextType {
     }
   }, [isMinimized]);
 
-  // Restore active conversation from localStorage on mount
-  useEffect(() => {
-    // Only restore if we have conversations loaded and no active conversation yet
-    if (
-      typeof window !== 'undefined' &&
-      conversations.length > 0 &&
-      !activeConversation
-    ) {
-      const storedConversationId = localStorage.getItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
-      if (storedConversationId) {
-        const conversation = conversations.find(
-          (c) => c.id === storedConversationId
-        );
-        if (conversation) {
-          if (debugLogger.messaging.enabled()) {
-            debugLogger.messaging.event('MessagingContext', 'restore-active-conversation', {
-              conversationId: conversation.id,
-            });
-          }
-          setActiveConversation(conversation);
-        } else {
-          // Conversation not found, clear from localStorage
-          localStorage.removeItem(DRAWER_STORAGE_KEYS.ACTIVE_CONVERSATION_ID);
-        }
-      }
-    }
-  }, [conversations, activeConversation, setActiveConversation]);
-
   // Get message management hooks
   const messagesManager = useMessages(activeConversation?.id || null);
+  // Phase 5 T8: the signed-in user's durable outbox (text/reply sends).
+  // T11: owned by users.id; its auth identity is the same row's supabase_uid.
+  const {
+    queueTextMessage,
+    retryOutboxMessage,
+    discardOutboxMessage,
+    cancelOutboxMessage,
+    countUnsentOutboxMessages,
+    beginOutboxSignOut,
+    resumeOutboxDrains,
+    noteOutboxConnectivityLost,
+  } = useMessageOutbox(
+    currentUserProfile?.id,
+    currentUserProfile?.supabase_uid
+  );
+
+  // Block B fix F3 (FR-002, FR-004): the messages stream failing with this
+  // tab's socket down is a connectivity loss; its recovery then advances the
+  // outbox's shared recovery epoch (handleMessagesRecovered → resumeDrains).
+  useEffect(
+    () =>
+      realtimeHealth.subscribe(() => {
+        if (isSocketOutage(realtimeHealth.get('messages'))) noteOutboxConnectivityLost();
+      }),
+    [realtimeHealth, noteOutboxConnectivityLost]
+  );
 
   // The conversation whose feed the drawer shows (same choice as
   // MessagingDrawer), or null when the drawer is closed, minimized, or on the
@@ -152,6 +127,78 @@ function useMessagingProviderValue(): MessagingContextType {
   const viewedConversationId = isDrawerOpen && !isMinimized && activeView === 'conversation'
     ? displayedConversationId
     : null;
+
+  // T20 (FR-031, BR-016): drawer restore (src/lib/messaging/drawer-restore.ts).
+  // One decision per page load, for the first user signed in on it: after a
+  // reload, that user's drawer reopens if it was open there — on the same
+  // conversation while it is still in their list, otherwise on the list; on
+  // any other load it starts closed. From then on this tab's drawer is saved
+  // for that user. The record is read once, so another tab never moves this
+  // tab's drawer (T16 tab jump). When the tab switches to another user in
+  // place, the previous user's conversation leaves the drawer.
+  const conversationsSettled = hasLoadedConversations || errorConversations !== null;
+  // The user whose drawer this tab saves (null until the load's decision).
+  const drawerOwnerRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ownerId || drawerOwnerRef.current === ownerId) return;
+    if (drawerOwnerRef.current !== null) {
+      drawerOwnerRef.current = ownerId;
+      setActiveConversation(null);
+      clearLastActiveConversation();
+      setActiveView('list');
+      return;
+    }
+    const restoring = isRestoringPageLoad();
+    if (restoring && !conversationsSettled) return;
+    drawerOwnerRef.current = ownerId;
+    removeLegacyDrawerKeys();
+    // A fresh load, or the user opened the drawer before the list arrived.
+    if (!restoring || isDrawerOpen || activeConversation) return;
+    const saved = readSavedDrawer(ownerId);
+    if (!saved) return;
+    const conversation = saved.conversationId
+      ? conversations.find((c) => c.id === saved.conversationId)
+      : undefined;
+    if (debugLogger.messaging.enabled()) {
+      debugLogger.messaging.event('MessagingContext', 'restore-drawer', {
+        view: conversation ? 'conversation' : 'list',
+        conversationLost: Boolean(saved.conversationId && !conversation),
+      });
+    }
+    setIsDrawerOpen(true);
+    setIsMinimized(saved.minimized);
+    if (conversation) {
+      setActiveConversation(conversation);
+      setActiveView('conversation');
+    } else {
+      setActiveView('list');
+    }
+  }, [
+    ownerId,
+    conversationsSettled,
+    conversations,
+    isDrawerOpen,
+    activeConversation,
+    setActiveConversation,
+    clearLastActiveConversation,
+  ]);
+
+  // Saved after the decision above (same commit included): an open drawer is
+  // recorded, a closed one removes the record.
+  const savedConversationId = activeView === 'conversation' ? displayedConversationId : null;
+  useEffect(() => {
+    if (!ownerId || drawerOwnerRef.current !== ownerId) return;
+    saveDrawer(
+      ownerId,
+      isDrawerOpen
+        ? {
+            minimized: isMinimized,
+            view: savedConversationId ? 'conversation' : 'list',
+            conversationId: savedConversationId,
+          }
+        : null
+    );
+  }, [ownerId, conversationsSettled, isDrawerOpen, isMinimized, savedConversationId]);
 
   const openConversationFromNotification = useCallback((conversationId: string) => {
     const conversation = getCachedConversations().find((c) => c.id === conversationId);
@@ -162,9 +209,11 @@ function useMessagingProviderValue(): MessagingContextType {
     setActiveView('conversation');
   }, [getCachedConversations, setActiveConversation]);
 
-  // Phase 4 FR-023: desktop notifications for live messages from others.
+  // Phase 4 FR-023: desktop notifications for live messages from others;
+  // Phase 5 T18 (FR-025): mentions, authorized under this users row's auth identity.
   const notifyIncomingMessage = useIncomingMessageNotifications({
     currentUserId: currentUserProfile?.id,
+    currentUserAuthUid: currentUserProfile?.supabase_uid,
     conversationsLoaded: hasLoadedConversations,
     getCachedConversations,
     viewedConversationId,
@@ -245,6 +294,15 @@ function useMessagingProviderValue(): MessagingContextType {
     void trackIncomingMessage(message);
   }, [trackIncomingMessage]);
 
+  // T13 (FR-002, FR-015): the messages stream is back after a failure. The
+  // feeds catch up on the server's stream confirmation (useMessageSubscription);
+  // the list's unread counts and order are refetched, and the outbox drains
+  // again through its usual path (owner check, sign-out stop).
+  const handleMessagesRecovered = useCallback(() => {
+    void refreshConversations();
+    resumeOutboxDrains();
+  }, [refreshConversations, resumeOutboxDrains]);
+
   // One channel for every messaging event (audit M-06): RLS scopes rows
   // server-side, so no conversation id list is needed and this status is the
   // real status of the channel delivering messages, receipts and reactions.
@@ -254,7 +312,21 @@ function useMessagingProviderValue(): MessagingContextType {
     currentUserId: currentUserProfile?.id,
     ignoreSenderId: currentUserProfile?.id,
     onInsert: handleConversationInsert,
+    health: realtimeHealth,
+    onRecovered: handleMessagesRecovered,
   });
+
+  // T14 (FR-016): while a required stream has been unhealthy > 30 s and the
+  // tab is visible, the open feed, open reader lists and the list are polled.
+  useMessagingPollingFallback({
+    health: realtimeHealth,
+    userId: currentUserProfile?.id,
+    conversationId: activeConversation?.id ?? null,
+  });
+
+  // T19 (FR-027, FR-028): this tab's messaging metrics, delivered fire and
+  // forget for the signed-in user; stream drops/recoveries from the health store.
+  useMessagingMetrics({ health: realtimeHealth, userId: currentUserProfile?.id });
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -303,6 +375,7 @@ function useMessagingProviderValue(): MessagingContextType {
     attachments?: FileAttachment[];
     type?: MessageType;
     clientMessageId?: string;
+    mentionIds?: string[];
   }) => {
     if (!activeConversation) return;
 
@@ -359,11 +432,18 @@ function useMessagingProviderValue(): MessagingContextType {
     loadHistoryUntilMessage,
     refreshMessages,
     sendMessage,
+    queueTextMessage,
+    retryOutboxMessage,
+    discardOutboxMessage,
+    cancelOutboxMessage,
+    countUnsentOutboxMessages,
+    beginOutboxSignOut,
     addReaction,
     removeReaction,
     uploadAttachment,
     // Realtime
     connectionStatus: realtimeStatus,
+    realtimeHealth,
   }), [
     isDrawerOpen,
     isMinimized,
@@ -398,10 +478,17 @@ function useMessagingProviderValue(): MessagingContextType {
     loadHistoryUntilMessage,
     refreshMessages,
     sendMessage,
+    queueTextMessage,
+    retryOutboxMessage,
+    discardOutboxMessage,
+    cancelOutboxMessage,
+    countUnsentOutboxMessages,
+    beginOutboxSignOut,
     addReaction,
     removeReaction,
     uploadAttachment,
     realtimeStatus,
+    realtimeHealth,
   ]);
 
   return value;

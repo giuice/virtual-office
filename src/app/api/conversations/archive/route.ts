@@ -1,8 +1,8 @@
 // src/app/api/conversations/archive/route.ts
 import { NextResponse } from 'next/server';
 import { SupabaseConversationRepository } from '@/repositories/implementations/supabase';
-import { IConversationRepository } from '@/repositories/interfaces';
-import { isAuthzFailure, requireConversationParticipant } from '@/lib/auth/authorize';
+import { IConversationRepository, NotParticipantError } from '@/repositories/interfaces';
+import { isAuthzFailure, jsonError, requireConversationParticipant } from '@/lib/auth/authorize';
 
 export async function PATCH(request: Request) {
   try {
@@ -37,6 +37,10 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, preferences }, { status: 200 });
   } catch (error) {
+    if (error instanceof NotParticipantError) {
+      // Phase 5 T28: the membership vanished after authorization; nothing written.
+      return jsonError(403, 'NOT_PARTICIPANT', 'You are not a participant of this conversation');
+    }
     console.error('Error setting conversation archive status:', error);
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });

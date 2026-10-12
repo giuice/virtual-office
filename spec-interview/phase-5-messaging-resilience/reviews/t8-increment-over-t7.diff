@@ -1,0 +1,660 @@
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/hooks/useMessages.ts b/src/hooks/useMessages.ts
+index 71df36a..e2437c2 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/hooks/useMessages.ts
++++ b/src/hooks/useMessages.ts
+@@ -1,5 +1,5 @@
+ // src/hooks/useMessages.ts
+-import { useCallback, useMemo, useState } from 'react';
++import { useCallback, useEffect, useMemo, useState } from 'react';
+ import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+ import { v4 as uuidv4 } from 'uuid';
+ import { useCompany } from '@/contexts/CompanyContext';
+@@ -15,10 +15,13 @@ import { toggleReactionInPages } from '@/lib/messaging/reaction-cache';
+ import { attachmentMessageType } from '@/lib/messaging/attachment-policy';
+ import {
+   appendMessageToPages,
++  isMessageDeleted,
++  isPendingMessage,
+   keepMessageThroughInflightFetch,
+   normalizeClientMessageId,
+   pendingMessagesQueryKey,
+   PENDING_MESSAGE_ID_PREFIX,
++  resolvePendingMessages,
+   visiblePendingMessages,
+   type MessagesInfiniteData,
+ } from '@/lib/messaging/message-cache';
+@@ -117,18 +120,37 @@ export function useMessages(activeConversationId: string | null) {
+     queryFn: () => queryClient.getQueryData<Message[]>(pendingQueryKey) ?? [],
+     enabled: false,
+     staleTime: Infinity,
++    // Phase 5 T8: also the render view of the durable outbox; never collected.
++    gcTime: Infinity,
+   });
+ 
+-  const messages: Message[] = useMemo(() => {
+-    // Pages are returned Newest -> Oldest (Page 0 is newest)
+-    // We want to display Oldest -> Newest
+-    // So we reverse the pages array before flattening
+-    const stored = data?.pages ? [...data.pages].reverse().flatMap((p) => p.messages) : [];
+-    // A pending message shows until the feed holds the stored message with
+-    // its key (Realtime, fetch or create response, whichever comes first).
+-    const pending = activeConversationId ? visiblePendingMessages(stored, pendingMessages) : [];
+-    return pending.length > 0 ? [...stored, ...pending] : stored;
+-  }, [activeConversationId, data, pendingMessages]);
++  // Pages are returned Newest -> Oldest (Page 0 is newest)
++  // We want to display Oldest -> Newest
++  // So we reverse the pages array before flattening
++  const storedMessages: Message[] = useMemo(
++    () => (data?.pages ? [...data.pages].reverse().flatMap((p) => p.messages) : []),
++    [data]
++  );
++  // A pending message shows until the feed holds the stored message with its
++  // key (Realtime, fetch or create response, whichever comes first).
++  const visiblePending = useMemo(
++    () => (activeConversationId ? visiblePendingMessages(storedMessages, pendingMessages) : []),
++    [activeConversationId, storedMessages, pendingMessages]
++  );
++  const messages: Message[] = useMemo(
++    () => (visiblePending.length > 0 ? [...storedMessages, ...visiblePending] : storedMessages),
++    [storedMessages, visiblePending]
++  );
++  // Once the rendered feed holds a pending message's stored copy (e.g. from
++  // a fetch), the pending message is resolved for good: if the stored message
++  // later leaves the feed (e.g. a Realtime DELETE), it is not shown again as
++  // "sending".
++  const hasObservedPending = pendingMessages.length > visiblePending.length;
++  useEffect(() => {
++    if (activeConversationId && hasObservedPending) {
++      resolvePendingMessages(queryClient, activeConversationId, storedMessages);
++    }
++  }, [activeConversationId, hasObservedPending, queryClient, storedMessages]);
+ 
+   // Initial load only. Background refetches (realtime/receipt invalidations,
+   // focus) and older-page fetches must not swap the feed for a skeleton: that
+@@ -350,20 +372,26 @@ export function useMessages(activeConversationId: string | null) {
+           });
+         }
+ 
+-        // The server stored (or replayed) the message of this key. Merge it
+-        // into the feed first (a no-op when Realtime or a fetch already
+-        // delivered it), then drop the pending copy: the copy is hidden as
+-        // soon as the feed holds the key, so neither step shows two bubbles
+-        // or none.
++        // The server stored (or replayed) the message of this key. Unless the
++        // feed already observed it (the pending copy is then resolved: its
++        // stored copy came by Realtime or a fetch, and that copy stays the
++        // feed's) or this client saw a Realtime DELETE for it (bounded
++        // registry; a deletion missed during a stream gap is not known here),
++        // merge it into the feed first, then drop the pending copy: the copy
++        // is hidden as soon as the feed holds the key, so neither step shows
++        // two bubbles or none.
+         const confirmed: Message = {
+           ...savedMessage,
+           clientMessageId: normalizeClientMessageId(savedMessage.clientMessageId) ?? clientMessageId,
+         };
+-        queryClient.setQueryData<MessagesInfiniteData | undefined>(
+-          ['messages', conversationId],
+-          (oldData) => appendMessageToPages(oldData, confirmed)
+-        );
+-        keepMessageThroughInflightFetch(queryClient, conversationId, confirmed);
++        const unresolved = isPendingMessage(queryClient.getQueryData<Message[]>(pendingKey), clientMessageId);
++        if (unresolved && !isMessageDeleted(queryClient, confirmed.id)) {
++          queryClient.setQueryData<MessagesInfiniteData | undefined>(
++            ['messages', conversationId],
++            (oldData) => appendMessageToPages(oldData, confirmed)
++          );
++          keepMessageThroughInflightFetch(queryClient, conversationId, confirmed);
++        }
+         updatePendingMessages(queryClient, pendingKey, clientMessageId);
+         return confirmed;
+       } catch (err) {
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/lib/messaging-api.ts b/src/lib/messaging-api.ts
+index f4dc3b8..de53eff 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/lib/messaging-api.ts
++++ b/src/lib/messaging-api.ts
+@@ -183,6 +183,54 @@ export const messagingApi = {
+     }
+   },
+ 
++  /**
++   * Phase 5 T8: one attempt of an outbox item (POST /api/messages/create
++   * with `attemptGeneration` and `expectedSenderId`, FR-006/FR-011). Resolves
++   * with the HTTP status, the error code of a refusal and, on 200/201, the
++   * stored message; rejects only when no response arrived (network error),
++   * which the caller treats as an unknown outcome.
++   */
++  async createMessageAttempt(attempt: {
++    conversationId: string;
++    content: string;
++    replyToId: string | null;
++    clientMessageId: string;
++    attemptGeneration: number;
++    expectedSenderId: string;
++    mentionIds: readonly string[];
++  }): Promise<{ status: number; code?: string; message?: Message }> {
++    const response = await fetch('/api/messages/create', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({
++        conversationId: attempt.conversationId,
++        content: attempt.content,
++        type: 'text',
++        ...(attempt.replyToId ? { replyToId: attempt.replyToId } : {}),
++        clientMessageId: attempt.clientMessageId,
++        attemptGeneration: attempt.attemptGeneration,
++        expectedSenderId: attempt.expectedSenderId,
++        // Unchanged on every attempt of the key (an empty set is not sent).
++        ...(attempt.mentionIds.length > 0 ? { mentionIds: [...attempt.mentionIds] } : {}),
++      }),
++    });
++    const data = (await response.json().catch(() => null)) as
++      | { code?: unknown; message?: Record<string, unknown> }
++      | null;
++    const code = typeof data?.code === 'string' ? data.code : undefined;
++    if (!response.ok || !data?.message || typeof data.message !== 'object') {
++      return { status: response.status, code };
++    }
++    return {
++      status: response.status,
++      message: {
++        ...(data.message as unknown as Message),
++        timestamp: normalizeDate(data.message.timestamp),
++        reactions: normalizeReactions(data.message.reactions),
++      },
++    };
++  },
++
+   /**
+    * Get messages for a conversation with pagination
+    */
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/lib/messaging/message-cache.ts b/src/lib/messaging/message-cache.ts
+index 35ae4e5..a50c5d3 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/lib/messaging/message-cache.ts
++++ b/src/lib/messaging/message-cache.ts
+@@ -57,6 +57,99 @@ export function visiblePendingMessages(stored: readonly Message[], pending: read
+   });
+ }
+ 
++type StoredMessageObserver = (conversationId: string, stored: readonly Message[]) => void;
++const storedMessageObservers = new WeakMap<QueryClient, Set<StoredMessageObserver>>();
++
++/**
++ * Phase 5 T8: calls `observer` with every batch of stored keyed messages
++ * that resolvePendingMessages sees (a Realtime INSERT, the rendered feed after
++ * a fetch), so the durable outbox confirms an item the first time its stored
++ * key is observed from any source. Returns the unsubscribe function.
++ */
++export function observeStoredMessages(queryClient: QueryClient, observer: StoredMessageObserver): () => void {
++  let observers = storedMessageObservers.get(queryClient);
++  if (!observers) {
++    observers = new Set();
++    storedMessageObservers.set(queryClient, observers);
++  }
++  observers.add(observer);
++  return () => {
++    storedMessageObservers.get(queryClient)?.delete(observer);
++  };
++}
++
++/**
++ * Phase 5 FR-034: retires the sender's pending messages of a conversation
++ * whose stored message has been observed (`stored`: a Realtime INSERT just
++ * merged, or the feed as rendered after a fetch). A pending message is
++ * resolved the first time its key is seen: it is removed from every pending
++ * list of that conversation, so it is not shown again as "sending" if the
++ * stored message later leaves the feed (for example a Realtime DELETE). Call
++ * it only after the stored message is in the feed cache, so no render shows
++ * neither copy.
++ */
++export function resolvePendingMessages(
++  queryClient: QueryClient,
++  conversationId: string,
++  stored: readonly Message[]
++): void {
++  const storedKeys = new Set<string>();
++  for (const message of stored) {
++    const key = correlationKey(message);
++    if (key) storedKeys.add(key);
++  }
++  if (storedKeys.size === 0) return;
++  // Phase 5 T8: the outbox confirms (and deletes) the items of these keys.
++  storedMessageObservers.get(queryClient)?.forEach((observer) => observer(conversationId, stored));
++  queryClient
++    .getQueriesData<Message[]>({ queryKey: ['messages-pending'] })
++    .forEach(([queryKey, pending]) => {
++      if (queryKey[2] !== conversationId || !pending?.length) return;
++      const remaining = pending.filter((message) => {
++        const key = correlationKey(message);
++        return key === null || !storedKeys.has(key);
++      });
++      if (remaining.length !== pending.length) {
++        queryClient.setQueryData<Message[]>(queryKey, remaining);
++      }
++    });
++}
++
++/** Whether `pending` still holds the pending message of `clientMessageId` (not yet resolved). */
++export function isPendingMessage(pending: readonly Message[] | undefined, clientMessageId: string): boolean {
++  return Boolean(pending?.some((message) => normalizeClientMessageId(message.clientMessageId) === clientMessageId));
++}
++
++// Ids of messages this client saw deleted through a Realtime DELETE event, per
++// query client, bounded to the last 1000 (the oldest are forgotten first).
++// Only three merges consult it: a create response (useMessages), a Realtime
++// INSERT (useMessageSubscription) and the re-merge after an in-flight fetch
++// (keepMessageThroughInflightFetch). It does not reconcile deletions this
++// client missed (e.g. during a Realtime stream gap), and fetched pages are
++// not filtered by it: a feed GET that read the row before it was deleted can
++// still return it. No product path deletes stored messages today; the only
++// deletion is a sender's own Data API delete under RLS (delete_own_messages).
++const MAX_REMEMBERED_DELETIONS = 1000;
++const deletedMessageIds = new WeakMap<QueryClient, Set<string>>();
++
++export function markMessageDeleted(queryClient: QueryClient, messageId: string): void {
++  let ids = deletedMessageIds.get(queryClient);
++  if (!ids) {
++    ids = new Set();
++    deletedMessageIds.set(queryClient, ids);
++  }
++  ids.delete(messageId);
++  ids.add(messageId);
++  if (ids.size > MAX_REMEMBERED_DELETIONS) {
++    const oldest = ids.values().next().value;
++    if (oldest !== undefined) ids.delete(oldest);
++  }
++}
++
++export function isMessageDeleted(queryClient: QueryClient, messageId: string): boolean {
++  return deletedMessageIds.get(queryClient)?.has(messageId) ?? false;
++}
++
+ /**
+  * Merges a stored message (a Realtime INSERT, a create response) into the
+  * infinite-query cache:
+@@ -116,7 +209,9 @@ export function isMessageInFeedCache(
+  * refetch. Once the in-flight fetch settles the message is merged again
+  * (a no-op when the result already has it). If the message leaves the cache
+  * while the fetch is still running (deleted, or a failed send rolled back),
+- * it is not brought back.
++ * it is not brought back, and neither is a message this client has seen
++ * deleted by a Realtime DELETE (isMessageDeleted) by the time the fetch
++ * settles.
+  */
+ export function keepMessageThroughInflightFetch(
+   queryClient: QueryClient,
+@@ -149,6 +244,9 @@ export function keepMessageThroughInflightFetch(
+       return;
+     }
+     unsubscribe();
++    if (isMessageDeleted(queryClient, message.id)) {
++      return;
++    }
+     queryClient.setQueryData<MessagesInfiniteData | undefined>(queryKey, (oldData) =>
+       oldData ? appendMessageToPages(oldData, message) : oldData
+     );
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/types/messaging.ts b/src/types/messaging.ts
+index 140cf80..fce19f0 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t7-new/src/types/messaging.ts
++++ b/src/types/messaging.ts
+@@ -184,8 +184,18 @@ export interface Message {
+   // its first creation (members other than the sender at that time), sorted.
+   // Set on messages read by the repository (feed, create/fence responses).
+   mentionedUserIds?: string[];
++  // Phase 5 T8 (client only, never sent by the server): delivery state of the
++  // sender's outbox copy of a text message, shown as a text label.
++  deliveryState?: MessageDeliveryState;
+ }
+ 
++/**
++ * Phase 5 T8: label state of a pending outbox copy — `pending` (waiting to
++ * be sent), `sending` (an attempt is or may be in progress), `failed`
++ * (definitively rejected), `expired` (not sent within 24 h, T9).
++ */
++export type MessageDeliveryState = 'pending' | 'sending' | 'failed' | 'expired';
++
+ /**
+  * Phase 5 T4 (FR-023): a current member of a conversation
+  * (public.conversation_members), as listed to other current members.
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t8/client-correlation-orig.spec.ts b/__tests__/api/playwright/messaging-phase5/client-correlation.spec.ts
+index 08fe596..1ebf459 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t8/client-correlation-orig.spec.ts
++++ b/__tests__/api/playwright/messaging-phase5/client-correlation.spec.ts
+@@ -33,8 +33,10 @@ import type { RealtimeFaultController } from '../helpers/realtime-stream-faults'
+  *
+  *   1. one tab sends the plain message, then the reply (literal AC-050);
+  *   2. both messages are pending at once, one in each tab (the plain one's
+- *      request held before the server; the reply's INSERT reaches the plain
+- *      one's tab first): they must never be taken for each other;
++ *      request held before the server; the reply queued in the shared
++ *      outbox and, per BR-003 (T8), dispatched only after the plain one is
++ *      resolved, so the plain one's INSERT reaches the reply's tab while the
++ *      reply is still pending): they must never be taken for each other;
+  *   3. the stored message reaches both tabs through a feed fetch, not
+  *      Realtime (the messages stream is faulted during the send; its
+  *      recovery catch-up refetches the feed) before the HTTP response: the
+@@ -501,7 +503,7 @@ test.describe('Phase 5 T7 — one bubble per message, matched by clientMessageId
+     const { harness, tab1, tab2, conn1, conn2, parentId, parentText } = tabs;
+     const text = `t7 concurrent ${randomUUID()}`;
+     const hold1 = await holdCreates(tab1, { holdRequest: true });
+-    const hold2 = await holdCreates(tab2);
++    const hold2 = await holdCreates(tab2, { holdRequest: true });
+     for (const tab of [tab1, tab2]) await installBubbleSampler(tab, text, parentText);
+ 
+     // Tab 2 prepares the reply; tab 1 the plain message with the same text.
+@@ -510,31 +512,21 @@ test.describe('Phase 5 T7 — one bubble per message, matched by clientMessageId
+     await composerInput(tab1).fill(text);
+ 
+     // Tab 1 sends; its request is held before the server, so its message is
+-    // pending (not stored) while tab 2's reply is stored and published.
++    // pending (not stored). Tab 2 then sends the reply: it is queued in the
++    // shared outbox but not dispatched while the conversation's earlier
++    // create is in progress (Phase 5 T8, BR-003) — both are pending at once.
+     await composerInput(tab1).press('Enter');
+     const plainEntry = await hold1.next();
+-    await composerInput(tab2).press('Enter');
+-    const replyEntry = await hold2.next();
+-    expect(replyEntry.request.replyToId).toBe(parentId);
+     expect(plainEntry.request.replyToId ?? null).toBeNull();
+-    expect(plainEntry.request.clientMessageId).not.toBe(replyEntry.request.clientMessageId);
+-
+-    await replyEntry.fetched;
+-    const replyId = storedId(replyEntry);
+-    expectKeyCarried(replyEntry);
+-    const replyAt1 = await waitForInsert(harness, conn1, replyId);
+-    const replyAt2 = await waitForInsert(harness, conn2, replyId);
+-    await waitForStoredBubble(tab1, replyId, 'tab 1 shows the stored reply next to its own pending message');
+-    await waitForStoredBubble(tab2, replyId, 'tab 2 shows the stored reply before its HTTP response');
+-    // Tab 1's own message is still pending: the identical-text reply did not
+-    // take its place.
+-    await expect(tab1.locator('[data-testid="messages-feed"] [data-testid^="message-temp-"]')).toHaveCount(1);
+-    expect(plainEntry.fetchedAt, 'the plain message is not stored yet').toBeUndefined();
+-    await tab1.waitForTimeout(SETTLE_SAMPLING_MS);
+-    replyEntry.release();
+-    await replyEntry.fulfilled;
++    await composerInput(tab2).press('Enter');
+     await expect(composerInput(tab2)).toHaveValue('');
++    await expect(tab2.locator('[data-testid="messages-feed"] [data-testid^="message-temp-"]')).toHaveCount(2);
++    await tab2.waitForTimeout(SETTLE_SAMPLING_MS);
++    expect(hold1.all().length + hold2.all().length, 'no second create of the conversation while one is in progress').toBe(1);
+ 
++    // The plain message is stored and published while the identical-text
++    // reply is still pending: the stored plain message must not take the
++    // reply's place in either tab.
+     plainEntry.letRequestThrough();
+     await plainEntry.fetched;
+     const plainId = storedId(plainEntry);
+@@ -542,22 +534,43 @@ test.describe('Phase 5 T7 — one bubble per message, matched by clientMessageId
+     const plainAt1 = await waitForInsert(harness, conn1, plainId);
+     const plainAt2 = await waitForInsert(harness, conn2, plainId);
+     await waitForStoredBubble(tab1, plainId, 'tab 1 shows its stored message before its HTTP response');
+-    await waitForStoredBubble(tab2, plainId, 'tab 2 shows the plain message');
++    await waitForStoredBubble(tab2, plainId, 'tab 2 shows the stored plain message next to its pending reply');
++    await expect(tab2.locator('[data-testid="messages-feed"] [data-testid^="message-temp-"]')).toHaveCount(1);
+     await tab1.waitForTimeout(SETTLE_SAMPLING_MS);
++    expect(hold1.all().length + hold2.all().length, 'the reply waits for the plain message to resolve').toBe(1);
+     plainEntry.release();
+     await plainEntry.fulfilled;
+     await expect(composerInput(tab1)).toHaveValue('');
++
++    // Only now is the reply dispatched (by whichever tab drains the conversation).
++    await expect.poll(() => hold1.all().length + hold2.all().length, { timeout: STEP_TIMEOUT_MS }).toBe(2);
++    const replyEntry = [...hold1.all(), ...hold2.all()].find((entry) => entry !== plainEntry) as HeldCreate;
++    expect(replyEntry.request.replyToId).toBe(parentId);
++    expect(plainEntry.request.clientMessageId).not.toBe(replyEntry.request.clientMessageId);
++    replyEntry.letRequestThrough();
++    await replyEntry.fetched;
++    const replyId = storedId(replyEntry);
++    expectKeyCarried(replyEntry);
++    const replyAt1 = await waitForInsert(harness, conn1, replyId);
++    const replyAt2 = await waitForInsert(harness, conn2, replyId);
++    await waitForStoredBubble(tab1, replyId, 'tab 1 shows the stored reply before its HTTP response');
++    await waitForStoredBubble(tab2, replyId, 'tab 2 shows its stored reply before its HTTP response');
++    await tab1.waitForTimeout(SETTLE_SAMPLING_MS);
++    replyEntry.release();
++    await replyEntry.fulfilled;
+     await tab1.waitForTimeout(SETTLE_SAMPLING_MS);
+ 
+     expect(replyEntry.releasedAt as number).toBeGreaterThan(Math.max(replyAt1, replyAt2));
+     expect(plainEntry.releasedAt as number).toBeGreaterThan(Math.max(plainAt1, plainAt2));
++    expect(hold1.all().length + hold2.all().length, 'one create per message').toBe(2);
+     for (const [label, tab] of [['tab 1', tab1], ['tab 2', tab2]] as const) {
+       expectOneBubbleThroughout(label, await readSampler(tab), { plain: plainId, reply: replyId });
+       await expect(tab.locator(`[data-testid="reply-context-${replyId}"]`)).toContainText(parentText);
++      await expect(tab.locator('[data-testid="messages-feed"] [data-testid^="message-temp-"]')).toHaveCount(0);
+     }
+     testInfo.annotations.push({
+       type: 't7-order',
+-      description: JSON.stringify({ replyId, replyAt1, replyAt2, replyReleased: replyEntry.releasedAt, plainId, plainAt1, plainAt2, plainReleased: plainEntry.releasedAt }),
++      description: JSON.stringify({ plainId, plainAt1, plainAt2, plainReleased: plainEntry.releasedAt, replyId, replyAt1, replyAt2, replyReleased: replyEntry.releasedAt }),
+     });
+   });
+ 
+diff --git a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t8/epic4a-orig.spec.ts b/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts
+index c4776a7..a661879 100644
+--- a/C:/Users/giuic/AppData/Local/Temp/claude/E--projects-virtual-office/9c19b826-50d0-4e52-b940-d7f642e670e2/scratchpad/t8/epic4a-orig.spec.ts
++++ b/__tests__/api/playwright/epic-4A-drawer-interactions.spec.ts
+@@ -109,11 +109,16 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+   });
+ 
+   /**
+-   * FR-024 / AC-029: a failed send keeps the text and reply target in the
+-   * composer with an error and a retry action; the retry delivers exactly one
+-   * message to the other account and leaves no optimistic copy behind.
++   * FR-024 / AC-029, as changed for TEXT messages by Phase 5 FR-001/FR-002
++   * (T8): a text or reply message is written to the durable outbox before it
++   * is sent, so the composer and reply target clear at once and no composer
++   * failure is shown; when its create fails in transit the outbox sends it
++   * again by itself (same composition key, a newer attempt generation), and
++   * exactly one message is stored, threaded under the reply target, for both
++   * accounts. Messages with files keep the Phase 4 composer failure and
++   * "Tentar de novo" (messaging-attachments-composer.spec.ts, Phase 5 AC-011).
+    */
+-  test('should keep a failed send in the composer and deliver exactly one message on retry', async ({
++  test('should deliver a text send whose create fails in transit exactly once, without user action', async ({
+     primaryPage,
+     secondaryPage,
+     messagingData,
+@@ -142,52 +147,47 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     const input = composer.locator('textarea').first();
+     const replyPreview = composer.locator('[data-testid="reply-composer-preview"]');
+     const sendError = composer.locator('[data-testid="composer-send-error"]');
+-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
+ 
+     await primaryPage.locator(`[data-testid="reply-button-${parentId}"]`).click();
+     await expect(replyPreview).toContainText(parentText);
+ 
+-    // Every create request that reaches the app server, by outcome.
+-    const createRequests: Array<{ replyToId?: string; content?: string }> = [];
+-    let createMode: 'fail' | 'hold' = 'fail';
++    // Every create request that reaches the page's network layer: the first
++    // fails in transit; the later ones are held, then passed to the server.
++    const failedRequests: Array<Record<string, unknown>> = [];
++    const createRequests: Array<Record<string, unknown>> = [];
+     let releaseHeldCreate: () => void = () => {};
+     const heldCreateReleased = new Promise<void>((resolve) => {
+       releaseHeldCreate = resolve;
+     });
+     await primaryPage.route('**/api/messages/create', async (route) => {
+-      if (createMode === 'fail') {
++      const body = route.request().postDataJSON() as Record<string, unknown>;
++      if (failedRequests.length === 0) {
++        failedRequests.push(body);
+         await route.abort('failed');
+         return;
+       }
+-      createRequests.push(route.request().postDataJSON());
+-      // Hold the retry in flight so a second trigger races it.
++      createRequests.push(body);
+       await heldCreateReleased;
+       await route.continue();
+     });
+-
+-    const failedText = `Failed then retried ${Date.now()}`;
+-    await input.fill(failedText);
+-    await composer.locator('[data-testid="message-send-button"]').click();
+-
+-    // Failure state: error + retry, text and reply target intact, no message.
+-    await expect(sendError).toBeVisible();
+-    await expect(sendError).toHaveAttribute('role', 'alert');
+-    await expect(retryButton).toBeEnabled();
+-    await expect(input).toHaveValue(failedText);
+-    await expect(replyPreview).toContainText(parentText);
+-    await expect(feedMessages(primaryPage, failedText)).toHaveCount(0);
+-
+-    // Retry, then re-trigger the send while the retry is still in flight.
+-    createMode = 'hold';
+     const createResponse = primaryPage.waitForResponse(
+       (response) =>
+         new URL(response.url()).pathname === '/api/messages/create' &&
+         response.request().method() === 'POST'
+     );
+-    await retryButton.click();
+-    await expect.poll(() => createRequests.length).toBe(1);
+-    await expect(sendError).toBeHidden();
+-    await expect(composer.locator('[data-testid="message-send-button"]')).toBeDisabled();
++
++    const failedText = `Failed then retried ${Date.now()}`;
++    await input.fill(failedText);
++    await composer.locator('[data-testid="message-send-button"]').click();
++
++    // Queued: composer and reply target clear at once; no failure is shown.
++    await expect(input).toHaveValue('');
++    await expect(replyPreview).toBeHidden();
++    await expect.poll(() => failedRequests.length).toBe(1);
++    // The outbox sends it again by itself, while the user does nothing.
++    await expect.poll(() => createRequests.length, { timeout: 15_000 }).toBe(1);
++    await expect(sendError).toHaveCount(0);
++    // Enter on the empty composer while the retry is in flight sends nothing.
+     await input.press('Enter');
+     releaseHeldCreate();
+ 
+@@ -195,18 +195,22 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     expect(response.status()).toBe(201);
+     const { message: created } = (await response.json()) as { message: { id: string; replyToId?: string } };
+     expect(created.replyToId).toBe(parentId);
++    expect(failedRequests[0]).toMatchObject({ content: failedText, replyToId: parentId, attemptGeneration: 1 });
+     expect(createRequests).toEqual([
+-      expect.objectContaining({ content: failedText, replyToId: parentId }),
++      expect.objectContaining({
++        content: failedText,
++        replyToId: parentId,
++        clientMessageId: failedRequests[0].clientMessageId,
++        attemptGeneration: 2,
++      }),
+     ]);
+ 
+-    // Sender: composer reset, exactly one persisted copy, no temp leftover.
+-    await expect(input).toHaveValue('');
+-    await expect(replyPreview).toBeHidden();
+-    await expect(sendError).toBeHidden();
++    // Sender: exactly one persisted copy, no temp leftover.
+     await expect(primaryPage.locator(`[data-testid="reply-count-${parentId}"]`)).toHaveText(/1 reply/);
+     await primaryPage.locator(`[data-testid="reply-count-${parentId}"]`).click();
+     await expect(feedMessages(primaryPage, failedText)).toHaveCount(1);
+     await expect(primaryPage.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
++    await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
+ 
+     // Recipient: exactly one delivery, threaded under the reply target.
+     const recipientReplyCount = secondaryPage.locator(`[data-testid="reply-count-${parentId}"]`);
+@@ -216,15 +220,19 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     await expect(feedMessages(secondaryPage, failedText)).toHaveCount(1);
+     await expect(recipientThread.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
+     expect(createRequests).toHaveLength(1);
++    expect(failedRequests).toHaveLength(1);
+   });
+ 
+   /**
+-   * FR-024 / AC-029 (T23): the create reaches the server and commits, but its
+-   * response never reaches the browser. "Tentar de novo" resends the same
+-   * composition key, the server answers with the stored message, and both
+-   * accounts keep exactly one copy. A new composition gets a new key.
++   * FR-024 / AC-029 (T23), as changed for TEXT messages by Phase 5 FR-002
++   * (T8): the create reaches the server and commits, but its response never
++   * reaches the browser. The composer is already clear (the message is in the
++   * durable outbox); the outbox resolves the message by itself — from the
++   * stored message reaching the feed, or by resending the same composition
++   * key, which the server answers with the stored message — and both accounts
++   * keep exactly one copy. A new composition gets a new key.
+    */
+-  test('should keep exactly one message when a committed send loses its response and is retried', async ({
++  test('should keep exactly one message when a committed send loses its response', async ({
+     primaryPage,
+     secondaryPage,
+     messagingData,
+@@ -284,16 +292,14 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     const input = composer.locator('textarea').first();
+     const sendButton = composer.locator('[data-testid="message-send-button"]');
+     const sendError = composer.locator('[data-testid="composer-send-error"]');
+-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
+ 
+     const text = `Committed but response lost ${Date.now()}`;
+     await input.fill(text);
+     await sendButton.click();
+ 
+-    // The sender sees a failure although the server stored the message.
+-    await expect(sendError).toBeVisible();
+-    await expect(input).toHaveValue(text);
+-    expect(creates).toHaveLength(1);
++    // Queued: the composer clears at once and never shows a failure.
++    await expect(input).toHaveValue('');
++    await expect.poll(() => creates.length).toBe(1);
+     expect(creates[0]).toMatchObject({ content: text, status: 201, deliveredToBrowser: false });
+     const firstKey = creates[0].clientMessageId;
+     expect(firstKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+@@ -302,29 +308,17 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     await expect.poll(() => serverCopies(text)).toEqual([storedId]);
+     await waitForRealtimeMessage(secondaryPage, text);
+ 
+-    // Retry: same composition key, the server returns the stored message.
+-    const retryResponse = primaryPage.waitForResponse(
+-      (response) =>
+-        new URL(response.url()).pathname === '/api/messages/create' &&
+-        response.request().method() === 'POST'
+-    );
+-    await retryButton.click();
+-    expect((await retryResponse).status()).toBe(200);
+-    expect(creates).toHaveLength(2);
+-    expect(creates[1]).toMatchObject({
+-      clientMessageId: firstKey,
+-      content: text,
+-      status: 200,
+-      messageId: storedId,
+-      deliveredToBrowser: true,
+-    });
+-
+-    // Sender: composer reset, one persisted copy, no optimistic leftover.
+-    await expect(input).toHaveValue('');
+-    await expect(sendError).toBeHidden();
+-    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible();
++    // Sender: the stored message replaces the pending copy; nothing else is stored.
++    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible({ timeout: 15_000 });
+     await expect(feedMessages(primaryPage, text)).toHaveCount(1);
+     await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
++    await expect(sendError).toHaveCount(0);
++    // Any resend is the same key, answered with the stored message.
++    await primaryPage.waitForTimeout(3_000);
++    for (const resend of creates.slice(1)) {
++      expect(resend).toMatchObject({ clientMessageId: firstKey, content: text, status: 200, messageId: storedId });
++    }
++    const resends = creates.length;
+ 
+     // Recipient: exactly one copy live, on the server, and after a reload.
+     await expect(feedMessages(secondaryPage, text)).toHaveCount(1);
+@@ -339,11 +333,12 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
+     // Sending the same text again is a new composition: new key, new message.
+     await input.fill(text);
+     await sendButton.click();
+-    await expect.poll(() => creates.length).toBe(3);
+-    expect(creates[2]).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
+-    expect(creates[2].clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
+-    expect(creates[2].clientMessageId).not.toBe(firstKey);
+-    const secondId = creates[2].messageId;
++    await expect.poll(() => creates.length).toBe(resends + 1);
++    const again = creates[resends];
++    expect(again).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
++    expect(again.clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
++    expect(again.clientMessageId).not.toBe(firstKey);
++    const secondId = again.messageId;
+     await expect(input).toHaveValue('');
+     await expect(feedMessages(primaryPage, text)).toHaveCount(2);
+     await expect(primaryPage.locator(`[data-testid="message-${secondId}"]`)).toBeVisible();

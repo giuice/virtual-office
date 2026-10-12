@@ -1,0 +1,31 @@
+ADVERSARIAL BLOCK REVIEW — block C (tasks T17, T18, T19, T20; T21 reduced to a migration-list check by owner decision D14) of spec-interview/phase-5-messaging-resilience in E:/projects/virtual-office.
+Read-only. Never access an online/hosted database or service. Read-only queries against LOCAL Supabase are allowed (npx supabase db query --local). Do NOT start Playwright, a dev server, or any long-running process; reason from code, the SPEC, and TRACK.
+
+Contract: SPEC.md (approved Final v4, AC-036 amended by D13, AC-034 amended by D14) and state.md decisions D1–D14 in that folder. Owner decision D11 governs this review (AGENTS.md "Adversarial review gate"): this is the single review for the whole block; tasks were not reviewed one by one. Rank each finding and state how it is triggered:
+- High/Medium only when a real user or a realistic failure (network loss/latency, lost or late Realtime replies, socket drop, browser/tab close, sleep/freeze, several tabs/devices, account switch, membership removal, concurrency, clock skew) can trigger it.
+- A finding that needs the application's own server to be broken or tampered with is a follow-up, not High/Medium — label it "server-tamper follow-up".
+- Low for the rest. Do not pad: no style nits, no speculative refactors. The owner is time-constrained: report only what matters to a real user.
+
+Scope (all client-side; no DB/route/migration change in this block):
+- T17 @mentions: src/lib/messaging/mentions.ts, src/hooks/ui/use-composer-mentions.ts, src/components/messaging/{ComposerMentions.tsx,MessageMentions.tsx,message-composer.tsx,message-feed.tsx,message-item.tsx}, src/hooks/useMessages.ts, src/lib/messaging-api.ts (mentionIds), src/lib/messaging/outbox/outbox-view.ts, src/lib/messaging/message-cache.ts (lacksStoredMentions), src/hooks/realtime/useMessageSubscription.ts (mention enrichment refetch).
+- T18 mention notifications: src/hooks/ui/use-message-notifications.ts, src/lib/messaging/desktop-notifications.ts (view registry, decideIncomingMessage), src/lib/messaging/outbox/message-outbox.ts (signOutStopState), src/contexts/messaging/MessagingContext.tsx.
+- T19 metrics: src/lib/messaging/metrics-recorder.ts, src/lib/messaging/stream-metrics.ts, src/lib/messaging/outbox/outbox-metrics.ts, src/hooks/realtime/useMessagingMetrics.ts, metrics points in message-outbox.ts / outbox-outcome.ts / outbox-sign-out.ts / useMessagingPollingFallback.ts; the T6 route contract it targets (src/app/api/... metrics route, read only).
+- T20 drawer restore per user: the files its TRACK entry lists (MessagingContext.tsx persistence, drawer state, messaging-browser-state.ts helper).
+- E2E specs (judge whether they prove what they claim): __tests__/api/playwright/messaging-phase5/{mentions,mention-notifications,messaging-metrics}.spec.ts, the T20 spec named in TRACK, helpers/desktop-notification-recorder.ts.
+
+What each task claims: read TRACK.md entries "## T17", "## T18", "## T19", "## T20", "## T21" (State delta, Deviation, Discovered). Verify the claims against the code; flag any claim or code comment that is false.
+
+Attack at least these:
+1. Mentions: composer value ↔ mention ids consistency (edit/delete/paste inside a token, duplicate names, unnamed "Usuário" members, IME/accents), ids that are not current members, ids unchanged across outbox attempts and the Phase 4 attachment retry (409 risk), the "@"-keyed enrichment refetch (missed enrichment, refetch storms), stale poll vs mention.
+2. Notifications (BR-011, AC-025/026/049/046): authorization read correctness (1 ms cursor window, limit 20, ordering/timestamps, fail-closed), identity and removal re-check without awaits, account switch/sign-out while pending, browser-wide suppression via the localStorage view registry (stale keys, crashed tabs, storage unavailable, two hidden tabs, races), claim-before-authorization consequences, duplicates for DM/group, room messages without "@".
+3. Metrics (FR-028, AC-028/029): can metrics ever delay, block, throw into or change messaging; buffer bounds; in-flight/abort/overload; redaction (no content, ids, emails, names reach the route or logs); reason mapping correctness; identity switch.
+4. Drawer restore (AC-032): per-users.id scoping, another user inheriting state, lost access, closed drawer, old global keys, the same-browser tab jump.
+5. Cross-cutting: anything in this block that regresses blocks A/B guarantees (outbox exactly-once/order, identity fencing, sign-out hold, Realtime recovery, polling).
+6. Test validity: any assertion that would still pass with the behavior broken; harness shaping beyond SPEC §15 / D4.
+
+Known and routed (do not re-report unless worse than recorded): block A/B follow-ups listed in TRACK gate checkpoints (#8, #9, #12, silent miss, retries never classified, T16 5 s margin); D14 rollout window.
+
+Output (markdown):
+- Verdict: approve | revision required (revision required only for High/Medium that a real user or realistic failure can trigger).
+- Findings, most severe first. For each: severity; trigger (real user | realistic failure | server-tamper follow-up); file:line; concrete failure scenario; smallest fix; which test should prove the fix.
+- A short list of claims verified true and any false claims.

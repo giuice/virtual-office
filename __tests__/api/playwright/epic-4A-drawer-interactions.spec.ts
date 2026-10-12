@@ -96,11 +96,11 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     // Step 7: Verify message appears in realtime for recipient
     await waitForRealtimeMessage(secondaryPage, testMessage, { timeout: 15_000 });
 
-    // Step 8: Refresh primary user's page and verify message persists
+    // Step 8: Refresh primary user's page: the open drawer reopens on the same
+    // conversation (Phase 5 T20, FR-031) and the message persists
     await primaryPage.reload();
     await waitForRealtimeReady(primaryPage);
-    await openDrawer(primaryPage);
-    await selectConversation(primaryPage, { id: messagingData.directConversationId });
+    await expect(primaryPage.locator('[data-testid="messages-feed"]')).toBeVisible({ timeout: 10_000 });
 
     // Message should still be visible after refresh
     await expect(
@@ -109,11 +109,16 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
   });
 
   /**
-   * FR-024 / AC-029: a failed send keeps the text and reply target in the
-   * composer with an error and a retry action; the retry delivers exactly one
-   * message to the other account and leaves no optimistic copy behind.
+   * FR-024 / AC-029, as changed for TEXT messages by Phase 5 FR-001/FR-002
+   * (T8): a text or reply message is written to the durable outbox before it
+   * is sent, so the composer and reply target clear at once and no composer
+   * failure is shown; when its create fails in transit the outbox sends it
+   * again by itself (same composition key, a newer attempt generation), and
+   * exactly one message is stored, threaded under the reply target, for both
+   * accounts. Messages with files keep the Phase 4 composer failure and
+   * "Tentar de novo" (messaging-attachments-composer.spec.ts, Phase 5 AC-011).
    */
-  test('should keep a failed send in the composer and deliver exactly one message on retry', async ({
+  test('should deliver a text send whose create fails in transit exactly once, without user action', async ({
     primaryPage,
     secondaryPage,
     messagingData,
@@ -142,52 +147,47 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     const input = composer.locator('textarea').first();
     const replyPreview = composer.locator('[data-testid="reply-composer-preview"]');
     const sendError = composer.locator('[data-testid="composer-send-error"]');
-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
 
     await primaryPage.locator(`[data-testid="reply-button-${parentId}"]`).click();
     await expect(replyPreview).toContainText(parentText);
 
-    // Every create request that reaches the app server, by outcome.
-    const createRequests: Array<{ replyToId?: string; content?: string }> = [];
-    let createMode: 'fail' | 'hold' = 'fail';
+    // Every create request that reaches the page's network layer: the first
+    // fails in transit; the later ones are held, then passed to the server.
+    const failedRequests: Array<Record<string, unknown>> = [];
+    const createRequests: Array<Record<string, unknown>> = [];
     let releaseHeldCreate: () => void = () => {};
     const heldCreateReleased = new Promise<void>((resolve) => {
       releaseHeldCreate = resolve;
     });
     await primaryPage.route('**/api/messages/create', async (route) => {
-      if (createMode === 'fail') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      if (failedRequests.length === 0) {
+        failedRequests.push(body);
         await route.abort('failed');
         return;
       }
-      createRequests.push(route.request().postDataJSON());
-      // Hold the retry in flight so a second trigger races it.
+      createRequests.push(body);
       await heldCreateReleased;
       await route.continue();
     });
-
-    const failedText = `Failed then retried ${Date.now()}`;
-    await input.fill(failedText);
-    await composer.locator('[data-testid="message-send-button"]').click();
-
-    // Failure state: error + retry, text and reply target intact, no message.
-    await expect(sendError).toBeVisible();
-    await expect(sendError).toHaveAttribute('role', 'alert');
-    await expect(retryButton).toBeEnabled();
-    await expect(input).toHaveValue(failedText);
-    await expect(replyPreview).toContainText(parentText);
-    await expect(feedMessages(primaryPage, failedText)).toHaveCount(0);
-
-    // Retry, then re-trigger the send while the retry is still in flight.
-    createMode = 'hold';
     const createResponse = primaryPage.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === '/api/messages/create' &&
         response.request().method() === 'POST'
     );
-    await retryButton.click();
-    await expect.poll(() => createRequests.length).toBe(1);
-    await expect(sendError).toBeHidden();
-    await expect(composer.locator('[data-testid="message-send-button"]')).toBeDisabled();
+
+    const failedText = `Failed then retried ${Date.now()}`;
+    await input.fill(failedText);
+    await composer.locator('[data-testid="message-send-button"]').click();
+
+    // Queued: composer and reply target clear at once; no failure is shown.
+    await expect(input).toHaveValue('');
+    await expect(replyPreview).toBeHidden();
+    await expect.poll(() => failedRequests.length).toBe(1);
+    // The outbox sends it again by itself, while the user does nothing.
+    await expect.poll(() => createRequests.length, { timeout: 15_000 }).toBe(1);
+    await expect(sendError).toHaveCount(0);
+    // Enter on the empty composer while the retry is in flight sends nothing.
     await input.press('Enter');
     releaseHeldCreate();
 
@@ -195,18 +195,22 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     expect(response.status()).toBe(201);
     const { message: created } = (await response.json()) as { message: { id: string; replyToId?: string } };
     expect(created.replyToId).toBe(parentId);
+    expect(failedRequests[0]).toMatchObject({ content: failedText, replyToId: parentId, attemptGeneration: 1 });
     expect(createRequests).toEqual([
-      expect.objectContaining({ content: failedText, replyToId: parentId }),
+      expect.objectContaining({
+        content: failedText,
+        replyToId: parentId,
+        clientMessageId: failedRequests[0].clientMessageId,
+        attemptGeneration: 2,
+      }),
     ]);
 
-    // Sender: composer reset, exactly one persisted copy, no temp leftover.
-    await expect(input).toHaveValue('');
-    await expect(replyPreview).toBeHidden();
-    await expect(sendError).toBeHidden();
+    // Sender: exactly one persisted copy, no temp leftover.
     await expect(primaryPage.locator(`[data-testid="reply-count-${parentId}"]`)).toHaveText(/1 reply/);
     await primaryPage.locator(`[data-testid="reply-count-${parentId}"]`).click();
     await expect(feedMessages(primaryPage, failedText)).toHaveCount(1);
     await expect(primaryPage.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
+    await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
 
     // Recipient: exactly one delivery, threaded under the reply target.
     const recipientReplyCount = secondaryPage.locator(`[data-testid="reply-count-${parentId}"]`);
@@ -216,15 +220,19 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     await expect(feedMessages(secondaryPage, failedText)).toHaveCount(1);
     await expect(recipientThread.locator(`[data-testid="message-${created.id}"]`)).toBeVisible();
     expect(createRequests).toHaveLength(1);
+    expect(failedRequests).toHaveLength(1);
   });
 
   /**
-   * FR-024 / AC-029 (T23): the create reaches the server and commits, but its
-   * response never reaches the browser. "Tentar de novo" resends the same
-   * composition key, the server answers with the stored message, and both
-   * accounts keep exactly one copy. A new composition gets a new key.
+   * FR-024 / AC-029 (T23), as changed for TEXT messages by Phase 5 FR-002
+   * (T8): the create reaches the server and commits, but its response never
+   * reaches the browser. The composer is already clear (the message is in the
+   * durable outbox); the outbox resolves the message by itself — from the
+   * stored message reaching the feed, or by resending the same composition
+   * key, which the server answers with the stored message — and both accounts
+   * keep exactly one copy. A new composition gets a new key.
    */
-  test('should keep exactly one message when a committed send loses its response and is retried', async ({
+  test('should keep exactly one message when a committed send loses its response', async ({
     primaryPage,
     secondaryPage,
     messagingData,
@@ -284,16 +292,14 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     const input = composer.locator('textarea').first();
     const sendButton = composer.locator('[data-testid="message-send-button"]');
     const sendError = composer.locator('[data-testid="composer-send-error"]');
-    const retryButton = sendError.getByRole('button', { name: 'Tentar de novo' });
 
     const text = `Committed but response lost ${Date.now()}`;
     await input.fill(text);
     await sendButton.click();
 
-    // The sender sees a failure although the server stored the message.
-    await expect(sendError).toBeVisible();
-    await expect(input).toHaveValue(text);
-    expect(creates).toHaveLength(1);
+    // Queued: the composer clears at once and never shows a failure.
+    await expect(input).toHaveValue('');
+    await expect.poll(() => creates.length).toBe(1);
     expect(creates[0]).toMatchObject({ content: text, status: 201, deliveredToBrowser: false });
     const firstKey = creates[0].clientMessageId;
     expect(firstKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -302,48 +308,37 @@ test.describe('AC1: Open Drawer → Select DM → Send Message → Realtime Deli
     await expect.poll(() => serverCopies(text)).toEqual([storedId]);
     await waitForRealtimeMessage(secondaryPage, text);
 
-    // Retry: same composition key, the server returns the stored message.
-    const retryResponse = primaryPage.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === '/api/messages/create' &&
-        response.request().method() === 'POST'
-    );
-    await retryButton.click();
-    expect((await retryResponse).status()).toBe(200);
-    expect(creates).toHaveLength(2);
-    expect(creates[1]).toMatchObject({
-      clientMessageId: firstKey,
-      content: text,
-      status: 200,
-      messageId: storedId,
-      deliveredToBrowser: true,
-    });
-
-    // Sender: composer reset, one persisted copy, no optimistic leftover.
-    await expect(input).toHaveValue('');
-    await expect(sendError).toBeHidden();
-    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible();
+    // Sender: the stored message replaces the pending copy; nothing else is stored.
+    await expect(primaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible({ timeout: 15_000 });
     await expect(feedMessages(primaryPage, text)).toHaveCount(1);
     await expect(primaryPage.locator('[data-testid^="message-temp-"]')).toHaveCount(0);
+    await expect(sendError).toHaveCount(0);
+    // Any resend is the same key, answered with the stored message.
+    await primaryPage.waitForTimeout(3_000);
+    for (const resend of creates.slice(1)) {
+      expect(resend).toMatchObject({ clientMessageId: firstKey, content: text, status: 200, messageId: storedId });
+    }
+    const resends = creates.length;
 
     // Recipient: exactly one copy live, on the server, and after a reload.
     await expect(feedMessages(secondaryPage, text)).toHaveCount(1);
     await expect(secondaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible();
     expect(await serverCopies(text)).toEqual([storedId]);
+    // The open drawer reopens on the same conversation (Phase 5 T20, FR-031).
     await secondaryPage.reload();
-    await openDrawer(secondaryPage);
-    await selectConversation(secondaryPage, { id: conversationId });
+    await expect(secondaryPage.getByTestId('messages-feed')).toBeVisible({ timeout: 10_000 });
     await expect(secondaryPage.locator(`[data-testid="message-${storedId}"]`)).toBeVisible({ timeout: 10_000 });
     await expect(feedMessages(secondaryPage, text)).toHaveCount(1);
 
     // Sending the same text again is a new composition: new key, new message.
     await input.fill(text);
     await sendButton.click();
-    await expect.poll(() => creates.length).toBe(3);
-    expect(creates[2]).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
-    expect(creates[2].clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(creates[2].clientMessageId).not.toBe(firstKey);
-    const secondId = creates[2].messageId;
+    await expect.poll(() => creates.length).toBe(resends + 1);
+    const again = creates[resends];
+    expect(again).toMatchObject({ content: text, status: 201, deliveredToBrowser: true });
+    expect(again.clientMessageId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(again.clientMessageId).not.toBe(firstKey);
+    const secondId = again.messageId;
     await expect(input).toHaveValue('');
     await expect(feedMessages(primaryPage, text)).toHaveCount(2);
     await expect(primaryPage.locator(`[data-testid="message-${secondId}"]`)).toBeVisible();

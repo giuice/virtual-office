@@ -10,11 +10,14 @@ import { AlertCircle, Mic, Paperclip, Send, Smile, Image, X } from 'lucide-react
 import { useCompany } from '@/contexts/CompanyContext';
 import { VOICE_NOTE_ALONE_FILES_TEXT, useComposerAttachments } from '@/hooks/ui/use-composer-attachments';
 import { useVoiceRecorder } from '@/hooks/ui/use-voice-recorder';
+import { useComposerMentions } from '@/hooks/ui/use-composer-mentions';
 import { ATTACHMENT_INPUT_ACCEPT, IMAGE_ATTACHMENT_INPUT_ACCEPT } from '@/lib/messaging/attachment-policy';
 import { describeVoiceRecordingProblem } from '@/lib/messaging/voice-recording';
+import { isOutboxStorageError } from '@/lib/messaging/outbox/outbox-db';
 import { cn } from '@/lib/utils';
 import { ComposerFileRejections, ComposerPendingFiles } from './ComposerPendingFiles';
 import { PendingVoiceNotePreview, VoiceRecordingNotice, VoiceRecordingPanel } from './ComposerVoiceNote';
+import { ComposerMentionHighlights, ComposerMentionListbox } from './ComposerMentions';
 
 interface MessageComposerSendOptions {
   /**
@@ -25,6 +28,12 @@ interface MessageComposerSendOptions {
   clientMessageId: string;
   /** Uploaded pending files of the message (FR-008); empty for text only. */
   attachments: FileAttachment[];
+  /**
+   * Phase 5 T17 (FR-023): users.id of the members chosen from the "@" list
+   * whose mention is still in the text (sorted); the same on every retry of
+   * the composition. Empty when nobody is mentioned.
+   */
+  mentionIds: string[];
 }
 
 interface MessageComposerProps {
@@ -37,6 +46,8 @@ interface MessageComposerProps {
   placeholder?: string;
   initialValue?: string;
   onValueChange?: (value: string) => void;
+  /** The text field lost focus (Phase 5 T15: stops the typing indicator). */
+  onBlur?: () => void;
 }
 
 function MessageComposerReplyPreview({
@@ -76,6 +87,9 @@ function MessageComposerReplyPreview({
 // Copy follows the SPEC journey J6 (Portuguese); the rest of this composer
 // predates it and is still in English.
 const SEND_FAILED_TEXT = 'Mensagem não enviada.';
+// Phase 5 FR-033 (owner decision D5): the outbox could not store the message,
+// so nothing was sent.
+const STORAGE_UNAVAILABLE_TEXT = 'Este navegador não permite guardar mensagens; libere o armazenamento do site';
 const RETRY_SEND_TEXT = 'Tentar de novo';
 const DROP_FILES_TEXT = 'Solte os arquivos para anexar';
 const RECORD_VOICE_TEXT = 'Gravar nota de voz';
@@ -120,6 +134,19 @@ function MessageComposerSendError({
   );
 }
 
+function MessageComposerStorageError() {
+  return (
+    <div
+      role="alert"
+      className="flex items-center gap-2 rounded-md bg-destructive/10 px-2 py-1 mb-2 text-sm text-destructive"
+      data-testid="composer-storage-error"
+    >
+      <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+      <span className="flex-1">{STORAGE_UNAVAILABLE_TEXT}</span>
+    </div>
+  );
+}
+
 export function MessageComposer({
   onSendMessage,
   conversationId,
@@ -128,15 +155,20 @@ export function MessageComposer({
   disabled = false,
   placeholder = "Type a message...",
   initialValue = "",
-  onValueChange
+  onValueChange,
+  onBlur,
 }: MessageComposerProps) {
   const [content, setContent] = useState(initialValue);
   // A failed send keeps the draft (text and, via the parent, the reply
-  // target) in the composer; this flag drives the error + retry row.
-  const [sendFailed, setSendFailed] = useState(false);
+  // target) in the composer; 'send' drives the error + retry row, 'storage'
+  // the message that the outbox cannot store messages (FR-033).
+  const [sendError, setSendError] = useState<'send' | 'storage' | null>(null);
+  const sendFailed = sendError === 'send';
   const [isSending, setIsSending] = useState(false);
   // Synchronous guard: a double click/Enter lands before React re-renders
-  // the disabled send button, and must not create a second message.
+  // the disabled send button, and must not create a second message. For a
+  // text message (Phase 5 T8) it spans only the outbox write: delivery runs
+  // in the background, so the next message can be written at once.
   const sendInFlightRef = useRef(false);
   // The last composition submitted without a confirmed send. A retry of the
   // same text and reply target reuses its key, so a create that committed on
@@ -147,8 +179,10 @@ export function MessageComposer({
     content: string;
     replyToId: string | null;
     attachments: string;
+    mentions: string;
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionHighlightsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
@@ -192,13 +226,12 @@ export function MessageComposer({
     }
   }, [replyToMessage]);
   
-  // Handle content change
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value;
+  // Handle content change (typing, or a mention chosen from the "@" list)
+  const applyContent = (newContent: string) => {
     setContent(newContent);
     // Nothing left to retry once the draft is erased.
     if (!newContent.trim() && pendingFiles.length === 0) {
-      setSendFailed(false);
+      setSendError(null);
       unconfirmedSendRef.current = null;
     }
     
@@ -207,33 +240,52 @@ export function MessageComposer({
       onValueChange(newContent);
     }
   };
-  
+
+  // Phase 5 T17: the "@" mention list and the mentions chosen in this draft.
+  const mentions = useComposerMentions({
+    conversationId,
+    viewerId: currentUserProfile?.id ?? null,
+    content,
+    setContent: applyContent,
+    textareaRef,
+  });
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    applyContent(e.target.value);
+    mentions.trackCaret(e);
+  };
+
   const submitDraft = async () => {
     if (!canSubmit || sendInFlightRef.current) return;
 
     const submittedContent = content;
     const attachments = pendingFiles.flatMap((file) => (file.uploaded ? [file.uploaded] : []));
     const attachmentIds = attachments.map((attachment) => attachment.id);
+    const mentionIds = mentions.mentionIds;
     const composition = {
       content: submittedContent.trim(),
       replyToId: replyToMessage?.id ?? null,
       attachments: attachmentSetKey(attachments),
+      // Phase 5 T17: the requested mentions are part of the composition (the
+      // server answers a reused key with other mentions with 409).
+      mentions: mentionIds.join(','),
     };
     const unconfirmed = unconfirmedSendRef.current;
     const clientMessageId =
       unconfirmed &&
       unconfirmed.content === composition.content &&
       unconfirmed.replyToId === composition.replyToId &&
-      unconfirmed.attachments === composition.attachments
+      unconfirmed.attachments === composition.attachments &&
+      unconfirmed.mentions === composition.mentions
         ? unconfirmed.key
         : uuidv4();
     unconfirmedSendRef.current = { key: clientMessageId, ...composition };
     sendInFlightRef.current = true;
     setSendingUploadIds(attachmentIds);
     setIsSending(true);
-    setSendFailed(false);
+    setSendError(null);
     try {
-      await onSendMessage(submittedContent, { clientMessageId, attachments });
+      await onSendMessage(submittedContent, { clientMessageId, attachments, mentionIds });
       unconfirmedSendRef.current = null;
       // Clear only what was sent: text typed or files added while the send
       // was in flight belong to the next message and must survive.
@@ -243,7 +295,7 @@ export function MessageComposer({
       console.error('Failed to send message:', error);
       // The draft (text, reply target, files) stays in the composer; the
       // user can retry it.
-      setSendFailed(true);
+      setSendError(isOutboxStorageError(error) ? 'storage' : 'send');
     } finally {
       sendInFlightRef.current = false;
       setSendingUploadIds([]);
@@ -264,6 +316,10 @@ export function MessageComposer({
 
   // Handle key press (Enter to send, Shift+Enter for new line)
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Block C fix F7: an Enter that confirms an IME composition never sends.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    // An open "@" list uses arrows, Enter, Tab and Escape first.
+    if (mentions.handleKeyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -376,6 +432,7 @@ export function MessageComposer({
           onRetry={handleRetry}
         />
       )}
+      {sendError === 'storage' && <MessageComposerStorageError />}
 
       <ComposerFileRejections rejections={fileRejections} onDismiss={dismissRejections} />
       {recorder.problem && <VoiceRecordingNotice problem={recorder.problem} onDismiss={recorder.clearProblem} />}
@@ -406,15 +463,29 @@ export function MessageComposer({
 
       <form onSubmit={handleSubmit} className="w-full">
         <div className="relative">
+          {mentions.list && <ComposerMentionListbox list={mentions.list} />}
+          {mentions.hasMentions && (
+            <ComposerMentionHighlights ref={mentionHighlightsRef} segments={mentions.segments} className="pb-11" />
+          )}
           <Textarea
             ref={textareaRef}
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyPress}
+            onSelect={mentions.trackCaret}
+            onScroll={(e) => {
+              if (mentionHighlightsRef.current) mentionHighlightsRef.current.scrollTop = e.currentTarget.scrollTop;
+            }}
             onPaste={handlePaste}
+            onFocus={mentions.onFocus}
+            onBlur={() => {
+              mentions.onBlur();
+              onBlur?.();
+            }}
             placeholder={placeholder}
-            className="min-h-[96px] resize-none pb-11"
+            className="relative min-h-[96px] resize-none pb-11"
             disabled={disabled}
+            {...mentions.textareaProps}
           />
           
           <div className="absolute bottom-2 right-2 flex items-center gap-x-1">

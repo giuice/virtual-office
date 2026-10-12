@@ -13,13 +13,14 @@ import { AlertCircle, Star } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { isMessageInFeedCache } from '@/lib/messaging/message-cache';
+import { OutboxInvalidReplyTargetError } from '@/lib/messaging/outbox/message-outbox';
 import { MessageItem } from './message-item';
 import { MessageComposer } from './message-composer';
 import { StarredMessagesView } from './StarredMessagesView';
 import { FeedJumpStatus } from './FeedJumpStatus';
 import { FeedScrollSnapshot } from './FeedScrollSnapshot';
 import { TypingIndicator } from './TypingIndicator';
-import { useConversationPresence } from '@/hooks/useConversationPresence';
+import { useConversationTyping } from '@/hooks/realtime/useConversationTyping';
 import { useFeedScrollAnchor } from '@/hooks/ui/use-feed-scroll-anchor';
 import { useFeedJump } from '@/hooks/ui/use-feed-jump';
 import { useVisibleMessageReceipts } from '@/hooks/ui/use-visible-message-receipts';
@@ -53,6 +54,10 @@ export function MessageFeed({
     loadMoreMessages,
     loadHistoryUntilMessage,
     sendMessage,
+    queueTextMessage,
+    retryOutboxMessage,
+    discardOutboxMessage,
+    cancelOutboxMessage,
     activeConversation,
     setActiveConversation,
     getOrCreateRoomConversation,
@@ -67,13 +72,33 @@ export function MessageFeed({
   const activeConversationId = activeConversation?.id ?? null;
   const { starMessage, unstarMessage } = useMessageActions({ conversationId: activeConversationId ?? '' });
 
-  // Typing indicators ride the conversation presence channel (audit B-02)
-  const { typingUsers, notifyTyping, stopTyping } = useConversationPresence(
+  // Phase 5 T15: typing on the conversation's private members-only topic
+  const { typingUsers, notifyTyping, stopTyping } = useConversationTyping(
     activeConversation?.id ?? null
   );
 
   const [isLoading, setIsLoading] = useState(false);
-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  // The reply target belongs to the conversation it was chosen in: any switch
+  // of conversation (list, notification, an avatar's "Send Message") drops it
+  // (Phase 5 T8: a reply to another conversation's message is refused by the
+  // server, and a queued one would block that conversation's outbox).
+  const [replyState, setReplyState] = useState<{ conversationId: string | null; message: Message | null }>(() => ({
+    conversationId: activeConversationId,
+    message: null,
+  }));
+  if (replyState.conversationId !== activeConversationId) {
+    setReplyState({ conversationId: activeConversationId, message: null });
+  }
+  const replyToMessage = replyState.conversationId === activeConversationId ? replyState.message : null;
+  const setReplyToMessage = useCallback(
+    (next: Message | null | ((current: Message | null) => Message | null)) => {
+      setReplyState((state) => ({
+        conversationId: state.conversationId,
+        message: typeof next === 'function' ? next(state.message) : next,
+      }));
+    },
+    []
+  );
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
 
   // The starred view belongs to one conversation: switching conversations
@@ -247,30 +272,50 @@ export function MessageFeed({
   }, [expandedThreads, messageMap, repliesByParent, replyToMessage]);
 
   // Handle sending a message. Failures propagate to the composer, which keeps
-  // the draft with an error and retry; the reply target is only cleared on
-  // success, so a retry replies to the same message.
+  // the draft with an error; the reply target is only cleared on success, so
+  // a retry replies to the same message. Phase 5 T8 (FR-001, BR-002): a text
+  // or reply message goes to the durable outbox, which delivers it (also
+  // offline, later, in order); files and voice notes are never queued and
+  // keep the Phase 4 direct send.
   const handleSendMessage = useCallback(async (
     content: string,
-    { clientMessageId, attachments }: { clientMessageId: string; attachments: FileAttachment[] }
+    {
+      clientMessageId,
+      attachments,
+      mentionIds,
+    }: { clientMessageId: string; attachments: FileAttachment[]; mentionIds: string[] }
   ) => {
     if (!activeConversation) return;
 
     const replyToId = replyToMessage?.id;
+    // Never send a reply to a message of another conversation (the draft stays).
+    if (replyToMessage?.conversationId && replyToMessage.conversationId !== activeConversation.id) {
+      throw new OutboxInvalidReplyTargetError();
+    }
     stopTyping();
     markOwnSend();
-    await sendMessage(content, {
-      replyToId,
-      clientMessageId,
-      attachments: attachments.length > 0 ? attachments : undefined,
-    });
+    if (attachments.length === 0) {
+      await queueTextMessage({
+        conversationId: activeConversation.id,
+        clientMessageId,
+        content,
+        replyToId,
+        replyToConversationId: replyToMessage?.conversationId,
+        // Phase 5 T17: kept with the outbox item, resent unchanged on every attempt.
+        mentionIds,
+      });
+    } else {
+      // Phase 4 path: the same key and mention ids on every retry (else 409).
+      await sendMessage(content, { replyToId, clientMessageId, attachments, mentionIds });
+    }
     // Keep a reply target the user picked while the send was in flight.
     setReplyToMessage((current) => (current?.id === replyToId ? null : current));
-  }, [activeConversation, markOwnSend, replyToMessage?.id, sendMessage, stopTyping]);
+  }, [activeConversation, markOwnSend, queueTextMessage, replyToMessage, sendMessage, setReplyToMessage, stopTyping]);
 
   // Handle reply
   const handleReply = useCallback((message: Message) => {
     setReplyToMessage(message);
-  }, []);
+  }, [setReplyToMessage]);
 
   // Handle reaction
   const handleReaction = useCallback((messageId: string, emoji: string) => {
@@ -341,6 +386,9 @@ export function MessageFeed({
           parentMessage={parentMessage}
           onStar={starMessage}
           onUnstar={unstarMessage}
+          onRetryUnsent={retryOutboxMessage}
+          onDiscardUnsent={discardOutboxMessage}
+          onCancelUnsent={cancelOutboxMessage}
         />
         {replyCount > 0 && isExpanded && (
           <div
@@ -352,7 +400,7 @@ export function MessageFeed({
         )}
       </div>
     );
-  }, [effectiveExpandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap, starMessage, unstarMessage, jumpTargetId, highlightedMessageId]);
+  }, [effectiveExpandedThreads, handleReaction, handleReply, repliesByParent, toggleThread, messageMap, starMessage, unstarMessage, retryOutboxMessage, discardOutboxMessage, cancelOutboxMessage, jumpTargetId, highlightedMessageId]);
 
   // Render loading state
   if (showSkeleton) {
@@ -506,6 +554,7 @@ export function MessageFeed({
           onCancelReply={() => setReplyToMessage(null)}
           initialValue={""}
           onValueChange={(value) => (value.trim() ? notifyTyping() : stopTyping())}
+          onBlur={stopTyping}
         />
       </CardFooter>
     </Card>

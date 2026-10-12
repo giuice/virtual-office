@@ -50,6 +50,14 @@ export type MessagingSeedOptions = {
    * through markMessagesRead, the same RPC the read route uses.
    */
   thirdUser?: SeedUserDefinition;
+  /**
+   * Opt-in (Phase 5 E2E world, users C–E): more company members who sign in.
+   * Each joins the company like the secondary and is a participant of the group
+   * conversation (created when this is non-empty) and of every room
+   * conversation; the direct conversation stays between the first two users.
+   * Not combined with thirdUser.
+   */
+  worldMembers?: SeedUserDefinition[];
 };
 
 export const MAX_HISTORY_MESSAGE_COUNT = 200;
@@ -204,12 +212,27 @@ export class MessagingTestSeeder {
       await this.ensureCompanyMember(company.id, profiles[0].id, thirdProfile, options.thirdUser);
     }
 
+    const worldDefinitions = options.worldMembers ?? [];
+    if (worldDefinitions.length > 0 && options.thirdUser) {
+      throw new Error('worldMembers and thirdUser cannot be combined');
+    }
+    const worldProfiles = [];
+    for (const definition of worldDefinitions) {
+      const profile = await this.ensureProfileForAuthUser(
+        definition,
+        await this.ensureAuthUser(definition, allowedEmails),
+      );
+      await this.ensureCompanyMember(company.id, profiles[0].id, profile, definition);
+      worldProfiles.push(profile);
+    }
+    const worldIds = worldProfiles.map((profile) => profile.id);
+
     const spaces = await this.ensureReusableSpaces(company.id, primaryProfile.id, roomCount, created);
 
     const participants = profiles.map((profile) => profile.id);
     const directPromise = this.createDirectConversation(participants, runId, created);
     const roomsPromise = this.createRoomConversations({
-      participants,
+      participants: [...participants, ...worldIds],
       runId,
       spaces,
       includePinnedRoom,
@@ -254,9 +277,9 @@ export class MessagingTestSeeder {
       MAX_HISTORY_MESSAGE_COUNT,
     );
     const groupConversation =
-      options.includeGroupConversation || historyMessageCount > 0 || thirdProfile
+      options.includeGroupConversation || historyMessageCount > 0 || thirdProfile || worldIds.length > 0
         ? await this.createGroupConversation(
-            thirdProfile ? [...participants, thirdProfile.id] : participants,
+            [...participants, ...(thirdProfile ? [thirdProfile.id] : []), ...worldIds],
             runId,
             created,
           )
@@ -295,6 +318,12 @@ export class MessagingTestSeeder {
               role: options.thirdUser.role,
             }]
           : []),
+        ...worldProfiles.map((profile, index) => ({
+          id: profile.id,
+          email: worldDefinitions[index].email,
+          supabaseUid: profile.supabase_uid,
+          role: worldDefinitions[index].role,
+        })),
       ],
       spaces: spaces.map((space) => ({
         id: space.id,
@@ -611,6 +640,54 @@ export class MessagingTestSeeder {
   }
 
   /**
+   * Re-adds `userId` to `conversationId` through
+   * `public.restore_conversation_membership` (service role), the only
+   * authorized rejoin (Phase 5 T28): it lifts the revocation and re-creates the
+   * conversation_members row only when the conversation's own rules still
+   * allow it (room access under lock; original participants of direct/group
+   * conversations), and is a no-op for a current member. Callers must check
+   * isSeededConversationParticipant.
+   */
+  async restoreConversationMembership(conversationId: string, userId: string): Promise<void> {
+    await this.restoreMemberships(conversationId, [userId]);
+  }
+
+  /**
+   * True only when `userId` is in `conversationId`'s participants, every
+   * participant and every current member has one of `allowedEmails` (the
+   * shape of every seeded conversation), whether or not `userId` is still a
+   * member. Unknown ids are false.
+   */
+  async isSeededConversationParticipant(
+    conversationId: string,
+    userId: string,
+    allowedEmails: ReadonlySet<string>,
+  ): Promise<boolean> {
+    if (allowedEmails.size === 0) {
+      return false;
+    }
+    const { data: conversation, error } = await this.supabase
+      .from('conversations')
+      .select('participants')
+      .eq('id', conversationId)
+      .maybeSingle()
+      .overrideTypes<{ participants: string[] | null }, { merge: false }>();
+    if (error) {
+      throw new Error(`Failed to read conversation participants: ${error.message}`);
+    }
+    const participants = conversation?.participants ?? [];
+    if (!participants.includes(userId)) {
+      return false;
+    }
+    const accountIds = await this.findTestAccountIds(allowedEmails);
+    if (!participants.every((id) => accountIds.has(id))) {
+      return false;
+    }
+    const foreign = await this.findConversationsWithForeignMembers([conversationId], accountIds);
+    return !foreign.has(conversationId);
+  }
+
+  /**
    * True only when `userId` is a member of `conversationId` and every member
    * of that conversation (including `userId`) has one of `allowedEmails` — the
    * shape of every conversation this seeder creates. Unknown ids are false.
@@ -785,6 +862,10 @@ export class MessagingTestSeeder {
     const existing = await this.conversationRepository.findDirectByFingerprint(fingerprint);
 
     if (existing) {
+      // A reused direct conversation may have lost a member in an earlier run
+      // (remove-member). Preference writes no longer re-create memberships
+      // (Phase 5 T28), so seeding restores them explicitly (authorized rejoin).
+      await this.restoreMemberships(existing.id, participants);
       await this.conversationRepository.updateLastActivityTimestamp(existing.id, now.toISOString());
       return {
         ...existing,
@@ -804,6 +885,19 @@ export class MessagingTestSeeder {
     });
     created.conversationIds.push(conversation.id);
     return conversation;
+  }
+
+  /** Restores each participant's membership (service-role RPC; no-op for members). */
+  private async restoreMemberships(conversationId: string, userIds: readonly string[]): Promise<void> {
+    for (const userId of userIds) {
+      const { error } = await this.supabase.rpc('restore_conversation_membership', {
+        p_conversation_id: conversationId,
+        p_user_id: userId,
+      });
+      if (error) {
+        throw new Error(`Failed to restore conversation membership: ${error.message}`);
+      }
+    }
   }
 
   private async createRoomConversations(options: {

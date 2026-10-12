@@ -1,6 +1,7 @@
 import type { Locator, Page, Request, Route } from '@playwright/test';
 
 import { test, expect } from './fixtures/messaging';
+import { fullBrowserChannel } from './helpers/browser-channel';
 import { openDrawer, selectConversation, waitForRealtimeReady } from './helpers/drawer-helpers';
 import {
   mediaState,
@@ -21,8 +22,8 @@ import {
  * `npm run test:messaging:voice:cross-browser`, not from this suite.
  */
 test.use({
-  // Full Chromium with the fake microphone, as in messaging-voice-notes.spec.ts.
-  channel: 'chromium',
+  // A full browser with the fake microphone, as in messaging-voice-notes.spec.ts.
+  channel: fullBrowserChannel,
   launchOptions: { args: ['--use-fake-device-for-media-stream'] },
 });
 

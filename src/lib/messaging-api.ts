@@ -1,5 +1,5 @@
 // src/lib/messaging-api.ts
-import { Message, Conversation, ConversationType, FileAttachment, MessageReaction, MessageReader } from '@/types/messaging';
+import { Message, Conversation, ConversationMember, ConversationType, FileAttachment, MessageReaction, MessageReader } from '@/types/messaging';
 import { debugLogger } from '@/utils/debug-logger';
 
 const getTimestamp = (): number => {
@@ -115,7 +115,7 @@ export const messagingApi = {
    */
   async sendMessage(
     message: Partial<Message>,
-    options?: { clientMessageId?: string; attachmentIds?: string[] }
+    options?: { clientMessageId?: string; attachmentIds?: string[]; mentionIds?: readonly string[] }
   ): Promise<Message> {
     const scope = 'messagingApi.sendMessage';
     const requestId = createRequestId('msg-send');
@@ -139,6 +139,8 @@ export const messagingApi = {
           attachments: undefined,
           ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
           ...(options?.attachmentIds?.length ? { attachmentIds: options.attachmentIds } : {}),
+          // Phase 5 T17: mentions travel only with the composition key (T4).
+          ...(options?.clientMessageId && options.mentionIds?.length ? { mentionIds: [...options.mentionIds] } : {}),
         }),
       });
 
@@ -164,7 +166,13 @@ export const messagingApi = {
         messageId: data.message?.id,
         status: data.message?.status,
       });
-      return data.message;
+      // Same shape as feed messages (Date timestamps), since the sent
+      // message joins the feed cache when Realtime has not delivered it.
+      return {
+        ...data.message,
+        timestamp: normalizeDate(data.message?.timestamp),
+        reactions: normalizeReactions(data.message?.reactions),
+      };
     } catch (error) {
       const duration = getTimestamp() - start;
       debugLogger.messaging.error(scope, 'fetch:error', {
@@ -178,6 +186,85 @@ export const messagingApi = {
   },
 
   /**
+   * Phase 5 T8: one attempt of an outbox item (POST /api/messages/create
+   * with `attemptGeneration` and `expectedSenderId`, FR-006/FR-011). Resolves
+   * with the HTTP status, the error code of a refusal and, on 200/201, the
+   * response's `message` object exactly as received — unverified: the caller
+   * confirms the item only if it parses as that item's stored, renderable
+   * message (outbox-ack parseStoredMessage), which builds the feed's message
+   * from validated fields only. Rejects only when no response arrived
+   * (network error, or `signal` aborted — T10 request deadline), which the
+   * caller treats as an unknown outcome.
+   */
+  async createMessageAttempt(attempt: {
+    conversationId: string;
+    content: string;
+    replyToId: string | null;
+    clientMessageId: string;
+    attemptGeneration: number;
+    expectedSenderId: string;
+    mentionIds: readonly string[];
+  }, signal?: AbortSignal): Promise<{ status: number; code?: string; message?: Record<string, unknown> }> {
+    const response = await fetch('/api/messages/create', {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: attempt.conversationId,
+        content: attempt.content,
+        type: 'text',
+        ...(attempt.replyToId ? { replyToId: attempt.replyToId } : {}),
+        clientMessageId: attempt.clientMessageId,
+        attemptGeneration: attempt.attemptGeneration,
+        expectedSenderId: attempt.expectedSenderId,
+        // Unchanged on every attempt of the key (an empty set is not sent).
+        ...(attempt.mentionIds.length > 0 ? { mentionIds: [...attempt.mentionIds] } : {}),
+      }),
+    });
+    const data = (await response.json().catch(() => null)) as
+      | { code?: unknown; message?: Record<string, unknown> }
+      | null;
+    const code = typeof data?.code === 'string' ? data.code : undefined;
+    const message = data?.message;
+    if (!response.ok || typeof message !== 'object' || message === null || Array.isArray(message)) {
+      return { status: response.status, code };
+    }
+    return { status: response.status, message };
+  },
+
+  /**
+   * Phase 5 T27 (FR-006): fences an outbox item's key under a new attempt
+   * generation (POST /api/messages/fence; never creates a message). Resolves
+   * with the HTTP status, the error code of a refusal, and on 200 the
+   * `outcome` ('stored' | 'not_stored') and the stored `message` exactly as
+   * received (null when it was deleted since; unverified, see
+   * createMessageAttempt). Rejects only when no response arrived (or
+   * `signal` aborted).
+   */
+  async fenceMessageAttempt(attempt: {
+    conversationId: string;
+    clientMessageId: string;
+    attemptGeneration: number;
+    expectedSenderId: string;
+  }, signal?: AbortSignal): Promise<{ status: number; code?: string; outcome?: string; message?: unknown }> {
+    const response = await fetch('/api/messages/fence', {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(attempt),
+    });
+    const data = (await response.json().catch(() => null)) as
+      | { code?: unknown; outcome?: unknown; message?: unknown }
+      | null;
+    return {
+      status: response.status,
+      code: typeof data?.code === 'string' ? data.code : undefined,
+      outcome: typeof data?.outcome === 'string' ? data.outcome : undefined,
+      message: data?.message,
+    };
+  },
+
+  /**
    * Get messages for a conversation with pagination
    */
   async getMessages(
@@ -187,6 +274,12 @@ export const messagingApi = {
       cursor?: string; // legacy offset cursor (kept for compatibility)
       cursorBefore?: string; // ISO timestamp for older paging
       cursorAfter?: string; // ISO timestamp for newer paging
+      // Phase 5 T14: marks a polling-fallback request in its URL (`source=poll`;
+      // ignored by the route), so polls are observable apart from feed fetches.
+      // T18: `source=notification` marks a desktop notification's authorization read.
+      source?: 'poll' | 'notification';
+      // Block B fix F6: a polling round's deadline aborts the request.
+      signal?: AbortSignal;
     }
   ): Promise<{
     messages: Message[];
@@ -218,8 +311,9 @@ export const messagingApi = {
       if (options?.cursor) params.append('cursor', options.cursor);
       if (options?.cursorBefore) params.append('cursorBefore', options.cursorBefore);
       if (options?.cursorAfter) params.append('cursorAfter', options.cursorAfter);
-      
-      const response = await fetch(`/api/messages/get?${params.toString()}`);
+      if (options?.source) params.append('source', options.source);
+
+      const response = await fetch(`/api/messages/get?${params.toString()}`, { signal: options?.signal });
       const duration = getTimestamp() - start;
       debugLogger.messaging.metric(scope, 'fetch', duration, {
         requestId,
@@ -331,6 +425,10 @@ export const messagingApi = {
       includeArchived?: boolean;
       limit?: number;
       cursor?: string;
+      // Phase 5 T14: marks a polling-fallback request (`source=poll`; ignored by the route).
+      source?: 'poll';
+      // Block B fix F6: a polling round's deadline aborts the request.
+      signal?: AbortSignal;
     }
   ): Promise<{
     conversations: Conversation[];
@@ -367,8 +465,12 @@ export const messagingApi = {
       if (options?.cursor) {
         params.append('cursor', options.cursor);
       }
-      
-      const response = await fetch(`/api/conversations/get?${params.toString()}`);
+
+      if (options?.source) {
+        params.append('source', options.source);
+      }
+
+      const response = await fetch(`/api/conversations/get?${params.toString()}`, { signal: options?.signal });
       const duration = getTimestamp() - start;
       debugLogger.messaging.metric(scope, 'fetch', duration, {
         requestId,
@@ -651,6 +753,28 @@ export const messagingApi = {
       console.error('Error deleting file attachment:', error);
       throw error;
     }
+  },
+
+  /**
+   * Phase 5 T15: the conversation's current members (GET
+   * /api/conversations/members, users.id + display names). Null when the
+   * caller is not (or no longer) a member — 403 NOT_PARTICIPANT; other
+   * failures throw.
+   */
+  async getConversationMembers(conversationId: string): Promise<ConversationMember[] | null> {
+    const response = await fetch(
+      `/api/conversations/members?conversationId=${encodeURIComponent(conversationId)}`,
+      { method: 'GET', cache: 'no-store' }
+    );
+    if (response.status === 403) {
+      const errorData: { code?: string } = await response.json().catch(() => ({}));
+      if (errorData.code === 'NOT_PARTICIPANT') return null;
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to list conversation members (${response.status})`);
+    }
+    const data: { members?: ConversationMember[] } = await response.json();
+    return Array.isArray(data.members) ? data.members : [];
   },
 
   /**

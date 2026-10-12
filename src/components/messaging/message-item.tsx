@@ -3,7 +3,8 @@
 
 import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Message, MessageStatus, MessageType } from '@/types/messaging';
+import { Message, MessageStatus, MessageType, type MessageDeliveryState } from '@/types/messaging';
+import { PENDING_MESSAGE_ID_PREFIX } from '@/lib/messaging/message-cache';
 import { usePresence } from '@/contexts/PresenceContext';
 import { InteractiveUserAvatar } from '@/components/messaging/InteractiveUserAvatar';
 import { Button } from '@/components/ui/button';
@@ -18,10 +19,15 @@ import { EmojiPicker } from '@/components/messaging/EmojiPicker';
 import { ReactionChips } from '@/components/messaging/ReactionChips';
 import { MessageReadReceipts } from '@/components/messaging/MessageReadReceipts';
 import { MessageAttachments } from '@/components/messaging/MessageAttachments';
+import { MentionedYouCue, MessageMentionText } from '@/components/messaging/MessageMentions';
+import { mentionLabel, type MentionCandidate } from '@/lib/messaging/mentions';
 // Format message timestamp
 const formatMessageTime = (timestamp: Date) => {
   if (!timestamp) return '';
-  return formatDistanceToNow(new Date(timestamp), {
+  const date = new Date(timestamp);
+  // An invalid date would make date-fns throw and unmount the feed.
+  if (Number.isNaN(date.getTime())) return '';
+  return formatDistanceToNow(date, {
     addSuffix: true
   });
 };
@@ -43,6 +49,26 @@ const getMessageStatusIcon = (status: MessageStatus) => {
   }
 };
 
+// Phase 5 T8 (SPEC §13): a pending copy's state as text, not colour only.
+const DELIVERY_STATE_LABELS: Record<MessageDeliveryState, string> = {
+  pending: 'pendente',
+  sending: 'enviando',
+  failed: 'não enviada',
+  expired: 'expirada',
+};
+
+function MessageDeliveryLabel({ state, messageId }: { state: MessageDeliveryState; messageId: string }) {
+  return (
+    <span
+      className={cn('font-medium', state === 'failed' || state === 'expired' ? 'text-destructive' : 'text-muted-foreground')}
+      data-testid={`message-delivery-state-${messageId}`}
+      data-delivery-state={state}
+    >
+      {DELIVERY_STATE_LABELS[state]}
+    </span>
+  );
+}
+
 // Render message content based on type
 
 const containsTarget = (container: HTMLElement, target: EventTarget | null): boolean => {
@@ -59,19 +85,22 @@ const isDatabaseUser = (value: User | AvatarUser | null | undefined): value is U
 };
 
 function MessageContent({
-  message
+  message,
+  mentions
 }: {
   message: Message;
+  /** Phase 5 T17: the message's stored mentions, styled in its text. */
+  mentions: readonly MentionCandidate[];
 }) {
   switch (message.type) {
     case MessageType.TEXT:
-      return <p className="whitespace-pre-wrap break-words">{message.content}</p>;
+      return <MessageMentionText className="whitespace-pre-wrap break-words" text={message.content} mentions={mentions} />;
     case MessageType.IMAGE:
     case MessageType.FILE:
       // Phase 4 FR-011: every attachment renders (images as thumbnails with a
       // lightbox, other files as download cards); the text is optional.
       return <div className="flex min-w-0 flex-col gap-2">
-          {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+          {message.content && <MessageMentionText className="whitespace-pre-wrap break-words" text={message.content} mentions={mentions} />}
           {message.attachments && message.attachments.length > 0 && <MessageAttachments attachments={message.attachments} pending={message.status === MessageStatus.SENDING} />}
         </div>;
     case MessageType.SYSTEM:
@@ -139,13 +168,13 @@ function MessageActions({
   onMenuOpenChange: (open: boolean) => void;
 }) {
   if (!showActions) return null;
-  return <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1" data-avatar-interactive>
-      <Button variant="ghost" size="icon" className="size-7" onClick={e => {
+  return <div className="flex items-center gap-1 absolute -top-4 right-2 bg-background shadow rounded-md p-1" data-avatar-interactive data-testid={`message-actions-${message.id}`}>
+      {onReply && <Button variant="ghost" size="icon" className="size-7" aria-label="Responder" onClick={e => {
       e.stopPropagation();
-      onReply?.(message);
-    }} data-avatar-interactive>
+      onReply(message);
+    }} data-avatar-interactive data-testid={`message-action-reply-${message.id}`}>
         <Reply className="size-4" />
-      </Button>
+      </Button>}
       <EmojiPicker onEmojiSelect={emoji => onReaction?.(message.id, emoji)} />
       <DropdownMenu onOpenChange={onMenuOpenChange}>
         <DropdownMenuTrigger asChild>
@@ -188,6 +217,12 @@ interface MessageItemProps {
   onUnpin?: (messageId: string) => void;
   onStar?: (messageId: string) => void;
   onUnstar?: (messageId: string) => void;
+  /** Phase 5 T27: "Tentar de novo" on this user's failed/expired unsent copy (by clientMessageId). */
+  onRetryUnsent?: (clientMessageId: string) => Promise<void>;
+  /** Phase 5 T27: "Apagar" — removes the failed/expired unsent copy from this browser only. */
+  onDiscardUnsent?: (clientMessageId: string) => Promise<void>;
+  /** Phase 5 T10: "Cancelar" — this user's waiting copy that was never dispatched (by clientMessageId). */
+  onCancelUnsent?: (clientMessageId: string) => Promise<void>;
 }
 export function MessageItem({
   message,
@@ -202,7 +237,10 @@ export function MessageItem({
   onPin,
   onUnpin,
   onStar,
-  onUnstar
+  onUnstar,
+  onRetryUnsent,
+  onDiscardUnsent,
+  onCancelUnsent
 }: MessageItemProps) {
   const {
     users
@@ -244,6 +282,17 @@ export function MessageItem({
     };
   }, [message.senderId, resolvedUser, sender]);
   const isCurrentUser = message.senderId === currentUserProfile?.id;
+  // Phase 5 T8: a pending copy (temp-<key>) is not a stored message yet, so it
+  // cannot be a reply target (the server would refuse its id and the queued
+  // reply would fail): its Reply controls are not offered.
+  const isPendingCopy = message.id.startsWith(PENDING_MESSAGE_ID_PREFIX);
+  const replyHandler = isPendingCopy ? undefined : onReply;
+  // Phase 5 T27 (FR-007, FR-009): an unsent copy that will not be sent
+  // automatically offers "Tentar de novo" and "Apagar".
+  const unsentKey = isCurrentUser && isPendingCopy && (message.deliveryState === 'failed' || message.deliveryState === 'expired') ? message.clientMessageId ?? null : null;
+  // Phase 5 T10 (FR-005): only a copy known not to be stored may be cancelled;
+  // a dispatched one shows "enviando" without it.
+  const cancelKey = isCurrentUser && isPendingCopy && message.deliveryState === 'pending' && message.cancellable ? message.clientMessageId ?? null : null;
   const showAvatar = !isCurrentUser;
   const fallbackDisplayName = fallbackAvatarUser?.displayName || (message.senderId ? `User ${message.senderId.slice(0, 4)}` : 'System');
   const interactiveUser = useMemo(() => {
@@ -256,6 +305,17 @@ export function MessageItem({
       currentSpaceId: senderPresence?.currentSpaceId ?? resolvedUser.currentSpaceId
     } as User;
   }, [resolvedUser, senderPresence]);
+  // Phase 5 T17 (FR-026): stored mentions (users.id) with the names shown
+  // after "@"; the whole message is highlighted for a viewer it mentions.
+  const mentionedUserIds = message.mentionedUserIds;
+  const mentionCandidates = useMemo<MentionCandidate[]>(() => (mentionedUserIds ?? []).flatMap(userId => {
+    const user = userId === currentUserProfile?.id ? currentUserProfile : companyUsers.find(companyUser => companyUser.id === userId);
+    return user ? [{
+      userId,
+      label: mentionLabel(user.displayName)
+    }] : [];
+  }), [companyUsers, currentUserProfile, mentionedUserIds]);
+  const mentionsViewer = !!currentUserProfile?.id && (mentionedUserIds ?? []).includes(currentUserProfile.id);
   const isPinned = message.pins && message.pins.length > 0;
   const isStarred = message.stars && message.stars.some(s => s.userId === currentUserProfile?.id);
 
@@ -305,7 +365,7 @@ export function MessageItem({
         </div>
       </div>;
   }
-  return <div data-testid={`message-${message.id}`} className={cn('relative flex items-start mb-4 px-4 group', isCurrentUser ? 'justify-end' : 'justify-start')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onFocus={handleFocusWithin} onBlur={hideActionsOnBlur} data-thread-depth={depth} data-attachment-count={message.attachments?.length ?? 0}>
+  return <div data-testid={`message-${message.id}`} className={cn('relative flex items-start mb-4 px-4 group', isCurrentUser ? 'justify-end' : 'justify-start')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onFocus={handleFocusWithin} onBlur={hideActionsOnBlur} data-thread-depth={depth} data-attachment-count={message.attachments?.length ?? 0} data-mentions-viewer={mentionsViewer ? 'true' : undefined}>
       {showAvatar && (interactiveUser ? <InteractiveUserAvatar user={interactiveUser} size="sm" className="mr-2" display={{ status: true }} /> : fallbackAvatarUser ? <EnhancedAvatarV2 user={fallbackAvatarUser} size="sm" className="mr-2" display={{ status: !!senderPresence?.status }} status={senderPresence?.status} /> : null)}
 
       <div className={cn("max-w-[80%]", isCurrentUser ? "order-1" : "order-2")}>
@@ -315,8 +375,9 @@ export function MessageItem({
 
         <ReplyBadge message={message} parentMessage={parentMessage} />
 
-        <div className={cn('p-3 rounded-md', isCurrentUser ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground')}>
-          <MessageContent message={message} />
+        {mentionsViewer && <MentionedYouCue messageId={message.id} />}
+        <div className={cn('p-3 rounded-md', isCurrentUser ? 'bg-primary text-primary-foreground' : mentionsViewer ? 'bg-amber-50 text-foreground ring-2 ring-amber-500 dark:bg-amber-500/15' : 'bg-secondary text-secondary-foreground')}>
+          <MessageContent message={message} mentions={mentionCandidates} />
         </div>
 
         <MessageReactions message={message} currentUserId={currentUserProfile?.id} onReaction={onReaction} />
@@ -327,6 +388,9 @@ export function MessageItem({
             <span data-testid={`message-status-${message.id}`}>
               {getMessageStatusIcon(message.status)}
             </span>
+          )}
+          {isCurrentUser && isPendingCopy && (
+            <MessageDeliveryLabel state={message.deliveryState ?? 'sending'} messageId={message.id} />
           )}
           {isCurrentUser && (message.readCount ?? 0) > 0 && (
             <MessageReadReceipts messageId={message.id} readCount={message.readCount ?? 0} />
@@ -339,6 +403,21 @@ export function MessageItem({
           )}
         </div>
 
+        {cancelKey && onCancelUnsent && <div className="flex items-center gap-2 mt-1">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void onCancelUnsent(cancelKey).catch(() => undefined)} data-testid={`message-cancel-${message.id}`}>
+              Cancelar
+            </Button>
+          </div>}
+
+        {unsentKey && (onRetryUnsent || onDiscardUnsent) && <div className="flex items-center gap-2 mt-1">
+            {onRetryUnsent && <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => void onRetryUnsent(unsentKey).catch(() => undefined)} data-testid={`message-retry-${message.id}`}>
+                Tentar de novo
+              </Button>}
+            {onDiscardUnsent && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void onDiscardUnsent(unsentKey).catch(() => undefined)} data-testid={`message-discard-${message.id}`}>
+                Apagar
+              </Button>}
+          </div>}
+
         <div className="flex items-center gap-2 mt-2">
           {showReplyIndicator && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => onToggleThread?.()} data-testid={`reply-count-${message.id}`}>
               <ChevronDown className={cn('size-3 mr-1 transition-transform', {
@@ -346,12 +425,12 @@ export function MessageItem({
           })} />
               {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
             </Button>}
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => onReply?.(message)} data-testid={`reply-button-${message.id}`}>
+          {replyHandler && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => replyHandler(message)} data-testid={`reply-button-${message.id}`}>
             Reply
-          </Button>
+          </Button>}
         </div>
       </div>
 
-      <MessageActions showActions={showActions || isActionsMenuOpen} onMenuOpenChange={setIsActionsMenuOpen} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={onReply} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
+      <MessageActions showActions={showActions || isActionsMenuOpen} onMenuOpenChange={setIsActionsMenuOpen} message={message} isPinned={!!isPinned} isStarred={isStarred} onReply={replyHandler} onReaction={onReaction} onPin={onPin} onUnpin={onUnpin} onStar={onStar} onUnstar={onUnstar} />
     </div>;
 }

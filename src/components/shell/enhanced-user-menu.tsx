@@ -1,12 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useMessaging } from '@/contexts/messaging/MessagingContext';
+import type { OutboxSignOut } from '@/lib/messaging/outbox/outbox-sign-out';
 import { usePresence } from '@/contexts/PresenceContext';
 import { useNotification } from '@/hooks/useNotification';
 import Link from 'next/link';
@@ -25,10 +37,23 @@ export function EnhancedUserMenu() {
   const presenceAwareUser = users?.find(u => u.id === currentUserProfile?.id);
   const currentStatus = presenceAwareUser?.status || currentUserProfile?.status || 'offline';
 
-  const handleSignOut = async () => {
+  // Phase 5 T12 (FR-013, BR-008): signing out with unsent messages asks first.
+  const { countUnsentOutboxMessages, beginOutboxSignOut } = useMessaging();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  /** Unsent messages shown in the open confirmation; null while it is closed. */
+  const [unsentCount, setUnsentCount] = useState<number | null>(null);
+  const signOutRequested = useRef(false);
+
+  // The existing sign-out (Presence logout sequence unchanged). `outboxSignOut`:
+  // the "Sair mesmo" stop, ended once the sign-out finished or failed.
+  const signOutNow = async (outboxSignOut: OutboxSignOut | null = null) => {
     try {
       setIsSigningOut(true);
-      await signOut();
+      try {
+        await signOut();
+      } finally {
+        outboxSignOut?.release();
+      }
       showSuccess({ description: 'Successfully signed out!' });
       window.location.replace('/login');
     } catch (error) {
@@ -38,6 +63,50 @@ export function EnhancedUserMenu() {
       });
     } finally {
       setIsSigningOut(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (signOutRequested.current) return;
+    signOutRequested.current = true;
+    try {
+      setIsSigningOut(true);
+      let unsent = 0;
+      try {
+        unsent = await countUnsentOutboxMessages();
+      } catch (error) {
+        // Unreadable (or not answering within 3 s): nothing blocks the sign-out.
+        console.warn('Unsent messages could not be read before sign-out:', error);
+      }
+      if (unsent > 0) {
+        setIsSigningOut(false);
+        setIsMenuOpen(false);
+        setUnsentCount(unsent);
+        return;
+      }
+      await signOutNow();
+    } finally {
+      signOutRequested.current = false;
+    }
+  };
+
+  // "Sair mesmo": every tab's drains stop first, then the user's outbox is deleted, then the sign-out runs.
+  const confirmSignOut = async () => {
+    if (signOutRequested.current) return;
+    signOutRequested.current = true;
+    setUnsentCount(null);
+    try {
+      setIsSigningOut(true);
+      const outboxSignOut = beginOutboxSignOut();
+      try {
+        await outboxSignOut?.discard();
+      } catch (error) {
+        // As for Presence storage, local storage never blocks the sign-out.
+        console.error('Unsent messages could not be deleted before sign-out:', error);
+      }
+      await signOutNow(outboxSignOut);
+    } finally {
+      signOutRequested.current = false;
     }
   };
 
@@ -99,7 +168,8 @@ export function EnhancedUserMenu() {
   };
 
   return (
-    <Popover>
+    <>
+    <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -167,5 +237,29 @@ export function EnhancedUserMenu() {
         </div>
       </PopoverContent>
     </Popover>
+    {/* T12: outside the menu, which closes when it opens. Esc and Cancelar close it with no side effect. */}
+    <AlertDialog open={unsentCount !== null} onOpenChange={(open) => { if (!open) setUnsentCount(null); }}>
+      <AlertDialogContent data-testid="sign-out-unsent-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Mensagens não enviadas</AlertDialogTitle>
+          <AlertDialogDescription data-testid="sign-out-unsent-message">
+            {unsentCount === 1
+              ? 'Você tem 1 mensagem não enviada. Sair apaga essa mensagem.'
+              : `Você tem ${unsentCount ?? 0} mensagens não enviadas. Sair apaga essas mensagens.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="sign-out-unsent-cancel">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            data-testid="sign-out-unsent-confirm"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => void confirmSignOut()}
+          >
+            Sair mesmo
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

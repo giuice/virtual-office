@@ -1,6 +1,33 @@
 // src/repositories/interfaces/IConversationRepository.ts
-import { Conversation, ConversationType, ConversationPreferences } from '@/types/messaging';
+import { Conversation, ConversationMember, ConversationType, ConversationPreferences } from '@/types/messaging';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+
+/** Refusal codes of public.join_room_conversation (Phase 5 T28). */
+export type ConversationMembershipErrorCode =
+  | 'CONVERSATION_NOT_FOUND'
+  | 'ROOM_NOT_FOUND'
+  | 'USER_NOT_FOUND'
+  | 'JOIN_FORBIDDEN'
+  | 'MEMBERSHIP_REVOKED'
+  | 'ROOM_ACCESS_DENIED';
+
+/** The database refused a membership grant (join/rejoin) with `code`. */
+export class ConversationMembershipError extends Error {
+  readonly code: ConversationMembershipErrorCode;
+
+  constructor(code: ConversationMembershipErrorCode) {
+    super(code);
+    this.name = 'ConversationMembershipError';
+    this.code = code;
+  }
+
+  /** 404 for a missing conversation, room or user; 403 for every refusal. */
+  get status(): 403 | 404 {
+    return this.code === 'CONVERSATION_NOT_FOUND' || this.code === 'ROOM_NOT_FOUND' || this.code === 'USER_NOT_FOUND'
+      ? 404
+      : 403;
+  }
+}
 
 export interface IConversationRepository {
   /**
@@ -61,6 +88,7 @@ export interface IConversationRepository {
    * @param id The unique ID of the conversation.
    * @param userId The DB user ID (users.id) marking the conversation read.
    * @returns A promise that resolves to true if the operation was successful, false otherwise.
+   * @throws NotParticipantError when the user has no membership row (Phase 5 T28).
    */
   markConversationRead(id: string, userId: string): Promise<boolean>;
 
@@ -73,6 +101,7 @@ export interface IConversationRepository {
    * @param userId The DB user ID (users.id) who saw the messages.
    * @param messageIds Visible message ids (at most 100 per call; the RPC rejects more).
    * @returns The number of receipts newly recorded.
+   * @throws NotParticipantError when the user has no membership row (Phase 5 T28).
    */
   markMessagesRead(id: string, userId: string, messageIds: readonly string[]): Promise<number>;
 
@@ -88,13 +117,16 @@ export interface IConversationRepository {
    */
    updateLastActivityTimestamp(id: string, timestamp?: string): Promise<Conversation | null>;
 
-  // Add other methods as needed, e.g., findByParticipants, addParticipant, removeParticipant
-
   /**
-   * Adds a participant (by database user ID) to a conversation's participants list.
-   * No-op if the user is already a participant.
+   * Phase 5 T28: joins (or confirms) `userId` as a member of the ROOM
+   * conversation `id` through public.join_room_conversation, which re-checks
+   * the room's access rules and the user's revocations under row locks when
+   * the membership is written. Requires a service-role client; callers must
+   * authenticate the user first. Resolves true when a membership was created,
+   * false when the user already was a member; throws ConversationMembershipError
+   * for a refusal.
    */
-  addParticipant(id: string, userId: string): Promise<Conversation | null>;
+  joinRoomConversation(id: string, userId: string): Promise<boolean>;
 
   /**
    * Finds a direct conversation by the sorted participant fingerprint.
@@ -111,8 +143,10 @@ export interface IConversationRepository {
   // ============================================================================
 
   /**
-   * Sets or updates per-user conversation preferences (pin, star, archive, notifications).
-   * Creates a new preferences record if none exists for this user/conversation pair.
+   * Updates per-user conversation preferences (pin, star, archive,
+   * notifications) of an EXISTING membership. Never creates one (Phase 5 T28):
+   * throws NotParticipantError when the user has no membership row (e.g. it was
+   * removed after the caller authorized the request).
    * @param conversationId The unique ID of the conversation.
    * @param userId The unique ID of the user.
    * @param preferences Partial preferences to set or update.
@@ -138,4 +172,12 @@ export interface IConversationRepository {
    * @returns A promise that resolves to an array of pinned Conversation objects in user-defined order.
    */
   findPinnedByUser(userId: string): Promise<Conversation[]>;
+
+  /**
+   * Phase 5 T4 (FR-023): the conversation's current members
+   * (conversation_members: removed members are excluded) with display name and
+   * avatar. Use the user-scoped client: the database answers only a caller who
+   * is a current member and throws NotParticipantError otherwise.
+   */
+  listMembers(conversationId: string): Promise<ConversationMember[]>;
 }
