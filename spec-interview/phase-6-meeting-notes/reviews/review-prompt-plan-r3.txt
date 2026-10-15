@@ -1,0 +1,15 @@
+You are an adversarial reviewer re-reviewing an execution PLAN in the repository at E:/projects/virtual-office. Read-only review. Do not edit files.
+
+ARTIFACT UNDER REVIEW
+- spec-interview/phase-6-meeting-notes/PLAN.md (version 3). Contract: spec-interview/phase-6-meeting-notes/SPEC.md (v5, owner-approved; do not re-litigate it).
+- Your previous review: spec-interview/phase-6-meeting-notes/reviews/sol-review-plan-r2.md (PLAN v2 preserved at reviews/PLAN-v2-reviewed.md). Claimed dispositions: section "PLAN review r2" at the end of spec-interview/phase-6-meeting-notes/state.md.
+
+WHAT TO DO
+1. For P5 and R2-1..R2-6, state Resolved / Partially / Not resolved, judged from the PLAN v3 text itself.
+2. Attack only the v3 changes for new defects (release-on-never-dispatched vs the SPEC counting rule; ticket-embedded key vs FR-031 replay semantics and "Try again"; note row lock in admission vs concurrent Apply/attach and deadlock risk with the settings lock and T2's per-note lock; actor-row lock in the settings save vs the existing member-removal RPC in supabase/migrations/20260718210827_phase7_company_member_atomic_removal.sql).
+3. Only a High/Medium that a real user or a realistic failure (network, browser, crash, concurrency) can trigger warrants another round; mark server-tampering-only issues as follow-up.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Status table, then new findings ranked High / Medium / Low with id (R3-…), PLAN task, problem, realistic failure scenario, evidence (file:line), concrete PLAN fix.
+- Be specific and concise. No praise.

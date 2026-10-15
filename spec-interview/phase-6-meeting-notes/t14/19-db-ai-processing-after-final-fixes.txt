@@ -1,0 +1,17 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run vitest run --config vitest.meeting-notes-db.config.mts __tests__/meeting-notes-db/meeting-note-ai-processing.test.ts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+[meeting-notes fake AI] listening on http://127.0.0.1:54399; self-check passed:
+  anthropic: POST /anthropic/v1/messages → 200 draft ok; recorded #1 (x-api-key …a001)
+  openai: POST /openai/v1/chat/completions → 200 draft ok; recorded #2 (authorization …o002)
+  kimi: POST /kimi/v1/chat/completions → 200 draft ok; recorded #3 (authorization …k003)
+  glm: POST /glm/api/paas/v4/chat/completions → 200 draft ok; recorded #4 (authorization …g004)
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  00:38:32
+   Duration  50.13s (transform 395ms, setup 22ms, import 896ms, tests 48.81s, environment 0ms)
+
+[meeting-notes fake AI] stopped

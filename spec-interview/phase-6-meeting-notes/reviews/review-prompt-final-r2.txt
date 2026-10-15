@@ -1,0 +1,16 @@
+You are the FINAL adversarial reviewer, round 2, for the Phase 6 Meeting Notes work item in E:/projects/virtual-office (Next.js App Router + React + TypeScript strict + Supabase; TanStack Query). Read-only review. Do not edit files and do not run anything that writes to a database, calls a real AI provider, or starts long-lived processes.
+
+Round 1 (reviews/review-prompt-final.txt → reviews/sol-review-final-r1.md) found F-1 (Medium), F-2 (Medium), F-3 (Low). The fix round is the delta between reviews/final-cumulative.diff and reviews/final-cumulative-r2.diff, saved as reviews/final-r1-fixes.diff (a plain `diff` of the two diff files). Working-tree files equal final-cumulative-r2.diff; read them directly.
+
+Fixes to verify and attack:
+- F-1: src/lib/meeting-notes/ai/processing.ts settle() — a refused transition (MEETING_NOTE_AI_OPERATION_INVALID_TRANSITION) now returns the operation's current status from the error detail, so the `finally` path refunds an operation whose dispatch mark committed with a lost reply. Check every caller of settle() for behaviour changes now that a refused transition reports a status instead of null (could any path now return a draft, report success, refund a dispatched operation that DID call the provider, or double-settle?). Test: __tests__/meeting-notes-db/meeting-note-ai-processing.test.ts "the dispatch mark commits but its reply is lost" using a fetch fault injected in the child process (__tests__/meeting-notes-db/child/start-route-child.mjs, env MEETING_NOTES_CHILD_DROP_RPC_REPLY). Is the fault realistic (request committed, reply lost) and test-only? Negative control: with the fix disabled the test failed with "expected 'dispatched' to be 'refunded'" (t14/19-*.txt is the passing run).
+- F-2: src/hooks/mutations/useMeetingNoteAiMutations.ts — confirmDraftAccess returns the fresh note; useProcessMeetingNoteAi onSuccess (scope-fenced) stores it unless the cache holds the same or a newer revision (storeConfirmedNote → settleMeetingNoteCache, which also invalidates the viewer's lists). Attack: open editor with unsaved changes, a newer cache revision written in between, retired scope, late answers of an older attempt (latest-attempt guard in src/hooks/ui/useMeetingNoteAiFlow.ts), cross-note/cross-user cache keys, the draft now being compared with a note revision newer than its source (must still show conflict). E2E: __tests__/api/playwright/meeting-notes/ai-stale-view-apply.spec.ts (passes with the fix, t14/20-*.txt; negative control without the fix failed on meeting-note-ai-conflict count 1).
+- F-3: trailing whitespace removed in src/app/(dashboard)/company/page.tsx.
+
+RULES FOR SEVERITY
+- Only a High/Medium that a real user or a realistic failure (network, browser, crash, concurrency) can trigger counts as High/Medium. Anything needing the application's own server to be broken or tampered with is "follow-up". Do not re-raise round-1 or TRACK follow-ups unless the fix made them reachable.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Findings ranked High / Medium / Low / Follow-up. For each: id (F2-…), file:line, the concrete problem, a realistic failure scenario, evidence, and a concrete fix.
+- Be specific and concise. No praise.

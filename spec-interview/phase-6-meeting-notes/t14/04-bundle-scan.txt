@@ -1,0 +1,23 @@
+scan: AC-017 production client bundle (.next/static) after npm run build
+targets: .next\static; files=82; bytes=3685076
+- owner .env.local MEETING_NOTES_TICKET_SECRET value: not found
+- owner .env.local MEETING_NOTES_TICKET_SECRET_PREVIOUS value: SKIPPED (value not available)
+- owner .env.local SUPABASE_SERVICE_ROLE_KEY value: not found
+- local Supabase service_role key value: not found
+- canary prefix "mn-canary" (DB-suite keys): not found
+- canary prefix "mn-e2e-canary" (E2E keys): not found
+- canary "fake-t11-" (adapter-test keys): not found
+- RPC name read_meeting_note_ai_key: not found
+- env name MEETING_NOTES_TICKET_SECRET (ticket.ts): not found
+- ticket.ts message: not found
+- capabilities.ts marker anthropic-messages: not found
+- capabilities.ts marker openai-chat-completions: not found
+- capabilities.ts marker max_completion_tokens: not found
+- prompt.ts system prompt: not found
+- base-url.ts env MEETING_NOTES_AI_BASE_URL_OVERRIDE: not found
+- transport.ts message: not found
+- transport.ts header x-stainless-helper-method: not found
+- env name SUPABASE_SERVICE_ROLE_KEY: not found
+positive control 'An admin needs to configure AI': 1
+positive control 'Key ending in': 1
+positive control 'ai-settings': 9

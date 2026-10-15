@@ -1,0 +1,3 @@
+Online vhabpcoyypobgasacsko, 2026-10-14 ~12:10 UTC (read-only permission smoke; temp table only):
+- anon search_meeting_notes → 42501; authenticated read_meeting_note_ai_key → 42501; authenticated admit_meeting_note_ai_operation → 42501; anon SELECT meeting_note_ai_settings → 42501; authenticated SELECT meeting_note_ai_operations → 42501 (same as local).
+- pg_cron: meeting-notes-ai-fail-stale-v1 succeeded 2 runs (last 12:10:00 UTC); meeting-notes-ai-purge-operations-v1 scheduled 03:40 UTC daily, no run yet.

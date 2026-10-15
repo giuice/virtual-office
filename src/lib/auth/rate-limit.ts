@@ -72,6 +72,40 @@ const RATE_LIMITS = {
   // Fail-closed: the client drops a refused batch, so refusing never affects
   // messaging.
   'messaging:metrics': { limit: 30, windowSeconds: 60, failClosed: true },
+  // Phase 6 T3: meeting-note writes (create, update, restore, delete) and
+  // action-item writes (create, edit, completion, delete). The database has
+  // no write throttling; these bound per-user write bursts. Fail-open like the
+  // other non-messaging-send actions: an unavailable limiter never blocks
+  // notes (every write is still authorized by the RPCs).
+  'meeting-note:write': { limit: 60, windowSeconds: 60, failClosed: false },
+  'meeting-note:item-write': { limit: 120, windowSeconds: 60, failClosed: false },
+  // Phase 6 T10: transcript uploads ("New note from transcript", "Attach
+  // transcript"); each request may carry up to 1 MB that is read, validated,
+  // and stored. 20/60 s per user is far above interactive use; fail-open like
+  // the other meeting-note writes (the RPCs still authorize every write).
+  'meeting-note:transcript': { limit: 20, windowSeconds: 60, failClosed: false },
+  // Phase 6 T4: meeting-note search (the costliest read: ranking plus
+  // excerpts for up to 50 rows). 120/60 s covers typing-driven searches with
+  // paging; fail-open like the other meeting-note actions (the search RPC
+  // still scopes every read to the caller's company).
+  'meeting-note:search': { limit: 120, windowSeconds: 60, failClosed: false },
+  // Phase 6 T8: company AI settings saves by admins (each replaces a Vault
+  // secret). Rare by nature; 10/60 s bounds key-guessing or replace loops.
+  // Fail-closed when the check_rate_limit RPC fails. (If the service-role
+  // client cannot even be built, beginMeetingNoteRequest skips the limiter,
+  // but the save itself needs that client and then answers 500.)
+  'meeting-note:ai-settings': { limit: 10, windowSeconds: 60, failClosed: true },
+  // Phase 6 T9: AI processing tickets (issued each time the provider notice is
+  // shown). A ticket costs nothing by itself — admission charges the daily
+  // limit — so 30/60 s covers reopening the notice; fail-open like the other
+  // meeting-note reads (the route still authorizes every issuance).
+  'meeting-note:ai-ticket': { limit: 30, windowSeconds: 60, failClosed: false },
+  // Phase 6 T12: AI processing starts (each new one may dispatch one provider
+  // request; replays and refusals are cheap). The company's daily limit is the
+  // cost bound (atomic admission); this only bounds per-user bursts. 20/60 s
+  // covers retries of a network-failed start; fail-open like the other
+  // meeting-note actions (admission still authorizes and reserves).
+  'meeting-note:ai-process': { limit: 20, windowSeconds: 60, failClosed: false },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitedAction = keyof typeof RATE_LIMITS;

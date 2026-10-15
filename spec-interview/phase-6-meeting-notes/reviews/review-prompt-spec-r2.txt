@@ -1,0 +1,22 @@
+You are an adversarial reviewer re-reviewing a revised product SPEC in the repository at E:/projects/virtual-office (Next.js App Router + TypeScript strict + Supabase Postgres/Auth/RLS/Realtime). Read-only review. Do not edit files.
+
+ARTIFACTS
+- Revised SPEC v2: spec-interview/phase-6-meeting-notes/SPEC.md
+- Previous version you reviewed: spec-interview/phase-6-meeting-notes/reviews/SPEC-v1-reviewed.md
+- Your previous review (round 1): spec-interview/phase-6-meeting-notes/reviews/sol-review-spec-r1.md
+- Owner answers (authoritative, verbatim) and the round-1 disposition table: spec-interview/phase-6-meeting-notes/state.md (rounds 1–4; round 4 answered the owner decisions your review raised).
+
+TASK
+1. For each round-1 finding (H1–H4, M1–M9, L1–L2), verify against SPEC v2 whether it is actually resolved, not just mentioned. State Resolved / Partially / Not resolved with the reason.
+2. Attack SPEC v2 anew: new contradictions introduced by the revision, authorization holes, cost/limit bypasses under the new "count at dispatch" rule (e.g. what exactly is "rejected without processing", can a client induce that classification), idempotency-key scope and abuse, concurrency, data lifecycle, privacy, untestable acceptance criteria under the no-mock policy (a local fake AI server is approved; Supabase, repositories, and code under test must stay real), and any SPEC statement that contradicts the owner's recorded answers or AGENTS.md / repository schema (supabase/migrations/, src/).
+3. Do not re-raise items the owner explicitly decided unless the SPEC misstates the decision.
+
+RULES FOR SEVERITY
+- High/Medium only when a real user or a realistic failure (network, browser, crash, concurrency) can trigger it.
+- Anything that requires the application's own server to be broken or tampered with is a "follow-up", not High/Medium.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Section A: round-1 finding status table.
+- Section B: new findings ranked High / Medium / Low, each with SPEC ID, problem, realistic scenario, evidence (file:line), and a concrete SPEC fix.
+- Concise. No praise.

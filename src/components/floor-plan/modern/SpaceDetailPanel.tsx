@@ -14,9 +14,12 @@ import { SpaceAudioControls } from '../SpaceAudioControls';
 import { ScreenShareControls } from '../ScreenShareControls';
 import { SpaceTypeIndicator } from './SpaceTypeIndicator';
 import { isSpaceStatusEnterable } from './NowBoard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SpaceNotesTab } from '@/components/meeting-notes/SpaceNotesTab';
 
 /**
- * Real-data-only detail contract: space metadata, roster, audio, and actions.
+ * Real-data-only detail contract: space metadata, roster, audio, and actions
+ * ("Details" tab, the default), plus the space's meeting notes ("Notes" tab).
  */
 export interface SpaceDetailPanelProps {
   space: Space;
@@ -136,36 +139,50 @@ export const SpaceDetailPanel: React.FC<SpaceDetailPanelProps> = ({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
-        {userInSpace ? (
-          <div aria-labelledby={`space-audio-${space.id}`} data-space-action>
-            <h4 id={`space-audio-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Audio &amp; presentation
-            </h4>
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] p-2.5" data-testid="space-detail-audio">
-              <p className="text-xs text-muted-foreground">Space audio controls</p>
-              <div className="flex min-w-0 flex-wrap items-center gap-1">
-                <SpaceAudioControls />
-                <ScreenShareControls isCurrentOccupant />
+      <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
+        <TabsList
+          className="mx-4 mt-3 grid h-9 grid-cols-2 bg-[var(--vo-bg-2)]"
+          aria-label={`${space.name} sections`}
+        >
+          <TabsTrigger value="details" className="h-7 text-xs">Details</TabsTrigger>
+          <TabsTrigger value="notes" className="h-7 text-xs">Notes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="details" className="mt-0 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+          {userInSpace ? (
+            <div aria-labelledby={`space-audio-${space.id}`} data-space-action>
+              <h4 id={`space-audio-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Audio &amp; presentation
+              </h4>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--vo-line-soft)] bg-[var(--vo-bg-2)] p-2.5" data-testid="space-detail-audio">
+                <p className="text-xs text-muted-foreground">Space audio controls</p>
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
+                  <SpaceAudioControls />
+                  <ScreenShareControls isCurrentOccupant />
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <div className="min-h-0" aria-labelledby={`space-roster-${space.id}`}>
-          <h4 id={`space-roster-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            People
-          </h4>
-          <ParticipantRoster
-            users={usersInSpace}
-            onUserClick={onUserClick}
-            speakingUserIds={speakingUserIds}
-            presentingUserId={presentingUserId}
-            mutedUserIds={mutedUserIds}
-            maxHeight={320}
-          />
-        </div>
-      </div>
+          <div className="min-h-0" aria-labelledby={`space-roster-${space.id}`}>
+            <h4 id={`space-roster-${space.id}`} className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              People
+            </h4>
+            <ParticipantRoster
+              users={usersInSpace}
+              onUserClick={onUserClick}
+              speakingUserIds={speakingUserIds}
+              presentingUserId={presentingUserId}
+              mutedUserIds={mutedUserIds}
+              maxHeight={320}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-0 min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <SpaceNotesTab spaceId={space.id} spaceName={space.name} />
+        </TabsContent>
+      </Tabs>
 
       <footer className="border-t border-[var(--vo-line-soft)] px-4 py-3">
         <SpaceActionButtons

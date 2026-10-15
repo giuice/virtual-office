@@ -1,0 +1,10 @@
+You are an adversarial reviewer doing a narrow verification round on a product SPEC in E:/projects/virtual-office. Read-only; do not edit files.
+
+Artifacts: spec-interview/phase-6-meeting-notes/SPEC.md (v5); previous version reviews/SPEC-v4-reviewed.md; your round-4 review reviews/sol-review-spec-r4.md; owner answers and disposition tables in state.md (same folder).
+
+Task:
+1. Verify whether R4-1 and R4-2 are resolved in v5 (diff v5 against v4). Resolved / Partially / Not resolved with reason.
+2. Check that the v4→v5 changes introduced no new contradiction, authorization hole, cost bypass, or untestable acceptance criterion (no-mock policy: a local fake AI server is approved; Supabase, repositories, routes, and code under test stay real).
+3. Report only genuinely user-reachable or realistic-failure (network, browser, crash, concurrency) defects as High/Medium; server-tampering scenarios are follow-ups; implementation details the PLAN can settle are not findings.
+
+Output: Verdict APPROVE or REVISION REQUIRED; status of R4-1/R4-2; new findings (if any) ranked with SPEC ID, scenario, evidence, fix. Concise.

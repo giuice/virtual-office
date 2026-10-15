@@ -1,0 +1,88 @@
+npm notice run virtual-office@0.1.0 test:presence:db
+npm notice run vitest run --config vitest.presence-db.config.mts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+ ❯ __tests__/presence-db/screen-share-lease.test.ts (16 tests | 1 failed) 19716ms
+     × enforces media-topic RLS for a mapped Auth UID rather than the application UUID 7ms
+ ❯ __tests__/presence-db/phase6-cutover-audit.test.ts (17 tests | 1 failed) 1964ms
+     × requires the Phase 10 lock set before evaluating seven-day evidence 16ms
+ ❯ __tests__/presence-db/session-leases.test.ts (11 tests | 1 failed) 6372ms
+     × h: purge_presence_history deletes only eligible sessions and confirmed absent fences 124ms
+ ❯ __tests__/presence-db/health-check.test.ts (4 tests | 1 failed) 220ms
+     × executes read-only and returns every required database/log counter 54ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/presence-db/health-check.test.ts > presence remediation health-check artifact > executes read-only and returns every required database/log counter
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/presence-db/health-check.test.ts:78:9
+     76|           .filter((row) => row.expected === 'zero')
+     77|           .every((row) => row.observed_count === '0' && row.gate_pass …
+     78|       ).toBe(true);
+       |         ^
+     79|       expect(
+     80|         healthRows
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  __tests__/presence-db/phase6-cutover-audit.test.ts > presence-db Phase 6 immutable legacy cutover audit > requires the Phase 10 lock set before evaluating seven-day evidence
+AssertionError: expected [Function] to throw error including 'PRESENCE_LEGACY_CUTOVER_GATE_FAILED' but got 'PRESENCE_LEGACY_CUTOVER_COVERAGE_INCO…'
+
+Expected: "PRESENCE_LEGACY_CUTOVER_GATE_FAILED"
+Received: "PRESENCE_LEGACY_CUTOVER_COVERAGE_INCOMPLETE"
+
+ ❯ __tests__/presence-db/phase6-cutover-audit.test.ts:566:8
+    564|       await expect(
+    565|         fixtures.sql(`select private.assert_presence_legacy_cutover_ga…
+    566|       ).rejects.toThrow("PRESENCE_LEGACY_CUTOVER_GATE_FAILED");
+       |        ^
+    567|     } finally {
+    568|       await rollbackQuietly();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  __tests__/presence-db/screen-share-lease.test.ts > presence-db screen-share lease authority > enforces media-topic RLS for a mapped Auth UID rather than the application UUID
+error: new row violates row-level security policy for table "messages"
+ ❯ node_modules/pg/lib/client.js:652:17
+ ❯ PresenceFixtures.sql __tests__/presence-db/fixtures.ts:43:17
+     41|     params: unknown[] = [],
+     42|   ): Promise<T[]> {
+     43|     const res = await this.client.query(text, params);
+       |                 ^
+     44|     return res.rows as T[];
+     45|   }
+ ❯ __tests__/presence-db/screen-share-lease.test.ts:972:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  __tests__/presence-db/session-leases.test.ts > presence-db session leases > h: purge_presence_history deletes only eligible sessions and confirmed absent fences
+AssertionError: expected '1' to be '0' // Object.is equality
+
+Expected: "0"
+Received: "1"
+
+ ❯ __tests__/presence-db/session-leases.test.ts:1122:31
+    1120|       [recentRetiredId],
+    1121|     );
+    1122|     expect(deletedOld?.count).toBe("0");
+       |                               ^
+    1123|     expect(retainedRecent?.count).toBe("1");
+    1124|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  4 failed | 12 passed (16)
+      Tests  4 failed | 132 passed (136)
+   Start at  16:44:36
+   Duration  85.42s (transform 248ms, setup 134ms, import 1.09s, tests 82.25s, environment 1ms)
+
+exit=1 wall=86s

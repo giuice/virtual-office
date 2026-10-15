@@ -1,0 +1,5 @@
+Bundle scan after final-review fixes (.next/static, 82 files, build 22-build-final.txt):
+- needles: .env.local values of non-NEXT_PUBLIC *KEY/SECRET/TOKEN/PASSWORD vars (>=16 chars), mn-canary, mn-e2e-canary, fake-t11-, read_meeting_note_ai_key, MEETING_NOTES_TICKET_SECRET, SUPABASE_SERVICE_ROLE_KEY
+- only hit: value of SUPABASE_ANON_KEY (public by design; same value as NEXT_PUBLIC_SUPABASE_ANON_KEY) — expected
+- service-role key, ticket secret, canaries, server-only markers: not found
+- positive control 'An admin needs to configure AI': 1

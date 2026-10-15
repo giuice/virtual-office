@@ -1,0 +1,266 @@
+1064c1064
+< index ea385ff..9516697 100644
+---
+> index ea385ff..10d6e2a 100644
+1093c1093
+< +  
+---
+> +
+4155a4156,4248
+> diff --git a/__tests__/api/playwright/meeting-notes/ai-stale-view-apply.spec.ts b/__tests__/api/playwright/meeting-notes/ai-stale-view-apply.spec.ts
+> new file mode 100644
+> index 0000000..366e931
+> --- /dev/null
+> +++ b/__tests__/api/playwright/meeting-notes/ai-stale-view-apply.spec.ts
+> @@ -0,0 +1,87 @@
+> +import { expect, test } from '../fixtures/meeting-notes';
+> +import { MEETING_NOTES_E2E_PREFIX } from '../helpers/meeting-notes-e2e';
+> +import {
+> +  configureFakeOpenAi,
+> +  fakeAi,
+> +  openAiNotice,
+> +  processToReview,
+> +  successOutcome,
+> +} from '../helpers/meeting-notes-ai-e2e';
+> +import { openNote } from '../helpers/meeting-notes-ui';
+> +
+> +/**
+> + * AC-010 (FR-018), stale view (final review F-2): the note view is open at
+> + * revision N while the note is edited elsewhere (here another tab of the same
+> + * editor, through the real route). The draft generated afterwards is bound to
+> + * revision N + 1; the review must compare it with the note's current
+> + * revision, not the view's cached N, so Apply is offered and succeeds.
+> + */
+> +test.describe('meeting notes — AI draft after an edit made elsewhere (AC-010)', () => {
+> +  test('the review takes the note revision read by the access check; Apply succeeds', async ({
+> +    primaryPage,
+> +    notesWorld,
+> +  }) => {
+> +    await fakeAi.reset();
+> +    await configureFakeOpenAi(primaryPage, notesWorld);
+> +    try {
+> +      const tag = notesWorld.runTag;
+> +      const page = primaryPage;
+> +      const space = await notesWorld.createSpace('Stale view room');
+> +      const noteId = await notesWorld.createNote(page, {
+> +        spaceId: space.id,
+> +        title: `${MEETING_NOTES_E2E_PREFIX} Stale view ${tag}`,
+> +        meetingDate: new Date(),
+> +        content: '<p>Planning</p>',
+> +      });
+> +      await notesWorld.setSummaryAndTranscriptUnsafe(noteId, {
+> +        summary: null,
+> +        transcript: `Ana: Carla will book the venue ${tag}.`,
+> +      });
+> +
+> +      // The view caches the current revision.
+> +      const view = await openNote(page, noteId);
+> +      const before = (await notesWorld.readNote(page, noteId)).note;
+> +      if (!before) throw new Error('note not readable');
+> +
+> +      // Edited elsewhere: the open view does not know about the new revision.
+> +      const editedTitle = `${MEETING_NOTES_E2E_PREFIX} Stale view edited ${tag}`;
+> +      const revision = await notesWorld.updateNote(page, noteId, {
+> +        expectedRevision: before.revision,
+> +        title: editedTitle,
+> +        meetingDate: new Date(before.meetingDate),
+> +        content: before.content,
+> +        participantIds: before.participants.map((participant) => participant.userId),
+> +      });
+> +      expect(revision).toBe(before.revision + 1);
+> +      await expect(view.getByText(editedTitle)).toHaveCount(0);
+> +
+> +      await fakeAi.script(
+> +        'openai',
+> +        successOutcome({
+> +          summary: { keyPoints: [`The venue is pending ${tag}`], decisions: [], nextSteps: [] },
+> +          actionItems: [{ description: `Book the venue ${tag}`, assigneeName: null }],
+> +        }),
+> +      );
+> +      await openAiNotice(page);
+> +      const review = await processToReview(page);
+> +      await expect(review).toHaveAttribute('data-source-revision', String(revision));
+> +      await expect(page.getByTestId('meeting-note-ai-conflict')).toHaveCount(0);
+> +      // The view now shows the note it confirmed (the edit made elsewhere).
+> +      await expect(view.getByText(editedTitle).first()).toBeVisible({ timeout: 15_000 });
+> +
+> +      const apply = review.getByTestId('meeting-note-ai-apply');
+> +      await expect(apply).toBeEnabled();
+> +      await apply.click();
+> +      await expect(page.getByTestId('meeting-note-ai-review')).toHaveCount(0, { timeout: 30_000 });
+> +
+> +      const after = (await notesWorld.readNote(page, noteId)).note;
+> +      expect(after?.revision).toBe(revision + 1);
+> +      expect(after?.title).toBe(editedTitle);
+> +      expect(after?.actionItems.map((item) => item.description)).toEqual([`Book the venue ${tag}`]);
+> +      expect(after?.summary).toBe(['Key points', `- The venue is pending ${tag}`].join('\n'));
+> +    } finally {
+> +      await fakeAi.reset();
+> +      await notesWorld.resetAiSettingsUnsafe();
+> +    }
+> +  });
+> +});
+7330c7423
+< index 0000000..0be3162
+---
+> index 0000000..368f116
+7333c7426
+< @@ -0,0 +1,51 @@
+---
+> @@ -0,0 +1,69 @@
+7337,7341c7430,7435
+< +// restart with the same ticket secret, and NODE_ENV=production. The route's
+< +// TypeScript graph is loaded with jiti (the same `@/` and `server-only`
+< +// aliases as the Vitest config); `next/headers` is the cookie shim next to
+< +// this file. Every value it needs (local Supabase URL/keys, ticket secret,
+< +// fake AI override, NODE_ENV) comes from the environment the parent passes.
+---
+> +// restart with the same ticket secret, NODE_ENV=production, and a lost RPC
+> +// reply. The route's TypeScript graph is loaded with jiti (the same `@/` and
+> +// `server-only` aliases as the Vitest config); `next/headers` is the cookie
+> +// shim next to this file. Every value it needs (local Supabase URL/keys,
+> +// ticket secret, fake AI override, NODE_ENV) comes from the environment the
+> +// parent passes.
+7363a7458,7474
+> +// Network fault: when MEETING_NOTES_CHILD_DROP_RPC_REPLY names an RPC, its
+> +// request reaches the local database and commits, then the reply is lost
+> +// (the caller sees a fetch failure). Installed before the route loads.
+> +const dropReplyOf = process.env.MEETING_NOTES_CHILD_DROP_RPC_REPLY;
+> +if (dropReplyOf) {
+> +  const realFetch = globalThis.fetch;
+> +  globalThis.fetch = async (input, init) => {
+> +    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+> +    const response = await realFetch(input, init);
+> +    if (url.includes(`/rest/v1/rpc/${dropReplyOf}`)) {
+> +      await response.arrayBuffer();
+> +      throw new TypeError('fetch failed');
+> +    }
+> +    return response;
+> +  };
+> +}
+> +
+9169c9280
+< index 0000000..fd06dbd
+---
+> index 0000000..20bc516
+9172c9283
+< @@ -0,0 +1,1464 @@
+---
+> @@ -0,0 +1,1495 @@
+10600a10712,10742
+> +        'the dispatch mark commits but its reply is lost: no provider request, the operation is refunded, usage unchanged',
+> +        async () => {
+> +          const note = await noteWithTranscript(world.companyA, world.authorA);
+> +          const ticket = await ticketFor(world.authorA, note.noteId);
+> +          const used = await usedToday(world.companyA);
+> +          await control.setDefault('openai', success());
+> +          const server = await spawnChild({ MEETING_NOTES_CHILD_DROP_RPC_REPLY: 'mark_meeting_note_ai_operation_dispatched' });
+> +          try {
+> +            const result = await server.start(world.authorA, note.noteId, ticket);
+> +            expect(result.status).not.toBe(200);
+> +            expect(result.body.draft).toBeUndefined();
+> +            const verified = verifyMeetingNoteAiTicket(ticket);
+> +            if (!verified.ok) throw new Error('ticket did not verify');
+> +            const [op] = await world.query<{ status: string; dispatched_at: string | null }>(
+> +              `select status, dispatched_at::text as dispatched_at
+> +               from public.meeting_note_ai_operations where idempotency_key = $1`,
+> +              [verified.payload.idempotencyKey],
+> +            );
+> +            // The mark really committed (dispatched_at set); nothing was sent.
+> +            expect(op.dispatched_at).not.toBeNull();
+> +            expect(op.status).toBe('refunded');
+> +            expect(await control.received('openai')).toBe(0);
+> +            expect(await usedToday(world.companyA)).toBe(used);
+> +          } finally {
+> +            await server.kill();
+> +          }
+> +        },
+> +        120_000,
+> +      );
+> +
+> +      it(
+24232c24374
+< index 0000000..81c45bf
+---
+> index 0000000..d441bdf
+24235c24377
+< @@ -0,0 +1,150 @@
+---
+> @@ -0,0 +1,181 @@
+24255c24397,24399
+< +// retires through the normal membership reconciliation.
+---
+> +// retires through the normal membership reconciliation. On success the note
+> +// it read refreshes this viewer's cache when newer, so the review compares
+> +// the draft with the note's current revision.
+24279a24424
+> +  MeetingNoteDetail,
+24314,24316c24459,24462
+< + * and editable by the caller in `scope`'s company; throws the access-lost
+< + * error the flow shows otherwise. Uses the request's signal, so Cancel,
+< + * leaving the page, and a retiring scope abort it too.
+---
+> + * and editable by the caller in `scope`'s company, and returns that fresh
+> + * note; throws the access-lost error the flow shows otherwise. Uses the
+> + * request's signal, so Cancel, leaving the page, and a retiring scope abort
+> + * it too.
+24318c24464,24468
+< +async function confirmDraftAccess(noteId: string, scope: MeetingNotesScope, signal: AbortSignal): Promise<void> {
+---
+> +async function confirmDraftAccess(
+> +  noteId: string,
+> +  scope: MeetingNotesScope,
+> +  signal: AbortSignal
+> +): Promise<MeetingNoteDetail> {
+24325a24476,24490
+> +  return note;
+> +}
+> +
+> +/**
+> + * Stores the note read by the access check unless the cache already holds
+> + * that revision or a newer one: a note edited elsewhere before the ticket was
+> + * issued would otherwise stay at its old revision in this view, and the
+> + * review would report the draft's newer source as a conflict.
+> + */
+> +function storeConfirmedNote(queryClient: QueryClient, scope: MeetingNotesScope, note: MeetingNoteDetail): void {
+> +  const cached = queryClient.getQueryData<MeetingNoteDetail>(
+> +    meetingNoteQueryKeys.note(scope.userId, scope.companyId, note.id)
+> +  );
+> +  if (cached && cached.revision >= note.revision) return;
+> +  settleMeetingNoteCache(queryClient, scope, note);
+24349a24515,24519
+> +/** The processing answer plus the note read by the access check (null without a draft). */
+> +export interface ProcessMeetingNoteAiResult extends MeetingNoteAiProcessResponse {
+> +  confirmedNote: MeetingNoteDetail | null;
+> +}
+> +
+24352c24522
+< +  return useMeetingNotesScopedMutation<MeetingNoteAiProcessResponse, ProcessMeetingNoteAiVariables>({
+---
+> +  return useMeetingNotesScopedMutation<ProcessMeetingNoteAiResult, ProcessMeetingNoteAiVariables>({
+24359,24360c24529,24533
+< +      if (response.draft !== null) await confirmDraftAccess(noteId, scope, requestSignal);
+< +      return response;
+---
+> +      const confirmedNote = response.draft !== null ? await confirmDraftAccess(noteId, scope, requestSignal) : null;
+> +      return { ...response, confirmedNote };
+> +    },
+> +    onSuccess: ({ confirmedNote }, _variables, scope) => {
+> +      if (confirmedNote) storeConfirmedNote(queryClient, scope, confirmedNote);
+27259c27432
+< index 0000000..2ffa0f0
+---
+> index 0000000..8a85941
+27262c27435
+< @@ -0,0 +1,405 @@
+---
+> @@ -0,0 +1,413 @@
+27424a27598,27605
+> +    // A refused transition still reports the operation's current status
+> +    // (e.g. `released` refused because the dispatch mark committed).
+> +    if (error instanceof MeetingNoteDbError && error.token === 'MEETING_NOTE_AI_OPERATION_INVALID_TRANSITION') {
+> +      const status = error.detail?.status;
+> +      if (typeof status === 'string') {
+> +        return { status: status as MeetingNoteAiOperationStatus, recorded: false };
+> +      }
+> +    }

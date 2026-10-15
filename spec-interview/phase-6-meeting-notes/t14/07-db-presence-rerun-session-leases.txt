@@ -1,0 +1,33 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run vitest run --config vitest.presence-db.config.mts __tests__/presence-db/session-leases.test.ts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+ ❯ __tests__/presence-db/session-leases.test.ts (11 tests | 1 failed) 3156ms
+     × h: purge_presence_history deletes only eligible sessions and confirmed absent fences 129ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/presence-db/session-leases.test.ts > presence-db session leases > h: purge_presence_history deletes only eligible sessions and confirmed absent fences
+AssertionError: expected '1' to be '0' // Object.is equality
+
+Expected: "0"
+Received: "1"
+
+ ❯ __tests__/presence-db/session-leases.test.ts:1122:31
+    1120|       [recentRetiredId],
+    1121|     );
+    1122|     expect(deletedOld?.count).toBe("0");
+       |                               ^
+    1123|     expect(retainedRecent?.count).toBe("1");
+    1124|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  16:46:17
+   Duration  3.40s (transform 52ms, setup 26ms, import 96ms, tests 3.16s, environment 0ms)
+
+exit=1 wall=5s

@@ -1,0 +1,7 @@
+mode before reruns: atomic changed_by=phase6-t14-restore-atomic
+mode after reruns: atomic changed_by=phase6-t14-restore-atomic
+2026-10-14T01:29:43Z before 5a: atomic changed_by=phase6-t14-restore-atomic
+2026-10-14T01:33:23Z before 5a rerun: atomic
+2026-10-14T01:49:53Z before 5b: atomic
+2026-10-14T03:03:34Z before a11y: atomic
+final mode: atomic

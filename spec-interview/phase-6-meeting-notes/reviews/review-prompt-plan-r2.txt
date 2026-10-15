@@ -1,0 +1,15 @@
+You are an adversarial reviewer re-reviewing an execution PLAN in the repository at E:/projects/virtual-office. Read-only review. Do not edit files.
+
+ARTIFACT UNDER REVIEW
+- spec-interview/phase-6-meeting-notes/PLAN.md (version 2). Its contract is spec-interview/phase-6-meeting-notes/SPEC.md (v5, owner-approved; do not re-litigate it).
+- Your previous review of version 1: spec-interview/phase-6-meeting-notes/reviews/sol-review-plan-r1.md (PLAN v1 preserved at reviews/PLAN-v1-reviewed.md). Dispositions claimed: the "PLAN adversarial review r1" section at the end of spec-interview/phase-6-meeting-notes/state.md.
+
+WHAT TO DO
+1. For each finding P1–P11, state Resolved / Partially / Not resolved, checking the PLAN v2 text itself (not the disposition table's claims).
+2. Attack the changes for new defects: the function privilege rule vs actual Supabase behavior (default privileges in supabase/migrations/20260610183000_baseline_core_schema.sql:2128-2133; service_role usage from server routes; SECURITY DEFINER + Vault access); the admission transaction ordering in T9/T12 (existing-operation lookup before authorization? replay by a removed member?); the new dependency graph (T17, T16) and block grouping; whether any AC or Must FR lost coverage or now has evidence only at a task that cannot observe it; anything that would force mocks or unit tests; T15 sequencing.
+3. Apply the AGENTS.md rule: only a High/Medium that a real user or a realistic failure (network, browser, crash, concurrency) can trigger warrants another round; mark server-tampering-only issues as follow-up.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Status table for P1–P11, then new findings ranked High / Medium / Low with id (R2-…), PLAN task, problem, realistic failure scenario, evidence (file:line), concrete PLAN fix.
+- Be specific and concise. No praise.

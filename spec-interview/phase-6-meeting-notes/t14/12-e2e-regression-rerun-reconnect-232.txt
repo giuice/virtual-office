@@ -1,0 +1,458 @@
+mode before: atomic
+npm notice run virtual-office@0.1.0 npx
+npm notice run playwright test -c playwright.messaging-phase5.config.ts --project=regression-chrome __tests__/api/playwright/messaging-reconnect-consistency.spec.ts:232
+◇ injected env (22) from .env.local // tip: ⌘ override existing { override: true }
+[WebServer] ▲ Next.js 16.2.10 (Turbopack)
+[WebServer] - Local:         http://localhost:3210
+[WebServer] - Network:       http://192.168.1.66:3210
+[WebServer] - Environments: .env.local
+[WebServer] ✓ Ready in 428ms
+[WebServer] 
+[WebServer]  GET / 307 in 2.3s (next.js: 1564ms, proxy.ts: 293ms, application-code: 465ms)
+[WebServer]  GET /login 200 in 96ms (next.js: 35ms, proxy.ts: 7ms, application-code: 53ms)
+[WebServer]  DELETE /api/test/messaging/seed 200 in 165ms (next.js: 101ms, application-code: 64ms)
+[messaging local setup] removed 0 leftover seeded conversation(s) from earlier runs
+[messaging phase5 setup] removed leftover server state: 16 budget counter(s), 0 attempt row(s), 0 revocation(s), 0 mention(s)
+
+Running 1 test using 1 worker
+
+◇ injected env (0) from .env.local // tip: ⌘ override existing { override: true }
+[WebServer] Repository creating conversation with data: {
+[WebServer]   "type": "direct",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.908Z",
+[WebServer]   "name": "test_dm_fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "visibility": "direct",
+[WebServer]   "participantsFingerprint": "15c58f5bd01b91cb4a6d7cb47a85e503"
+[WebServer] }
+[WebServer] Repository creating conversation with data: {
+[WebServer]   "type": "room",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.909Z",
+[WebServer]   "name": "Test Room Conversation 1 fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+[WebServer]   "visibility": "public"
+[WebServer] }
+[WebServer] Repository creating conversation with data: {
+[WebServer]   "type": "room",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.909Z",
+[WebServer]   "name": "Test Room Conversation 2 fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+[WebServer]   "visibility": "public"
+[WebServer] }
+[WebServer] Created conversation in database: {
+[WebServer]   "id": "64d418fe-b41e-4d7f-80de-0b64f82b0833",
+[WebServer]   "type": "room",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.909Z",
+[WebServer]   "name": "Test Room Conversation 1 fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "unreadCount": 0,
+[WebServer]   "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+[WebServer]   "visibility": "public"
+[WebServer] }
+[WebServer] Created conversation in database: {
+[WebServer]   "id": "08347a62-b711-4093-9cf5-d0d7636c8102",
+[WebServer]   "type": "room",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.909Z",
+[WebServer]   "name": "Test Room Conversation 2 fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "unreadCount": 0,
+[WebServer]   "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+[WebServer]   "visibility": "public"
+[WebServer] }
+[WebServer] Created conversation in database: {
+[WebServer]   "id": "e9f7d5a3-1bda-4668-9ee0-8d38bffbf377",
+[WebServer]   "type": "direct",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:57.908Z",
+[WebServer]   "name": "test_dm_fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "unreadCount": 0,
+[WebServer]   "visibility": "direct"
+[WebServer] }
+[WebServer] Repository creating conversation with data: {
+[WebServer]   "type": "group",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815",
+[WebServer]     "5d12251d-8afe-4248-a2d9-fa07b156ecc2"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:59.880Z",
+[WebServer]   "name": "Test Group fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "visibility": "private"
+[WebServer] }
+[WebServer] Created conversation in database: {
+[WebServer]   "id": "6c88f0e4-e4fb-47bd-9479-5f8b133824af",
+[WebServer]   "type": "group",
+[WebServer]   "participants": [
+[WebServer]     "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+[WebServer]     "035eb4b3-bc8d-471e-a1df-0e84c4665815",
+[WebServer]     "5d12251d-8afe-4248-a2d9-fa07b156ecc2"
+[WebServer]   ],
+[WebServer]   "lastActivity": "2026-10-14T03:02:59.880Z",
+[WebServer]   "name": "Test Group fb3f19d5-274a-4ab9-8ee3-c403d8151dbd",
+[WebServer]   "isArchived": false,
+[WebServer]   "unreadCount": 0,
+[WebServer]   "visibility": "private"
+[WebServer] }
+[WebServer]  POST /api/test/messaging/seed 200 in 3.3s (next.js: 4ms, application-code: 3.3s)
+[WebServer]  GET /login 200 in 99ms (next.js: 5ms, proxy.ts: 5ms, application-code: 89ms)
+[WebServer]  POST /api/users/sync-profile 200 in 123ms (next.js: 33ms, application-code: 90ms)
+[WebServer]  GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 153ms (next.js: 39ms, application-code: 115ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 233ms (next.js: 30ms, application-code: 202ms)
+[WebServer]  GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 135ms (next.js: 36ms, application-code: 99ms)
+[WebServer]  GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 141ms (next.js: 32ms, application-code: 110ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 189ms (next.js: 4ms, application-code: 185ms)
+[WebServer]  GET /floor-plan 200 in 108ms (next.js: 29ms, proxy.ts: 54ms, application-code: 26ms)
+[WebServer]  GET /api/neighborhoods 200 in 290ms (next.js: 32ms, application-code: 258ms)
+[WebServer] [browser] Image with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:02.577Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"45ad1d7b-b126-4805-84f7-280ce3336337","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":147,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 310ms (next.js: 155ms, application-code: 155ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:02.810Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"cdd8e145-44d0-4c73-9f77-bb9ca450c497","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"f2956e57-ceac-4ac6-822f-d9dc2b70b823","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":443,"activeSessionCount":3,"retryable":false}
+[WebServer]  POST /api/presence/sessions 200 in 545ms (next.js: 93ms, application-code: 452ms)
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=f2956e57-ceac-4ac6-822f-d9dc2b70b823 200 in 69ms (next.js: 45ms, application-code: 24ms)
+[WebServer]  GET /api/presence/snapshot 200 in 110ms (next.js: 3ms, application-code: 107ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:02.970Z","category":"location","action":"transition","resultCode":"INVALID_REQUEST","reason":null,"authorizationMode":null,"consumeResult":null,"correlationId":"2d139c38-1a3c-457e-8933-6c1b126c9a32","transitionId":null,"appUserId":null,"presenceSessionId":null,"previousSpaceId":null,"targetSpaceId":null,"resultSpaceId":null,"requestId":null,"requesterUserId":null,"durationMs":0,"expectedLocationVersion":null,"previousLocationVersion":null,"resultLocationVersion":null,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":null}
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:03.017Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"2cf55d1e-ac56-4ff8-ac7b-922bfbcd8a24","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":193,"retryable":false}
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:03.057Z","category":"knock","action":"pending","resultCode":"SESSION_INVALID","correlationId":"bdf13066-4dbb-44f1-bdd8-ae428237a9cc","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"f2956e57-ceac-4ac6-822f-d9dc2b70b823","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":151,"retryable":false}
+[WebServer]  GET /login 200 in 65ms (next.js: 9ms, proxy.ts: 9ms, application-code: 46ms)
+[WebServer]  POST /api/users/sync-profile 200 in 81ms (next.js: 4ms, application-code: 78ms)
+[WebServer]  GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 116ms (next.js: 3ms, application-code: 113ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 138ms (next.js: 5ms, application-code: 132ms)
+[WebServer]  GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 127ms (next.js: 3ms, application-code: 123ms)
+[WebServer]  GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 130ms (next.js: 3ms, application-code: 127ms)
+[WebServer]  GET /floor-plan 200 in 89ms (next.js: 6ms, proxy.ts: 58ms, application-code: 25ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 182ms (next.js: 4ms, application-code: 178ms)
+[WebServer]  GET /api/neighborhoods 200 in 130ms (next.js: 4ms, application-code: 126ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:05.023Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"1fffdd9e-2af2-4c40-96d7-efa289e11221","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":119,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 140ms (next.js: 15ms, application-code: 126ms)
+[WebServer] [browser] Image with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:05.275Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"e644c7dc-e8f0-46d0-a636-e8ec6220a309","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"7edaef6b-2862-46e2-ab67-2f5376d2a6a4","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":381,"activeSessionCount":2,"retryable":false}
+[WebServer]  POST /api/presence/sessions 200 in 394ms (next.js: 3ms, application-code: 390ms)
+[WebServer]  GET /floor-plan 200 in 168ms (next.js: 5ms, proxy.ts: 61ms, application-code: 102ms)
+[WebServer]  POST /api/users/sync-profile 200 in 119ms (next.js: 3ms, application-code: 116ms)
+[WebServer]  GET /api/users/get-by-id?supabase_uid=34a8d819-f24f-4ce9-b44c-a05e5c4c31b6 200 in 169ms (next.js: 43ms, application-code: 125ms)
+[WebServer]  GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 130ms (next.js: 5ms, application-code: 126ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 165ms (next.js: 7ms, application-code: 158ms)
+[WebServer]  GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 122ms (next.js: 5ms, application-code: 117ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:06.561Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"18da3d68-718c-4d4c-b1a9-b8f07c9a0bcc","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":104,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 134ms (next.js: 22ms, application-code: 112ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:06.710Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"81f67c4b-39e8-4343-94e8-09f9927953d1","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":265,"activeSessionCount":4,"retryable":false}
+[WebServer]  POST /api/presence/sessions 200 in 283ms (next.js: 7ms, application-code: 276ms)
+[WebServer]  GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 173ms (next.js: 4ms, application-code: 170ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 219ms (next.js: 69ms, application-code: 150ms)
+[WebServer]  GET /api/conversations/members?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 225ms (next.js: 40ms, application-code: 186ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:06.902Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"cc29f71c-aea1-446a-8be6-aa14896890fb","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":159,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 172ms (next.js: 4ms, application-code: 168ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 213ms (next.js: 6ms, application-code: 208ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:06.972Z","category":"knock","action":"pending","resultCode":"SESSION_INVALID","correlationId":"69279a67-11ad-46b4-af52-51eff144167f","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":127,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=9feb1407-2b70-4f8d-94db-5782310b5861 409 in 147ms (next.js: 7ms, application-code: 139ms)
+[WebServer]  GET /api/neighborhoods 200 in 131ms (next.js: 13ms, application-code: 118ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:07.055Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"f3c819e6-1f8d-4687-b7c9-8a2b7177f8ed","transitionId":"cba7c7c1-2242-4405-886e-0c6ac1a34e52","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","previousSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","targetSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","resultSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","requestId":null,"requesterUserId":null,"durationMs":169,"expectedLocationVersion":16653,"previousLocationVersion":16653,"resultLocationVersion":16654,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+[WebServer]  POST /api/presence/location 200 in 189ms (next.js: 7ms, application-code: 182ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:07.102Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"967efe5f-e9a9-42c3-b584-2ec487691a9a","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":112,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 124ms (next.js: 5ms, application-code: 119ms)
+[WebServer] [browser] Image with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:07.293Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"959c165a-b495-4c83-9260-29683a27b5d9","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":159,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 169ms (next.js: 4ms, application-code: 166ms)
+[WebServer]  GET /floor-plan 200 in 141ms (next.js: 7ms, proxy.ts: 70ms, application-code: 64ms)
+[WebServer]  POST /api/users/sync-profile 200 in 177ms (next.js: 4ms, application-code: 173ms)
+[WebServer]  GET /api/users/get-by-id?supabase_uid=ca53fb3f-d48e-47e9-9329-b28e432ff1d0 200 in 197ms (next.js: 5ms, application-code: 192ms)
+[WebServer]  GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 115ms (next.js: 3ms, application-code: 112ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 191ms (next.js: 6ms, application-code: 185ms)
+[WebServer]  GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 162ms (next.js: 3ms, application-code: 158ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.334Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"2eef95cb-7900-41b3-98fc-3932af82b1e1","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":135,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 165ms (next.js: 18ms, application-code: 147ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.366Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"fc490e6d-3628-4ecb-9443-a34db7af647b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":181,"activeSessionCount":3,"retryable":false}
+[WebServer]  POST /api/presence/sessions 200 in 200ms (next.js: 9ms, application-code: 192ms)
+[WebServer]  GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb 200 in 158ms (next.js: 6ms, application-code: 152ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.557Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"d4596036-0637-4045-8dad-ec7bf996b8e6","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":139,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 156ms (next.js: 9ms, application-code: 147ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 244ms (next.js: 7ms, application-code: 238ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.695Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"f13ef7f1-c210-48d9-bd73-eaf82953c29d","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":205,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 225ms (next.js: 10ms, application-code: 214ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.800Z","category":"knock","action":"pending","resultCode":"SESSION_INVALID","correlationId":"a39a1b8a-e42d-4cc3-af00-01cf31d25c7e","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","spaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","durationMs":165,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=4988a8ee-f278-4fbc-a140-640421a00d30&sessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 409 in 180ms (next.js: 6ms, application-code: 174ms)
+[WebServer]  GET /api/neighborhoods 200 in 292ms (next.js: 11ms, application-code: 281ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.940Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"350c8cf7-724b-49d4-a28d-9c8cab4add7d","transitionId":"59a0dfe9-978e-4b18-9573-bcc9230b135b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","previousSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","targetSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","resultSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","requestId":null,"requesterUserId":null,"durationMs":250,"expectedLocationVersion":9653,"previousLocationVersion":9653,"resultLocationVersion":9654,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+[WebServer]  POST /api/presence/location 200 in 292ms (next.js: 32ms, application-code: 260ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:08.991Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"63589fb5-8ec8-46a4-bc72-22043a9f58e1","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","spaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","durationMs":166,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=4988a8ee-f278-4fbc-a140-640421a00d30&sessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 200 in 186ms (next.js: 8ms, application-code: 178ms)
+[WebServer] [browser] Image with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:09.118Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"52310d55-91c1-4f1e-947a-a9aa9d881eaf","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":113,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 132ms (next.js: 11ms, application-code: 121ms)
+[WebServer]  POST /api/messages/create 201 in 1159ms (next.js: 78ms, application-code: 1082ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:10.317Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"a8446b98-53a6-4c3a-bd02-0a8c3c3ea8ac","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":115,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 125ms (next.js: 5ms, application-code: 120ms)
+[WebServer]  POST /api/messages/create 201 in 361ms (next.js: 4ms, application-code: 357ms)
+[WebServer]  PATCH /api/test/messaging/seed 200 in 69ms (next.js: 3ms, application-code: 66ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:11.981Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"71ab6583-89ae-49b0-8760-6c50e21bbc83","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":114,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 128ms (next.js: 6ms, application-code: 121ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:12.211Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"e6c44f44-9007-44d9-b425-1ff94c42f44e","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":99,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 112ms (next.js: 3ms, application-code: 108ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 172ms (next.js: 5ms, application-code: 167ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 173ms (next.js: 4ms, application-code: 169ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 270ms (next.js: 5ms, application-code: 265ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:13.804Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"ef74954b-7fb9-49c5-a6cc-9d3fde761978","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","spaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","durationMs":132,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=4988a8ee-f278-4fbc-a140-640421a00d30&sessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 200 in 143ms (next.js: 5ms, application-code: 138ms)
+[WebServer]  GET /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/readers 200 in 971ms (next.js: 793ms, application-code: 178ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 232ms (next.js: 4ms, application-code: 228ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: '75cb69aa-5179-42e1-904e-c3251da527a8',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/active?presenceSessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 1038ms (next.js: 855ms, application-code: 183ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:14.107Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"a9e075e5-af10-487e-8cf3-4a62061dc42e","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":131,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 155ms (next.js: 12ms, application-code: 143ms)
+[WebServer]  POST /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/signal 200 in 1145ms (next.js: 955ms, application-code: 190ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 142ms (next.js: 4ms, application-code: 139ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 1,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 250,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 1,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 250,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 1,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 250,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:14.514Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"a7644509-f1ea-43d0-a914-ed2ac30296e3","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":113,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 122ms (next.js: 4ms, application-code: 118ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 2,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 375,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 2,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 375,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 2,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 375,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer]  GET /api/conversations/members?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 255ms (next.js: 7ms, application-code: 248ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 3,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 563,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 3,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 563,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 3,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 563,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: '803aaf6c-f88e-4fb1-a112-d8b18c471d59',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/4988a8ee-f278-4fbc-a140-640421a00d30/screen-share/active?presenceSessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 200 in 311ms (next.js: 15ms, application-code: 296ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 467ms (next.js: 8ms, application-code: 459ms)
+[WebServer]  POST /api/spaces/4988a8ee-f278-4fbc-a140-640421a00d30/screen-share/signal 200 in 366ms (next.js: 26ms, application-code: 340ms)
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"send_latency","durationMs":1462}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"outbox_wait","durationMs":285}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"send_outcome","reason":"delivered"}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"send_latency","durationMs":461}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"outbox_wait","durationMs":95}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"send_outcome","reason":"delivered"}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"messages_stream_drop","reason":"error"}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"list_stream_drop","reason":"error"}
+[WebServer] {"ts":"2026-10-14T03:03:15.331Z","appVersion":"0.1.0+local","type":"typing_stream_drop","reason":"error"}
+[WebServer]  POST /api/messages/metrics 202 in 257ms (next.js: 54ms, application-code: 202ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 4,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 844,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 4,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 844,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 4,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 844,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer]  GET /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/readers 200 in 242ms (next.js: 16ms, application-code: 226ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: 'f31db597-cd53-491d-a2e0-80f7b88b6ada',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/4988a8ee-f278-4fbc-a140-640421a00d30/screen-share/active?presenceSessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 200 in 338ms (next.js: 7ms, application-code: 331ms)
+[WebServer]  GET /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/readers 200 in 173ms (next.js: 4ms, application-code: 170ms)
+[WebServer]  PATCH /api/conversations/read 200 in 632ms (next.js: 45ms, application-code: 587ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 5,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 1266,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 5,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 1266,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 5,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 1266,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 161ms (next.js: 3ms, application-code: 158ms)
+[WebServer]  GET /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/readers 200 in 176ms (next.js: 3ms, application-code: 173ms)
+[WebServer]  GET /api/messages/3f1d9a02-7c51-4deb-ab5d-c2a77dc3de12/readers 200 in 167ms (next.js: 8ms, application-code: 160ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:16.998Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"50d05736-0e23-4e01-95f1-c7f7ff9d575d","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":137,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 149ms (next.js: 5ms, application-code: 144ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 184ms (next.js: 19ms, application-code: 165ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 285ms (next.js: 5ms, application-code: 280ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:17.494Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"74254afb-b388-40d4-a8a2-5b8a3f6cbf44","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":120,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 133ms (next.js: 4ms, application-code: 129ms)
+[WebServer]  GET /api/conversations/members?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 159ms (next.js: 9ms, application-code: 151ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 245ms (next.js: 9ms, application-code: 236ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:17.823Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"11c1df56-2b76-4ecb-987c-9b9162fce3b8","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":231,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 247ms (next.js: 5ms, application-code: 242ms)
+[WebServer]  GET /api/conversations/members?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 343ms (next.js: 30ms, application-code: 313ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 355ms (next.js: 9ms, application-code: 346ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: '2bf1ab21-cbc3-4c32-9695-e8a306eb342c',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/active?presenceSessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 323ms (next.js: 15ms, application-code: 308ms)
+[WebServer]  POST /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/signal 200 in 415ms (next.js: 20ms, application-code: 395ms)
+[WebServer]  GET /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/readers 200 in 270ms (next.js: 28ms, application-code: 242ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 414ms (next.js: 30ms, application-code: 383ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:18.815Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"7774b418-54d3-444c-b4bb-d4b0fee8424b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","spaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","durationMs":151,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=4988a8ee-f278-4fbc-a140-640421a00d30&sessionId=6a9dcced-6be2-4ae1-a2e1-580db93be663 200 in 166ms (next.js: 6ms, application-code: 160ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: 'ab8a391d-3de1-4989-aac5-2d7b936b4126',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/active?presenceSessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 203ms (next.js: 5ms, application-code: 198ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:19.460Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"ee1cfca8-d312-44d4-9237-2946fbaf937e","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":93,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 101ms (next.js: 3ms, application-code: 98ms)
+[WebServer]  POST /api/messages/3f1d9a02-7c51-4deb-ab5d-c2a77dc3de12/star 201 in 864ms (next.js: 694ms, application-code: 170ms)
+[WebServer]  GET /api/messages/starred?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 308ms (next.js: 41ms, application-code: 268ms)
+[WebServer] [browser] [useMessageSubscription] retry {
+[WebServer]   attempt: 6,
+[WebServer]   channel: 'messaging-db-changes',
+[WebServer]   delay: 1898,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationRealtime] retry {
+[WebServer]   attempt: 6,
+[WebServer]   channel: 'conversations-changes',
+[WebServer]   delay: 1898,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer] [browser] [useConversationTyping] retry {
+[WebServer]   attempt: 6,
+[WebServer]   channel: 'conversation-typing',
+[WebServer]   delay: 1898,
+[WebServer]   status: 'CHANNEL_ERROR'
+[WebServer] } (src/utils/debug-logger.ts:51:13)
+[WebServer]  POST /api/messages/259bdcd6-b2e7-4a58-befd-c10daaebdabb/star 201 in 232ms (next.js: 17ms, application-code: 214ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:20.668Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"76809822-ff59-40f3-90c3-22dbd22fff2a","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":156,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 200ms (next.js: 10ms, application-code: 190ms)
+[WebServer]  DELETE /api/messages/3f1d9a02-7c51-4deb-ab5d-c2a77dc3de12/star 200 in 200ms (next.js: 4ms, application-code: 196ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:21.522Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"27a36c1e-1ca5-49e8-bbe3-d43a09e7abe4","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":111,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 132ms (next.js: 8ms, application-code: 124ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 209ms (next.js: 5ms, application-code: 203ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:21.753Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"ca9949f3-ff00-4f8e-8736-6fb66acaa86b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":166,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 193ms (next.js: 8ms, application-code: 184ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: 'f76a739f-68f3-4f55-a530-0aba2b8b9c54',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/active?presenceSessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 240ms (next.js: 12ms, application-code: 228ms)
+[WebServer]  GET /api/conversations/members?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 304ms (next.js: 20ms, application-code: 284ms)
+[WebServer]  GET /api/conversations/get?includeArchived=true 200 in 344ms (next.js: 7ms, application-code: 337ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:22.096Z","category":"knock","action":"pending","resultCode":"KNOCK_PENDING_LIST","correlationId":"c6ff26ea-450b-4e38-9dd2-80cda7b8f477","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","responderUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","spaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","durationMs":185,"retryable":false}
+[WebServer]  GET /api/spaces/knock/pending?spaceId=05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3&sessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 231ms (next.js: 16ms, application-code: 214ms)
+[WebServer]  POST /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/signal 200 in 348ms (next.js: 26ms, application-code: 322ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 415ms (next.js: 27ms, application-code: 389ms)
+[WebServer]  GET /api/messages/starred?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=20 200 in 419ms (next.js: 35ms, application-code: 384ms)
+[WebServer] screen_share_route {
+[WebServer]   correlationId: 'c41a2564-d286-478a-b68c-b627592d490e',
+[WebServer]   operation: 'active',
+[WebServer]   outcome: 'ACTIVE_READ',
+[WebServer]   retryable: false
+[WebServer] }
+[WebServer]  GET /api/spaces/05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3/screen-share/active?presenceSessionId=9feb1407-2b70-4f8d-94db-5782310b5861 200 in 226ms (next.js: 13ms, application-code: 213ms)
+[WebServer]  GET /api/messages/starred?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af 200 in 347ms (next.js: 5ms, application-code: 342ms)
+[WebServer]  GET /api/messages/get?conversationId=6c88f0e4-e4fb-47bd-9479-5f8b133824af&limit=50 200 in 289ms (next.js: 3ms, application-code: 286ms)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:23.569Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"9fa3e1a7-385b-475e-a18f-5ee2539069c2","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":148,"retryable":false}
+[WebServer]  GET /api/presence/snapshot 200 in 161ms (next.js: 5ms, application-code: 155ms)
+[WebServer]  POST /api/presence/sessions/6a9dcced-6be2-4ae1-a2e1-580db93be663/disconnect 200 in 70ms
+[WebServer]  GET /api/presence/snapshot 200 in 24ms (next.js: 5ms, application-code: 18ms)
+[WebServer]  POST /api/presence/sessions/9feb1407-2b70-4f8d-94db-5782310b5861/disconnect 200 in 24ms
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:23.812Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"63d6fb9d-e324-4506-a96e-bc78bee9af1c","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":115,"retryable":false}
+[WebServer]  DELETE /api/test/messaging/seed 200 in 223ms (next.js: 4ms, application-code: 220ms)
+  ✓  1 [regression-chrome] › __tests__\api\playwright\messaging-reconnect-consistency.spec.ts:232:3 › Timeline data after the Realtime reconnect › Realtime-only drop: the open reader list and the open starred view show the server state after reconnect (27.3s)
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:24.461Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"cb6de52f-6cbd-4940-811d-d178c5f9dded","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"6a9dcced-6be2-4ae1-a2e1-580db93be663","durationMs":105,"activeSessionCount":1,"idempotentReplay":false}
+[WebServer] {"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:03:24.477Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"0070d5ea-30e6-4773-afb5-4904cf4438d3","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"9feb1407-2b70-4f8d-94db-5782310b5861","durationMs":119,"activeSessionCount":1,"idempotentReplay":false}
+
+  1 passed (34.8s)
+exit=0 wall=36s

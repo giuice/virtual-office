@@ -15,6 +15,7 @@
 /test-results
 /playwright-report
 /playwright-report-messaging-local
+/playwright-report-meeting-notes
 
 # Raw Presence rollout evidence contains stable UUIDs; keep it in the approved
 # access-controlled evidence repository, never in the application worktree.
@@ -42,6 +43,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 # Environment files with sensitive data
 .env
 env.example

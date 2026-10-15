@@ -1,0 +1,3 @@
+Diagnosis query (read-only, local DB):
+plain_text: <img src=x onerror="window.__mnXss=1"> mnxword markup
+ts_headline:   <b>mnxword</b> <b>markup</b>
