@@ -1,8 +1,9 @@
 'use client'
 {/* src/providers/query-provider.tsx */}
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { installE2EQueryCacheProbe } from '@/lib/test-utils/e2e-query-cache-probe'
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   // Use useState to ensure QueryClient is only created once per component instance
@@ -21,6 +22,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       },
     },
   }))
+
+  // E2E-only (NEXT_PUBLIC_E2E, set by the meeting-notes Playwright runner and
+  // inlined at build time): a boolean "does this text occur in the caches"
+  // probe for the API-key canary check. Never installed in production builds.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E !== 'true') return
+    return installE2EQueryCacheProbe(queryClient)
+  }, [queryClient])
 
   return (
     <QueryClientProvider client={queryClient}>

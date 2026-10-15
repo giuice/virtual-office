@@ -1,0 +1,61 @@
+scan: AC-017 captured meeting-notes E2E server logs (full run + each rerun) and saved failure contexts
+targets: spec-interview\phase-6-meeting-notes\t14\09-e2e-meeting-notes-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-155-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-76-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-not-configured-20-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-action-items-15-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-export-scope-switch-22-server.log, spec-interview\phase-6-meeting-notes\t14\failures, spec-interview\phase-6-meeting-notes\t14\08-e2e-meeting-notes.txt; files=14; bytes=1336050
+- owner .env.local MEETING_NOTES_TICKET_SECRET value: not found
+- owner .env.local MEETING_NOTES_TICKET_SECRET_PREVIOUS value: SKIPPED (value not available)
+- owner .env.local SUPABASE_SERVICE_ROLE_KEY value: not found
+- local Supabase service_role key value: not found
+- canary prefix "mn-canary" (DB-suite keys): not found
+- canary prefix "mn-e2e-canary" (E2E keys): not found
+- canary "fake-t11-" (adapter-test keys): not found
+- RPC name read_meeting_note_ai_key: not found
+- env name MEETING_NOTES_TICKET_SECRET (ticket.ts): not found
+- ticket.ts message: not found
+- capabilities.ts marker anthropic-messages: not found
+- capabilities.ts marker openai-chat-completions: not found
+- capabilities.ts marker max_completion_tokens: not found
+- prompt.ts system prompt: not found
+- base-url.ts env MEETING_NOTES_AI_BASE_URL_OVERRIDE: not found
+- transport.ts message: not found
+- transport.ts header x-stainless-helper-method: not found
+- env name SUPABASE_SERVICE_ROLE_KEY: not found
+scan: regression E2E server log + output (Chrome)
+targets: spec-interview\phase-6-meeting-notes\t14\12-e2e-regression-server.log, spec-interview\phase-6-meeting-notes\t14\12-e2e-regression-chrome.txt, spec-interview\phase-6-meeting-notes\t14\12-e2e-regression-rerun-reconnect-232.txt; files=3; bytes=12239778
+- owner .env.local MEETING_NOTES_TICKET_SECRET value: not found
+- owner .env.local MEETING_NOTES_TICKET_SECRET_PREVIOUS value: SKIPPED (value not available)
+- owner .env.local SUPABASE_SERVICE_ROLE_KEY value: not found
+- local Supabase service_role key value: not found
+- canary prefix "mn-canary" (DB-suite keys): not found
+- canary prefix "mn-e2e-canary" (E2E keys): not found
+- canary "fake-t11-" (adapter-test keys): not found
+- RPC name read_meeting_note_ai_key: not found
+- env name MEETING_NOTES_TICKET_SECRET (ticket.ts): not found
+- ticket.ts message: not found
+- capabilities.ts marker anthropic-messages: not found
+- capabilities.ts marker openai-chat-completions: not found
+- capabilities.ts marker max_completion_tokens: not found
+- prompt.ts system prompt: not found
+- base-url.ts env MEETING_NOTES_AI_BASE_URL_OVERRIDE: not found
+- transport.ts message: not found
+- transport.ts header x-stainless-helper-method: not found
+- env name SUPABASE_SERVICE_ROLE_KEY: not found
+scan: all T14 rerun outputs and their server logs + a11y run outputs
+targets: spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-155.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-155-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-76.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-late-response-76-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-not-configured-20.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-not-configured-20-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-settings-admin-link-after-company-fix.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-settings-admin-link-after-company-fix-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-settings-after-company-fix.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-ai-settings-after-company-fix-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-action-items-15.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-action-items-15-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-create-after-popover-label.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-create-after-popover-label-server.log, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-export-scope-switch-22.txt, spec-interview\phase-6-meeting-notes\t14\11-rerun-note-export-scope-switch-22-server.log, spec-interview\phase-6-meeting-notes\t14\14-a11y-run.txt, spec-interview\phase-6-meeting-notes\t14\14-a11y-run-before-popover-label.txt, spec-interview\phase-6-meeting-notes\t14\failures; files=26; bytes=593372
+- owner .env.local MEETING_NOTES_TICKET_SECRET value: not found
+- owner .env.local MEETING_NOTES_TICKET_SECRET_PREVIOUS value: SKIPPED (value not available)
+- owner .env.local SUPABASE_SERVICE_ROLE_KEY value: not found
+- local Supabase service_role key value: not found
+- canary prefix "mn-canary" (DB-suite keys): not found
+- canary prefix "mn-e2e-canary" (E2E keys): not found
+- canary "fake-t11-" (adapter-test keys): not found
+- RPC name read_meeting_note_ai_key: not found
+- env name MEETING_NOTES_TICKET_SECRET (ticket.ts): not found
+- ticket.ts message: not found
+- capabilities.ts marker anthropic-messages: not found
+- capabilities.ts marker openai-chat-completions: not found
+- capabilities.ts marker max_completion_tokens: not found
+- prompt.ts system prompt: not found
+- base-url.ts env MEETING_NOTES_AI_BASE_URL_OVERRIDE: not found
+- transport.ts message: not found
+- transport.ts header x-stainless-helper-method: not found
+- env name SUPABASE_SERVICE_ROLE_KEY: not found
+checked 8 .env.local secret-like values over 61 t14 files; found: 0

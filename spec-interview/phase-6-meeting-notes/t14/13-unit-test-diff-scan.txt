@@ -1,0 +1,70 @@
+== modified tracked files under __tests__ (git diff --name-only HEAD):
+(end)
+== deleted under __tests__:
+(end)
+== untracked files under __tests__ (classified):
+E2E (Playwright) :: __tests__/api/playwright/fixtures/meeting-notes.ts
+E2E (Playwright) :: __tests__/api/playwright/helpers/meeting-notes-ai-e2e.ts
+E2E (Playwright) :: __tests__/api/playwright/helpers/meeting-notes-e2e.ts
+E2E (Playwright) :: __tests__/api/playwright/helpers/meeting-notes-global-setup.ts
+E2E (Playwright) :: __tests__/api/playwright/helpers/meeting-notes-ui.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-late-response-scope.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-not-configured.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-processing-errors.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-reprocess-duplicates.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-settings-admin-link.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-settings.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/ai-transcript-review-apply.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/dashboard-link.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/meetings-search.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-action-items.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-conflict.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-create.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-delete-stale-confirm.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-delete.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-export-scope-switch.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-export.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-former-member.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-history.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-item-due-date-timezones.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-offline-save.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-rights.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/note-sanitization.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/space-notes-tab.spec.ts
+E2E (Playwright) :: __tests__/api/playwright/meeting-notes/space-removed.spec.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/config.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/control-client.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/playwright-global-setup.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/protocols.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/self-check.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/server.ts
+fake AI server (test infrastructure) :: __tests__/meeting-notes-ai-fake/vitest-global-setup.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/child/next-headers-shim.mjs
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/child/start-route-child.mjs
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/fixtures.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-action-items.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-ai-adapters.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-ai-cross-company.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-ai-processing.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-ai-settings.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-ai-usage.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-export-route.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-items-routes.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-note-transcript-intake.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-lifecycle.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-mutations.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-origin-guard.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-read-isolation.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-routes.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/meeting-notes-search.test.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/route-session.ts
+integration (meeting-notes DB) :: __tests__/meeting-notes-db/setup.ts
+(end)
+== other untracked test-like files outside __tests__:
+(end)
+== untracked vitest/playwright configs:
+playwright.meeting-notes.config.ts
+vitest.meeting-notes-db.config.mts
+(end)
+== any tracked test file modified/deleted anywhere:
+(end)

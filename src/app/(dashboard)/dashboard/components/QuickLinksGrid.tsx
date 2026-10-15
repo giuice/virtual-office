@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { MEETINGS_PATH } from '@/lib/meeting-notes/ui-paths';
 import { Users2Icon, HomeIcon, SettingsIcon, MessageSquareIcon, CalendarIcon, VideoIcon, BrainCircuitIcon, BarChart3Icon, PresentationIcon, RocketIcon, UserPlusIcon, BuildingIcon, SparklesIcon, Clock } from 'lucide-react';
 
 // ============================================
@@ -23,6 +24,12 @@ const workingFeatures: QuickLink[] = [{
   icon: Users2Icon,
   href: '/company',
   color: 'bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30'
+}, {
+  title: 'AI Meeting Notes',
+  description: 'Search, read, and write meeting notes from every space',
+  icon: BrainCircuitIcon,
+  href: MEETINGS_PATH,
+  color: 'bg-gradient-to-br from-purple-500/20 to-violet-600/20 border-purple-500/30'
 }, {
   title: 'Settings',
   description: 'Update your profile and preferences',
@@ -50,12 +57,6 @@ const comingSoonFeatures: ComingSoonFeature[] = [{
   icon: VideoIcon,
   epic: 'Epic 8',
   color: 'border-pink-500/20'
-}, {
-  title: 'AI Meeting Notes',
-  description: 'Automatic transcription and action item extraction',
-  icon: BrainCircuitIcon,
-  epic: 'Epic 5 & 7',
-  color: 'border-purple-500/20'
 }, {
   title: 'Calendar Integration',
   description: 'Schedule meetings directly in your virtual office',
@@ -195,7 +196,7 @@ export function QuickLinksGrid({
           <h3 className="text-lg font-semibold text-muted-foreground">Coming Soon</h3>
           <Badge variant="outline" className="text-xs">Roadmap</Badge>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {comingSoonFeatures.map(feature => <Card key={feature.title} className={`overflow-hidden border ${feature.color} opacity-60 hover:opacity-80 transition-opacity cursor-default`}>
               <CardHeader className="pb-2 pt-4">
                 <div className="flex items-center justify-between">

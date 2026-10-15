@@ -1,0 +1,25 @@
+You are an adversarial reviewer for an execution PLAN in the repository at E:/projects/virtual-office (Next.js App Router + TypeScript strict + Supabase Postgres/Auth/RLS/Realtime, TanStack Query, shadcn/ui). Read-only review. Do not edit files.
+
+ARTIFACT UNDER REVIEW
+- spec-interview/phase-6-meeting-notes/PLAN.md (version 1, tasks T1–T15, blocks A/B/C + final).
+- Its contract: spec-interview/phase-6-meeting-notes/SPEC.md (v5, approved by the owner after five review rounds — do NOT re-litigate the SPEC; attack only whether this PLAN delivers it safely). Owner decisions: spec-interview/phase-6-meeting-notes/state.md.
+
+REPOSITORY CONTRACTS TO CHECK AGAINST (read them)
+- AGENTS.md: users.id vs users.supabase_uid (RLS compares supabase_uid with auth.uid()::text); roles admin|member; no unit tests (integration against real local Supabase + Playwright E2E only; mocking Supabase/repositories/code-under-test is forbidden); migrations local until the owner authorizes the online target; service role never replaces authorization; per-task type-check+lint, per-block DB suite, E2E only once at the end in Chrome; block review cadence.
+- Schema: supabase/migrations/20260610183000_baseline_core_schema.sql, 20260610183139_enable_core_table_rls.sql, 20260718210827_phase7_company_member_atomic_removal.sql, and any later migration touching spaces, users, companies, membership, pg_cron, or vault.
+- Code: src/repositories/interfaces/IMeetingNoteRepository.ts, src/repositories/implementations/supabase/SupabaseMeetingNoteRepository.ts, src/types/database.ts, src/lib/auth/session.ts, src/lib/auth/authorize.ts, src/lib/auth/rate-limit.ts, src/components/floor-plan/modern/SpaceDetailPanel.tsx, SpaceDetailBottomSheet.tsx, src/app/(dashboard)/company/page.tsx, QuickLinksGrid.tsx, vitest.messaging-db.config.mts, playwright.messaging-phase5.config.ts, __tests__/api/playwright/helpers/local-supabase-mode.ts, package.json.
+
+WHAT TO ATTACK
+1. Coverage: every SPEC Must FR, BR, and AC is delivered and verified by some task whose Verify by can actually observe it under the no-mock policy. Find ACs claimed in the quality gate but whose evidence in the cited task cannot prove them (e.g. a UI-only AC verified only by a "spec written" E2E that runs only at T14; DB-level guarantees verified only through routes; timing thresholds).
+2. Ordering and dependencies: tasks that need artifacts of a later task (e.g. T2 capacity lock reused by T12; T9 depends on T8 settings revision; T10 transcript identity needed by T9 tickets; fake AI server built in T11 but needed by earlier tests; search index maintenance needing item tables from T2; T5 depending on T4). Missing dependencies, cycles, or a block whose review would see half a contract.
+3. Feasibility against the real repo/schema: grounding observations that are false (check them); RPC/RLS designs that cannot work (SECURITY DEFINER + revision checks + versions in one transaction; Vault access from SECURITY DEFINER under the local and hosted Supabase; pg_cron jobs in local migrations; unaccent/pg_trgm/text search configs for PT+EN; HMAC ticket secret source); legacy rows and the baseline FK/NOT NULL changes; type regeneration (src/types/database.ts) and existing callers of IMeetingNoteRepository.
+4. Security: places where the PLAN's task text would let a worker implement an authorization hole (direct table grants, RLS joins through spaces that break when room_id becomes NULL, service-role use without app checks, key reachable via Realtime/select/logs/error payloads, fake-AI base-URL override reachable in production or by a client, ticket replay across companies).
+5. Test-policy violations implied by the PLAN (anything that would need mocks; E2E executed before T14; unit tests).
+6. Rollout: T15 sequence, rollback statements, whether all migrations can be applied transactionally online with the Phase 4/5 method, extension availability on the hosted target, pg_cron/vault privileges on hosted Supabase, compatibility with the currently deployed app that may read meeting_notes.
+7. Granularity: any task too large for one worker pass or whose Done when is not a single observable outcome; block sizes vs the ~4–5 task cadence.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Findings ranked High / Medium / Low. For each: id (P1-…), PLAN task ID, the concrete problem, a realistic failure scenario (real user, network, browser, crash, concurrency — say which), evidence (file:line), and a concrete fix to the PLAN text.
+- Mark any finding that needs the application's own server to be broken or tampered with as "follow-up" rather than High/Medium.
+- Be specific and concise. No praise.

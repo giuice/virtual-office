@@ -21,8 +21,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Spatial Audio and Screen Sharing** - Reliable spatial audio and single-presenter screen sharing on the integrated floor-plan stage (owner confirmed completion 2026-10-03)
 - [x] **Phase 4: Messaging Timeline** - Reader/time details, usable attachments, voice notes, starred-message filter, plus desktop notifications and failed-send preservation (owner accepted 2026-10-06; app not yet deployed)
 - [x] **Phase 5: Messaging Resilience** - Durable offline outbox, Realtime recovery with polling fallback, typing, multi-device sync, @mentions with desktop notifications, redacted health metrics (owner accepted 2026-10-12)
-- [ ] **Phase 6: Meeting Notes** - Meeting note creation, action items, transcript upload, AI summaries, search, and notifications
-- [ ] **Phase 7: Announcements** - Company-wide announcements with priority, filtering, admin controls, and read tracking
+- [ ] **Phase 6: Meeting Notes** - Meeting note creation, action items, transcript upload, AI summaries (company API key), search, and Markdown export — in progress (spec-to-done); notifications moved to Phase 7
+- [ ] **Phase 7: Announcements** - Company-wide announcements with priority, filtering, admin controls, and read tracking; plus action-item notifications and reminders (MEET-08, moved from Phase 6)
 
 ## Phase Details
 
@@ -211,29 +211,23 @@ Plans: superseded by the spec-to-done PLAN (T1–T28) in `spec-interview/phase-5
 
 **Goal**: Users can capture, organize, and get AI-powered insights from their meetings
 **Depends on**: Phase 1
-**Requirements**: MEET-01, MEET-02, MEET-03, MEET-04, MEET-05, MEET-06, MEET-07, MEET-08
+**Requirements**: MEET-01, MEET-02, MEET-03, MEET-04, MEET-05, MEET-06, MEET-07 (MEET-08 moved to Phase 7 by owner decision 2026-10-12)
+**Status**: In progress — spec-to-done SPEC v5 approved by the owner 2026-10-13. Contract and evidence: [`spec-interview/phase-6-meeting-notes/`](../spec-interview/phase-6-meeting-notes/). Scope adds Markdown export; AI uses each company's own API key (Anthropic, OpenAI, Kimi, GLM) — subscription sign-in is out of scope.
 **Success Criteria** (what must be TRUE):
 
   1. User can create meeting notes for a space with title, date, participants, and rich text; can later view, edit, and delete them with version history
   2. User can add action items with assignee, due date, and completion tracking to any meeting note
   3. User can upload a transcript file (.txt, .vtt, .srt) and receive an AI-generated summary with key points, decisions, and extracted action items
   4. User can search across all meeting notes by title, content, summary, and action items
-  5. User receives notifications when assigned an action item and reminders before due dates
+  5. ~~User receives notifications when assigned an action item and reminders before due dates~~ — moved to Phase 7
 
-**Plans**: TBD
-
-Plans:
-
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
-- [ ] 06-04: TBD
+**Plans**: superseded by the spec-to-done PLAN in `spec-interview/phase-6-meeting-notes/`.
 
 ### Phase 7: Announcements
 
 **Goal**: Admins can broadcast important information company-wide and track engagement
 **Depends on**: Phase 1
-**Requirements**: ANNC-01, ANNC-02, ANNC-03, ANNC-04, ANNC-05, ANNC-06
+**Requirements**: ANNC-01, ANNC-02, ANNC-03, ANNC-04, ANNC-05, ANNC-06, MEET-08 (moved from Phase 6; shares the notification center and scheduler)
 **Success Criteria** (what must be TRUE):
 
   1. Admin can create announcements with priority level (urgent/normal/low) and optional expiration date
@@ -274,9 +268,9 @@ Note: Phases 4, 6, and 7 depend only on Phase 1, so they could theoretically run
 | 3. Spatial Audio and Screen Sharing | 15/15 | Complete — owner accepted | 2026-10-03 |
 | 4. Messaging Timeline | spec-to-done (T1–T32) | Complete — owner accepted; app not deployed | 2026-10-06 |
 | 5. Messaging Resilience | spec-to-done (T1–T28) | Complete — owner accepted | 2026-10-12 |
-| 6. Meeting Notes | 0/4 | Not started | - |
+| 6. Meeting Notes | spec-to-done | In progress — SPEC approved 2026-10-13 | - |
 | 7. Announcements | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-23*
-*Last updated: 2026-10-12 after owner acceptance of Phase 5 (Messaging Resilience)*
+*Last updated: 2026-10-13 — Phase 6 SPEC approved; MEET-08 moved to Phase 7*

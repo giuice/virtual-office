@@ -1,12 +1,13 @@
 // src/app/(dashboard)/company/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { redirect, useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/shell/dashboard-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompanySettings } from '@/components/dashboard/company-settings';
 import { CompanyMembers } from '@/components/dashboard/company-members';
+import { MeetingNoteAiSettingsSection } from '@/components/meeting-notes/MeetingNoteAiSettingsSection';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,14 @@ export default function CompanyPage() {
     return 'members';
   });
   
+  // A client-side navigation (e.g. the meeting-note AI settings link) can mount
+  // this page before window.location shows the new query, so the initializer
+  // above may read the previous URL; re-read it once the navigation committed.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab) setActiveTab(tab);
+  }, []);
+
   // Update URL when tab changes
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -115,6 +124,7 @@ export default function CompanyPage() {
           {isAdmin && (
             <TabsContent value="settings" className="space-y-4">
               <CompanySettings />
+              <MeetingNoteAiSettingsSection />
             </TabsContent>
           )}
         </Tabs>

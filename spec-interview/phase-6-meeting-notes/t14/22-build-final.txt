@@ -1,0 +1,131 @@
+npm notice run virtual-office@0.1.0 build
+npm notice run next build
+▲ Next.js 16.2.10 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 9.2s
+  Running TypeScript ...
+  Finished TypeScript in 14.4s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/53) ...
+  Generating static pages using 11 workers (13/53) 
+  Generating static pages using 11 workers (26/53) 
+  Generating static pages using 11 workers (39/53) 
+✓ Generating static pages using 11 workers (53/53) in 500ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin/invitations
+├ ƒ /api/auth/callback
+├ ƒ /api/companies/ai-settings
+├ ƒ /api/companies/create
+├ ƒ /api/companies/get
+├ ƒ /api/companies/update
+├ ƒ /api/conversations/archive
+├ ƒ /api/conversations/get
+├ ƒ /api/conversations/join
+├ ƒ /api/conversations/members
+├ ƒ /api/conversations/preferences
+├ ƒ /api/conversations/read
+├ ƒ /api/conversations/resolve
+├ ƒ /api/invitations/accept
+├ ƒ /api/invitations/create
+├ ƒ /api/invitations/list
+├ ƒ /api/invitations/pending
+├ ƒ /api/invitations/resend
+├ ƒ /api/invitations/revoke
+├ ƒ /api/invitations/validate
+├ ƒ /api/meeting-notes
+├ ƒ /api/meeting-notes/[id]
+├ ƒ /api/meeting-notes/[id]/ai/apply
+├ ƒ /api/meeting-notes/[id]/ai/process
+├ ƒ /api/meeting-notes/[id]/ai/ticket
+├ ƒ /api/meeting-notes/[id]/export
+├ ƒ /api/meeting-notes/[id]/items
+├ ƒ /api/meeting-notes/[id]/items/[itemId]
+├ ƒ /api/meeting-notes/[id]/items/[itemId]/completion
+├ ƒ /api/meeting-notes/[id]/restore
+├ ƒ /api/meeting-notes/[id]/transcript
+├ ƒ /api/meeting-notes/[id]/versions
+├ ƒ /api/meeting-notes/[id]/versions/[versionId]
+├ ƒ /api/meeting-notes/search
+├ ƒ /api/meeting-notes/transcript
+├ ƒ /api/messages/[messageId]/pin
+├ ƒ /api/messages/[messageId]/readers
+├ ƒ /api/messages/[messageId]/star
+├ ƒ /api/messages/attachment/[id]
+├ ƒ /api/messages/attachments
+├ ƒ /api/messages/create
+├ ƒ /api/messages/fence
+├ ƒ /api/messages/get
+├ ƒ /api/messages/metrics
+├ ƒ /api/messages/react
+├ ƒ /api/messages/starred
+├ ƒ /api/messages/upload
+├ ƒ /api/messages/upload/[uploadId]
+├ ƒ /api/neighborhoods
+├ ƒ /api/neighborhoods/[id]
+├ ƒ /api/neighborhoods/[id]/spaces
+├ ƒ /api/platform-admin/create-company
+├ ƒ /api/presence/location
+├ ƒ /api/presence/logout
+├ ƒ /api/presence/sessions
+├ ƒ /api/presence/sessions/[sessionId]/disconnect
+├ ƒ /api/presence/sessions/[sessionId]/heartbeat
+├ ƒ /api/presence/snapshot
+├ ƒ /api/spaces
+├ ƒ /api/spaces/[id]/details
+├ ƒ /api/spaces/[id]/neighborhood
+├ ƒ /api/spaces/[id]/screen-share/active
+├ ƒ /api/spaces/[id]/screen-share/claim
+├ ƒ /api/spaces/[id]/screen-share/release
+├ ƒ /api/spaces/[id]/screen-share/renew
+├ ƒ /api/spaces/[id]/screen-share/signal
+├ ƒ /api/spaces/knock/pending
+├ ƒ /api/spaces/knock/request
+├ ƒ /api/spaces/knock/respond
+├ ƒ /api/spaces/knock/status/[requestId]
+├ ƒ /api/test/messaging/seed
+├ ƒ /api/users/avatar
+├ ƒ /api/users/avatar/remove
+├ ƒ /api/users/by-company
+├ ƒ /api/users/get
+├ ƒ /api/users/get-by-id
+├ ƒ /api/users/list
+├ ƒ /api/users/location
+├ ƒ /api/users/remove-from-company
+├ ƒ /api/users/sync-profile
+├ ƒ /api/users/update
+├ ƒ /auth/callback
+├ ○ /company
+├ ○ /component-test
+├ ○ /create-company
+├ ○ /dashboard
+├ ○ /dashboard/profile
+├ ○ /debug/messaging-comparison
+├ ○ /debug/messaging-test
+├ ○ /floor-plan
+├ ○ /forgot-password
+├ ○ /join
+├ ○ /login
+├ ○ /meetings
+├ ƒ /meetings/[id]
+├ ○ /meetings/new
+├ ○ /office
+├ ○ /onboarding
+├ ƒ /platform-admin
+├ ○ /realtime-test
+├ ○ /set-password
+├ ○ /settings
+├ ○ /signup
+└ ○ /tools/cleanup-companies
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

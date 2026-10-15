@@ -1,0 +1,22 @@
+Root cause analysis: local retention backlog (retired user_presence_sessions older than 24 h) = 8223 rows; purge_presence_history() deletes at most 1000 per call (oldest first), so the session-leases 'h' seeded 25 h-old session is not reached and health-check 'retention_backlog'/'retention_session_history_backlog' are non-zero. No Phase 6 migration touches purge_presence_history or presence sessions.
+Remediation (LOCAL database only): drain the backlog by calling public.purge_presence_history() until no old retired session remains.
+call 1: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 7223
+call 2: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 6223
+call 3: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 5223
+call 4: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 4223
+call 5: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 3223
+call 6: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 2223
+call 7: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 1223
+call 8: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 1000}
+  remaining old retired: 223
+call 9: {"fencesDeleted": 0, "fencesConfirmed": 0, "transitionsDeleted": 0, "retiredSessionsDeleted": 223}
+  remaining old retired: 0
+legacy|t|t
+mode after restore: legacy cutover_id_null=true legacy_adapter_enabled=true

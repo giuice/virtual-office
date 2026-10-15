@@ -1,0 +1,12 @@
+npm notice run virtual-office@0.1.0 test:messaging:db
+npm notice run vitest run --config vitest.messaging-db.config.mts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+
+ Test Files  16 passed (16)
+      Tests  170 passed (170)
+   Start at  16:40:02
+   Duration  262.98s (transform 662ms, setup 173ms, import 3.00s, tests 257.83s, environment 1ms)
+
+exit=0 wall=264s

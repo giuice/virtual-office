@@ -111,7 +111,7 @@ export const SpaceDetailBottomSheet: React.FC<SpaceDetailBottomSheetProps> = ({
         <VisuallyHidden>
           <DialogTitle>Space Details: {space.name}</DialogTitle>
           <DialogDescription>
-            Details for {space.name}, including its participant roster, audio, and available actions.
+            Details for {space.name}, including its participant roster, audio, meeting notes, and available actions.
           </DialogDescription>
         </VisuallyHidden>
 

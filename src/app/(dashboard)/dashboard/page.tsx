@@ -24,9 +24,9 @@ export default function DashboardPage() {
         />
         
         {/* Quick Links Grid - now includes:
-            - Working features (Floor Plan, Team, Settings)
+            - Working features (Floor Plan, Team, AI Meeting Notes, Settings)
             - Admin features (Invite Team, Company Settings) - shown only to admins
-            - Coming Soon teasers (Messaging, Video, AI, Calendar, Analytics)
+            - Coming Soon teasers (Messaging, Video, Calendar, Analytics)
             - Investor Resources (Investor Deck, Product Vision)
         */}
         <QuickLinksGrid isAdmin={isAdmin} />

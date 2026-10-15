@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
+import { MeetingNotesScopeBoundary } from '@/components/meeting-notes/MeetingNotesScopeBoundary';
 import { MessagingProvider } from '@/contexts/messaging/MessagingContext'; // Use the modular provider
 import { ThemeProvider } from '@/providers/theme-provider';
 import { VOThemeProvider } from '@/contexts/ThemeContext';
@@ -49,6 +50,7 @@ export default function RootLayout({
               <VOThemeProvider>
                 <AmbientMesh />
                 <CompanyProvider>
+                  <MeetingNotesScopeBoundary />
                   <MessagingProvider> {/* Move MessagingProvider above PresenceProvider */}
                     <PresenceRouteBoundary>
                       <CallingProvider>

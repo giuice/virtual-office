@@ -1,0 +1,36 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run vitest run --config vitest.presence-db.config.mts __tests__/presence-db/health-check.test.ts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+ ❯ __tests__/presence-db/health-check.test.ts (4 tests | 1 failed) 212ms
+     × executes read-only and returns every required database/log counter 48ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/presence-db/health-check.test.ts > presence remediation health-check artifact > executes read-only and returns every required database/log counter
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ __tests__/presence-db/health-check.test.ts:78:9
+     76|           .filter((row) => row.expected === 'zero')
+     77|           .every((row) => row.observed_count === '0' && row.gate_pass …
+     78|       ).toBe(true);
+       |         ^
+     79|       expect(
+     80|         healthRows
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  16:46:22
+   Duration  408ms (transform 31ms, setup 24ms, import 50ms, tests 212ms, environment 0ms)
+
+exit=1 wall=1s

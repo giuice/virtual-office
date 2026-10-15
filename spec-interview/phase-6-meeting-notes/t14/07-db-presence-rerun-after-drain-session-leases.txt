@@ -1,0 +1,31 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run vitest run --config vitest.presence-db.config.mts __tests__/presence-db/session-leases.test.ts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+ ❯ __tests__/presence-db/session-leases.test.ts (11 tests | 1 failed) 3231ms
+     × g: reconcile clears stale placements and preserves active or recent evidence 83ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/presence-db/session-leases.test.ts > presence-db session leases > g: reconcile clears stale placements and preserves active or recent evidence
+error: CLIENT_UPGRADE_REQUIRED
+ ❯ node_modules/pg/lib/client.js:652:17
+ ❯ PresenceFixtures.sql __tests__/presence-db/fixtures.ts:43:17
+     41|     params: unknown[] = [],
+     42|   ): Promise<T[]> {
+     43|     const res = await this.client.query(text, params);
+       |                 ^
+     44|     return res.rows as T[];
+     45|   }
+ ❯ __tests__/presence-db/session-leases.test.ts:979:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  22:28:59
+   Duration  5.89s (transform 70ms, setup 41ms, import 1.22s, tests 3.23s, environment 0ms)
+
+exit=1 wall=17s

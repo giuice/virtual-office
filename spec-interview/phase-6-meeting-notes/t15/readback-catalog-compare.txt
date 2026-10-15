@@ -1,0 +1,27 @@
+columns: identical (75)
+constraints: identical (49)
+cron: identical (2)
+functions: identical (51)
+history: identical (11)
+indexes: identical (23)
+policies: identical (5)
+publication: identical (null)
+tables: identical (6)
+triggers: identical (9)
+ts_configs: identical (2)
+unaccent: identical (extensions)
+functions with anon/authenticated EXECUTE online: 13
+  public.apply_meeting_note_ai_draft(p_note_id uuid, p_expected_revision bigint, p_summary text, p_items jsonb) {postgres=X/postgres,authenticated=X/postgres}
+  public.attach_meeting_note_transcript(p_note_id uuid, p_expected_revision bigint, p_transcript text) {postgres=X/postgres,authenticated=X/postgres}
+  public.create_meeting_note(p_room_id uuid, p_title text, p_meeting_date timestamp with time zone, p_content text, p_participant_ids uuid[]) {postgres=X/postgres,authenticated=X/postgres}
+  public.create_meeting_note_action_item(p_note_id uuid, p_description text, p_assignee_id uuid, p_due_date date) {postgres=X/postgres,authenticated=X/postgres}
+  public.create_meeting_note_from_transcript(p_room_id uuid, p_title text, p_transcript text) {postgres=X/postgres,authenticated=X/postgres}
+  public.delete_meeting_note(p_note_id uuid, p_expected_revision bigint) {postgres=X/postgres,authenticated=X/postgres}
+  public.delete_meeting_note_action_item(p_item_id uuid, p_expected_revision bigint) {postgres=X/postgres,authenticated=X/postgres}
+  public.get_meeting_note_ai_usage() {postgres=X/postgres,authenticated=X/postgres}
+  public.restore_meeting_note_version(p_note_id uuid, p_expected_revision bigint, p_version_id uuid) {postgres=X/postgres,authenticated=X/postgres}
+  public.search_meeting_notes(p_query text, p_room_id uuid, p_space_removed boolean, p_meeting_from timestamp with time zone, p_meeting_to timestamp with time zone, p_limit integer, p_offset integer) {postgres=X/postgres,authenticated=X/postgres}
+  public.set_meeting_note_action_item_completed(p_item_id uuid, p_expected_revision bigint, p_completed boolean) {postgres=X/postgres,authenticated=X/postgres}
+  public.update_meeting_note(p_note_id uuid, p_expected_revision bigint, p_title text, p_meeting_date timestamp with time zone, p_content text, p_participant_ids uuid[]) {postgres=X/postgres,authenticated=X/postgres}
+  public.update_meeting_note_action_item(p_item_id uuid, p_expected_revision bigint, p_description text, p_assignee_id uuid, p_due_date date) {postgres=X/postgres,authenticated=X/postgres}
+functions without search_path="": 

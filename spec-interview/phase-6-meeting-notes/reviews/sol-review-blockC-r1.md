@@ -1,0 +1,24 @@
+**Verdict: REVISION REQUIRED.**
+
+- **C-1 — Medium — Redirects bypass dispatch and credential protections.** [transport.ts:110](E:/projects/virtual-office/src/lib/meeting-notes/ai/adapters/transport.ts:110)  
+  A provider or gateway’s 307/308 causes `fetch` to resend the POST internally, bypassing the one-fetch guard. Actual SDK probes produced two POSTs followed by `preprocessing_rejected`; redirecting to a refused connection produced `never_sent` after the first endpoint received the request. A cross-origin redirect also forwarded Anthropic’s API-key header. **Fix:** force `redirect: 'manual'`, classify the original response, and test redirect chains and credential forwarding.
+
+- **C-2 — Medium — Timeout and cancellation can return successful drafts.** [adapters/index.ts:125](E:/projects/virtual-office/src/lib/meeting-notes/ai/adapters/index.ts:125)  
+  Abort handling runs only when `finish === 'incomplete'`. If the provider emits valid draft text and a stop marker, then the connection stalls before completion, the SDK silently ends on abort and the adapter returns success. Probes returned `ok:true` after both a 300-ms timeout and a caller abort. **Fix:** check `control.reason` after iteration regardless of finish state; return a counted timeout/cancellation and discard the draft.
+
+- **C-3 — Medium — Multipart creation lacks origin protection.** [transcript/route.ts:27](E:/projects/virtual-office/src/app/api/meeting-notes/transcript/route.ts:27)  
+  An attacker-controlled sibling origin on the same site can submit a credentialed multipart POST containing a fabricated file and known space ID, creating a victim-authored note. No preflight or response access is needed. Neither this route nor its request helper checks Origin; `SameSite=Lax` does not isolate sibling origins. [OWASP’s SameSite limitations](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#limitations-of-samesite). **Fix:** validate trusted origins or require a CSRF token, with browser regression coverage.
+
+- **C-4 — Medium — Extra output fields discard otherwise usable drafts.** [draft-schema.ts:82](E:/projects/virtual-office/src/lib/meeting-notes/ai/draft-schema.ts:82)  
+  SPEC §11 requires extra fields to be dropped. The nested `.strict()` schemas reject them instead. A GLM HTTP probe returning valid required fields plus an action-item `dueDate` produced a counted `OUTPUT_INVALID` failure. This is realistic with GLM’s `json_object` mode. **Fix:** strip unknown properties while retaining validation of required fields, types, and limits.
+
+- **C-5 — Low — New unit-only tests violate the test policy.** [meeting-note-ai-adapters.test.ts:368](E:/projects/virtual-office/__tests__/meeting-notes-db/meeting-note-ai-adapters.test.ts:368)  
+  The base-URL cases exercise helpers or a pre-aborted adapter without a route, database, or provider interaction. Global fake-server setup does not make those assertions integration tests. TRACK’s claim that all 60 tests run against the fake overstates this evidence. **Fix:** replace these cases with route integration coverage and correct TRACK.
+
+- **C-6 — Low — The quota race test masks company-level serialization regressions.** [meeting-note-ai-usage.test.ts:491](E:/projects/virtual-office/__tests__/meeting-notes-db/meeting-note-ai-usage.test.ts:491)  
+  All five admissions target the same note. Its `FOR UPDATE` lock serializes them independently of the settings lock, so this test would remain green if concurrent processing of different notes could exceed the company limit. **Fix:** use distinct notes and actors, force overlap, and retain the one-admitted/four-refused assertions.
+
+- **C-7 — Follow-up — Ambient SDK headers override the admitted credentials.** [openai-compatible.ts:76](E:/projects/virtual-office/src/lib/meeting-notes/ai/adapters/openai-compatible.ts:76), [anthropic.ts:57](E:/projects/virtual-office/src/lib/meeting-notes/ai/adapters/anthropic.ts:57)  
+  This requires a hosting-environment configuration condition. With `OPENAI_CUSTOM_HEADERS` containing Authorization, a probe confirmed that the SDK sent the ambient credential instead of the company snapshot key. The shared client can also send those headers to Kimi/GLM. The “never pick up ambient credentials” comments are false. **Fix:** reject these environment overrides or enforce an outgoing header allowlist and the admitted credentials.
+
+Typecheck and targeted lint passed. Finite loopback probes reproduced C-1, C-2, C-4, and C-7. Read-only local catalog checks confirmed both Block C migrations and restricted grants. DB/E2E suites were not rerun; online grants and cron execution on `vhabpcoyypobgasacsko` remain unverified.

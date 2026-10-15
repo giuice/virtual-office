@@ -1,0 +1,66 @@
+# T14 §13 accessibility scratch check
+
+## space Notes tab (floor plan panel)
+controls in accessibility tree: 7; unnamed: 0
+tab stops walked: 6; without a drawn focus indicator: 0
+  sequence: tabpanel "Meeting notesNew noteNew note from trans" -> a "New note in MN E2E A11y room b812c75f" -> button[meeting-note-new-from-transcript] "New note from transcript in MN E2E A11y " -> a[space-note-item] "MN E2E A11y b812c75fOct 14, 2026 · Local" -> button "Join this space" -> button[space-05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3] "Space Test Space Fixed 2, Conference, 1 "
+
+## /meetings (search, filters, results)
+controls in accessibility tree: 10; unnamed: 0
+tab stops walked: 12; without a drawn focus indicator: 0
+  sequence: a "Virtual Office" -> input "" -> button "Current theme: Paper White. Click to cha" -> button "" -> button[account-menu-trigger] "LP" -> input "" -> select "All spacesMN E2E A11y room b812c75fTest " -> input "" -> input "" -> input "" -> input "" -> input ""
+
+## /meetings/new (form + editor toolbar)
+controls in accessibility tree: 17; unnamed: 0
+tab stops walked: 30; without a drawn focus indicator: 1
+  sequence: a "Virtual Office" -> input "" -> button "Current theme: Paper White. Click to cha" -> button "" -> button[account-menu-trigger] "LP" -> a "Meetings" -> button[meeting-note-new-from-transcript] "New note from transcript in MN E2E A11y " -> input "" -> input "" -> input "" -> input "" -> input "" -> button "Add participants" -> button "Bold" -> textbox[meeting-note-editor] "" -> button "Cancel" -> button[meeting-note-submit] "Save note" -> button[messaging-drawer-trigger] "Open messages" -> nextjs-portal "" [NO-RING] -> (body) [NO-RING] -> a "Virtual Office" -> input "" -> button "Current theme: Paper White. Click to cha" -> button "" -> button[account-menu-trigger] "LP" -> a "Meetings" -> button[meeting-note-new-from-transcript] "New note from transcript in MN E2E A11y " -> input "" -> input "" -> input ""
+
+## dialog: participant picker popover (/meetings/new)
+focus inside on open: true; trapped over 12 Tabs: true; labelled (aria-labelledby): false; unnamed controls: 0; Escape closes: true; focus returned to trigger: true; stops without ring: 0
+
+## /meetings/[id] view (actions, items, export, AI section)
+controls in accessibility tree: 9; unnamed: 0
+tab stops walked: 30; without a drawn focus indicator: 0
+  sequence: a "Virtual Office" -> input "" -> button "Current theme: Paper White. Click to cha" -> button "" -> button[account-menu-trigger] "LP" -> a "Meetings" -> button[meeting-note-edit-button] "Edit" -> button[meeting-note-history-button] "History" -> button[meeting-note-delete-button] "Delete" -> button[meeting-note-export-button] "Export Markdown" -> input[meeting-note-item-toggle] "Done: A11y item" -> button[meeting-note-item-edit] "Edit action item" -> button[meeting-note-item-delete] "Delete action item" -> button[meeting-note-item-add] "Add action item" -> button[meeting-note-attach-transcript] "Attach transcript" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast"
+
+## dialog: history dialog
+focus inside on open: true; trapped over 12 Tabs: true; labelled (aria-labelledby): true; unnamed controls: 0; Escape closes: true; focus returned to trigger: true; stops without ring: 0
+
+## dialog: delete note confirm
+focus inside on open: true; trapped over 12 Tabs: true; labelled (aria-labelledby): true; unnamed controls: 0; Escape closes: true; focus returned to trigger: true; stops without ring: 0
+
+## dialog: delete action item confirm
+focus inside on open: true; trapped over 12 Tabs: true; labelled (aria-labelledby): true; unnamed controls: 0; Escape closes: true; focus returned to trigger: true; stops without ring: 0
+
+## action-item form
+controls in accessibility tree: 5; unnamed: 0
+tab stops walked: 6; without a drawn focus indicator: 0
+  sequence: combobox[meeting-note-item-assignee-select] "Unassigned" -> input[meeting-note-item-due-input] "" -> input[meeting-note-item-due-input] "" -> input[meeting-note-item-due-input] "" -> input[meeting-note-item-due-input] "" -> button "Cancel"
+
+## edit form (editor)
+controls in accessibility tree: 18; unnamed: 0
+tab stops walked: 30; without a drawn focus indicator: 1
+  sequence: input "" -> input "" -> input "" -> input "" -> input "" -> button "Remove Local Secondary" -> button "Add participants" -> button "Bold" -> textbox[meeting-note-editor] "Accessibility check v2" -> button "Cancel" -> button[meeting-note-submit] "Save changes" -> button[messaging-drawer-trigger] "Open messages" -> nextjs-portal "" [NO-RING] -> (body) [NO-RING] -> a "Virtual Office" -> input "" -> button "Current theme: Paper White. Click to cha" -> button "" -> button[account-menu-trigger] "LP" -> input "" -> input "" -> input "" -> input "" -> input "" -> button "Remove Local Secondary" -> button "Add participants" -> button "Bold" -> textbox[meeting-note-editor] "Accessibility check v2" -> button "Cancel" -> button[meeting-note-submit] "Save changes"
+
+AI notice: focus after opening lands on: "Before processing"
+
+## AI provider notice
+controls in accessibility tree: 2; unnamed: 0
+tab stops walked: 4; without a drawn focus indicator: 0
+  sequence: button[meeting-note-ai-process] "Process" -> button[meeting-note-ai-notice-cancel] "Cancel" -> input[meeting-note-item-toggle] "Done: A11y item" -> button[meeting-note-item-edit] "Edit action item"
+AI review: focus after processing lands on: "Review the AI draft"
+
+## AI draft review
+controls in accessibility tree: 14; unnamed: 0
+tab stops walked: 20; without a drawn focus indicator: 0
+  sequence: textarea[meeting-note-ai-summary-entry] "Key points 1" -> button "Remove Key points 1" -> button "Add an entry to Key points" -> textarea[meeting-note-ai-summary-entry] "Decisions 1" -> button "Remove Decisions 1" -> button "Add an entry to Decisions" -> textarea[meeting-note-ai-summary-entry] "Next steps 1" -> button "Remove Next steps 1" -> button "Add an entry to Next steps" -> input[meeting-note-ai-suggestion-accept] "Accept suggestion 1: Suggested item" -> button[meeting-note-ai-suggestion-reject] "Reject suggestion 1: Suggested item" -> textarea[meeting-note-ai-suggestion-description] "Suggested item" -> combobox[meeting-note-item-assignee-select] "Unassigned" -> input[meeting-note-ai-suggestion-due-date] "" -> input[meeting-note-ai-suggestion-due-date] "" -> input[meeting-note-ai-suggestion-due-date] "" -> input[meeting-note-ai-suggestion-due-date] "" -> button[meeting-note-ai-apply] "Apply" -> button[meeting-note-ai-discard] "Discard draft" -> input[meeting-note-item-toggle] "Done: A11y item"
+
+## company AI settings section
+controls in accessibility tree: 6; unnamed: 0
+tab stops walked: 10; without a drawn focus indicator: 0
+  sequence: combobox[ai-model-select] "Model" -> combobox[ai-reasoning-select] "Reasoning level" -> input[ai-key-input] "" -> input[ai-daily-limit-input] "" -> button[ai-save-button] "Save AI settings" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2" -> button "Close toast" -> button[messaging-drawer-trigger] "Open messages" -> li "Reconnected to Test Space Fixed 2"
+
+## Issues (3)
+- /meetings/new (form + editor toolbar): no visible focus on nextjs-portal ""
+- participant picker popover (/meetings/new): dialog has no aria-labelledby
+- edit form (editor): no visible focus on nextjs-portal ""

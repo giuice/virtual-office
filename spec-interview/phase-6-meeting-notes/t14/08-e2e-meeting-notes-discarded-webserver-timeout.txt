@@ -1,0 +1,17 @@
+start 2026-10-14T01:29:48Z
+npm notice run virtual-office@0.1.0 test:meeting-notes:e2e
+npm notice run playwright test -c playwright.meeting-notes.config.ts
+◇ injected env (22) from .env.local // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[WebServer] ▲ Next.js 16.2.10 (Turbopack)
+[WebServer] - Local:         http://localhost:3230
+[WebServer] - Network:       http://192.168.1.66:3230
+[WebServer] - Environments: .env.local
+[WebServer] ✓ Ready in 4.7s
+[WebServer] ⚠ Slow filesystem detected. The benchmark took 300ms. If E:\projects\virtual-office\.next-messaging-local/dev is a network drive, consider moving it to a local folder.
+[WebServer] See more: https://nextjs.org/docs/app/guides/local-development
+[WebServer] ○ Compiling proxy ...
+[WebServer] 
+[WebServer] ○ Compiling / ...
+Error: Timed out waiting 180000ms from config.webServer.
+
+exit=1 wall=183s

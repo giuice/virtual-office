@@ -1,0 +1,30 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run vitest run --config vitest.presence-db.config.mts __tests__/presence-db/health-check.test.ts
+
+ RUN  v4.1.10 E:/projects/virtual-office
+
+ ❯ __tests__/presence-db/health-check.test.ts (4 tests | 1 failed) 162ms
+     × surfaces every database abort family when corruption or cleanup lag is present 28ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/presence-db/health-check.test.ts > presence remediation health-check artifact > surfaces every database abort family when corruption or cleanup lag is present
+error: CLIENT_UPGRADE_REQUIRED
+ ❯ node_modules/pg/lib/client.js:652:17
+ ❯ __tests__/presence-db/health-check.test.ts:192:7
+    190|       }
+    191|
+    192|       await client.query(
+       |       ^
+    193|         `update public.users
+    194|          set current_space_id = case
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  22:29:06
+   Duration  359ms (transform 30ms, setup 25ms, import 46ms, tests 162ms, environment 0ms)
+
+exit=1 wall=1s

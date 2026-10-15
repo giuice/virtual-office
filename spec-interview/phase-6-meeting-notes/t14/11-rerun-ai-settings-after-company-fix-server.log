@@ -1,0 +1,204 @@
+[1m[38;2;173;127;168m▲ Next.js 16.2.10[39m[22m (Turbopack)
+- Local:         http://localhost:3230
+- Network:       http://192.168.1.66:3230
+- Environments: .env.local
+[32m[1m✓[22m[39m Ready in 406ms
+
+ GET / [34m307[39m in 2.4s[2m (next.js: 1693ms, proxy.ts: 300ms, application-code: 443ms)[22m
+ GET /login [32m200[39m in 80ms[2m (next.js: 22ms, proxy.ts: 4ms, application-code: 54ms)[22m
+ DELETE /api/test/messaging/seed [32m200[39m in 136ms[2m (next.js: 94ms, application-code: 42ms)[22m
+Repository creating conversation with data: {
+  "type": "direct",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "test_dm_3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "visibility": "direct",
+  "participantsFingerprint": "15c58f5bd01b91cb4a6d7cb47a85e503"
+}
+Repository creating conversation with data: {
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "Test Room Conversation 1 3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+  "visibility": "public"
+}
+Repository creating conversation with data: {
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "Test Room Conversation 2 3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+  "visibility": "public"
+}
+Created conversation in database: {
+  "id": "45b5991f-4106-4bf7-84c3-0fd07ff7619e",
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "Test Room Conversation 1 3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "unreadCount": 0,
+  "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+  "visibility": "public"
+}
+Created conversation in database: {
+  "id": "c7547362-e2c5-4bb5-b8e0-d02ac7e951c6",
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "Test Room Conversation 2 3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "unreadCount": 0,
+  "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+  "visibility": "public"
+}
+Created conversation in database: {
+  "id": "ae53dcb2-1dc3-4400-b645-c13bf75e9f78",
+  "type": "direct",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:07:41.011Z",
+  "name": "test_dm_3e93f679-e38c-489f-a1fd-4155097aaf8d",
+  "isArchived": false,
+  "unreadCount": 0,
+  "visibility": "direct"
+}
+ POST /api/test/messaging/seed [32m200[39m in 436ms[2m (next.js: 3ms, application-code: 433ms)[22m
+ GET /login [32m200[39m in 83ms[2m (next.js: 6ms, proxy.ts: 4ms, application-code: 73ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 121ms[2m (next.js: 32ms, application-code: 89ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 149ms[2m (next.js: 31ms, application-code: 118ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 184ms[2m (next.js: 33ms, application-code: 152ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 142ms[2m (next.js: 34ms, application-code: 108ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 144ms[2m (next.js: 3ms, application-code: 140ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 145ms[2m (next.js: 34ms, application-code: 112ms)[22m
+ GET /floor-plan [32m200[39m in 97ms[2m (next.js: 28ms, proxy.ts: 47ms, application-code: 22ms)[22m
+[36m[browser][39m [33mImage with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.[39m
+ GET /api/neighborhoods [32m200[39m in 247ms[2m (next.js: 32ms, application-code: 215ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:43.458Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"bd66ed16-872f-4a28-9e06-84d11c6686ab","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":154,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 277ms[2m (next.js: 115ms, application-code: 162ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:43.463Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"2f4e08e4-23c2-4fe5-8f66-4b13c6cdf420","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"34ae36d4-8eac-4251-9e35-1d91ba373607","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":205,"activeSessionCount":2,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 282ms[2m (next.js: 68ms, application-code: 214ms)[22m
+ GET /api/presence/snapshot [32m200[39m in 26ms[2m (next.js: 5ms, application-code: 21ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:43.686Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"ff852302-9c16-40d5-866a-fbc6af871500","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":109,"retryable":false}
+ GET /login [32m200[39m in 64ms[2m (next.js: 6ms, proxy.ts: 7ms, application-code: 50ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 86ms[2m (next.js: 4ms, application-code: 82ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 112ms[2m (next.js: 5ms, application-code: 107ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 143ms[2m (next.js: 4ms, application-code: 140ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 118ms[2m (next.js: 4ms, application-code: 114ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 105ms[2m (next.js: 3ms, application-code: 102ms)[22m
+ GET /floor-plan [32m200[39m in 80ms[2m (next.js: 8ms, proxy.ts: 49ms, application-code: 24ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 170ms[2m (next.js: 4ms, application-code: 166ms)[22m
+ GET /api/neighborhoods [32m200[39m in 133ms[2m (next.js: 6ms, application-code: 127ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:45.480Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"7cfe1439-38bd-4852-904c-135650221600","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":131,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 148ms[2m (next.js: 11ms, application-code: 137ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:45.494Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"58c90e7b-e72c-4bb1-8a10-bb1da3d0a8bd","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"44a1491e-4f8b-4ede-a2ad-ed06310b4d9d","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":153,"activeSessionCount":1,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 162ms[2m (next.js: 3ms, application-code: 160ms)[22m
+[36m[browser][39m [33mImage with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.[39m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:45.714Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"b8dad4f1-be2f-452e-ba59-640daf2286e3","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":127,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 135ms[2m (next.js: 3ms, application-code: 132ms)[22m
+ POST /api/presence/sessions/44a1491e-4f8b-4ede-a2ad-ed06310b4d9d/disconnect [32m200[39m in 68ms
+ POST /api/presence/location [32m200[39m in 178ms[2m (next.js: 50ms, application-code: 128ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:45.930Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"b3585fbd-6e51-415c-86c5-d52c6f2b59d5","transitionId":"c367d4a9-335d-4106-81c5-799b3a1bc3a1","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"44a1491e-4f8b-4ede-a2ad-ed06310b4d9d","previousSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","targetSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","resultSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","requestId":null,"requesterUserId":null,"durationMs":261,"expectedLocationVersion":9654,"previousLocationVersion":9654,"resultLocationVersion":9655,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+ GET /company?tab=settings [32m200[39m in 214ms[2m (next.js: 32ms, proxy.ts: 99ms, application-code: 83ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 97ms[2m (next.js: 3ms, application-code: 94ms)[22m
+ GET /api/users/get-by-id?supabase_uid=34a8d819-f24f-4ce9-b44c-a05e5c4c31b6 [32m200[39m in 163ms[2m (next.js: 33ms, application-code: 130ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 124ms[2m (next.js: 5ms, application-code: 120ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:46.991Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"96a9b8cd-bcb0-4f89-be2e-747cbf57ab7b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"44a1491e-4f8b-4ede-a2ad-ed06310b4d9d","durationMs":213,"activeSessionCount":0,"idempotentReplay":false}
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 173ms[2m (next.js: 3ms, application-code: 169ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:47.105Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"b8cc6aee-44c2-4368-9155-5d2ef5ca0584","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":86,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 113ms[2m (next.js: 21ms, application-code: 92ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 124ms[2m (next.js: 4ms, application-code: 120ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:47.206Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"00491e21-1719-4dd1-b246-1b4a8bcacd15","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"4c4773a7-e107-4869-a326-aa352a079323","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":199,"activeSessionCount":3,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 214ms[2m (next.js: 8ms, application-code: 206ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 131ms[2m (next.js: 3ms, application-code: 128ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 61ms[2m (next.js: 42ms, application-code: 19ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:47.385Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"beb2b7f5-0dff-40e7-af14-b890b2f1d45d","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":155,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 172ms[2m (next.js: 7ms, application-code: 164ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 219ms[2m (next.js: 4ms, application-code: 216ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 105ms[2m (next.js: 7ms, application-code: 97ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:47.523Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"b596544f-175a-49d0-9190-178cdae2a439","transitionId":"c8b72421-59d1-4e98-b91c-80dc0c926772","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"4c4773a7-e107-4869-a326-aa352a079323","previousSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","targetSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","resultSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","requestId":null,"requesterUserId":null,"durationMs":141,"expectedLocationVersion":16674,"previousLocationVersion":16674,"resultLocationVersion":16675,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+ POST /api/presence/location [32m200[39m in 162ms[2m (next.js: 16ms, application-code: 146ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:47.634Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"039c997d-a970-4fb4-8167-bf465c96d6ed","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":86,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 95ms[2m (next.js: 3ms, application-code: 91ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:49.077Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"e47baf53-4c2c-40b5-aed6-70e620d9cb13","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":90,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 100ms[2m (next.js: 4ms, application-code: 96ms)[22m
+ PUT /api/companies/ai-settings [32m200[39m in 190ms[2m (next.js: 4ms, application-code: 185ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:49.977Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"f61f5aee-8902-43fc-bcfa-0aa028ec3abf","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"4c4773a7-e107-4869-a326-aa352a079323","durationMs":162,"activeSessionCount":2,"idempotentReplay":false}
+ POST /api/presence/sessions/4c4773a7-e107-4869-a326-aa352a079323/disconnect [32m200[39m in 182ms[2m (next.js: 10ms, application-code: 172ms)[22m
+ GET /company?tab=settings [32m200[39m in 204ms[2m (next.js: 6ms, proxy.ts: 63ms, application-code: 135ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 85ms[2m (next.js: 2ms, application-code: 83ms)[22m
+ GET /api/users/get-by-id?supabase_uid=34a8d819-f24f-4ce9-b44c-a05e5c4c31b6 [32m200[39m in 102ms[2m (next.js: 5ms, application-code: 97ms)[22m
+ GET /company?tab=settings [32m200[39m in 127ms[2m (next.js: 6ms, proxy.ts: 63ms, application-code: 58ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 94ms[2m (next.js: 3ms, application-code: 90ms)[22m
+ GET /api/users/get-by-id?supabase_uid=34a8d819-f24f-4ce9-b44c-a05e5c4c31b6 [32m200[39m in 157ms[2m (next.js: 4ms, application-code: 154ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 129ms[2m (next.js: 7ms, application-code: 121ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 208ms[2m (next.js: 5ms, application-code: 203ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 133ms[2m (next.js: 5ms, application-code: 129ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:50.888Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"86584565-8bee-4b5e-b828-42282cd5d8a3","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":107,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 127ms[2m (next.js: 13ms, application-code: 114ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:50.916Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"ff5adb16-1c10-4776-96b7-c44ab3243728","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"3bfc2bba-7242-480b-bf2b-0b43848151fb","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":145,"activeSessionCount":3,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 155ms[2m (next.js: 3ms, application-code: 151ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 124ms[2m (next.js: 3ms, application-code: 121ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:51.015Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"990e9a72-95dc-4ca2-8890-e56eccc0a4d3","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":83,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 97ms[2m (next.js: 7ms, application-code: 90ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 124ms[2m (next.js: 3ms, application-code: 121ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 41ms[2m (next.js: 6ms, application-code: 35ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 94ms[2m (next.js: 7ms, application-code: 87ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:51.271Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"7ce548bf-eca2-46b0-a6b6-83286fd7c718","transitionId":"f817e1d9-36c3-440e-9ba6-6bd2f2b22716","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"3bfc2bba-7242-480b-bf2b-0b43848151fb","previousSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","targetSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","resultSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","requestId":null,"requesterUserId":null,"durationMs":216,"expectedLocationVersion":16675,"previousLocationVersion":16675,"resultLocationVersion":16676,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+ POST /api/presence/location [32m200[39m in 228ms[2m (next.js: 6ms, application-code: 222ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:51.382Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"ec0da73b-5356-43b3-b886-acf5526d49b9","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":102,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 108ms[2m (next.js: 3ms, application-code: 105ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 132ms[2m (next.js: 3ms, application-code: 129ms)[22m
+ GET /company?tab=settings [32m200[39m in 97ms[2m (next.js: 4ms, proxy.ts: 47ms, application-code: 46ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 77ms[2m (next.js: 3ms, application-code: 74ms)[22m
+ GET /api/users/get-by-id?supabase_uid=ca53fb3f-d48e-47e9-9329-b28e432ff1d0 [32m200[39m in 111ms[2m (next.js: 4ms, application-code: 107ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 104ms[2m (next.js: 4ms, application-code: 101ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 168ms[2m (next.js: 4ms, application-code: 164ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 122ms[2m (next.js: 5ms, application-code: 117ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:52.699Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"7ee61fc5-9d19-4f08-ae65-758cb3b74410","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":87,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 108ms[2m (next.js: 14ms, application-code: 94ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:52.716Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"6e5a7234-90d5-4a42-8ae1-7b8a476ade3d","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"1102fa13-5411-4c9b-88ea-00a2b4cae167","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":113,"activeSessionCount":1,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 126ms[2m (next.js: 7ms, application-code: 118ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 109ms[2m (next.js: 3ms, application-code: 106ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:52.832Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"e78255a9-74d9-4a47-b3a5-059af058846b","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":100,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 115ms[2m (next.js: 5ms, application-code: 109ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:52.884Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"223f8252-4674-4676-b02b-60c312376fde","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":101,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 115ms[2m (next.js: 6ms, application-code: 109ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 148ms[2m (next.js: 5ms, application-code: 144ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:52.982Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"3be31417-2370-42ea-b41d-88d09f5bcfb5","transitionId":"7e9624e2-2de7-4f5e-8942-fe42284f68b0","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"1102fa13-5411-4c9b-88ea-00a2b4cae167","previousSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","targetSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","resultSpaceId":"4988a8ee-f278-4fbc-a140-640421a00d30","requestId":null,"requesterUserId":null,"durationMs":116,"expectedLocationVersion":9655,"previousLocationVersion":9655,"resultLocationVersion":9656,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+ POST /api/presence/location [32m200[39m in 126ms[2m (next.js: 5ms, application-code: 122ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:53.097Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"e9fa9af3-81af-43f2-9bc0-bd7e7197067d","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":103,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 112ms[2m (next.js: 4ms, application-code: 108ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:53.316Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"b86568f0-0555-4081-8077-5b688875e662","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":92,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 101ms[2m (next.js: 3ms, application-code: 97ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 97ms[2m (next.js: 3ms, application-code: 95ms)[22m
+{"event":"api_error","correlationId":"66dc04c1-078a-4194-8fc4-58125b12c1a9","context":"aiSettings.save.authorize","status":403,"code":"MEETING_NOTE_AI_SETTINGS_FORBIDDEN","message":"Only company admins can change AI settings."}
+ PUT /api/companies/ai-settings [33m403[39m in 246ms[2m (next.js: 3ms, application-code: 244ms)[22m
+ POST /api/presence/sessions/1102fa13-5411-4c9b-88ea-00a2b4cae167/disconnect [32m200[39m in 23ms[2m (next.js: 14ms, application-code: 9ms)[22m
+ GET /api/presence/snapshot [32m200[39m in 59ms[2m (next.js: 4ms, application-code: 55ms)[22m
+ POST /api/presence/sessions/3bfc2bba-7242-480b-bf2b-0b43848151fb/disconnect [32m200[39m in 45ms[2m (next.js: 6ms, application-code: 38ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:54.146Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"54f5b1f1-2225-4763-b4a1-e67ba443c0c9","appUserId":"035eb4b3-bc8d-471e-a1df-0e84c4665815","presenceSessionId":"1102fa13-5411-4c9b-88ea-00a2b4cae167","durationMs":146,"activeSessionCount":0,"idempotentReplay":false}
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:54.157Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"b9f93d6f-957c-49a1-bca5-642541b98676","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":112,"retryable":false}
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:07:54.288Z","category":"session","action":"disconnect","resultCode":"SESSION_DISCONNECTED","correlationId":"79962891-d0b6-48ca-b90e-53480a54ed6d","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"3bfc2bba-7242-480b-bf2b-0b43848151fb","durationMs":201,"activeSessionCount":1,"idempotentReplay":false}
+ DELETE /api/test/messaging/seed [32m200[39m in 327ms[2m (next.js: 5ms, application-code: 322ms)[22m

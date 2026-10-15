@@ -1,0 +1,32 @@
+You are an adversarial reviewer for a block of implemented work in the repository at E:/projects/virtual-office (Next.js App Router + React + TypeScript strict + Supabase Postgres/Auth/RLS/Realtime/Vault, TanStack Query, shadcn/ui/Radix, Tiptap). Read-only review. Do not edit files and do not run anything that writes to a database or starts long-lived processes.
+
+ARTIFACT UNDER REVIEW — Phase 6 Meeting Notes, Block B (tasks T5, T6, T7, T8)
+- Whole work-item diff so far: spec-interview/phase-6-meeting-notes/reviews/blockB-cumulative.diff (tracked changes + every new file). Block A was already reviewed; its final state is reviews/blockA-cumulative-r2.diff. The BLOCK B SCOPE is everything in blockB-cumulative.diff that is not in blockA-cumulative-r2.diff, including block B's changes to files that block A created (e.g. src/lib/meeting-notes/validation.ts, client-api.ts, content-sanitizer.ts, format.ts, period.ts, src/types/meeting-notes.ts, src/lib/auth/rate-limit.ts, package.json). Working-tree files equal the diff; read them directly.
+- Block B content: space detail "Notes" tab (src/components/floor-plan/modern/SpaceDetailPanel.tsx, src/components/meeting-notes/SpaceNotesTab.tsx), Meetings page with search/filters (src/app/(dashboard)/meetings/**, src/components/meeting-notes/*), dashboard card (QuickLinksGrid.tsx), note create/view/edit/conflict/history/delete UI with a Tiptap editor (src/components/meeting-notes/editor/*), render-side sanitization (sanitizeMeetingNoteHtmlForDisplay), action-items UI, Markdown export route src/app/api/meeting-notes/[id]/export/route.ts with src/lib/meeting-notes/{html-to-markdown,markdown-escape,markdown-export}.ts (htmlparser2 12.0.0), company AI settings: migration supabase/migrations/20261013142351_meeting_notes_ai_settings.sql (table, Vault secret, service_role-only RPCs), route src/app/api/companies/ai-settings/route.ts, capability matrix src/lib/meeting-notes/ai/capabilities.ts, admin UI MeetingNoteAiSettingsSection.tsx, hooks under src/hooks/{queries,mutations}, integration tests __tests__/meeting-notes-db/meeting-note-export-route.test.ts and meeting-note-ai-settings.test.ts, E2E specs (written, NOT yet executed by owner rule) under __tests__/api/playwright/meeting-notes/ with playwright.meeting-notes.config.ts and helpers/fixtures.
+- Contract: spec-interview/phase-6-meeting-notes/SPEC.md (owner-approved; do not re-litigate). PLAN standing rules: spec-interview/phase-6-meeting-notes/PLAN.md. Implementer claims: T5, T6, T7, T8 records in spec-interview/phase-6-meeting-notes/TRACK.md — verify every claim against the code.
+
+REPOSITORY TRAPS (AGENTS.md)
+- users.id (application id, FKs) vs users.supabase_uid (= auth.uid()::text in RLS). Roles admin | member only.
+- Baseline default privileges grant EXECUTE on new public functions to anon/authenticated/service_role (20260610183000_baseline_core_schema.sql:2131-2134).
+- Service role never replaces application authorization; routes use createSupabaseServerClient + auth.getUser(); SUPABASE_SERVICE_ROLE_KEY never reaches client code.
+- UI: interactive children in clickable cards use data-avatar-interactive; parents ignore interactive descendants; portal menus stop pointer/click/keyboard propagation to avoid accidental room navigation. Do not regress presence.
+- Query hooks in src/hooks/queries, mutations in src/hooks/mutations; caches must never cross users/companies.
+- No unit tests; no mocking of Supabase/repositories/code under test.
+
+ATTACK
+1. XSS and injection: every place note content, summary, transcript, item descriptions, names, excerpts, or AI-settings metadata reach the DOM (dangerouslySetInnerHTML paths, Tiptap link handling incl. paste/autolink/obfuscated javascript:, task-list inputs, search excerpt rendering, toast messages); client-side sanitize-html behavior; Markdown export escaping (can any user/AI text produce raw HTML, a live link to javascript:/data:, an image, or break out of a code/heading context? Content-Disposition filename injection?).
+2. Key secrecy (AC-017/BR-009): any path where the API key or the Vault secret reaches a client, a log, an error body, a Realtime payload, a React Query cache, a client bundle (is capabilities.ts or the repository importable from client code?), or another company. Can a member or a removed/demoted admin save settings? Can the save RPC be driven to write another company's settings? Vault secret naming/collision, orphaned secrets, rollback correctness. Fail-closed rate limit claims.
+3. Authorization/UI rights: controls shown or actions possible beyond `rights` (edit/restore/delete/item completion/assignee rules), stale caches after sign-out/account switch (query keys), conflict handling that silently overwrites (409 paths for note, restore, delete, items), date handling that shifts meeting dates or due dates across timezones (AC-009) — including the create form's "local noon" choice and editing an unchanged date.
+4. Space detail and floor-plan interaction: does the new Notes tab/links trigger room navigation, knock, or presence movement? Keyboard/focus traps? Regressions in SpaceDetailPanel/BottomSheet behavior.
+5. Export route: authorization/404 parity, timeZone parameter abuse, size, caching headers.
+6. Capability matrix correctness against the SPEC (FR-016/FR-020/FR-022/FR-024): parameters that would be invalid for a listed model, rejection classifications that would refund processed (billed) requests, anything that contradicts the doc URLs cited (fetch them only if needed and allowed; otherwise flag as unverified).
+7. Tests: do the integration tests prove what TRACK claims (AC-017 incl. Realtime canary and logs, AC-019, AC-003 export, AC-023 settings)? Are the E2E specs likely to be falsely green or impossible (selectors, fixtures, shared seed company reset, rate limits)? Any no-mock policy violation?
+8. Every comment, migration header, and doc claim in block B: verify it is true.
+
+RULES FOR SEVERITY
+- Only a High/Medium that a real user or a realistic failure (network, browser, crash, concurrency) can trigger counts as High/Medium. Anything needing the application's own server to be broken or tampered with is "follow-up".
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Findings ranked High / Medium / Low / Follow-up. For each: id (B-…), file:line, the concrete problem, a realistic failure scenario, evidence, and a concrete fix.
+- Be specific and concise. No praise.

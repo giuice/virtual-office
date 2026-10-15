@@ -1,0 +1,123 @@
+[1m[38;2;173;127;168m▲ Next.js 16.2.10[39m[22m (Turbopack)
+- Local:         http://localhost:3230
+- Network:       http://192.168.1.66:3230
+- Environments: .env.local
+[32m[1m✓[22m[39m Ready in 415ms
+
+ GET / [34m307[39m in 2.2s[2m (next.js: 1607ms, proxy.ts: 255ms, application-code: 363ms)[22m
+ GET /login [32m200[39m in 80ms[2m (next.js: 25ms, proxy.ts: 4ms, application-code: 51ms)[22m
+ DELETE /api/test/messaging/seed [32m200[39m in 144ms[2m (next.js: 101ms, application-code: 43ms)[22m
+Repository creating conversation with data: {
+  "type": "direct",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "test_dm_4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "visibility": "direct",
+  "participantsFingerprint": "15c58f5bd01b91cb4a6d7cb47a85e503"
+}
+Repository creating conversation with data: {
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "Test Room Conversation 1 4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+  "visibility": "public"
+}
+Repository creating conversation with data: {
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "Test Room Conversation 2 4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+  "visibility": "public"
+}
+Created conversation in database: {
+  "id": "2411ed54-24eb-42ed-a2d1-92179497e245",
+  "type": "direct",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "test_dm_4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "unreadCount": 0,
+  "visibility": "direct"
+}
+Created conversation in database: {
+  "id": "dc4d1785-a191-45e8-9994-5019ae747d16",
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "Test Room Conversation 1 4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "unreadCount": 0,
+  "roomId": "4988a8ee-f278-4fbc-a140-640421a00d30",
+  "visibility": "public"
+}
+Created conversation in database: {
+  "id": "c8d8a8eb-6cb8-4bfe-b310-df151e85c804",
+  "type": "room",
+  "participants": [
+    "10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a",
+    "035eb4b3-bc8d-471e-a1df-0e84c4665815"
+  ],
+  "lastActivity": "2026-10-14T03:08:03.590Z",
+  "name": "Test Room Conversation 2 4d781280-dc8b-44a6-bd28-55c6df7e4b05",
+  "isArchived": false,
+  "unreadCount": 0,
+  "roomId": "05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3",
+  "visibility": "public"
+}
+ POST /api/test/messaging/seed [32m200[39m in 478ms[2m (next.js: 4ms, application-code: 474ms)[22m
+ GET /login [32m200[39m in 89ms[2m (next.js: 5ms, proxy.ts: 5ms, application-code: 80ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 128ms[2m (next.js: 34ms, application-code: 93ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 130ms[2m (next.js: 34ms, application-code: 96ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 223ms[2m (next.js: 31ms, application-code: 193ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 157ms[2m (next.js: 37ms, application-code: 121ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 142ms[2m (next.js: 31ms, application-code: 111ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 169ms[2m (next.js: 37ms, application-code: 131ms)[22m
+ GET /floor-plan [32m200[39m in 115ms[2m (next.js: 27ms, proxy.ts: 57ms, application-code: 31ms)[22m
+[36m[browser][39m [33mImage with src "/images/virtual-office.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.[39m
+ GET /api/neighborhoods [32m200[39m in 260ms[2m (next.js: 35ms, application-code: 225ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:06.095Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"d749f9ad-1789-443a-9ace-9631f375d44e","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":159,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 285ms[2m (next.js: 116ms, application-code: 169ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:06.284Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"d6cbf82d-4d5c-419c-b13d-e92494225c10","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"32a57735-ffad-4769-9ad2-9b4dffe262a6","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":395,"activeSessionCount":2,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 475ms[2m (next.js: 70ms, application-code: 406ms)[22m
+ GET /company?tab=settings [32m200[39m in 142ms[2m (next.js: 23ms, proxy.ts: 51ms, application-code: 68ms)[22m
+ POST /api/users/sync-profile [32m200[39m in 79ms[2m (next.js: 6ms, application-code: 72ms)[22m
+ GET /api/users/get-by-id?supabase_uid=34a8d819-f24f-4ce9-b44c-a05e5c4c31b6 [32m200[39m in 139ms[2m (next.js: 30ms, application-code: 109ms)[22m
+ GET /api/companies/get?id=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 101ms[2m (next.js: 4ms, application-code: 96ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 175ms[2m (next.js: 3ms, application-code: 172ms)[22m
+ GET /api/users/by-company?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 127ms[2m (next.js: 3ms, application-code: 124ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:07.392Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"8c85db71-a8ed-4cc9-aa5c-dbabeb1459a9","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":91,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 114ms[2m (next.js: 15ms, application-code: 98ms)[22m
+ GET /api/spaces?companyId=5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb [32m200[39m in 118ms[2m (next.js: 4ms, application-code: 114ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:07.520Z","category":"session","action":"register","resultCode":"SESSION_REGISTERED","correlationId":"f7461e69-247c-4b92-95bb-8f39cf1cb356","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"be218009-d6fa-4652-bb7e-06ed4aeaf834","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":226,"activeSessionCount":3,"retryable":false}
+ POST /api/presence/sessions [32m200[39m in 240ms[2m (next.js: 8ms, application-code: 232ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 58ms[2m (next.js: 41ms, application-code: 18ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:07.769Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"c85bb685-5297-40bc-b8de-d8a25b236c8b","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":136,"retryable":false}
+ GET /api/presence/snapshot [32m200[39m in 153ms[2m (next.js: 11ms, application-code: 143ms)[22m
+ GET /api/companies/ai-settings [32m200[39m in 163ms[2m (next.js: 4ms, application-code: 158ms)[22m
+ GET /api/conversations/get?includeArchived=true [32m200[39m in 142ms[2m (next.js: 8ms, application-code: 135ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:07.893Z","category":"location","action":"transition","resultCode":"LOCATION_UNCHANGED","reason":"auto-rejoin","authorizationMode":"public","consumeResult":null,"correlationId":"22196d4e-31dc-4f92-ae07-e7200e47d9f2","transitionId":"510daf82-0cb9-4974-9cb9-539b1f36dbfe","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","presenceSessionId":"be218009-d6fa-4652-bb7e-06ed4aeaf834","previousSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","targetSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","resultSpaceId":"05c5b2cd-628a-47b6-ad88-3d6f52c9f0d3","requestId":null,"requesterUserId":null,"durationMs":214,"expectedLocationVersion":16676,"previousLocationVersion":16676,"resultLocationVersion":16677,"requesterLocationVersionBefore":null,"requesterLocationVersionAfter":null,"retryable":false,"idempotentReplay":false}
+ POST /api/presence/location [32m200[39m in 277ms[2m (next.js: 57ms, application-code: 220ms)[22m
+ POST /api/presence/sessions/be218009-d6fa-4652-bb7e-06ed4aeaf834/disconnect [32m200[39m in 57ms
+ GET /api/presence/snapshot [32m200[39m in 129ms[2m (next.js: 4ms, application-code: 125ms)[22m
+{"schema":"presence-observability-v1","occurredAt":"2026-10-14T03:08:08.062Z","category":"snapshot","action":"read","resultCode":"SNAPSHOT_OK","correlationId":"41e2ee81-f21f-4e06-8c0e-81dff76217ef","appUserId":"10dbd6b7-a411-4b61-b5ca-2dcb6fa1df1a","companyId":"5db59e7e-2d9c-4ff7-9d6b-2814a8b6b2cb","durationMs":155,"retryable":false}
+ DELETE /api/test/messaging/seed [32m200[39m in 130ms[2m (next.js: 3ms, application-code: 127ms)[22m

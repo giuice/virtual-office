@@ -1,0 +1,6 @@
+npm notice run virtual-office@0.1.0 npx
+npm notice run eslint src/components/meeting-notes/MeetingNoteParticipantPicker.tsx
+eslint exit=0
+npm notice run virtual-office@0.1.0 npx
+npm notice run tsc --noEmit
+tsc exit=0

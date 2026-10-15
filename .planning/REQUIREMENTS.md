@@ -182,7 +182,7 @@ LiveKit or another SFU may be evaluated with this future capability set; it is n
 | MEET-05 | Phase 6 | Pending |
 | MEET-06 | Phase 6 | Pending |
 | MEET-07 | Phase 6 | Pending |
-| MEET-08 | Phase 6 | Pending |
+| MEET-08 | Phase 7 | Pending (moved from Phase 6, 2026-10-12) |
 | ANNC-01 | Phase 7 | Pending |
 | ANNC-02 | Phase 7 | Pending |
 | ANNC-03 | Phase 7 | Pending |

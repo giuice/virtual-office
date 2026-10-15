@@ -168,25 +168,50 @@ export interface Announcement {
   priority?: 'low' | 'medium' | 'high';
 }
 
-// Action Item for Meeting Notes
+// Action item of a meeting note (Phase 6: public.meeting_note_action_items).
+// Ids are application users.id values (never supabase_uid).
 export interface ActionItem {
+  id: string;
+  noteId: string;
   description: string;
-  assignee?: string; // User ID
-  dueDate?: TimeStampType;
+  /** Assignee users.id; null when unassigned. */
+  assigneeId: string | null;
+  /** Assignee display-name snapshot taken when the assignee was chosen. */
+  assigneeName: string | null;
+  /** Date-only due date 'YYYY-MM-DD' (no time, no timezone); null when none. */
+  dueDate: string | null;
   completed: boolean;
+  /** Item revision; every change requires the current value. */
+  revision: number;
+  creatorUserId: string;
+  creatorName: string;
+  createdAt: TimeStampType;
+  updatedAt: TimeStampType;
 }
 
-// Meeting Notes Collection
+// Meeting note (Phase 6: public.meeting_notes). The transcript text is not part
+// of this shape (it can be up to 1 MB); see MeetingNoteDetail.
 export interface MeetingNote {
   id: string;
-  roomId: string;
+  companyId: string;
+  /** Space of the note; null once the space was deleted ("Space removed"). */
+  roomId: string | null;
   title: string;
   meetingDate: TimeStampType;
-  transcript?: string;
-  summary: string;
-  actionItems?: ActionItem[]; // Use the exported ActionItem type
-  generatedBy: 'ai' | 'user';
-  editedBy?: string; // User ID who last edited
+  /** Sanitized rich-text HTML ('' when empty). */
+  content: string;
+  summary: string | null;
+  /** Identity of the stored transcript; null when none is stored. */
+  transcriptId: string | null;
+  generatedBy: NoteGenerator;
+  /** Historical snapshot of the author's users.id. */
+  authorUserId: string;
+  /** Historical snapshot of the author's display name. */
+  authorName: string;
+  /** users.id of the last editor (live reference; null after that user is deleted). */
+  editedBy: string | null;
+  /** Note revision; every change requires the current value. */
+  revision: number;
   createdAt: TimeStampType;
   updatedAt: TimeStampType;
 }

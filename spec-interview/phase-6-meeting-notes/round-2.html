@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!--
+  Spec interview round (HTML fallback path), generated from the spec-to-done
+  interview-round template. Self-contained; works without a network connection.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fase 6 · Notas de reunião — Rodada 2</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --card-2:#1f232c; --border:#2b303b;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#6ea8fe; --accent-soft:#2a3b57; --ok:#3ddc97; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; }
+  .wrap { max-width:820px; margin:0 auto; padding:32px 20px 120px; }
+  header h1 { font-size:1.5rem; margin:0 0 6px; }
+  header p { color:var(--muted); margin:0 0 8px; }
+  .hint { background:var(--accent-soft); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; font-size:.92rem; margin:18px 0 28px; }
+  fieldset { border:1px solid var(--border); border-radius:12px; background:var(--card);
+    margin:0 0 20px; padding:18px 20px; }
+  legend { font-weight:600; padding:0 8px; font-size:1.02rem; }
+  .domain { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); margin:-4px 0 12px; }
+  .opt { display:flex; gap:10px; align-items:flex-start; padding:9px 11px;
+    border:1px solid transparent; border-radius:8px; cursor:pointer; transition:background .12s,border-color .12s; }
+  .opt:hover { background:var(--card-2); }
+  .opt:focus-within { border-color:var(--accent); outline:2px solid var(--accent); outline-offset:1px; }
+  .opt input { margin-top:4px; accent-color:var(--accent); width:16px; height:16px; flex:none; }
+  .rec { color:var(--ok); font-size:.78rem; font-weight:600; margin-left:6px; }
+  .reason { color:var(--muted); }
+  textarea { width:100%; margin-top:12px; background:var(--card-2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font:inherit; resize:vertical; min-height:44px; }
+  textarea:focus, button:focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .note-label { font-size:.8rem; color:var(--muted); display:block; margin-top:12px; }
+  .bar { position:fixed; bottom:0; left:0; right:0; background:rgba(15,17,21,.92);
+    backdrop-filter:blur(6px); border-top:1px solid var(--border); padding:14px 20px;
+    display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; cursor:pointer; border-radius:9px; padding:11px 20px; border:1px solid var(--border); }
+  .primary { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  .primary:hover { filter:brightness(1.08); }
+  .ghost { background:transparent; color:var(--text); }
+  .ghost:hover { background:var(--card-2); }
+  #status { color:var(--ok); font-size:.9rem; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fase 6 · Notas de reunião — Rodada 2</h1>
+    <p>17 perguntas. Clique nas opções; use o campo de nota para ajustar ou escrever sua própria resposta.</p>
+  </header>
+  <div class="hint">
+    Escolha a opção que melhor se encaixa. <strong>Toda pergunta tem um campo de texto livre</strong>: use para escrever sua resposta, ajustar a opção ou explicar. No fim, clique em <strong>Copy answers</strong> e cole o bloco no chat.
+  </div>
+  <form id="form"></form>
+  <div class="bar">
+    <button type="button" class="primary" onclick="copyAnswers()">Copy answers</button>
+    <button type="button" class="ghost" onclick="downloadAnswers()">Download answers.json</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<script>
+const QUESTIONS = [
+  { id: "q1", domain: "Integrações / IA", multi: false,
+    title: "Login com assinatura (Claude Pro/Max) dentro do nosso app é proibido pela Anthropic, e para Codex/ChatGPT não há rota suportada que eu tenha confirmado. Como conectar a IA?",
+    options: [
+      ["A", "Cada empresa (o admin) cadastra a própria chave de API; a chave fica criptografada no servidor e o uso é cobrado na conta da empresa", true, "permitido; o custo fica com o cliente; quem assina cria a chave no console do provedor"],
+      ["B", "Uma chave única da plataforma (sua); o custo é seu", false, "mais simples para o cliente; você paga tudo"],
+      ["C", "Ambos: a chave da plataforma como padrão e a empresa pode usar a própria", false, "flexível; mais regras de limite e cobrança"]
+    ] },
+  { id: "q2", domain: "Integrações / IA", multi: false,
+    title: "Quais provedores já no lançamento?",
+    options: [
+      ["A", "Anthropic (Claude) e OpenAI", true, "atende quem usa um ou outro; duas integrações para testar"],
+      ["B", "Só Anthropic agora; OpenAI depois", false, "metade do trabalho de integração"]
+    ] },
+  { id: "q3", domain: "Requisitos / IA", multi: false,
+    title: "Quem escolhe o modelo e o nível de raciocínio?",
+    options: [
+      ["A", "O admin define o padrão da empresa (modelo + raciocínio, de uma lista curta e testada); o usuário pode trocar ao processar", true, "controle de custo e liberdade"],
+      ["B", "Só o admin (vale para todos)", false, "mais simples"],
+      ["C", "O usuário escolhe a cada processamento, sem padrão", false, "mais cliques"]
+    ] },
+  { id: "q4", domain: "Regras de negócio / custo", multi: false,
+    title: "O limite diário (ex.: 20 por empresa) vale como?",
+    options: [
+      ["A", "Vale sempre, como proteção contra abuso; o admin ajusta o número (1–200)", true, "evita estouro de conta por engano"],
+      ["B", "Só vale quando se usa a chave da plataforma", false, "depende da resposta 1 = B ou C"],
+      ["C", "Sem limite quando a chave é da empresa", false, "risco de custo para o cliente"]
+    ] },
+  { id: "q5", domain: "Casos de borda / IA", multi: false,
+    title: "A empresa ainda não configurou a IA. O que o usuário vê?",
+    options: [
+      ["A", "As notas manuais funcionam normalmente; o botão de IA aparece desativado com 'o admin precisa configurar a IA' (admin vê um link para configurar)", true, "a funcionalidade é descoberta sem quebrar nada"],
+      ["B", "Esconder tudo de IA", false, "o recurso fica invisível"]
+    ] },
+  { id: "q6", domain: "Escopo", multi: false,
+    title: "Você não marcou M8 (notificações e lembretes). Confirma?",
+    options: [
+      ["A", "M8 inteiro fica para depois; as respostas de canais/lembrete ficam registradas para a fase futura", true, "coerente com a rodada 1"],
+      ["B", "Só uma lista 'Meus action items' (sem notificar) entra agora", false, "útil e barato"],
+      ["C", "Incluir M8 completo (app + computador, 24 h antes e no dia)", false, "mais infra: agendador + entrega"]
+    ] },
+  { id: "q7", domain: "Requisitos / exportação", multi: false,
+    title: "Exportar em Markdown: o que vai no arquivo .md? (PDF fica de fora?)",
+    options: [
+      ["A", "Título, data, espaço, participantes, conteúdo, resumo e action items; a transcrição só se a pessoa marcar a opção. PDF fora", true, "arquivo limpo por padrão"],
+      ["B", "Tudo, sempre com a transcrição. PDF fora", false, "arquivo pode ficar enorme"],
+      ["C", "Markdown e também PDF", false, "mais trabalho"]
+    ] },
+  { id: "q8", domain: "Regras de negócio / permissões", multi: false,
+    title: "Quem mexe nos action items?",
+    options: [
+      ["A", "Criar/editar/excluir: quem pode editar a nota. Marcar concluído: esses e o próprio responsável", true, "o responsável fecha o que é dele"],
+      ["B", "Qualquer membro da empresa", false, ""],
+      ["C", "Só quem pode editar a nota", false, "o responsável não consegue fechar o próprio item"]
+    ] },
+  { id: "q9", domain: "Requisitos / dados", multi: false,
+    title: "Campos do action item?",
+    options: [
+      ["A", "Descrição obrigatória; 1 responsável opcional (membro da empresa); prazo opcional só com data (sem hora)", true, "simples e suficiente"],
+      ["B", "Vários responsáveis por item", false, ""],
+      ["C", "Prazo com data e hora", false, ""]
+    ] },
+  { id: "q10", domain: "Regras de negócio / versões", multi: false,
+    title: "O que entra numa versão?",
+    options: [
+      ["A", "Cada salvamento cria uma versão de título, data, participantes, conteúdo e resumo; os action items têm só o estado atual", true, "o histórico fica legível; restaurar não 'desfaz' tarefas concluídas"],
+      ["B", "Os action items também entram no histórico e na restauração", false, "restaurar pode reabrir tarefas"],
+      ["C", "Agrupar salvamentos seguidos (ex.: 5 min) em uma versão", false, "menos versões, mais regra"]
+    ] },
+  { id: "q11", domain: "Regras de negócio / permissões", multi: false,
+    title: "Quem pode criar nota, e admins podem editar qualquer nota?",
+    options: [
+      ["A", "Qualquer membro da empresa cria nota em qualquer espaço da empresa; admins também editam qualquer nota", true, "admin consegue corrigir e moderar"],
+      ["B", "Qualquer membro cria; admins NÃO editam notas alheias (só excluem)", false, ""],
+      ["C", "Só quem está no espaço cria nota dele", false, "impede registrar uma reunião depois"]
+    ] },
+  { id: "q12", domain: "Fluxo / transcrição", multi: false,
+    title: "Como a transcrição entra no fluxo?",
+    options: [
+      ["A", "Criar nota nova a partir da transcrição OU anexar a uma nota existente; 1 transcrição por nota (trocar substitui); reprocessar gera um novo rascunho e conta no limite", true, "cobre os dois usos"],
+      ["B", "Só ao criar uma nota nova", false, ""],
+      ["C", "Várias transcrições por nota", false, "mais complexo"]
+    ] },
+  { id: "q13", domain: "Casos de borda / falhas", multi: true,
+    title: "Confirme os comportamentos de falha (desmarque o que discordar e explique na nota)",
+    options: [
+      ["F1", "Arquivo vazio, de extensão errada, maior que o limite ou ilegível: rejeitado antes de ir para a IA, com mensagem clara; nada salvo e não conta no limite", true, ""],
+      ["F2", ".vtt/.srt: remover números e marcas de tempo antes de enviar, mantendo os nomes de quem fala", true, "menos custo, resumo melhor"],
+      ["F3", "Se a IA falhar, demorar demais, recusar ou a chave for inválida: a nota e a transcrição continuam salvas, aparece uma mensagem e um 'Tentar de novo'; a falha não conta no limite", true, ""],
+      ["F4", "Responsável sugerido pela IA que não bate com nenhum membro (ou bate com mais de um): a sugestão fica sem responsável e o usuário escolhe", true, "nunca atribuir à pessoa errada"],
+      ["F5", "Participante ou responsável que saiu da empresa: o nome continua aparecendo como 'ex-membro'; ele perde o acesso", true, ""],
+      ["F6", "Se o usuário sair da página durante o processamento, o rascunho fica pronto quando ele voltar", false, "mais complexo (processamento em segundo plano); sem isso, sair cancela e não conta no limite"]
+    ] },
+  { id: "q14", domain: "Restrições / limites", multi: false,
+    title: "Tamanhos máximos?",
+    options: [
+      ["A", "Título até 200 caracteres; conteúdo até ~100 mil caracteres; até 50 participantes; até 100 action items por nota; transcrição até 1 MB", true, "folgado para reuniões reais"],
+      ["B", "Outros valores (escreva na nota)", false, ""]
+    ] },
+  { id: "q15", domain: "Objetivos / métricas", multi: false,
+    title: "Como medir que ficou bom?",
+    options: [
+      ["A", "Rascunho de uma transcrição de 1 h pronto em até 60 s; busca respondendo em até 1 s com 1.000 notas; nenhuma nota de outra empresa jamais aparece", true, "verificável em teste"],
+      ["B", "Outros números (escreva na nota)", false, ""]
+    ] },
+  { id: "q16", domain: "Requisitos / busca", multi: false,
+    title: "Filtros da busca na página Reuniões?",
+    options: [
+      ["A", "Texto + filtro por espaço e por período; ordem por relevância e depois por data; paginação", true, ""],
+      ["B", "Só texto", false, ""]
+    ] },
+  { id: "q17", domain: "Estratégia de teste", multi: false,
+    title: "Como testar a IA sem gastar e sem testes instáveis?",
+    options: [
+      ["A", "Testes automáticos usam um servidor de IA falso local, compatível com a API (respostas fixas, configurado por variável de ambiente); a chamada real é verificada no seu teste final com uma chave de verdade", true, "o banco, a RLS e as rotas continuam reais; só o provedor externo é substituído"],
+      ["B", "Os testes automáticos chamam a API real", false, "custa dinheiro e varia a cada execução"],
+      ["C", "Sem teste automático do fluxo de IA", false, "deixa o principal recurso sem cobertura"]
+    ] }
+];
+
+const form = document.getElementById("form");
+QUESTIONS.forEach((q, i) => {
+  const fs = document.createElement("fieldset");
+  const type = q.multi ? "checkbox" : "radio";
+  let html = `<legend>${i + 1}. ${q.title}</legend>`;
+  html += `<div class="domain">${q.domain}${q.multi ? " / múltipla escolha" : ""}</div>`;
+  q.options.forEach(([key, label, rec, reason]) => {
+    html += `<label class="opt"><input type="${type}" name="${q.id}" value="${key}">
+      <span><b>${key}.</b> ${label}${rec ? '<span class="rec">(Recomendado)</span>' : ""}
+      ${reason ? ` - <span class="reason">${reason}</span>` : ""}</span></label>`;
+  });
+  html += `<label class="note-label" for="${q.id}-note">Outro / nota (escreva sua resposta):</label>
+    <textarea id="${q.id}-note" placeholder="Escreva aqui se nenhuma opção servir, ou para detalhar..."></textarea>`;
+  fs.innerHTML = html;
+  form.appendChild(fs);
+});
+
+function collect() {
+  return {
+    round: 2,
+    topic: "phase-6-meeting-notes",
+    answers: QUESTIONS.map(q => ({
+      id: q.id,
+      selected: [...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value),
+      note: document.getElementById(`${q.id}-note`).value.trim()
+    }))
+  };
+}
+function copyAnswers() {
+  const data = JSON.stringify(collect(), null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(data).then(
+      () => setStatus("Copiado! Cole o bloco no chat."),
+      () => fallbackCopy(data)
+    );
+  } else {
+    fallbackCopy(data);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); setStatus("Copiado! Cole o bloco no chat."); }
+  catch (e) { setStatus("Não deu para copiar - use Download answers.json."); }
+  document.body.removeChild(ta);
+}
+function downloadAnswers() {
+  const r = collect().round;
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `answers-round-${r}.json`; a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Arquivo de respostas baixado.");
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+</script>
+</body>
+</html>

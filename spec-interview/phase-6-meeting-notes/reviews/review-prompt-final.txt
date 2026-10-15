@@ -1,0 +1,36 @@
+You are the FINAL adversarial reviewer for a whole work item in the repository at E:/projects/virtual-office (Next.js App Router + React + TypeScript strict + Supabase Postgres/Auth/RLS/Vault/pg_cron; TanStack Query; Tiptap; Anthropic/OpenAI SDKs). Read-only review. Do not edit files and do not run anything that writes to a database, calls a real AI provider, or starts long-lived processes.
+
+ARTIFACT UNDER REVIEW — Phase 6 Meeting Notes, whole work item (tasks T1–T13, T16, T17 plus the T14 verification fixes)
+- Whole work-item diff: spec-interview/phase-6-meeting-notes/reviews/final-cumulative.diff (tracked changes + every new file; .planning/ is unrelated and excluded). Working-tree files equal the diff; read them directly.
+- Each block was reviewed once already (reviews/sol-review-block{A,B,C,D}-r1.md) and got one fix round (TRACK.md "Block X fix round checkpoint"). Findings carried forward or recorded as follow-ups are in TRACK.md and SNAPSHOT.md "Unresolved".
+- NOT YET REVIEWED BY ANYONE — attack these first:
+  1. supabase/migrations/20261014101500_meeting_notes_search_excerpt_markup.sql — maps < and > to U+E002/U+E003 before ts_headline and back after, so markup-looking user text survives in search excerpts. Check: can user text forge highlight markers or brackets; does the excerpt still render as text only (src/lib/meeting-notes/search-excerpt.ts, src/components/meeting-notes/MeetingNoteExcerpt.tsx); privileges; rollback note; any change to matching/ranking.
+  2. src/app/(dashboard)/company/page.tsx — useEffect re-reading ?tab after mount (AC-018 link to /company?tab=settings#ai-settings) and the MeetingNoteAiSettingsSection mount; non-admins, unknown tab values, back/forward.
+  3. src/components/meeting-notes/MeetingNoteParticipantPicker.tsx — aria-label on the popover.
+  4. __tests__/api/playwright/helpers/meeting-notes-e2e.ts deleteUsersAsPresenceReconciliation — sets app.presence_internal_writer='atomic-reconciliation' for test-user deletes when local Presence mode is atomic. Confirm it is test-only, transaction-local, and cannot leak into app code.
+  5. E2E spec edits: note-action-items.spec.ts (click + toBeChecked), note-export-scope-switch.spec.ts (wait for the export response before switching account), meetings-search.spec.ts (a word now precedes the markup text) — any assertion weakened or false green?
+- Contract: spec-interview/phase-6-meeting-notes/SPEC.md (owner-approved; do not re-litigate). PLAN v4 standing rules (function privilege rule, lock order): spec-interview/phase-6-meeting-notes/PLAN.md. Implementer claims: TRACK.md task and checkpoint records — verify claims against the code.
+- T14 evidence (verification run outputs): spec-interview/phase-6-meeting-notes/t14/ — type-check/lint/build, bundle scan, DB suites, Chrome E2E run (26 new + 162 regression), server-log scan, accessibility notes.
+
+REPOSITORY TRAPS (AGENTS.md)
+- users.id (FKs) vs users.supabase_uid (= auth.uid()::text in RLS); roles admin | member only.
+- Baseline default privileges grant EXECUTE on new public functions to anon/authenticated/service_role.
+- Service role never replaces application authorization; routes use createSupabaseServerClient + auth.getUser(); SUPABASE_SERVICE_ROLE_KEY and the AI key never reach client code, logs, Realtime, or caches.
+- UI: interactive children in clickable cards use data-avatar-interactive / data-space-action; no presence/floor-plan regressions.
+- No unit tests; no mocking of Supabase/repositories/code under test.
+
+ATTACK (whole work item, cross-block seams)
+1. Seams between blocks: contracts one block assumed and a later block broke (rights rule, lock order, revision/conflict semantics, scope fence, origin guard, rate limits, error codes the UI maps).
+2. Online rollout (T15 will apply all 11 migrations in timestamp order to a database with 0 meeting_notes rows, pg_cron 1.6, Vault in schema vault, unaccent not installed): any migration that fails or behaves differently online vs local (extension creation, Vault privileges for postgres, cron job names, ACCESS EXCLUSIVE rewrites, ordering dependencies, CREATE OR REPLACE losing grants/comments, functions redefined later with different privileges). Is each rollback note true and in the right order?
+3. Security end to end: XSS from any stored or AI text, key secrecy, cross-company reads/writes, removed/demoted users, CSRF on mutating routes, cost protection (daily limit, replay, refund) under realistic failures.
+4. Deployment config: required env (MEETING_NOTES_TICKET_SECRET, NEXT_PUBLIC_APP_URL), NEXT_PUBLIC_E2E and the cache probe, MEETING_NOTES_AI_BASE_URL_OVERRIDE in production, SDK env leakage — any path where a missing or wrong value fails open.
+5. Every comment, migration header, and doc claim you touch: verify it is true.
+
+RULES FOR SEVERITY
+- Only a High/Medium that a real user or a realistic failure (network, browser, crash, concurrency) can trigger counts as High/Medium. Anything needing the application's own server to be broken or tampered with is "follow-up".
+- Do not re-raise findings already recorded as follow-ups in TRACK unless you show they are reachable without server tampering.
+
+OUTPUT FORMAT
+- Verdict: APPROVE or REVISION REQUIRED.
+- Findings ranked High / Medium / Low / Follow-up. For each: id (F-…), file:line, the concrete problem, a realistic failure scenario, evidence, and a concrete fix.
+- Be specific and concise. No praise.
